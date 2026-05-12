@@ -4,8 +4,9 @@ This doc defines the codebase structure, conventions and patterns for Book My Te
 
 ## Stack
 
-- **Framework:** Next.js 15 (App Router, TypeScript)
-- **Styling:** Tailwind CSS with design tokens in `tailwind.config.ts`
+- **Framework:** Next.js 16 (App Router, TypeScript, Turbopack)
+- **Runtime:** React 19
+- **Styling:** Tailwind CSS v4 — CSS-first config via `@theme { ... }` in `app/globals.css`. There is NO `tailwind.config.ts`.
 - **Database & Auth:** Supabase (Postgres, Auth, Realtime, Storage)
 - **Hosting:** Vercel (three projects, one repo — customer / mechanic / admin subdomains)
 - **Payments:** Stripe Connect (added at booking-flow task)
@@ -28,10 +29,13 @@ For now, only one Vercel project exists. The second and third are added when the
 ```
 bookmytech/
 ├── app/
+│   ├── globals.css                # @import "tailwindcss" + @theme tokens
+│   ├── layout.tsx                 # root layout, Inter font, metadata
 │   ├── (customer)/                # customer routes — no URL prefix
 │   │   ├── page.tsx               # → /  (landing page)
-│   │   ├── book/                  # → /book  (booking flow)
-│   │   └── dashboard/             # → /dashboard
+│   │   ├── _components/           # page-specific composites (hero, faq, footer, etc.)
+│   │   ├── book/                  # → /book  (booking flow — not yet built)
+│   │   └── dashboard/             # → /dashboard (not yet built)
 │   ├── (mechanic)/
 │   │   └── mechanic/              # → /mechanic/*
 │   │       ├── jobs/
@@ -42,17 +46,19 @@ bookmytech/
 │   │       ├── services/
 │   │       ├── bookings/
 │   │       └── approvals/
+│   ├── actions/                   # server actions (e.g. lookup-vehicle.ts when DVLA lands)
 │   └── api/                       # API routes (rare — prefer server actions)
 ├── components/
-│   ├── ui/                        # design-system primitives (Button, Card, Input, Pill, Icon)
-│   ├── customer/                  # customer-specific composite components
+│   ├── ui/                        # design-system primitives (Button, Card, Pill, Icon, etc.)
+│   ├── customer/                  # cross-page customer composites (if any — page-local stays in (customer)/_components)
 │   ├── mechanic/                  # mechanic-specific
 │   └── admin/                     # admin-specific
 ├── lib/
 │   ├── supabase/                  # client.ts, server.ts
-│   ├── dvla/                      # API wrapper
+│   ├── dvla/                      # API wrapper (added when DVLA key lands)
 │   ├── stripe/                    # added later
-│   └── utils.ts                   # cn() helper, formatters
+│   └── utils.ts                   # cn(), normaliseReg(), formatPrice(), etc.
+├── public/                        # static assets (logo.png, favicon, etc.)
 ├── docs/                          # this folder — project documentation
 │   ├── 00-working-brief.md
 │   ├── 01-architecture.md
@@ -60,7 +66,7 @@ bookmytech/
 │   ├── 03-design-system.md
 │   ├── HANDOFF.md
 │   └── tasks/
-└── middleware.ts                  # Supabase auth refresh
+└── middleware.ts                  # Supabase auth refresh (deprecated in Next 16; rename to proxy.ts when convenient)
 ```
 
 ## Conventions
@@ -75,7 +81,9 @@ bookmytech/
 
 **Imports.** Use the `@/*` alias for absolute imports (`@/components/ui/button` not `../../components/ui/button`).
 
-**Styling.** Tailwind utilities only. No inline styles, no CSS modules, no styled-components. Design tokens (colours, spacing, radii) live in `tailwind.config.ts` and are referenced by name (`bg-brand-blue` not `bg-[#2563EB]`).
+**Styling.** Tailwind v4 utilities only. No inline styles (except for runtime-dynamic values like avatar `size` that can't be expressed as static classes), no CSS modules, no styled-components. Design tokens (colours, spacing, radii) live in the `@theme { ... }` block of `app/globals.css` and are referenced by name (`bg-brand-blue` not `bg-[#2563EB]`).
+
+**Tailwind v4 specifics.** v4 reads CSS variables under the `@theme` block to derive utility classes. A `--color-brand-blue` token emits `bg-brand-blue` / `text-brand-blue` / `border-brand-blue` utilities. `--shadow-card` → `shadow-card`. `--radius-button` → `rounded-button`. `--container-content` → `max-w-content`. `--background-image-brand-gradient` → `bg-brand-gradient`. There is NO `tailwind.config.ts` — adding one will be ignored.
 
 **Money is integer pence.** Never floats, never `numeric`. `£45.99` is stored as `4599`. Format for display with a helper.
 
@@ -88,8 +96,9 @@ bookmytech/
 - Don't add `react-router-dom` — Next has its own router
 - Don't put secrets in code or in `NEXT_PUBLIC_*` env vars — those ship to the browser
 - Don't bypass RLS by using the service-role key client-side. Service-role is server-only.
-- Don't write inline styles — use Tailwind utilities and design-system components
+- Don't write inline styles — use Tailwind utilities and design-system components (exception: runtime-dynamic numeric values like avatar `size` that can't be Tailwind utilities)
 - Don't hard-code colours, spacing, or radii — reference the design tokens
+- Don't add a `tailwind.config.ts` — v4 is CSS-first and will ignore it. Add tokens to `@theme` in `app/globals.css` instead.
 
 ## Adding a new feature
 

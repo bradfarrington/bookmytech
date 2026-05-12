@@ -55,67 +55,75 @@ Strict scale, no arbitrary values: **4 / 8 / 12 / 16 / 24 / 32 / 48 / 64** pixel
 - Mobile-first breakpoint: `375px`
 - Grid: 12-column with `gap-4` (16px) default
 
-## Tailwind config
+## Tailwind v4 setup (CSS-first)
 
-The tokens above should be encoded in `tailwind.config.ts` so they're referenced by name throughout the codebase. Use this as the base — extend rather than replace defaults:
+This project uses Tailwind v4, which reads design tokens from CSS variables under an `@theme` block in `app/globals.css`. There is NO `tailwind.config.ts` — adding one is a no-op.
 
-```ts
-// tailwind.config.ts
-import type { Config } from "tailwindcss";
+The variable prefix determines the utility namespace:
 
-const config: Config = {
-  content: ["./app/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}"],
-  theme: {
-    extend: {
-      colors: {
-        brand: {
-          blue: "#2563EB",
-          "blue-dark": "#1E3A8A",
-          "blue-light": "#3B82F6",
-        },
-        surface: {
-          DEFAULT: "#F8FAFC",
-          card: "#FFFFFF",
-        },
-        border: {
-          DEFAULT: "#E2E8F0",
-          subtle: "#F1F5F9",
-        },
-        text: {
-          primary: "#0F172A",
-          secondary: "#475569",
-          muted: "#64748B",
-          disabled: "#CBD5E1",
-        },
-        success: "#22C55E",
-        warning: "#F59E0B",
-        danger: "#EF4444",
-        "plate-yellow": "#FEF3C7",
-      },
-      fontFamily: {
-        sans: ["Inter", "system-ui", "sans-serif"],
-      },
-      borderRadius: {
-        button: "10px",
-      },
-      boxShadow: {
-        card: "0 4px 20px rgba(0,0,0,0.05)",
-        hero: "0 20px 60px rgba(15,23,42,0.25)",
-      },
-      backgroundImage: {
-        "brand-gradient":
-          "linear-gradient(135deg, #1E3A8A 0%, #2563EB 60%, #3B82F6 100%)",
-      },
-      maxWidth: {
-        content: "1200px",
-      },
-    },
-  },
-  plugins: [],
-};
+| Variable prefix | Utility shape |
+|---|---|
+| `--color-<name>` | `bg-<name>`, `text-<name>`, `border-<name>` |
+| `--font-<name>` | `font-<name>` |
+| `--radius-<name>` | `rounded-<name>` |
+| `--shadow-<name>` | `shadow-<name>` |
+| `--background-image-<name>` | `bg-<name>` |
+| `--container-<name>` | `max-w-<name>` (and the `container` queries) |
 
-export default config;
+The current `app/globals.css` defines:
+
+```css
+@import "tailwindcss";
+
+@theme {
+  /* Brand */
+  --color-brand-blue: #2563eb;
+  --color-brand-blue-dark: #1e3a8a;
+  --color-brand-blue-light: #3b82f6;
+
+  /* Surfaces */
+  --color-surface: #f8fafc;
+  --color-surface-card: #ffffff;
+
+  /* Borders */
+  --color-border: #e2e8f0;
+  --color-border-subtle: #f1f5f9;
+
+  /* Text */
+  --color-text-primary: #0f172a;
+  --color-text-secondary: #475569;
+  --color-text-muted: #64748b;
+  --color-text-disabled: #cbd5e1;
+
+  /* Status */
+  --color-success: #22c55e;
+  --color-warning: #f59e0b;
+  --color-danger: #ef4444;
+
+  /* Plate */
+  --color-plate-yellow: #fef3c7;
+
+  /* Typography — Inter is bound to --font-inter in app/layout.tsx */
+  --font-sans: var(--font-inter), Inter, ui-sans-serif, system-ui, sans-serif;
+
+  /* Radii */
+  --radius-button: 10px;
+
+  /* Shadows */
+  --shadow-card: 0 4px 20px rgba(15, 23, 42, 0.05);
+  --shadow-hero: 0 20px 60px rgba(15, 23, 42, 0.25);
+
+  /* Gradients */
+  --background-image-brand-gradient: linear-gradient(
+    135deg, #1e3a8a 0%, #2563eb 60%, #3b82f6 100%
+  );
+
+  /* Layout */
+  --container-content: 1200px;
+}
 ```
+
+Adding a new token? Add a CSS variable inside `@theme`. The corresponding Tailwind utility is generated on next build.
 
 ## Core components
 
@@ -155,7 +163,7 @@ Star rating display. Accepts `value` (0–5) and `size`. Used in mechanic cards 
 
 ### `Overline`
 
-Small uppercase eyebrow text above section headings. Brand-blue, letter-spacing `0.1em`, weight 700.
+Small uppercase eyebrow text above section headings. Defaults to `text-muted` slate (matches the proposal); section-specific overlines (e.g. "How it works") apply `className="text-brand-blue"` to override. Letter-spacing `0.1em`, weight 700.
 
 ### `TrustBadge`
 

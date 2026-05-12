@@ -1,8 +1,23 @@
 # Task 01 — Landing page + DVLA lookup
 
-**Status:** 🟡 Active
+**Status:** ✅ Complete (landing page shipped; DVLA wiring deferred to task 01b — see "DVLA carve-out" below)
 
 Build the customer-facing landing page at `/`, with a working reg-plate lookup powered by the DVLA Vehicle Enquiry Service.
+
+## DVLA carve-out
+
+The DVLA API key wasn't available when this task was built. Everything *visual* shipped:
+
+- The reg-plate + postcode form is fully functional client-side (`app/(customer)/_components/reg-lookup-form.tsx`).
+- On submit it opens a `<dialog>` modal (`app/(customer)/_components/vehicle-lookup-modal.tsx`) with a "Lookup coming soon — DVLA integration pending" placeholder.
+- The modal already echoes back the user's reg + postcode, so it's halfway to displaying real data.
+
+When the key lands, the follow-up is small:
+
+1. Add `lib/dvla/types.ts` and `lib/dvla/client.ts` (the latter with stub mode for the canned regs `LB21 XYZ` / `AB12 CDE` / `XY99 ZZZ`).
+2. Add `app/actions/lookup-vehicle.ts` — server action that validates the reg with zod and calls the client.
+3. Swap the placeholder body in `vehicle-lookup-modal.tsx` for the real `VehicleDetails` render. The `reg` and `postcode` props already flow through.
+4. Wire `reg-lookup-form.tsx` to call the server action via `useActionState` instead of the current `useState`-only flow.
 
 ## Why this task
 
@@ -18,9 +33,9 @@ The task is split into three sub-stages so progress is visible and reviewable. D
 
 ---
 
-### Stage 1 — Encode design tokens
+### Stage 1 — Encode design tokens ✅
 
-Update `tailwind.config.ts` with the brand tokens from `docs/03-design-system.md`. This is a small but critical step: every component built after this references these tokens by name, so getting them right once means no hard-coded hex values anywhere else in the codebase.
+Tokens encoded in `app/globals.css` via Tailwind v4's `@theme { ... }` block (NOT `tailwind.config.ts` — the project uses Tailwind v4, which is CSS-first). See `docs/03-design-system.md` for the full block.
 
 **Acceptance criteria:**
 
@@ -36,9 +51,16 @@ Update `tailwind.config.ts` with the brand tokens from `docs/03-design-system.md
 
 ---
 
-### Stage 2 — Extract UI components
+### Stage 2 — Extract UI components ✅
 
-The proposal JSX in `/proposal/` contains the landing page (and other screens) using inline styles. Extract the reusable primitives into `components/ui/`, converting inline styles to Tailwind utilities and the new tokens.
+10 primitives shipped in `components/ui/`: `button.tsx`, `card.tsx`, `pill.tsx`, `icon.tsx`, `avatar.tsx`, `stars.tsx`, `overline.tsx`, `trust-badge.tsx`, `reg-plate-input.tsx`, `customer-nav.tsx`. `cn()` helper plus `normaliseReg()` and `formatPrice()` in `lib/utils.ts`.
+
+Deviations from the original spec:
+- `Icon` takes `icon: LucideIcon` (component prop) instead of `name: string`, preserving tree-shaking.
+- `Overline` defaults to `text-muted` slate per the proposal (the original spec said brand-blue; section eyebrows that want brand-blue pass `className="text-brand-blue"`).
+- `Avatar` uses inline `style` for runtime-dynamic `size`/`fontSize` — unavoidable since Tailwind can't compile dynamic numeric values to utilities.
+
+The proposal JSX in `/proposal/` is preserved as the visual reference; the Tailwind components are the canonical implementations.
 
 **Components to extract:**
 
@@ -85,9 +107,9 @@ The proposal JSX in `/proposal/` contains the landing page (and other screens) u
 
 ---
 
-### Stage 3 — Build the landing page
+### Stage 3 — Build the landing page ✅ (DVLA bits deferred — see carve-out at top)
 
-Port the landing page mockup into `app/(customer)/page.tsx`, using the components from Stage 2 and the tokens from Stage 1. Build it out to the **full** landing page — the proposal JSX only shows the hero, trust strip, "how it works" and reviews. We need to extend it with more sections to make it a real, conversion-focused page.
+All 9 sections shipped at `app/(customer)/page.tsx`, composed from `app/(customer)/_components/*`. The DVLA wiring (server action, client, types) is the only piece deliberately skipped until the API key arrives — see the "DVLA carve-out" section at the top of this doc.
 
 **Sections to build (in order, top to bottom):**
 

@@ -1,26 +1,56 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@theme {
+  /* Brand */
+  --color-brand-blue: #2563eb;
+  --color-brand-blue-dark: #1e3a8a;
+  --color-brand-blue-light: #3b82f6;
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  /* Surfaces */
+  --color-surface: #f8fafc;
+  --color-surface-card: #ffffff;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  /* Borders */
+  --color-border: #e2e8f0;
+  --color-border-subtle: #f1f5f9;
+
+  /* Text */
+  --color-text-primary: #0f172a;
+  --color-text-secondary: #475569;
+  --color-text-muted: #64748b;
+  --color-text-disabled: #cbd5e1;
+
+  /* Status */
+  --color-success: #22c55e;
+  --color-warning: #f59e0b;
+  --color-danger: #ef4444;
+
+  /* Plate */
+  --color-plate-yellow: #fef3c7;
+
+  /* Typography — Inter is bound to --font-inter in app/layout.tsx */
+  --font-sans: var(--font-inter), Inter, ui-sans-serif, system-ui, sans-serif;
+
+  /* Radii */
+  --radius-button: 10px;
+
+  /* Shadows */
+  --shadow-card: 0 4px 20px rgba(15, 23, 42, 0.05);
+  --shadow-hero: 0 20px 60px rgba(15, 23, 42, 0.25);
+
+  /* Gradients */
+  --background-image-brand-gradient: linear-gradient(
+    135deg,
+    #1e3a8a 0%,
+    #2563eb 60%,
+    #3b82f6 100%
+  );
+
+  /* Layout */
+  --container-content: 1200px;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--color-surface);
+  color: var(--color-text-primary);
 }

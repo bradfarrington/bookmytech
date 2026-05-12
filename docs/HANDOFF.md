@@ -7,67 +7,63 @@ You are working on **Book My Tech**, a UK mobile-mechanic booking platform. This
 1. **`docs/00-working-brief.md`** — the full product spec. The source of truth for what we're building and why.
 2. **`docs/01-architecture.md`** — codebase structure, conventions, and what NOT to do.
 3. **`docs/02-data-model.md`** — current Supabase schema and patterns.
-4. **`docs/03-design-system.md`** — brand tokens, Tailwind config, component patterns.
+4. **`docs/03-design-system.md`** — brand tokens, Tailwind v4 setup, component patterns.
 5. **The currently active task in `docs/tasks/`** — see "Current task" below.
 
 ## Project state
 
-**Stack:** Next.js 15 (App Router, TypeScript) · Tailwind · Supabase · Vercel · `@/*` import alias
+**Stack:** Next.js 16 (App Router, TypeScript, Turbopack) · React 19 · Tailwind v4 (CSS-first `@theme`) · Supabase · Vercel · `@/*` import alias
 
 **What's done:**
-- ✅ Task 00 — Foundation complete (`docs/tasks/00-foundation.md`)
-- Next.js project scaffolded with Tailwind, TypeScript, App Router
-- Supabase project provisioned, three tables created (`profiles`, `services`, `bookings`), RLS enabled
-- Supabase clients wired (`lib/supabase/client.ts`, `lib/supabase/server.ts`)
-- Auth middleware in place (`middleware.ts`) — no login screens yet, just the plumbing
-- Route groups created: `app/(customer)/`, `app/(mechanic)/`, `app/(admin)/`
-- Admin user exists in Supabase (manually promoted via SQL)
-- Repo on GitHub, deployed to Vercel
-- Proposal JSX mockups added to `/proposal/` for reference
+- **Foundation complete** (`docs/tasks/00-foundation.md`)
+  - Next.js project scaffolded with Tailwind v4, TypeScript, App Router
+  - Supabase project provisioned in eu-west-2; three tables (`profiles`, `services`, `bookings`) with RLS
+  - Supabase clients wired (`lib/supabase/client.ts`, `lib/supabase/server.ts`)
+  - Auth middleware in place (`middleware.ts`) — no login screens yet, just the plumbing
+  - Route groups created: `app/(customer)/`, `app/(mechanic)/`, `app/(admin)/`
+  - Admin user exists in Supabase (manually promoted via SQL)
+  - Repo on GitHub, deployed to Vercel
+  - Proposal JSX mockups added to `/proposal/` for reference
+- **Task 01 complete** (`docs/tasks/01-landing-and-dvla.md`)
+  - Design tokens encoded in `app/globals.css` via Tailwind v4 `@theme` (brand colours, surfaces, borders, text scale, radii, shadows, gradient, max-width)
+  - Inter wired via `next/font/google` in `app/layout.tsx`
+  - 10 UI primitives extracted to `components/ui/`: `Button`, `Card`, `Pill`, `Icon`, `Avatar`, `Stars`, `Overline`, `TrustBadge`, `RegPlateInput`, `CustomerNav`
+  - `cn()` helper + `normaliseReg()` + `formatPrice()` in `lib/utils.ts`
+  - Full landing page at `/` — 9 sections: hero, trust strip, how-it-works, reviews, services preview, why BMT, FAQ, final CTA, footer
+  - Page-specific composites in `app/(customer)/_components/`
+  - Reg-plate lookup form (hero + final CTA, shared component) — opens a `<dialog>` modal on submit
+  - Services preview pulls from the `services` Supabase table with a seeded fallback (table currently empty)
+  - Production build passes; `/` serves as a dynamic SSR route due to the Supabase read
 
 **What's not done:**
-- No real UI yet — the default Next.js placeholder still renders at `/`
-- Design tokens not yet encoded in `tailwind.config.ts`
-- No UI components extracted from the proposal JSX
-- DVLA API access pending (business owner is applying — use the stub until the key arrives)
+- **DVLA wiring** — deferred until the API key arrives. The form is fully functional UI; submit opens a "Lookup coming soon" modal. When the key lands, the next task is to:
+  1. Add `lib/dvla/{client,types}.ts` and `app/actions/lookup-vehicle.ts` (stub mode for missing key)
+  2. Swap the placeholder body in `vehicle-lookup-modal.tsx` for the real `VehicleDetails` render
+  3. Wire `reg-lookup-form.tsx` to call the server action via `useActionState`
+- **`/book` flow** — task 02. Customer booking steps 1–4 from the mobile mockups.
+- **Auth / login screens** — task 03 (or wherever it fits).
+- **Admin services CRUD** — when this ships, the seeded fallback in `services-preview.tsx` becomes dead code and the table gets a populated default catalogue.
+- **Tablet (768px) and mobile (375px) polish** — desktop (1280px) looks right; the 768/375 layouts work but need design tweaks (spacing, type scale, the hero stack, the modal sizing). Owner flagged this on the task 01 commit; treat as a follow-up before going further on customer-facing pages.
 
 ## Current task
 
-**`docs/tasks/01-landing-and-dvla.md`** — Build the landing page and wire it up to the DVLA Vehicle Enquiry Service.
-
-## Full task roadmap
-
-The platform is built across 13 tasks (00–12). They're sequenced — each generally depends on what came before, though stages within tasks can sometimes run in parallel.
-
-| #  | Task | File | Status |
-|----|------|------|--------|
-| 00 | Foundation — Next.js scaffold, Supabase, route groups | `tasks/00-foundation.md` | ✅ Complete |
-| 01 | Landing page + DVLA lookup | `tasks/01-landing-and-dvla.md` | 🟡 Active |
-| 02 | Admin shell + services catalogue CRUD | `tasks/02-admin-services.md` | ⏳ Queued |
-| 03 | Customer booking flow (4 steps + Stripe pre-auth) | `tasks/03-booking-flow.md` | ⏳ Queued |
-| 04 | Admin live monitor + manual mechanic creation | `tasks/04-admin-live-monitor.md` | ⏳ Queued |
-| 05 | Mechanic desktop dashboard | `tasks/05-mechanic-dashboard.md` | ⏳ Queued |
-| 06 | Mechanic mobile PWA (field work, push notifications) | `tasks/06-mechanic-mobile-pwa.md` | ⏳ Queued |
-| 07 | Mechanic onboarding + admin approvals queue | `tasks/07-mechanic-onboarding.md` | ⏳ Queued |
-| 08 | Pricing engine + Stripe Connect payouts | `tasks/08-pricing-and-stripe-connect.md` | ⏳ Queued |
-| 09 | Customer dashboard + live tracking + smart dispatch | `tasks/09-customer-dashboard-tracking-dispatch.md` | ⏳ Queued |
-| 10 | Analytics + parts margin + multi-city tooling | `tasks/10-analytics-parts-multi-city.md` | ⏳ Queued |
-| 11 | Retention: rebooking, reminders, Pro tier, referrals | `tasks/11-retention-rebooking-pro-tier.md` | ⏳ Queued |
-| 12 | Disputes, refunds, polish, launch | `tasks/12-disputes-polish-launch.md` | ⏳ Queued |
-
-When a task completes, update its row to ✅ and update the "Current task" pointer above.
+**Next: DVLA wiring + `/book` flow.** Likely split across two task docs once the API key situation is resolved. The DVLA work is small (one types file, one client file, one server action, one modal-body swap) and can land before the booking flow begins.
 
 ## Working principles
 
 - **Read before writing.** When asked to do a task, first summarise back what you understand and the steps you'll take. Don't write code until the human has confirmed.
-- **Stage by stage.** Each task is split into sub-stages. Work one stage at a time, show your output, get sign-off, then move on. Don't skip ahead.
 - **Server components by default.** Add `"use client"` only when interactivity is needed.
-- **Tailwind only, no inline styles.** Convert any inline styles you encounter during ports.
-- **Design tokens by name.** Use `bg-brand-blue`, never `bg-[#2563EB]`.
+- **Tailwind v4 utilities only.** Tokens live in `@theme` in `app/globals.css` and are referenced by name (`bg-brand-blue`, never `bg-[#2563EB]`). There is NO `tailwind.config.ts` — v4 is CSS-first.
 - **Money is integer pence.** Never floats.
-- **Database changes go in a migration file.** Even if you run them via the Supabase dashboard, the SQL gets committed in `supabase/migrations/`.
 - **Update this HANDOFF when a task completes.** Mark what changed, what's the new "current task".
-- **Commit often.** Small focused commits beat big sweeping ones. Use clear messages: "Task 01 Stage 2: extract Button, Card, Pill components".
+
+## Stack quirks worth knowing
+
+- **Next 16** has deprecated `middleware.ts` in favour of `proxy.ts`. Renaming + updating the export name is a tiny follow-up but harmless to defer.
+- **Tailwind v4** uses CSS-first config via `@theme { ... }` in `app/globals.css`. No `tailwind.config.ts` file.
+- **`lucide-react` v1** dropped brand icons (Twitter/Instagram/LinkedIn). Hand-rolled SVGs live inline in `app/(customer)/_components/footer.tsx`.
+- **`Icon` primitive** takes an `icon: LucideIcon` component prop, not a `name` string — preserves tree-shaking. Call sites: `import { Zap } from "lucide-react"; <Icon icon={Zap} />`.
+- **Route groups + `tsc`**: bare `npx tsc --noEmit` reports a false-positive validator error because `.next/types/validator.ts` doesn't perfectly track route groups (looks for `app/page.tsx` when the page is at `app/(customer)/page.tsx`). `npm run build` passes cleanly — the build pipeline handles route groups correctly.
 
 ## When in doubt
 
@@ -76,11 +72,3 @@ When a task completes, update its row to ✅ and update the "Current task" point
 - For database / schema → check `02-data-model.md`
 - For colours / spacing / component patterns → check `03-design-system.md`
 - For step-by-step instructions on the current task → check the task doc
-- For what's been done previously → look at git log and previously-completed task docs
-
-## Non-obvious things to remember
-
-- This is **one codebase, three Vercel deploys**. Don't suggest splitting into multiple repos.
-- The mechanic mobile experience is a **PWA**, not a native app. Don't suggest React Native unless explicitly asked.
-- The brief is the source of truth for product behaviour. If a task doc contradicts the brief, the brief wins — flag the discrepancy.
-- The owner is moving fast and not following weekly timelines from the brief — tasks are done at the owner's own pace.
