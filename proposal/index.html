@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Book My Tech · Platform Proposal</title>
+<meta name="description" content="Interactive proposal for the Book My Tech mobile-mechanic marketplace — customer booking flow, mechanic app and operations console.">
+
+<meta property="og:type" content="website">
+<meta property="og:title" content="Book My Tech · Platform Proposal">
+<meta property="og:description" content="A two-sided marketplace that turns every car repair into a 60-second booking.">
+<meta property="og:image" content="/social-share.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="/social-share.png">
+
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="proposal-styles.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  input, textarea, select, button { font-family: inherit; }
+  input:focus, textarea:focus, select:focus { outline: 2px solid #2563EB; outline-offset: 1px; }
+</style>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" src="primitives.jsx"></script>
+<script type="text/babel" src="customer-screens.jsx"></script>
+<script type="text/babel" src="mechanic-screens.jsx"></script>
+<script type="text/babel" src="admin-screens.jsx"></script>
+<script type="text/babel" src="proposal-slides.jsx"></script>
+
+<script type="text/babel" data-presets="react">
+ReactDOM.createRoot(document.getElementById("root")).render(<window.ProposalApp />);
+</script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+{
+  "name": "bmt-proposal",
+  "version": "1.0.0",
+  "description": "Book My Tech — interactive product proposal (customer + mechanic + admin)",
+  "scripts": {
+    "dev": "live-server --open=index.html"
+  },
+  "devDependencies": {
+    "live-server": "^1.2.2",
+    "puppeteer": "^24.42.0"
+  }
+}

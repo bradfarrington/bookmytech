@@ -1,0 +1,487 @@
+/* ============================================================
+   BOOK MY TECH — Proposal Deck (interactive scrollable slides)
+   Inspired by gamlearn-slidedeck, themed with BMT design tokens.
+   ============================================================ */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; overflow: hidden; background: #0B1220; }
+body { font-family: 'Inter', system-ui, sans-serif; color: #0F172A; }
+
+/* ---- Deck container ---- */
+.deck { width: 100vw; height: 100vh; display: flex; align-items: center; justify-content: center; position: relative; }
+
+/* ---- Slide ---- */
+.slide {
+  width: 100vw;
+  height: 100vh;
+  background: #F8FAFC;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  padding: 64px 72px 64px;
+}
+.slide--white   { background: #FFFFFF; }
+.slide--dark    { background: #0B1220; color: #fff; }
+.slide--blue    { background: linear-gradient(135deg, #1E3A8A 0%, #2563EB 100%); color: #fff; }
+.slide--gradient{ background: radial-gradient(ellipse at top right, #DBEAFE 0%, #F8FAFC 60%); }
+
+/* ---- Slide footer ---- */
+.slide__footer {
+  position: absolute; bottom: 0; left: 0; right: 0; height: 40px;
+  padding: 0 72px; display: flex; align-items: center; gap: 8px;
+  font-size: 11px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase;
+  color: rgba(15, 23, 42, 0.4);
+}
+.slide--blue .slide__footer,
+.slide--dark .slide__footer { color: rgba(255,255,255,0.4); }
+
+/* ---- Typography ---- */
+.deck-overline {
+  font-size: 13px; letter-spacing: 0.16em; font-weight: 700;
+  text-transform: uppercase; color: #2563EB; margin-bottom: 18px;
+}
+.slide--blue .deck-overline,
+.slide--dark .deck-overline { color: #93C5FD; }
+
+.deck-h1 {
+  font-size: clamp(40px, 5.5vw, 76px); font-weight: 800; color: #0F172A;
+  line-height: 1.04; letter-spacing: -0.025em;
+}
+.deck-h2 {
+  font-size: clamp(32px, 4.5vw, 60px); font-weight: 800; color: #0F172A;
+  line-height: 1.05; letter-spacing: -0.025em;
+}
+.deck-h3 {
+  font-size: clamp(20px, 2vw, 26px); font-weight: 700; color: #0F172A;
+  line-height: 1.2; letter-spacing: -0.01em;
+}
+.slide--blue .deck-h1, .slide--blue .deck-h2,
+.slide--dark .deck-h1, .slide--dark .deck-h2 { color: #fff; }
+
+.deck-body {
+  font-size: clamp(16px, 1.4vw, 20px); color: #334155;
+  line-height: 1.55; max-width: 700px;
+}
+.slide--blue .deck-body,
+.slide--dark .deck-body { color: rgba(255,255,255,0.78); }
+
+/* ---- Callout cards (left-bordered, BMT blue accent) ---- */
+.callout {
+  background: #fff; border-radius: 12px; padding: 16px 20px;
+  border-left: 3px solid #2563EB; margin-top: 12px;
+  box-shadow: 0 1px 3px rgba(15,23,42,0.04);
+}
+.callout--green { border-left-color: #22C55E; }
+.callout--amber { border-left-color: #F59E0B; }
+.callout--red   { border-left-color: #EF4444; }
+.callout--dark  { border-left-color: #0F172A; }
+.slide--blue .callout, .slide--dark .callout { background: rgba(255,255,255,0.06); border-left-color: #93C5FD; backdrop-filter: blur(4px); }
+
+.callout__title {
+  font-size: 16px; font-weight: 700; color: #1E3A8A; margin-bottom: 4px;
+  letter-spacing: -0.005em;
+}
+.callout--green .callout__title { color: #15803D; }
+.callout--amber .callout__title { color: #B45309; }
+.callout--red .callout__title   { color: #B91C1C; }
+.callout--dark .callout__title  { color: #0F172A; }
+.slide--blue .callout__title, .slide--dark .callout__title { color: #fff; }
+
+.callout__body { font-size: 14px; line-height: 1.5; color: #475569; }
+.slide--blue .callout__body, .slide--dark .callout__body { color: rgba(255,255,255,0.75); }
+
+/* ---- Split layouts ---- */
+.slide__left  { flex: 0 0 40%; display: flex; flex-direction: column; justify-content: center; padding-right: 40px; z-index: 2; }
+.slide__right { flex: 1; display: flex; align-items: center; justify-content: center; gap: 20px; z-index: 2; }
+.slide__center{ flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; z-index: 2; }
+
+/* ---- Phone mockup ---- */
+.phone-mock {
+  width: 240px; flex-shrink: 0; background: #fff; border-radius: 36px;
+  border: 8px solid #0F172A; box-shadow: 0 24px 60px rgba(15,23,42,0.18);
+  overflow: hidden; position: relative;
+}
+.phone-mock--lg { width: 280px; }
+.phone-mock__status {
+  height: 30px; display: flex; align-items: center; justify-content: space-between;
+  padding: 0 22px; font-size: 11px; font-weight: 700; color: #0F172A; position: relative;
+}
+.phone-mock__notch {
+  position: absolute; left: 50%; transform: translateX(-50%); top: 6px;
+  width: 80px; height: 22px; background: #0F172A; border-radius: 11px;
+}
+.phone-mock__screen { overflow: hidden; }
+.phone-mock__inner {
+  width: 375px; transform-origin: top left; pointer-events: none;
+}
+
+/* ---- Desktop mockup ---- */
+.desktop-mock {
+  background: #fff; border-radius: 14px; border: 1px solid #E2E8F0;
+  box-shadow: 0 20px 60px rgba(15,23,42,0.14); overflow: hidden; width: 100%;
+  position: relative;
+}
+.desktop-mock::before {
+  content: "";
+  display: block;
+  height: 28px;
+  background: #F1F5F9;
+  border-bottom: 1px solid #E2E8F0;
+  background-image:
+    radial-gradient(circle 4px at 14px 14px, #EF4444 50%, transparent 51%),
+    radial-gradient(circle 4px at 32px 14px, #F59E0B 50%, transparent 51%),
+    radial-gradient(circle 4px at 50px 14px, #22C55E 50%, transparent 51%);
+}
+.desktop-mock__inner {
+  width: 1280px; height: 800px; transform-origin: top left; pointer-events: none;
+}
+
+/* ---- Stat row ---- */
+.stat-row { display: flex; gap: 16px; margin-top: 28px; }
+.stat-box {
+  background: #fff; border-radius: 14px; padding: 18px 22px;
+  border: 1px solid #E2E8F0; flex: 1;
+}
+.slide--blue .stat-box,
+.slide--dark .stat-box { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.12); }
+.stat-box__value {
+  font-size: 36px; font-weight: 800; color: #2563EB; letter-spacing: -0.03em;
+}
+.slide--blue .stat-box__value,
+.slide--dark .stat-box__value { color: #93C5FD; }
+.stat-box__label { font-size: 12px; color: #64748B; margin-top: 4px; font-weight: 500; }
+.slide--blue .stat-box__label,
+.slide--dark .stat-box__label { color: rgba(255,255,255,0.6); }
+
+/* ---- Navigation ---- */
+.deck-nav {
+  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 12px; z-index: 100;
+  background: rgba(15,23,42,0.92); backdrop-filter: blur(12px);
+  padding: 8px 16px; border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.1);
+}
+.deck-nav__btn {
+  width: 36px; height: 36px; border-radius: 50%; border: none;
+  background: rgba(255,255,255,0.08); color: #fff; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.2s; font-size: 16px;
+}
+.deck-nav__btn:hover { background: rgba(255,255,255,0.18); }
+.deck-nav__btn:disabled { opacity: 0.3; cursor: default; }
+.deck-nav__dots { display: flex; gap: 6px; }
+.deck-nav__dot {
+  width: 6px; height: 6px; border-radius: 50%; border: none; padding: 0;
+  background: rgba(255,255,255,0.22); cursor: pointer; transition: all 0.2s;
+}
+.deck-nav__dot--active { background: #3B82F6; transform: scale(1.5); }
+.deck-nav__dot:hover { background: rgba(255,255,255,0.5); }
+
+/* ---- Entrance animations ---- */
+@keyframes slideUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes slideRight { from { opacity: 0; transform: translateX(-30px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes scaleUp { from { opacity: 0; transform: scale(0.94); } to { opacity: 1; transform: scale(1); } }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+.enter { opacity: 0; }
+.enter.on { animation-fill-mode: forwards; }
+.enter.on.e-up    { animation: slideUp    0.7s cubic-bezier(0.16,1,0.3,1) forwards; }
+.enter.on.e-right { animation: slideRight 0.7s cubic-bezier(0.16,1,0.3,1) forwards; }
+.enter.on.e-scale { animation: scaleUp    0.8s cubic-bezier(0.16,1,0.3,1) forwards; }
+.enter.on.e-fade  { animation: fadeIn     0.6s ease forwards; }
+.d1 { animation-delay: 0.08s !important; }
+.d2 { animation-delay: 0.16s !important; }
+.d3 { animation-delay: 0.24s !important; }
+.d4 { animation-delay: 0.32s !important; }
+.d5 { animation-delay: 0.40s !important; }
+.d6 { animation-delay: 0.48s !important; }
+
+/* ---- Feature & Callout grid ---- */
+.feature-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 24px; }
+.callout-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.business-model-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; width: 100%; }
+
+/* ---- Business Card ---- */
+.business-card { display: flex; flex-direction: column; padding: 22px !important; }
+.business-card__icon { width: 44px; height: 44px; border-radius: 12px; margin-bottom: 12px; }
+.business-card__stats { margin-bottom: 12px; order: 1; }
+.business-card__main { order: 2; display: flex; flex-direction: column; }
+.business-card__big { font-size: 32px; font-weight: 800; color: #fff; letter-spacing: -0.03em; margin-bottom: 4px; }
+.business-card__cap { font-size: 11px; font-weight: 600; color: #93C5FD; text-transform: uppercase; letter-spacing: 0.08em; }
+.business-card__title { font-size: 16px; font-weight: 700; color: #fff; margin-bottom: 6px; }
+.business-card__desc { font-size: 13px; color: rgba(255,255,255,0.65); line-height: 1.55; }
+
+/* ---- Future Proof Box ---- */
+.future-proof-box {
+  margin-top: 32px; padding: 20px; background: rgba(37,99,235,0.18);
+  border: 1px solid rgba(147,197,253,0.3); border-radius: 14px;
+  display: flex; align-items: center; gap: 16px;
+}
+.future-proof-icon { width: 48px; height: 48px; border-radius: 12px; background: #2563EB; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.future-proof-title { font-size: 15px; font-weight: 700; color: #fff; margin-bottom: 4px; }
+.future-proof-desc { font-size: 13px; color: rgba(255,255,255,0.7); line-height: 1.4; }
+.feature-card {
+  background: #fff; border: 1px solid #E2E8F0; border-radius: 14px; padding: 18px;
+  box-shadow: 0 1px 3px rgba(15,23,42,0.03);
+}
+.feature-card__icon {
+  width: 38px; height: 38px; border-radius: 10px; background: #EFF6FF;
+  display: flex; align-items: center; justify-content: center; margin-bottom: 12px;
+}
+.feature-card__title { font-size: 15px; font-weight: 700; color: #0F172A; margin-bottom: 4px; }
+.feature-card__desc  { font-size: 12px; color: #475569; line-height: 1.5; }
+.slide--blue .feature-card, .slide--dark .feature-card {
+  background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.1);
+}
+.slide--blue .feature-card__icon, .slide--dark .feature-card__icon { background: rgba(147,197,253,0.15); }
+.slide--blue .feature-card__title, .slide--dark .feature-card__title { color: #fff; }
+.slide--blue .feature-card__desc, .slide--dark .feature-card__desc { color: rgba(255,255,255,0.65); }
+
+/* Tab nav for screen carousels */
+.screen-tabs { display: flex; gap: 8px; flex-wrap: wrap; }
+.screen-tab {
+  padding: 8px 16px; border-radius: 999px; border: none; cursor: pointer;
+  font-size: 13px; font-weight: 600; font-family: inherit;
+  background: #fff; color: #475569; border: 1px solid #E2E8F0;
+  transition: all 150ms ease;
+}
+.screen-tab--active {
+  background: #2563EB; color: #fff; border-color: #2563EB;
+  box-shadow: 0 4px 12px rgba(37,99,235,0.25);
+}
+.slide--blue .screen-tab, .slide--dark .screen-tab {
+  background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.7); border-color: rgba(255,255,255,0.15);
+}
+.slide--blue .screen-tab--active, .slide--dark .screen-tab--active {
+  background: #fff; color: #2563EB; border-color: #fff;
+}
+
+/* Wrapper for animated screen swap */
+@keyframes screenSwap {
+  from { opacity: 0; transform: scale(0.98); }
+  to   { opacity: 1; transform: scale(1); }
+}
+.screen-fade { animation: screenSwap 0.4s ease-out forwards; }
+
+/* Mobile-only tab bar (top of slide) */
+.mobile-only-tabs { display: none; }
+
+/* Print */
+@page { size: A4 landscape; margin: 0; }
+@media print {
+  body { background: #fff; overflow: visible; }
+  .deck { width: auto; height: auto; display: block; position: static !important; }
+  .slide-wrap {
+    position: relative !important;
+    opacity: 1 !important;
+    display: flex !important;
+    page-break-after: always;
+    height: 100vh !important;
+    z-index: 1 !important;
+  }
+  .slide {
+    width: 100%; height: 100vh !important;
+    page-break-inside: avoid; transform: none !important;
+  }
+  .deck-nav { display: none !important; }
+  .enter { opacity: 1 !important; transform: none !important; animation: none !important; }
+}
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+
+/* Tablet */
+@media (max-width: 1200px) and (min-width: 769px) {
+  .slide { padding: 40px 48px 60px !important; flex-direction: column !important; justify-content: center !important; }
+  .deck-h1 { font-size: 44px !important; }
+  .deck-h2 { font-size: 36px !important; }
+  .slide__left  { padding-right: 0 !important; flex: none !important; margin-bottom: 24px !important; width: 100% !important; }
+  .slide__right { flex: none !important; height: 50vh !important; min-height: 380px !important; width: 100% !important; }
+  .deck-body { font-size: 15px !important; margin-bottom: 16px !important; }
+  .stat-row { margin-top: 16px !important; }
+
+  /* Single-mock slides: center the mock */
+  .slide__right > div[style*="position: absolute"]:only-child,
+  .crm-mock-wrapper {
+    position: absolute !important; top: 50% !important;
+    transform: translate(-50%, -50%) !important; left: 50% !important; right: auto !important;
+    width: 95% !important; max-width: 1000px !important;
+    margin: 0 !important; opacity: 1 !important;
+  }
+
+  /* Multi-mock slides: stagger so they don't all overlap at center */
+  .slide__right > div[style*="position: absolute"]:not(:only-child) {
+    position: absolute !important; top: 50% !important;
+    margin: 0 !important; opacity: 1 !important;
+    width: 70% !important; max-width: 720px !important;
+  }
+  .slide__right > div[style*="position: absolute"]:not(:only-child):nth-child(1) {
+    left: 0 !important; right: auto !important;
+    transform: translateY(-50%) rotate(-2deg) !important;
+    opacity: 0.85 !important; z-index: 1 !important;
+  }
+  .slide__right > div[style*="position: absolute"]:not(:only-child):nth-child(2) {
+    left: auto !important; right: 0 !important;
+    transform: translateY(-50%) rotate(2deg) !important;
+    z-index: 2 !important;
+  }
+  /* Third mock (e.g. slide 10's phone) — anchor bottom-right, override desktop width */
+  .slide__right > div[style*="position: absolute"]:not(:only-child):nth-child(3) {
+    width: auto !important; max-width: none !important;
+    top: auto !important; bottom: 0 !important;
+    left: auto !important; right: 24px !important;
+    transform: rotate(4deg) !important;
+    z-index: 3 !important;
+  }
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+  .slide { padding: 24px !important; }
+
+  .slide-wrap.active .slide__left,
+  .slide-wrap.active .slide__center {
+    position: absolute !important; top: 0 !important; left: 0 !important;
+    width: 100% !important; height: 100% !important; max-width: 100% !important;
+    flex: none !important;
+    padding: clamp(16px, 4vh, 40px) 24px clamp(60px, 10vh, 100px) 24px !important;
+    display: flex !important; flex-direction: column !important; justify-content: flex-start !important; z-index: 10 !important;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.4s ease, transform 0.4s ease;
+    transform: translateY(20px);
+    overflow-y: auto !important;
+  }
+  .deck-h1 { font-size: clamp(24px, 5.5vh, 34px) !important; line-height: 1.1 !important; margin-bottom: 12px !important; }
+  .deck-h2 { font-size: clamp(22px, 5vh, 32px) !important; line-height: 1.1 !important; margin-bottom: 12px !important; }
+  .deck-body { font-size: clamp(13px, 2.2vh, 15px) !important; margin-bottom: 16px !important; }
+
+  /* Stat row: 4-up flex overflows the viewport on mobile — wrap to 2×2 grid and shrink */
+  .stat-row { display: grid !important; grid-template-columns: 1fr 1fr !important; gap: 8px !important; margin-top: 16px !important; max-width: 100% !important; }
+  .stat-box { padding: 10px 12px !important; border-radius: 10px !important; min-width: 0 !important; }
+  .stat-box__value { font-size: 22px !important; }
+  .stat-box__label { font-size: 11px !important; }
+
+  /* Cover slide: tighten the logo gap so the rest fits without scroll */
+  .slide-wrap.active .slide__left > .e-fade:first-child { margin-bottom: 20px !important; }
+  .slide-wrap.active .slide__left > .e-fade:first-child img { height: 88px !important; }
+
+  .slide-wrap.active .slide__right {
+    position: absolute !important; top: 0 !important; left: 0 !important;
+    width: 100% !important; height: 100% !important; max-width: 100% !important;
+    flex: none !important; padding: 32px 0 110px 0 !important;
+    display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: flex-start !important; z-index: 5 !important;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.4s ease, transform 0.4s ease;
+    transform: scale(0.95);
+    gap: 24px !important;
+    overflow: hidden !important;
+  }
+
+  /* Sub-slide active states */
+  .slide-wrap.active.step-text .slide__left,
+  .slide-wrap.active.step-text .slide__center {
+    opacity: 1 !important; transform: translateY(0) !important; pointer-events: auto !important; z-index: 2 !important;
+  }
+  .slide-wrap.active.step-text .slide__right {
+    opacity: 0 !important; pointer-events: none !important; z-index: 1 !important;
+  }
+  .slide-wrap.active.step-image .slide__left,
+  .slide-wrap.active.step-image .slide__center {
+    opacity: 0 !important; transform: translateY(-20px) !important; pointer-events: none !important;
+  }
+  .slide-wrap.active.step-image .slide__right {
+    opacity: 1 !important; transform: scale(1) !important; pointer-events: auto !important;
+  }
+
+  .deck-nav { bottom: 16px; padding: 6px 12px; gap: 8px; }
+  .feature-grid { grid-template-columns: 1fr; }
+  .callout-grid { grid-template-columns: 1fr; }
+  .business-model-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+  
+  .business-card { padding: 14px !important; }
+  .business-card__icon { width: 32px; height: 32px; margin-bottom: 10px; }
+  .business-card__stats { margin-bottom: 8px; }
+  .business-card__big { font-size: 20px; margin-bottom: 2px; }
+  .business-card__cap { font-size: 9px; }
+  .business-card__title { font-size: 14px; }
+  .business-card__desc { display: none; }
+
+  /* Multiplier card (2nd item) spans 2 columns and stays horizontal */
+  .business-card:nth-child(2) {
+    grid-column: span 2; order: 3;
+    flex-direction: row; align-items: center; gap: 12px;
+  }
+  .business-card:nth-child(2) .business-card__icon { margin-bottom: 0; flex-shrink: 0; }
+  .business-card:nth-child(2) .business-card__stats { text-align: right; margin-bottom: 0; flex-shrink: 0; order: 3; }
+  .business-card:nth-child(2) .business-card__main { flex: 1; order: 2; }
+
+  .future-proof-box { margin-top: 16px; padding: 14px; gap: 12px; align-items: flex-start; }
+  .future-proof-icon { width: 32px; height: 32px; }
+  .future-proof-title { font-size: 14px; margin-bottom: 2px; }
+  .future-proof-desc { font-size: 11px; }
+  .slide__footer { display: none !important; }
+
+  /* Stack mocks on the right */
+  .slide__right > div[style]:not(.crm-mock-wrapper):not(.screen-fade) {
+    position: relative !important; margin: 0 !important;
+    top: auto !important; bottom: auto !important; left: auto !important; right: auto !important;
+    transform: none !important; opacity: 1 !important;
+  }
+
+  .slide__right > div[style]:not(.crm-mock-wrapper):not(.screen-fade):nth-child(1) {
+    width: 140vw !important; max-width: 700px !important;
+    align-self: flex-start; margin-left: 16px !important;
+  }
+  .slide__right > div[style]:not(.crm-mock-wrapper):not(.screen-fade):nth-child(2) {
+    width: 140vw !important; max-width: 700px !important;
+    align-self: flex-end; margin-right: 16px !important;
+    margin-top: -100px !important; z-index: 10 !important;
+  }
+  /* When the 2nd mock is a fixed-width phone (cover, transformation), the 140vw
+     wrapper above pushes the phone off the left edge — let it size to content and
+     centre instead. Tight negative margin overlaps the desktop chrome above. */
+  .slide__right > div[style]:not(.crm-mock-wrapper):not(.screen-fade):nth-child(2):has(.phone-mock) {
+    width: auto !important; max-width: none !important;
+    align-self: center !important;
+    margin: -60px 0 0 0 !important;
+    z-index: 10 !important;
+  }
+  .slide__right > div[style]:not(.crm-mock-wrapper):not(.screen-fade):nth-child(3) {
+    align-self: flex-end; margin-right: 24px !important;
+    margin-top: -180px !important; z-index: 20 !important;
+  }
+  
+  .screen-fade { margin: auto !important; }
+
+  .crm-mock-wrapper {
+    position: absolute !important; top: 50% !important;
+    transform: translateY(-50%) !important;
+    width: 250vw !important; max-width: 1000px !important;
+    transition: left 0.4s ease, right 0.4s ease !important;
+  }
+  .crm-mock-wrapper[data-screen-idx="0"],
+  .crm-mock-wrapper[data-screen-idx="2"],
+  .crm-mock-wrapper[data-screen-idx="4"] {
+    left: 16px !important; right: auto !important;
+  }
+  .crm-mock-wrapper[data-screen-idx="1"],
+  .crm-mock-wrapper[data-screen-idx="3"],
+  .crm-mock-wrapper[data-screen-idx="5"] {
+    left: auto !important; right: 16px !important;
+  }
+
+  .desktop-only-tabs { display: none !important; }
+  .slide-wrap.step-image .mobile-only-tabs { display: flex !important; }
+  .mobile-only-tabs .screen-tabs {
+    display: grid !important; grid-template-columns: repeat(3, 1fr);
+    width: 100%; padding: 0 16px; gap: 6px !important;
+  }
+  .mobile-only-tabs .screen-tab { width: 100%; padding: 8px 6px !important; text-align: center; font-size: 11px !important; }
+
+  /* transform: scale doesn't shrink the layout box, so a 280×580 phone visually 65%-sized
+     leaves ~100px of empty layout space above and below. Negative margins absorb that
+     space so siblings (and the nav pill) don't sit clear of phantom whitespace. */
+  .phone-mock { transform: scale(0.7) !important; transform-origin: center center !important; margin: -85px 0 !important; }
+  .phone-mock--lg { transform: scale(0.65) !important; transform-origin: center center !important; margin: -100px 0 !important; }
+  .slide__right > .phone-mock { position: relative !important; }
+}
