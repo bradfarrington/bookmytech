@@ -26,7 +26,7 @@ export function Hero() {
             1,200+ mechanics live across the UK
           </Pill>
 
-          <h1 className="mb-[18px] text-[40px] font-extrabold leading-[1.05] tracking-[-0.025em] text-white sm:text-5xl lg:text-[56px]">
+          <h1 className="mb-[18px] text-[34px] font-extrabold leading-[1.05] tracking-[-0.025em] text-white sm:text-[42px] lg:text-[56px]">
             Your car, fixed at your door — booked in 60 seconds.
           </h1>
 
@@ -36,11 +36,7 @@ export function Hero() {
             come to you.
           </p>
 
-          <RegLookupForm
-            defaultReg="LB21 XYZ"
-            defaultPostcode="SE15 4QF"
-            className="max-w-[540px]"
-          />
+          <RegLookupForm className="max-w-[540px]" />
 
           <ul className="mt-[22px] flex flex-wrap gap-x-[18px] gap-y-2 text-xs text-white/75">
             {REASSURANCES.map((label) => (
@@ -52,7 +48,7 @@ export function Hero() {
           </ul>
         </div>
 
-        <div className="relative lg:ml-auto">
+        <div className="relative mx-auto w-full max-w-[420px] lg:ml-auto lg:mr-0">
           <MechanicPreviewCard />
         </div>
       </div>

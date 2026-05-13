@@ -75,8 +75,8 @@ export function Footer() {
   return (
     <footer className="bg-text-primary text-white">
       <div className="mx-auto max-w-content px-4 py-14 sm:px-8 lg:py-[56px]">
-        <div className="grid gap-10 lg:grid-cols-[1.4fr_repeat(3,_1fr)]">
-          <div>
+        <div className="grid gap-10 md:grid-cols-3 lg:grid-cols-[1.4fr_repeat(3,_1fr)]">
+          <div className="md:col-span-3 lg:col-span-1">
             <Link href="/" aria-label="Book My Tech home" className="inline-block">
               <Image
                 src="/logo.png"

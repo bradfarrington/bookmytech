@@ -1,16 +1,17 @@
 "use client";
 
-import { useState } from "react";
-import { ArrowRight } from "lucide-react";
+import { useState, useTransition } from "react";
+import { ArrowRight, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Icon } from "@/components/ui/icon";
 import { RegPlateInput } from "@/components/ui/reg-plate-input";
 import { cn, normaliseReg } from "@/lib/utils";
-import { VehicleLookupModal } from "./vehicle-lookup-modal";
-
-// Two instances of this form live on the landing page (hero + final CTA).
-// Both behave identically: collect reg + postcode, open the lookup modal.
-// DVLA wiring lands in the next iteration — replace `setOpen(true)` with a
-// call to a server action.
+import { lookupVehicleAction } from "@/app/actions/lookup-vehicle";
+import type { VehicleDetails } from "@/lib/dvla/types";
+import {
+  VehicleLookupModal,
+  type VehicleLookupStatus,
+} from "./vehicle-lookup-modal";
 
 export interface RegLookupFormProps {
   /** Pre-fills the reg input (e.g. for the hero's example state). */
@@ -20,6 +21,14 @@ export interface RegLookupFormProps {
   className?: string;
 }
 
+interface LookupState {
+  reg: string;
+  postcode: string;
+  status: VehicleLookupStatus;
+  details?: VehicleDetails;
+  errorMessage?: string;
+}
+
 export function RegLookupForm({
   defaultReg = "",
   defaultPostcode = "",
@@ -27,19 +36,40 @@ export function RegLookupForm({
 }: RegLookupFormProps) {
   const [reg, setReg] = useState(defaultReg);
   const [postcode, setPostcode] = useState(defaultPostcode);
-  const [submitted, setSubmitted] = useState<{ reg: string; postcode: string } | null>(null);
+  const [lookup, setLookup] = useState<LookupState | null>(null);
+  const [, startTransition] = useTransition();
+
+  function handleSubmit() {
+    const normalised = normaliseReg(reg);
+    if (!normalised) return;
+    const trimmedPostcode = postcode.trim();
+    setLookup({
+      reg: normalised,
+      postcode: trimmedPostcode,
+      status: "loading",
+    });
+    startTransition(async () => {
+      const result = await lookupVehicleAction(normalised);
+      setLookup((current) => {
+        // Guard against the user closing the modal / submitting a new reg
+        // before the response lands.
+        if (!current || current.reg !== normalised) return current;
+        if (result.ok) {
+          return { ...current, status: "success", details: result.details };
+        }
+        return { ...current, status: "error", errorMessage: result.message };
+      });
+    });
+  }
 
   return (
     <>
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          const normalised = normaliseReg(reg);
-          if (!normalised) return;
-          setSubmitted({ reg: normalised, postcode: postcode.trim() });
+          handleSubmit();
         }}
         className={cn(
-          // Mobile: stack everything. md+: plate + postcode + button on one row.
           "flex w-full flex-col gap-2.5 rounded-2xl border border-border bg-surface-card p-3.5 shadow-card md:flex-row md:items-center",
           className,
         )}
@@ -51,28 +81,51 @@ export function RegLookupForm({
           required
           aria-label="Vehicle registration"
         />
-        <input
-          type="text"
-          value={postcode}
-          onChange={(e) => setPostcode(e.target.value)}
-          name="postcode"
-          placeholder="Your postcode"
-          aria-label="Postcode"
-          autoComplete="postal-code"
-          className="h-10 min-w-0 flex-1 rounded-lg border border-border bg-surface-card px-3 text-sm text-text-primary outline-none placeholder:text-text-muted focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/30 md:border-0 md:bg-transparent md:focus:ring-0"
-        />
+        <label
+          className={cn(
+            "flex h-10 min-w-0 items-center gap-2 rounded-md border-[1.5px] border-border bg-surface px-3",
+            "transition-colors focus-within:border-brand-blue focus-within:bg-surface-card focus-within:ring-2 focus-within:ring-brand-blue/25",
+            "md:flex-1 md:border-0 md:bg-transparent md:px-2 md:focus-within:bg-transparent md:focus-within:ring-0",
+          )}
+        >
+          <Icon
+            icon={MapPin}
+            size={16}
+            className="shrink-0 text-text-muted"
+            aria-hidden
+          />
+          <input
+            type="text"
+            value={postcode}
+            onChange={(e) => setPostcode(e.target.value)}
+            name="postcode"
+            placeholder="Postcode"
+            aria-label="Postcode"
+            autoComplete="postal-code"
+            autoCapitalize="characters"
+            autoCorrect="off"
+            spellCheck={false}
+            maxLength={8}
+            className={cn(
+              "h-full min-w-0 flex-1 border-0 bg-transparent text-sm font-bold uppercase tracking-[0.04em] text-text-primary outline-none",
+              "placeholder:font-medium placeholder:normal-case placeholder:tracking-normal placeholder:text-text-muted",
+            )}
+          />
+        </label>
         <Button type="submit" variant="primary" iconRight={ArrowRight}>
           Get a price
         </Button>
       </form>
 
       <VehicleLookupModal
-        open={submitted !== null}
-        onClose={() => setSubmitted(null)}
-        reg={submitted?.reg ?? ""}
-        postcode={submitted?.postcode}
+        open={lookup !== null}
+        onClose={() => setLookup(null)}
+        reg={lookup?.reg ?? ""}
+        postcode={lookup?.postcode}
+        status={lookup?.status ?? "loading"}
+        details={lookup?.details}
+        errorMessage={lookup?.errorMessage}
       />
     </>
   );
 }
-

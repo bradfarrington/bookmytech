@@ -37,7 +37,7 @@ const REVIEWS: Review[] = [
 export function Reviews() {
   return (
     <section className="mx-auto max-w-content px-4 pb-14 sm:px-8 lg:pb-[56px]">
-      <ul className="grid gap-4 md:grid-cols-3">
+      <ul className="grid gap-4 lg:grid-cols-3">
         {REVIEWS.map((r, i) => (
           <li key={r.name}>
             <Card className="flex h-full flex-col">

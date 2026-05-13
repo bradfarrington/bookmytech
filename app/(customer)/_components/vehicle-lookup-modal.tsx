@@ -1,15 +1,14 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { X, Car, Wrench } from "lucide-react";
+import { X, Car, Loader2, AlertCircle, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { Pill } from "@/components/ui/pill";
 import { cn } from "@/lib/utils";
+import type { VehicleDetails } from "@/lib/dvla/types";
 
-// Stage 3 ships the modal shell with a placeholder body. When the DVLA API key
-// arrives, swap the placeholder for the real VehicleDetails render — no other
-// changes needed.
+export type VehicleLookupStatus = "loading" | "success" | "error";
 
 export interface VehicleLookupModalProps {
   open: boolean;
@@ -17,6 +16,10 @@ export interface VehicleLookupModalProps {
   /** The reg the user submitted — echoed back inside the modal. */
   reg: string;
   postcode?: string;
+  status: VehicleLookupStatus;
+  details?: VehicleDetails;
+  errorMessage?: string;
+  onContinue?: () => void;
 }
 
 export function VehicleLookupModal({
@@ -24,11 +27,13 @@ export function VehicleLookupModal({
   onClose,
   reg,
   postcode,
+  status,
+  details,
+  errorMessage,
+  onContinue,
 }: VehicleLookupModalProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
 
-  // Open/close via the native <dialog> API — we get focus trap, ESC-to-close,
-  // and accessible modal semantics for free.
   useEffect(() => {
     const dialog = dialogRef.current;
     if (!dialog) return;
@@ -44,14 +49,11 @@ export function VehicleLookupModal({
       ref={dialogRef}
       onClose={onClose}
       onClick={(e) => {
-        // Click on the backdrop (the dialog element itself) closes; clicks
-        // inside the content card bubble up from a child and don't match.
         if (e.target === dialogRef.current) onClose();
       }}
       className={cn(
         "w-full max-w-md rounded-2xl border border-border bg-surface-card p-0 shadow-hero",
         "backdrop:bg-text-primary/50 backdrop:backdrop-blur-sm",
-        // Reset the browser default centring math so we don't fight it
         "fixed inset-0 m-auto",
       )}
     >
@@ -62,7 +64,9 @@ export function VehicleLookupModal({
           </div>
           <div>
             <h2 className="text-lg font-bold text-text-primary">
-              Looking up your vehicle
+              {status === "loading" && "Looking up your vehicle"}
+              {status === "success" && "We found your car"}
+              {status === "error" && "Lookup failed"}
             </h2>
             <p className="text-[13px] text-text-muted">
               {reg}
@@ -80,35 +84,154 @@ export function VehicleLookupModal({
         </button>
       </div>
 
-      <div className="space-y-4 p-6">
-        <Pill tone="pending" dot>
-          DVLA integration pending
-        </Pill>
-        <p className="text-sm text-text-secondary">
-          We&apos;re finalising our DVLA API access. Once the key lands, this pop-up
-          will show the make, model, year, fuel type, MOT status and tax status for
-          your plate — in under a second.
-        </p>
-        <div className="flex items-start gap-3 rounded-xl bg-surface p-4 text-[13px] text-text-secondary">
-          <Icon icon={Wrench} size={16} className="mt-0.5 text-brand-blue" />
-          <p>
-            <span className="font-semibold text-text-primary">
-              In the meantime,
-            </span>{" "}
-            you can still browse our services and pricing below — we&apos;ll be
-            booking real jobs the moment the API switches on.
+      {status === "loading" && (
+        <div className="flex flex-col items-center gap-3 px-6 py-10 text-center">
+          <Icon
+            icon={Loader2}
+            size={28}
+            className="animate-spin text-brand-blue"
+          />
+          <p className="text-sm text-text-secondary">
+            Checking DVLA for your vehicle…
           </p>
         </div>
-      </div>
+      )}
+
+      {status === "success" && details && (
+        <div className="space-y-4 p-6">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-xl font-bold text-text-primary">
+              {[details.yearOfManufacture, details.make, details.model]
+                .filter(Boolean)
+                .join(" ")}
+            </p>
+            {details.colour && (
+              <Pill tone="neutral">{titleCase(details.colour)}</Pill>
+            )}
+          </div>
+
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-xl bg-surface p-4 text-sm">
+            {details.fuelType && (
+              <DetailRow label="Fuel" value={titleCase(details.fuelType)} />
+            )}
+            {typeof details.engineCapacity === "number" && (
+              <DetailRow label="Engine" value={`${details.engineCapacity} cc`} />
+            )}
+            {details.motStatus && (
+              <DetailRow
+                label="MOT"
+                value={details.motStatus}
+                hint={
+                  details.motExpiryDate
+                    ? `until ${formatDate(details.motExpiryDate)}`
+                    : undefined
+                }
+                tone={statusTone(details.motStatus)}
+              />
+            )}
+            {details.taxStatus && (
+              <DetailRow
+                label="Tax"
+                value={details.taxStatus}
+                hint={
+                  details.taxDueDate
+                    ? `until ${formatDate(details.taxDueDate)}`
+                    : undefined
+                }
+                tone={statusTone(details.taxStatus)}
+              />
+            )}
+          </dl>
+
+          <p className="text-[13px] text-text-muted">
+            Not your car?{" "}
+            <button
+              type="button"
+              onClick={onClose}
+              className="font-semibold text-brand-blue hover:underline"
+            >
+              Try a different reg
+            </button>
+          </p>
+        </div>
+      )}
+
+      {status === "error" && (
+        <div className="space-y-4 p-6">
+          <div className="flex items-start gap-3 rounded-xl bg-red-50 p-4">
+            <Icon icon={AlertCircle} size={18} className="mt-0.5 text-red-600" />
+            <p className="text-sm text-red-700">
+              {errorMessage ?? "Something went wrong looking up your vehicle."}
+            </p>
+          </div>
+          <p className="text-[13px] text-text-muted">
+            Double-check the registration and try again.
+          </p>
+        </div>
+      )}
 
       <div className="flex items-center justify-end gap-3 border-t border-border-subtle p-6">
         <Button variant="ghost" onClick={onClose}>
-          Close
+          {status === "success" ? "Close" : "Cancel"}
         </Button>
-        <Button variant="primary" onClick={onClose}>
-          Browse services
-        </Button>
+        {status === "success" && (
+          <Button
+            variant="primary"
+            iconRight={ArrowRight}
+            onClick={onContinue ?? onClose}
+          >
+            Continue to booking
+          </Button>
+        )}
       </div>
     </dialog>
   );
+}
+
+function DetailRow({
+  label,
+  value,
+  hint,
+  tone,
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+  tone?: "success" | "error" | "pending" | "neutral";
+}) {
+  return (
+    <div className="flex flex-col gap-1">
+      <dt className="text-[11px] font-semibold uppercase tracking-[0.04em] text-text-muted">
+        {label}
+      </dt>
+      <dd className="flex flex-wrap items-center gap-2">
+        <Pill tone={tone ?? "neutral"}>{value}</Pill>
+        {hint && <span className="text-[12px] text-text-muted">{hint}</span>}
+      </dd>
+    </div>
+  );
+}
+
+function statusTone(status: string): "success" | "error" | "pending" | "neutral" {
+  const lower = status.toLowerCase();
+  if (lower.includes("valid") || lower.includes("taxed")) return "success";
+  if (lower.includes("expired") || lower.includes("untaxed") || lower.includes("sorn")) return "error";
+  if (lower.includes("due")) return "pending";
+  return "neutral";
+}
+
+function titleCase(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function formatDate(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  return date.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
 }
