@@ -25,22 +25,29 @@ type ServiceRow = {
   starting_price_pence: number;
 };
 
+// Fallback seed mirrors the top 6 services from `supabase/migrations/0001_seed_services.sql`
+// so this preview renders sensibly even if the DB read fails. Slugs match the
+// SERVICE_META map below; prices are kept in sync with the seed.
 const SEED_SERVICES: ServiceRow[] = [
-  { id: "seed-full-service", slug: "full-service", name: "Full Service", starting_price_pence: 11900 },
-  { id: "seed-diagnostic", slug: "diagnostic", name: "Diagnostic", starting_price_pence: 4500 },
-  { id: "seed-brakes-tyres", slug: "brakes-tyres", name: "Brakes & Tyres", starting_price_pence: 7500 },
-  { id: "seed-battery", slug: "battery", name: "Battery", starting_price_pence: 8500 },
-  { id: "seed-clutch-gears", slug: "clutch-gears", name: "Clutch & Gears", starting_price_pence: 18000 },
-  { id: "seed-mot-precheck", slug: "mot-precheck", name: "MOT Pre-check", starting_price_pence: 3900 },
+  { id: "seed-full-service",        slug: "full-service",        name: "Full Service",        starting_price_pence: 18900 },
+  { id: "seed-diagnostic",          slug: "diagnostic",          name: "Diagnostic",          starting_price_pence: 4500 },
+  { id: "seed-front-brake-pads",    slug: "front-brake-pads",    name: "Front Brake Pads",    starting_price_pence: 13900 },
+  { id: "seed-battery-replacement", slug: "battery-replacement", name: "Battery Replacement", starting_price_pence: 12400 },
+  { id: "seed-clutch-replacement",  slug: "clutch-replacement",  name: "Clutch Replacement",  starting_price_pence: 29800 },
+  { id: "seed-mot-precheck",        slug: "mot-precheck",        name: "MOT Pre-check",       starting_price_pence: 5900 },
 ];
 
 const SERVICE_META: Record<string, { icon: LucideIcon; featured?: boolean }> = {
   "full-service": { icon: Wrench },
   diagnostic: { icon: Search, featured: true },
-  "brakes-tyres": { icon: Disc },
-  battery: { icon: BatteryCharging },
-  "clutch-gears": { icon: Settings },
+  "front-brake-pads": { icon: Disc },
+  "front-brake-discs-pads": { icon: Disc },
+  "battery-replacement": { icon: BatteryCharging },
+  "clutch-replacement": { icon: Settings },
   "mot-precheck": { icon: ShieldCheck },
+  "interim-service": { icon: Wrench },
+  "cambelt-replacement": { icon: Settings },
+  "air-con-regas": { icon: Wrench },
 };
 
 const FALLBACK_ICON: LucideIcon = Wrench;

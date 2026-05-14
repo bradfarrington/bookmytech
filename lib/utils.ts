@@ -28,3 +28,26 @@ export function formatPrice(pence: number): string {
     ? `£${pounds.toFixed(0)}`
     : `£${pounds.toFixed(2)}`;
 }
+
+// Parses a £-shaped string ("£45.99", "45.99", "  £45 ") into integer pence.
+// Returns null when the input doesn't parse to a non-negative number — the
+// server action surfaces a friendly error.
+export function parsePrice(input: string): number | null {
+  const clean = input.trim().replace(/^£/, "").replace(/,/g, "").trim();
+  if (clean === "") return null;
+  const num = Number(clean);
+  if (!Number.isFinite(num) || num < 0) return null;
+  return Math.round(num * 100);
+}
+
+// Lower-cases, hyphenates and strips punctuation to produce a URL-safe slug.
+// "Front Brake Pads (Premium)" → "front-brake-pads-premium".
+export function slugify(input: string): string {
+  return input
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+}

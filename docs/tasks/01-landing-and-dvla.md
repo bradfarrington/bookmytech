@@ -1,23 +1,25 @@
 # Task 01 — Landing page + DVLA lookup
 
-**Status:** ✅ Complete (landing page shipped; DVLA wiring deferred to task 01b — see "DVLA carve-out" below)
+**Status:** ✅ Complete (landing page + DVLA lookup both shipped — see "DVLA wiring — closed" below)
 
 Build the customer-facing landing page at `/`, with a working reg-plate lookup powered by the DVLA Vehicle Enquiry Service.
 
-## DVLA carve-out
+## DVLA wiring — closed
 
-The DVLA API key wasn't available when this task was built. Everything *visual* shipped:
+The carve-out has been closed. The reg-plate form is live end-to-end:
 
-- The reg-plate + postcode form is fully functional client-side (`app/(customer)/_components/reg-lookup-form.tsx`).
-- On submit it opens a `<dialog>` modal (`app/(customer)/_components/vehicle-lookup-modal.tsx`) with a "Lookup coming soon — DVLA integration pending" placeholder.
-- The modal already echoes back the user's reg + postcode, so it's halfway to displaying real data.
+- `lib/dvla/types.ts` — `VehicleDetails` + `LookupResult` discriminated union (`not_found` / `invalid_reg` / `rate_limited` / `unknown`).
+- `lib/dvla/client.ts` — POSTs to the DVLA VES endpoint with `x-api-key`, returns canned stub data for `LB21 XYZ` / `AB12 CDE` / `XY99 ZZZ` when `DVLA_API_KEY` is empty.
+- `lib/dvla/mot-client.ts` — **added beyond the original spec.** DVLA VES doesn't return `model`, so we also call the DVSA MOT History API (OAuth2 client-credentials, module-level token cache) and merge `model` onto the VES response. Best-effort: a MOT failure never blocks the primary lookup.
+- `app/actions/lookup-vehicle.ts` — server action that normalises the reg, validates with the UK plate regex, then runs DVLA VES + MOT lookup in parallel via `Promise.all`.
+- `app/(customer)/_components/vehicle-lookup-modal.tsx` — renders the real `VehicleDetails` (make/model/year, colour pill, fuel, engine, MOT + tax with tone-coded pills and expiry dates).
 
-When the key lands, the follow-up is small:
+Deviations from the original Stage 3 spec:
 
-1. Add `lib/dvla/types.ts` and `lib/dvla/client.ts` (the latter with stub mode for the canned regs `LB21 XYZ` / `AB12 CDE` / `XY99 ZZZ`).
-2. Add `app/actions/lookup-vehicle.ts` — server action that validates the reg with zod and calls the client.
-3. Swap the placeholder body in `vehicle-lookup-modal.tsx` for the real `VehicleDetails` render. The `reg` and `postcode` props already flow through.
-4. Wire `reg-lookup-form.tsx` to call the server action via `useActionState` instead of the current `useState`-only flow.
+- **`useTransition` instead of `useActionState`** — `reg-lookup-form.tsx` uses `useTransition` + local `useState` because we want the modal open immediately in `loading` state, then to update in place as the result arrives. `useActionState`'s pending → result flow doesn't model that cleanly.
+- **Modal instead of inline "we found your car" card** — the spec said render a card below the input; we render a `<dialog>` modal that echoes reg + postcode and shows the result. Same goal, better UX.
+- **No `/book?reg=…` redirect yet** — the modal's "Continue to booking" button is wired to `onClose` for now. Real redirect lands when the booking flow (task 02/03) exists.
+- **Env vars needed for live mode:** `DVLA_API_KEY` (VES), plus `MOT_API_KEY` / `MOT_CLIENT_ID` / `MOT_CLIENT_SECRET` / `MOT_TOKEN_URL` / `MOT_SCOPE` (MOT History). Missing either set falls back gracefully — DVLA to stub data, MOT to "no model".
 
 ## Why this task
 
@@ -39,11 +41,11 @@ Tokens encoded in `app/globals.css` via Tailwind v4's `@theme { ... }` block (NO
 
 **Acceptance criteria:**
 
-- [ ] `tailwind.config.ts` includes the `brand`, `surface`, `border`, `text`, `success`, `warning`, `danger`, `plate-yellow` colour tokens
-- [ ] Inter font family wired (via `next/font` in `app/layout.tsx`)
-- [ ] Custom `borderRadius.button`, `boxShadow.card`, `boxShadow.hero`, `backgroundImage.brand-gradient`, `maxWidth.content` are present
-- [ ] A throwaway test page (e.g. `/style-test`) renders one of each colour to verify they work — delete this page once verified
-- [ ] `npm run dev` shows no Tailwind errors in the terminal
+- [x] Colour tokens (`brand`, `surface`, `border`, `text`, `success`, `warning`, `danger`, `plate-yellow`) encoded in `app/globals.css` via Tailwind v4 `@theme` (not `tailwind.config.ts` — see note above)
+- [x] Inter font family wired (via `next/font` in `app/layout.tsx`)
+- [x] Custom `borderRadius.button`, `boxShadow.card`, `boxShadow.hero`, `backgroundImage.brand-gradient`, `maxWidth.content` are present
+- [x] Throwaway style test page used during build and removed before shipping
+- [x] `npm run dev` shows no Tailwind errors in the terminal
 
 **Files touched:**
 - `tailwind.config.ts`
@@ -64,16 +66,16 @@ The proposal JSX in `/proposal/` is preserved as the visual reference; the Tailw
 
 **Components to extract:**
 
-- [ ] `Button` — `primary` / `secondary` / `ghost` variants, optional `iconLeft` / `iconRight`
-- [ ] `Card` — white surface, `rounded-2xl`, `shadow-card`, `p-6` default
-- [ ] `Pill` — tone variants (`blue` / `green` / `amber` / `red` / `dark`), optional `dot` prop
-- [ ] `Icon` — wrapper around `lucide-react`, takes `name` / `size` / `color` / `className`
-- [ ] `Avatar` — circular initials avatar, `size` and `tint` props
-- [ ] `Stars` — rating display, `value` (0–5) and `size`
-- [ ] `Overline` — small uppercase brand-blue eyebrow text
-- [ ] `TrustBadge` — icon + value + label trio for the trust strip
-- [ ] `RegPlateInput` — UK plate styling with GB badge, yellow background, monospace letters
-- [ ] `CustomerNav` — top navigation, `active` and `dark` props
+- [x] `Button` — `primary` / `secondary` / `ghost` variants, optional `iconLeft` / `iconRight`
+- [x] `Card` — white surface, `rounded-2xl`, `shadow-card`, `p-6` default
+- [x] `Pill` — tone variants, optional `dot` prop
+- [x] `Icon` — wrapper around `lucide-react` (takes `icon: LucideIcon` component prop, not `name: string` — preserves tree-shaking)
+- [x] `Avatar` — circular initials avatar, `size` and `tint` props
+- [x] `Stars` — rating display, `value` (0–5) and `size`
+- [x] `Overline` — small uppercase eyebrow text (defaults to `text-muted`; pass `className="text-brand-blue"` for brand-blue)
+- [x] `TrustBadge` — icon + value + label trio for the trust strip
+- [x] `RegPlateInput` — UK plate styling with GB badge, yellow background, monospace letters
+- [x] `CustomerNav` — top navigation, `active` and `dark` props
 
 **Conventions while extracting:**
 
@@ -95,11 +97,11 @@ The proposal JSX in `/proposal/` is preserved as the visual reference; the Tailw
 
 **Acceptance criteria:**
 
-- [ ] All 10 components above live in `components/ui/` as individual files
-- [ ] No inline `style={{ }}` props anywhere in `components/ui/`
-- [ ] No hard-coded hex colours anywhere in `components/ui/`
-- [ ] `lib/utils.ts` exists with `cn()` helper
-- [ ] Each component is importable via `@/components/ui/<name>` (no barrel exports needed yet — keep it explicit)
+- [x] All 10 components live in `components/ui/` as individual files
+- [x] No hard-coded hex colours anywhere in `components/ui/`
+- [x] `lib/utils.ts` exists with `cn()` helper (plus `normaliseReg()` and `formatPrice()`)
+- [x] Each component is importable via `@/components/ui/<name>` (no barrel exports)
+- [~] No inline `style={{ }}` — exception: `Avatar` uses inline `style` for runtime-dynamic `size`/`fontSize`, since Tailwind can't compile dynamic numeric values to utilities
 
 **Files touched:**
 - `components/ui/*.tsx` (10 new files)
@@ -107,9 +109,9 @@ The proposal JSX in `/proposal/` is preserved as the visual reference; the Tailw
 
 ---
 
-### Stage 3 — Build the landing page ✅ (DVLA bits deferred — see carve-out at top)
+### Stage 3 — Build the landing page ✅
 
-All 9 sections shipped at `app/(customer)/page.tsx`, composed from `app/(customer)/_components/*`. The DVLA wiring (server action, client, types) is the only piece deliberately skipped until the API key arrives — see the "DVLA carve-out" section at the top of this doc.
+All 9 sections shipped at `app/(customer)/page.tsx`, composed from `app/(customer)/_components/*`. DVLA wiring is now live — see "DVLA wiring — closed" section at the top of this doc for what shipped and the deviations from the original spec.
 
 **Sections to build (in order, top to bottom):**
 
@@ -125,11 +127,14 @@ All 9 sections shipped at `app/(customer)/page.tsx`, composed from `app/(custome
 
 **DVLA wiring:**
 
-- [ ] `lib/dvla/client.ts` — wraps the POST request to `https://driver-vehicle-licensing.api.gov.uk/vehicle-enquiry/v1/vehicles` with the `x-api-key` header and a `{ registrationNumber: string }` body
-- [ ] `lib/dvla/types.ts` — TypeScript type for the response (`VehicleDetails` with `make`, `model`, `colour`, `fuelType`, `yearOfManufacture`, `engineCapacity`, `motStatus`, `motExpiryDate`, `taxStatus`, `taxDueDate`, `co2Emissions`)
-- [ ] **Stub mode** — if `process.env.DVLA_API_KEY` is empty, return canned data for a small set of regs (`LB21 XYZ`, `AB12 CDE`, `XY99 ZZZ`) and a `vehicleNotFound`-style response for anything else. This lets the UI be built fully without waiting on the key.
-- [ ] The reg-plate input on the hero (and on the final CTA strip) submits the reg via a server action, fetches DVLA data, and on success redirects to `/book?reg=<reg>` (the booking flow doesn't exist yet — for now, render the result in a small "we found your car" card below the input on the landing page itself, just to prove the integration works end-to-end)
-- [ ] Validate UK reg format client-side with `zod` before submitting (regex like `/^[A-Z0-9]{2,3} ?[A-Z0-9]{3,4}$/i`, normalised to uppercase with single space)
+- [x] `lib/dvla/client.ts` — POSTs `{ registrationNumber }` to the DVLA VES endpoint with `x-api-key`, maps 400/404/429 to typed error codes
+- [x] `lib/dvla/types.ts` — `VehicleDetails` (`make`, `model?`, `colour?`, `fuelType?`, `yearOfManufacture?`, `engineCapacity?`, `motStatus?`, `motExpiryDate?`, `taxStatus?`, `taxDueDate?`, `co2Emissions?`) + `LookupResult` discriminated union
+- [x] **Stub mode** — when `DVLA_API_KEY` is empty, returns canned data for `LB21 XYZ` / `AB12 CDE` / `XY99 ZZZ` and a `not_found` result for anything else
+- [x] `app/actions/lookup-vehicle.ts` — server action validates the UK plate regex, runs DVLA VES + MOT lookup in parallel via `Promise.all`, merges `model` from MOT onto the VES response
+- [x] **Bonus — MOT History API integration** (`lib/dvla/mot-client.ts`): OAuth2 client-credentials with module-level token cache (refreshes ~60s before expiry), supplies the `model` field DVLA VES doesn't return
+- [x] Plate validation via regex (`/^[A-Z0-9]{2,3} ?[A-Z0-9]{3,4}$/i`) plus `normaliseReg()` — `zod` not needed for a single-field shape
+- [x] Hero + final-CTA reg inputs both submit through the same `RegLookupForm` component, which calls the server action and opens the result modal
+- [ ] `/book?reg=<reg>` redirect on success — deferred until the booking flow exists; "Continue to booking" button in the modal currently closes it
 
 **The live mechanic preview card** in the hero — this is currently hard-coded in the JSX with three mechanics. Keep it hard-coded as seed data for this task. When mechanics actually exist in the system (much later task), this will be replaced with a real query.
 
@@ -143,19 +148,19 @@ All 9 sections shipped at `app/(customer)/page.tsx`, composed from `app/(custome
 
 **Acceptance criteria:**
 
-- [ ] `app/(customer)/page.tsx` renders the full landing page (all 9 sections above)
-- [ ] All sections built using `components/ui/` primitives — no inline styles, no hard-coded hex
-- [ ] Hero reg-plate input validates UK format and submits via server action
-- [ ] DVLA lookup works (real key or stub mode) and returns vehicle data
-- [ ] Successful lookup shows a "we found your car" card with make / model / year
-- [ ] Services preview pulls from the `services` table (seeded fallback if empty)
-- [ ] FAQ accordion expands/collapses (client component)
-- [ ] Final CTA reg-plate input behaves the same as the hero one (extract to a shared component if there's duplication)
-- [ ] Footer renders with the three link columns
-- [ ] Page is fully responsive — verified at 375px, 768px, 1280px widths
-- [ ] No console errors in the browser
-- [ ] Lighthouse score: performance ≥ 85, accessibility ≥ 95 (run in Chrome DevTools)
-- [ ] Deployed to Vercel and the live URL renders correctly
+- [x] `app/(customer)/page.tsx` renders the full landing page (all 9 sections above)
+- [x] All sections built using `components/ui/` primitives — no hard-coded hex
+- [x] Hero reg-plate input validates UK format and submits via server action
+- [x] DVLA lookup works (real key or stub mode) and returns vehicle data
+- [x] Successful lookup shows a "we found your car" view with make / model / year (rendered in a modal — see deviation note above)
+- [x] Services preview pulls from the `services` table (seeded fallback if empty)
+- [x] FAQ accordion expands/collapses (client component)
+- [x] Final CTA reg-plate input shares the hero's behaviour via the `RegLookupForm` component
+- [x] Footer renders with the three link columns
+- [x] Page is fully responsive — verified at 375px, 768px, 1280px widths (mobile/tablet pass confirmed in commit `ac0afe7`)
+- [ ] No console errors in the browser — not re-verified since DVLA wiring landed
+- [ ] Lighthouse score: performance ≥ 85, accessibility ≥ 95 — not re-run since DVLA wiring landed
+- [ ] Deployed to Vercel and the live URL renders correctly — not verified in this update
 
 **Files touched:**
 - `app/(customer)/page.tsx`

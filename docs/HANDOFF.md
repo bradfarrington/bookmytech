@@ -24,30 +24,86 @@ You are working on **Book My Tech**, a UK mobile-mechanic booking platform. This
   - Admin user exists in Supabase (manually promoted via SQL)
   - Repo on GitHub, deployed to Vercel
   - Proposal JSX mockups added to `/proposal/` for reference
-- **Task 01 complete** (`docs/tasks/01-landing-and-dvla.md`)
+- **Task 02 ✅ complete** (`docs/tasks/02-admin-services.md`) — admin auth, admin shell, services CRUD, and an added Stage 4 (settings sub-page + admin-managed categories) all shipped. Landing page's services preview now reads real DB rows. Two RLS gotchas documented in `docs/02-data-model.md`.
+  - **Stage 3 — services CRUD + seed**
+    - `app/(admin)/admin/(shell)/services/page.tsx` — list page, full-width, server-fetches services + active categories, renders `<ServicesTable />`. Header has "Settings" (gear) and "Add service" buttons.
+    - `app/(admin)/admin/(shell)/services/new/page.tsx` + `[id]/edit/page.tsx` — create/edit pages, narrow (`max-w-3xl`), server-fetch categories and pass to the form. Edit page passes all categories (active or not) so the current selection is representable even if its category was later deactivated.
+    - `app/(admin)/admin/(shell)/services/_components/service-form.tsx` — controlled client form. Slug field is **hidden**: auto-generated server-side from name on create, never updated on edit (stable references). Category select is the custom primitive driven by the prop.
+    - `app/(admin)/admin/(shell)/services/_components/services-table.tsx` — client table. Filters (category, status) use the custom Select. Each row has up/down reorder, edit link, power-icon toggle. `is_active=false` rows render greyed out.
+    - `app/actions/services.ts` — 4 actions: `createService`, `updateService` (slug excluded from payload — stable), `setServiceActive` (toggle), `reorderService` (swap display_order with neighbour). All run under the user's session and rely on admin RLS.
+    - `lib/utils.ts` — added `parsePrice("£45.99") → 4599` and `slugify("Front Brake Pads") → "front-brake-pads"`. `formatPrice` was already there.
+    - `supabase/migrations/0001_seed_services.sql` — idempotent (`on conflict (slug) do nothing`) seed of 10 services with slugs matching the landing-page `SERVICE_META` icon map. Top 6 by `display_order` render with proper icons; remaining 4 use the wrench fallback.
+    - `app/(customer)/_components/services-preview.tsx` — `SERVICE_META` extended for the 10 new slugs; `SEED_SERVICES` fallback rewritten to match the top 6 of the seed so a DB read failure still renders sensibly.
+    - **Toasts via `sonner`** (~3KB) — `<Toaster richColors position="top-right" closeButton />` mounted in the shell layout. `FlashToast` client component (in `_components/`) reads `?flash=...` after redirects, fires the toast, strips the param.
+    - **Custom `Select` primitive** at `components/ui/select.tsx` — replaces native `<select>` everywhere in admin client UI. Generic over value type, click-outside + keyboard nav + basic ARIA. **Project memory saved** at `~/.claude/projects/-Users-bradfarrington-Downloads-bookmytech/memory/select-primitive.md` reminding future Claude sessions to use this primitive, never native `<select>`.
+    - **List vs form layout pattern locked in**: list/dashboard pages drop `max-w-*` and fill the panel; form pages keep `max-w-3xl mx-auto`. `components/ui/kpi.tsx` exists as a primitive but isn't currently used (added during a KPI-strip experiment that was reverted by the user — kept for future pages with meaningful stats).
+    - **RLS lessons** (now canonicalised in `docs/02-data-model.md` under "RLS patterns to follow"):
+      - Pattern #1 — `public.is_admin()` `SECURITY DEFINER` function as the single role check. Use everywhere; never inline `EXISTS (SELECT FROM profiles ...)`.
+      - Pattern #2 — any soft-delete (`is_active` toggle) table needs **two** SELECT policies: public sees active, admin sees all. Without the admin one, UPDATEs that flip `is_active = false` fail RLS because the new row state would be invisible to SELECT.
+  - **Stage 4 — service settings sub-page + categories CRUD**
+    - New table `service_categories` (id, name, slug, description, display_order, is_active, timestamps). Soft-FK from `services.category` to `service_categories.slug` (text column, no FK constraint — lighter migration, integrity enforced in admin UI).
+    - `supabase/migrations/0002_service_categories.sql` — table + RLS (following pattern #2) + idempotent seed of the 8 categories matching the static enum slugs.
+    - `app/actions/categories.ts` — 5 actions: `createCategory`, `updateCategory`, `setCategoryActive`, `reorderCategory`, `deleteCategory`. Delete is blocked when services reference the category (returns a count-aware friendly error).
+    - Settings sub-page at `/admin/services/settings` with a categories panel. Reached via a new "Settings" (gear) button on the services list page. Designed to grow — more settings sections will live here.
+    - Full CRUD on categories: list / create / edit / reorder / toggle active / delete. Slug field hidden on the category form same as services.
+    - Service form's category dropdown is now DB-driven. Empty state with a deep-link to "create a category first" if no active categories exist.
+    - Top-bar breadcrumbs updated with pattern matching for `[id]/edit` routes so dynamic pages get sensible crumbs.
+    - `FlashToast` extended with `service-created`, `service-updated`, `category-created`, `category-updated`, `category-deleted`.
+    - `lib/services.ts` (Stage 3 home for the static category enum) was deleted entirely once categories went DB-driven.
+  - **Stage 1 — auth**
+    - `app/(admin)/admin/login/page.tsx` — 50/50 split layout: brand-gradient panel left (watermark favicon top-right at ~6% opacity, marketing tagline bottom), form panel right (centred BMT wordmark above the form). Collapses to a stacked layout below `md:` with a small centred favicon in the banner.
+    - `app/(admin)/admin/login/_components/login-form.tsx` — client form using React 19's `useActionState` for inline error + pending state. No `react-hook-form` / `zod` — plain HTML + server-side checks.
+    - `app/actions/sign-in.ts` — calls `supabase.auth.signInWithPassword`, double-checks `profiles.role === 'admin'` before completing (friendly "This account doesn't have admin access." error otherwise), then redirects to `/admin`.
+    - `app/actions/sign-out.ts` — `signOut()` then redirect to `/admin/login`.
+    - `middleware.ts` — extended with `/admin/*` role gate: redirects to `/admin/login` if no session, redirects to `/` if role ≠ admin. Bounces already-signed-in admins away from `/admin/login` to `/admin`. Uses a `redirectKeepingCookies` helper so session refresh + redirect in one request doesn't drop tokens.
+    - Assets: `public/logo-no-bg.png` + `public/favicon.png` copied from `proposal/`.
+  - **Stage 2 — admin shell**
+    - `app/(admin)/admin/(shell)/layout.tsx` — admin shell: fetches user + profile, renders sidebar + top-bar + main. Wraps every admin route except `/admin/login` because login sits outside the `(shell)` route group (see below).
+    - `app/(admin)/admin/(shell)/page.tsx` — overview welcome card: "Welcome back, {firstName}." + an "Open services" CTA. First name derives from `profiles.full_name` → falls back to email local-part → "there".
+    - `app/(admin)/admin/(shell)/_components/placeholder-page.tsx` — shared "Coming soon" composite used by every placeholder page.
+    - 10 placeholder pages under `(shell)/`: `jobs`, `live`, `disputes`, `mechanics`, `approvals`, `documents`, `pricing`, `areas`, `analytics`, `services` — each is a one-liner using `PlaceholderPage`.
+    - `components/admin/sidebar.tsx` — dark sidebar (240px, `bg-text-primary`), three nav groups (Operations / Network / Commercial, 11 links total), active link highlighted brand-blue via `usePathname()`. BMT logo top (`h-24`, brightness-0 invert). User avatar + name + role at the bottom with a sign-out button (`<form action={signOut}>`).
+    - `components/admin/top-bar.tsx` — breadcrumbs (from a static `CRUMBS` map keyed by pathname), `⌘K` search input (readOnly UI placeholder), notification bell with red-dot indicator.
+    - **RLS gotcha resolved** — dropped `Admins can view all profiles` on `profiles` because its `EXISTS (SELECT … FROM profiles)` subquery caused infinite-recursion errors that broke the role check in `sign-in.ts`. Documented in `docs/02-data-model.md` with the `SECURITY DEFINER` pattern to use when an admin-read-all policy is needed back. SQL run during this stage:
+      ```sql
+      drop policy if exists "Admins can view all profiles" on profiles;
+      ```
+    - `next.config.ts` — `devIndicators: false` to hide the Next dev-mode "N" badge (cosmetic, no production effect).
+  - Verified end-to-end: signed in as admin, hit every sidebar link, sign-out returns to `/admin/login`. Unauthenticated probes: every `/admin/*` returns 307 → `/admin/login`; `/admin/login` 200; `/` 200 (no regression).
+- **Task 01 complete** (`docs/tasks/01-landing-and-dvla.md`) — including DVLA wiring (carve-out now closed)
   - Design tokens encoded in `app/globals.css` via Tailwind v4 `@theme` (brand colours, surfaces, borders, text scale, radii, shadows, gradient, max-width)
   - Inter wired via `next/font/google` in `app/layout.tsx`
   - 10 UI primitives extracted to `components/ui/`: `Button`, `Card`, `Pill`, `Icon`, `Avatar`, `Stars`, `Overline`, `TrustBadge`, `RegPlateInput`, `CustomerNav`
   - `cn()` helper + `normaliseReg()` + `formatPrice()` in `lib/utils.ts`
   - Full landing page at `/` — 9 sections: hero, trust strip, how-it-works, reviews, services preview, why BMT, FAQ, final CTA, footer
   - Page-specific composites in `app/(customer)/_components/`
-  - Reg-plate lookup form (hero + final CTA, shared component) — opens a `<dialog>` modal on submit
+  - **DVLA reg-plate lookup live end-to-end:**
+    - `lib/dvla/{client,types}.ts` — POSTs to DVLA VES with `x-api-key`; stub mode for `LB21 XYZ` / `AB12 CDE` / `XY99 ZZZ` when `DVLA_API_KEY` is empty
+    - `lib/dvla/mot-client.ts` — DVSA MOT History API (OAuth2 client-credentials, module-level token cache) supplies the `model` field that DVLA VES doesn't return
+    - `app/actions/lookup-vehicle.ts` — server action validates plate regex, runs VES + MOT in parallel, merges `model` onto the response
+    - `vehicle-lookup-modal.tsx` renders the real `VehicleDetails` (make/model/year, colour, fuel, engine, MOT + tax with tone-coded pills)
+    - `reg-lookup-form.tsx` uses `useTransition` (not `useActionState`) so the modal can open immediately in `loading` state and update in place
   - Services preview pulls from the `services` Supabase table with a seeded fallback (table currently empty)
   - Production build passes; `/` serves as a dynamic SSR route due to the Supabase read
 
 **What's not done:**
-- **DVLA wiring** — deferred until the API key arrives. The form is fully functional UI; submit opens a "Lookup coming soon" modal. When the key lands, the next task is to:
-  1. Add `lib/dvla/{client,types}.ts` and `app/actions/lookup-vehicle.ts` (stub mode for missing key)
-  2. Swap the placeholder body in `vehicle-lookup-modal.tsx` for the real `VehicleDetails` render
-  3. Wire `reg-lookup-form.tsx` to call the server action via `useActionState`
-- **`/book` flow** — task 02. Customer booking steps 1–4 from the mobile mockups.
-- **Auth / login screens** — task 03 (or wherever it fits).
-- **Admin services CRUD** — when this ships, the seeded fallback in `services-preview.tsx` becomes dead code and the table gets a populated default catalogue.
-- **Tablet (768px) and mobile (375px) polish** — desktop (1280px) looks right; the 768/375 layouts work but need design tweaks (spacing, type scale, the hero stack, the modal sizing). Owner flagged this on the task 01 commit; treat as a follow-up before going further on customer-facing pages.
+- **`/book?reg=…` redirect** — modal's "Continue to booking" button currently just closes the modal. Real redirect lands when the booking flow exists.
+- **`/book` flow** — task 03. Customer booking steps 1–4 from the mobile mockups.
+- **Admins-can-read-all-profiles RLS policy** — dropped during Task 02 Stage 1 because of recursion. When a feature needs it back (mechanic approvals etc.), reintroduce via the `public.is_admin()` `SECURITY DEFINER` function as documented in `docs/02-data-model.md` — never with an inline subquery on `profiles`.
+- **Mechanic / customer login** — same pattern as admin login but at `/login` (shared) or per-role. Lands at whichever task first needs it (mechanic onboarding is task 07).
+- **`middleware.ts` → `proxy.ts` rename** — Next 16 dev server logs the deprecation warning on startup. Trivial follow-up: rename the file and the exported function name from `middleware` to `proxy`.
+- **Tablet (768px) and mobile (375px) polish** — desktop (1280px) looks right; the 768/375 layouts were re-worked in commit `ac0afe7` but treat as a candidate for further design tweaks before going further on customer-facing pages.
 
 ## Current task
 
-**Next: DVLA wiring + `/book` flow.** Likely split across two task docs once the API key situation is resolved. The DVLA work is small (one types file, one client file, one server action, one modal-body swap) and can land before the booking flow begins.
+**Next: Task 03 — customer booking flow (`docs/tasks/03-booking-flow.md`).** Task 02 fully complete. The `/book` route currently 404s (placeholder folder exists but no `page.tsx`). The hero + final-CTA reg-plate forms call `lookupVehicle` (a server action), open the result modal, and currently close it on "Continue to booking" — that button needs to push to `/book?reg=<reg>` once the route exists. Booking flow is 4 mobile-style steps in the proposal: 1) confirm vehicle, 2) pick service(s) from the live `services` table, 3) pick a slot (date/time + postcode), 4) checkout (Stripe Connect lands at task 08, so step 4 is a placeholder "confirmed" screen for now).
+
+**Watch-outs for Task 03:**
+- **Use the canonicalised RLS patterns.** Bookings will be a new table — start from the templates in `docs/02-data-model.md` (section "RLS patterns to follow"). For any table with `is_active` or a soft-delete concept, include the parallel admin SELECT policy from pattern #2. For admin checks, use `public.is_admin()` from pattern #1 — never inline `EXISTS (SELECT FROM profiles ...)`.
+- **Services + categories are DB-driven.** Step 2 of the flow queries `services` (with optional `category` filter via the slug). The 10-row seed catalogue is in place and the customer-facing services-preview already reads from the DB.
+- **`Select` primitive.** Custom dropdown at `components/ui/select.tsx`. Use this for any single-choice picker in the booking flow rather than native `<select>` — memory entry reminds future Claude of this.
+- **`sonner` is wired** at the admin shell layout but not at the customer side yet. If the booking flow wants toasts, mount a separate `<Toaster />` somewhere in the customer tree.
+- **Customer auth doesn't exist yet.** Booking can stay guest-only for now (mirrors the brief) — the `bookings` table already has `customer_id uuid NULL`. When customer login lands later, attach existing guest bookings via email match.
 
 ## Working principles
 
@@ -64,6 +120,7 @@ You are working on **Book My Tech**, a UK mobile-mechanic booking platform. This
 - **`lucide-react` v1** dropped brand icons (Twitter/Instagram/LinkedIn). Hand-rolled SVGs live inline in `app/(customer)/_components/footer.tsx`.
 - **`Icon` primitive** takes an `icon: LucideIcon` component prop, not a `name` string — preserves tree-shaking. Call sites: `import { Zap } from "lucide-react"; <Icon icon={Zap} />`.
 - **Route groups + `tsc`**: bare `npx tsc --noEmit` reports a false-positive validator error because `.next/types/validator.ts` doesn't perfectly track route groups (looks for `app/page.tsx` when the page is at `app/(customer)/page.tsx`). `npm run build` passes cleanly — the build pipeline handles route groups correctly.
+- **DVLA vs DVSA**: DVLA Vehicle Enquiry Service gives tax/MOT status but **not** the model. DVSA MOT History API gives the model (and full MOT history). We hit both in parallel and merge — see `app/actions/lookup-vehicle.ts`. Required env vars when running with real keys: `DVLA_API_KEY` (VES) plus `MOT_API_KEY` / `MOT_CLIENT_ID` / `MOT_CLIENT_SECRET` / `MOT_TOKEN_URL` / `MOT_SCOPE` (MOT). Missing either set falls back gracefully — DVLA to stub data, MOT to "no model".
 
 ## When in doubt
 
