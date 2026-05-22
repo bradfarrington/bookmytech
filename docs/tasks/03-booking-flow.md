@@ -17,10 +17,10 @@ Customer can complete a booking end-to-end:
 1. Lands on `/book?reg=LB21XYZ` from the homepage hero (or types reg if entering directly)
 2. Step 1: confirms vehicle (DVLA-fetched)
 3. Step 2: picks a service from the catalogue
-4. Step 3: sees the price + matched mechanic
+4. Step 3: sees the price and what's included (no mechanic — they are assigned after booking via backend dispatch)
 5. Step 4: picks a time slot, sees address + parking, confirms
 6. Stripe pre-authorisation runs
-7. Lands on confirmation screen with booking ID
+7. Lands on confirmation screen: booking reference + "finding your mechanic" status
 
 A row appears in the `bookings` table.
 
@@ -41,7 +41,7 @@ The structural scaffolding for the four-step flow. URL-driven step state — eac
   - `/book/vehicle` — step 1
   - `/book/service` — step 2
   - `/book/match` — step 3 (price + matched mechanic)
-  - `/book/slot` — step 4 (time slot + confirm)
+  - `/book/slot` — step 4 (time slot + confirm) — no mechanic param needed
   - `/book/confirmed/[id]` — confirmation screen (after successful pre-auth)
 - [ ] Booking state passed between steps via URL params (reg, service slug, mechanic id, slot timestamp) — no client-side global state library
 - [ ] Each step has a sticky back button (top left) and a sticky primary CTA (bottom on mobile, inline on desktop) — single decision per screen, per the brief
@@ -97,31 +97,26 @@ The service catalogue, presented as a category grid.
 
 ---
 
-### Stage 4 — Step 3: Price and matched mechanic
+### Stage 4 — Step 3: Price confirmation
 
-The big "here's your price" moment. Gradient blue hero card. Matched mechanic below.
-
-**Note on mechanic matching:** the dispatch/matching logic from the brief (section 11, open item) isn't fully scoped. For this task, do the simplest possible thing: pick a random "online" mechanic from the `profiles` table with role='mechanic'. We don't yet have mechanics in the system, so seed 5–10 fake mechanic profiles via SQL. Smart dispatch logic is a later task.
+The big "here's your price" moment. Gradient blue hero card only — **no mechanic is shown or selected here**. The customer never picks a mechanic. Once the booking is confirmed, the job is distributed on the backend to available mechanics; the first one to accept is assigned, and the customer is notified by email. The mechanic is revealed on the customer dashboard once accepted.
 
 **Acceptance criteria:**
 
-- [ ] Server component fetches the service by slug, picks a mechanic, and renders the screen
+- [ ] Server component fetches the service by slug and renders the screen
 - [ ] Large gradient blue hero card displaying:
   - Service name
-  - Fixed price (the service's starting_price_pence for now — area multipliers come later)
+  - Fixed price (the service's `starting_price_pence` for now — area multipliers come in task 08)
   - What's included: parts and labour, no call-out fee, 12-month guarantee
-  - Transparency note: "You won't be charged until the job is complete and you've signed off"
-- [ ] Mechanic card below with: avatar, name, verified badge, star rating (use seed values), job count, specialism (text), distance ("2.3 miles away" — fake for now)
-- [ ] "Change mechanic" link → opens a modal/sheet with 3–4 other available mechanics, customer can pick
-- [ ] Primary CTA "Pick a time" → navigates to `/book/slot?reg=...&service=...&mechanic=<id>`
-- [ ] Seed 8–10 fake mechanics via SQL (with names, avatars, ratings, job counts) so the screen has real data
+  - Transparency note: "A deposit is pre-authorised now. No money leaves your account until the job is complete and you've signed off."
+- [ ] A trust row beneath the hero: three icon+text items — "Vetted professional", "12-month guarantee", "No fix, no fee"
+- [ ] A short "How it works after you book" note — e.g. "Once confirmed, we'll match you with the best available mechanic in your area. You'll receive a confirmation email as soon as one accepts — usually within minutes."
+- [ ] Primary CTA "Pick a time" → navigates to `/book/slot?reg=...&service=<slug>`
+- [ ] No mechanic card, no "change mechanic" option, no mechanic seed data needed for this step
 
 **Files touched:**
 - `app/(customer)/book/match/page.tsx`
 - `app/(customer)/book/match/_components/price-hero.tsx`
-- `app/(customer)/book/match/_components/mechanic-card.tsx`
-- `app/(customer)/book/match/_components/change-mechanic-sheet.tsx`
-- Seed SQL for fake mechanics
 
 ---
 
@@ -139,11 +134,11 @@ The final step. Pick a slot, see total, confirm.
 - [ ] Special instructions textarea
 - [ ] Sticky bottom CTA bar showing: total price, "Confirm booking" button
 - [ ] On confirm:
-  1. Insert booking row in DB with status='pending'
-  2. Call Stripe Connect to create a PaymentIntent with `capture_method: 'manual'` (pre-auth, no capture yet)
+  1. Insert booking row in DB with status='pending_mechanic' (awaiting mechanic acceptance — no mechanic_id yet)
+  2. Call Stripe to create a PaymentIntent with `capture_method: 'manual'` (pre-auth, no capture yet)
   3. Pass the client_secret to Stripe Elements for card entry — show a Stripe-hosted card form in a modal
-  4. On successful pre-auth, update booking row with stripe_payment_intent_id and status='confirmed'
-  5. Send confirmation email via Resend
+  4. On successful pre-auth, update booking row with stripe_payment_intent_id and status='sourcing_mechanic'
+  5. Send confirmation email via Resend — subject: "Booking received — we're finding your mechanic"
   6. Redirect to `/book/confirmed/[booking-id]`
 - [ ] If Stripe pre-auth fails, surface the error and let the customer retry
 
@@ -171,7 +166,11 @@ Also relax the customer_id constraint (it's already nullable) — guest bookings
 
 **Confirmation screen:**
 
-- [ ] `/book/confirmed/[id]` — renders the booking ID, mechanic contact card (name, phone — fake for now), full booking summary (vehicle, service, mechanic, slot, total), and a "live tracking notice" placeholder ("Live tracking will activate 1 hour before your slot")
+- [ ] `/book/confirmed/[id]` — renders:
+  - Booking reference number
+  - Full booking summary: vehicle, service, time slot, address, total pre-authorised
+  - A "finding your mechanic" status card — animated/pulsing, e.g. "We're matching you with the best available mechanic in your area. You'll get an email confirmation as soon as they accept — usually within minutes."
+  - No mechanic card — the mechanic is unknown at this point
 - [ ] "Create an account to track your booking" CTA at the bottom — links to signup (signup screen doesn't exist yet, placeholder href is fine)
 
 **Files touched:**
@@ -189,10 +188,11 @@ Also relax the customer_id constraint (it's already nullable) — guest bookings
 
 ## What NOT to do in this task
 
-- Don't build smart dispatch logic — random mechanic selection is fine
+- Don't show or assign a mechanic during the booking flow — dispatch happens on the backend after booking is placed (task 05/09)
+- Don't seed fake mechanics for the booking flow — no mechanic data is needed until the mechanic dashboard tasks
 - Don't build real-time availability from mechanic working hours — fake availability is fine
 - Don't build customer signup at the end of booking — that's a later task (guest bookings only for now)
-- Don't build the customer dashboard / live tracking — placeholder text on confirmation screen is enough
+- Don't build the customer dashboard / live tracking — the confirmation screen "finding your mechanic" state is the extent of it for now
 - Don't capture the Stripe payment — only pre-authorise. Capture happens when the mechanic marks the job complete (later task)
 - Don't build SMS notifications — email only for this task
 

@@ -16,18 +16,18 @@ This task also covers the launch polish — accessibility audit, performance pas
 
 ### Stage 1 — Disputes resolution flow
 
-The brief lists this as an open question (section 11). We're picking a workable approach: disputes start with the involved parties, escalate to admin if unresolved.
+Disputes are raised by the customer from their job list on the customer dashboard. They are visible to the admin and to the mechanic assigned to the disputed booking. The admin monitors all correspondence but acts only as mediator — they intervene only if the parties cannot resolve it themselves. BMT is the named mediator. Disputes start with the involved parties and escalate to admin only if unresolved.
 
 **Customer-initiated dispute:**
 
-After a completed booking, customer has 48 hours to flag a problem. From the dashboard or via the review:
+After a completed booking, customer has 48 hours to flag a problem. From the "Raise dispute" button on the past jobs list in their dashboard:
 
 - Reason categories: Workmanship · Parts cost · Price · Mechanic conduct · Damage · Other
 - Description (required, min 30 chars)
 - Photos (optional, up to 6)
 - Refund request — full, partial (with amount), or "not after a refund, just want to flag this"
 
-Status: 'opened'. Booking status flips to 'disputed'. Stripe payment held (don't transfer to mechanic until resolved).
+Status: 'opened'. Booking status flips to 'disputed'. Stripe payment held (don't transfer to mechanic until resolved). A notification is sent to both the admin team and the assigned mechanic.
 
 **Mechanic-initiated dispute:**
 
@@ -50,14 +50,24 @@ Less common but happens — mechanic does the work, customer disputes payment or
 **Admin arbitration UI (`/admin/disputes/[id]`):**
 
 - Full case file: booking, customer account, mechanic account, all messages, all photos, payment status
-- "Suggested resolution" surfaced by simple rules (e.g. mechanic rating ≥ 4.8 and customer first booking → likely lean customer benefit-of-doubt warning; otherwise neutral)
+- Admin sees ALL correspondence between the parties throughout the dispute lifecycle
+- "Suggested resolution" surfaced by simple rules (e.g. mechanic rating ≥ 4.8 and customer first booking → lean customer benefit-of-doubt; otherwise neutral)
 - Decision: Full refund · Partial refund (£) · No refund · Compensation credit · Account action
 - Reason + customer-facing explanation
 - Auto-actions on resolution:
   - Refund via Stripe (full or partial)
   - Credit issued via `customer_credits`
-  - Mechanic flag (performance issue, repeated offences could lead to suspension)
+  - Mechanic flag (performance issue, repeated offences can lead to suspension)
   - Email both parties with outcome
+
+**Mechanic account suspension (`/admin/mechanics/[id]`):**
+
+Accessible from the mechanic detail page and from the dispute arbitration UI. Admin can:
+- Suspend a mechanic's account with a recorded reason and a defined end date (or indefinite pending review)
+- Suspended mechanics are immediately removed from all new job offer distribution — the dispatch function skips mechanics where `suspended_until > now()` or `is_suspended = true`
+- Suspension history is retained on the mechanic's profile in admin
+- Mechanic receives an email explaining the suspension, reason, and (if applicable) end date
+- When suspension lifts (either the end date passes or admin manually un-suspends), mechanic re-enters the distribution automatically
 
 **Schema:**
 
@@ -91,6 +101,21 @@ create table mechanic_flags (
   notes text,
   created_at timestamptz not null default now()
 );
+
+create table mechanic_suspensions (
+  id uuid primary key default gen_random_uuid(),
+  mechanic_id uuid not null references mechanics(id) on delete cascade,
+  reason text not null,
+  suspended_by uuid not null references profiles(id),
+  suspended_at timestamptz not null default now(),
+  suspended_until timestamptz, -- null = indefinite until manually lifted
+  lifted_at timestamptz,
+  lifted_by uuid references profiles(id)
+);
+
+-- Add suspension state to mechanics table
+alter table mechanics add column is_suspended boolean not null default false;
+alter table mechanics add column suspended_until timestamptz;
 ```
 
 **Mechanic performance flags:**
@@ -104,15 +129,20 @@ Mentioned in the live monitor's "needs attention" panel (task 04). Wire it up pr
 
 **Acceptance criteria:**
 
-- [ ] Customer can open dispute from dashboard within 48h of completion
+- [ ] Customer can open dispute from "Raise dispute" button on past jobs list within 48 h of completion
 - [ ] Mechanic can open dispute from job detail
-- [ ] In-app message thread per dispute
+- [ ] In-app message thread per dispute — admin sees all correspondence
+- [ ] Notification sent to admin and assigned mechanic when dispute is opened
 - [ ] Stripe payment hold on opened dispute (don't transfer to mechanic)
-- [ ] 48h auto-escalation to admin
+- [ ] 48 h auto-escalation to admin
 - [ ] Admin arbitration UI with case file + decision flow
 - [ ] Refund via Stripe API on resolution
 - [ ] Customer credits on partial refunds
 - [ ] Mechanic flags created on lost disputes
+- [ ] Admin can suspend mechanic from `/admin/mechanics/[id]` or dispute UI, with reason + optional end date
+- [ ] Suspended mechanic immediately excluded from dispatch; `mechanics.is_suspended = true` and `suspended_until` checked in dispatch function
+- [ ] Suspension email sent to mechanic; auto-lift when `suspended_until` passes (cron or check on dispatch)
+- [ ] Suspension history visible on mechanic profile in admin
 - [ ] Email notifications at every status change
 - [ ] Counters in admin "needs attention" panel and overview KPIs
 
@@ -144,9 +174,9 @@ A pass across the whole app fixing the rough edges.
 - [ ] **Network failure handling** — retry buttons where appropriate, queued actions where offline (already done for mobile PWA in task 06)
 - [ ] **Stripe failures** — clear customer-facing messages, support contact info
 - [ ] **DVLA failures** — fallback to manual vehicle entry, no dead-ends
-- [ ] **Cancel flows** — customer can cancel before mechanic accepted (full refund), can cancel after up to 2h before slot (partial refund with policy stated), can't cancel after that (must use dispute flow)
+- [ ] **Cancel flows** — customer cancellation fees are sourced from `platform_settings` at cancellation time: more than 24 h before slot → £0; within 24 h → £30 (configurable); mechanic already en route → £50 (configurable). The fee is charged from the pre-authorised deposit; the remainder is released. The cancel/reschedule UI is built in task 09.
 - [ ] **Mechanic no-show** — automatic if mechanic hasn't updated status to 'en_route' within 30 min of slot. Re-dispatches to backup mechanic, customer notified, original mechanic flagged.
-- [ ] **Cancellation policy** — public page at `/cancellation-policy`, linked from booking flow
+- [ ] **Cancellation policy** — public page at `/cancellation-policy`, linked from booking flow, showing the three fee tiers
 
 **Acceptance criteria:**
 

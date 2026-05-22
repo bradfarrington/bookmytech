@@ -158,16 +158,34 @@ When a mechanic clicks into an offer or scheduled job.
 - Customer notes (verbatim from special_instructions)
 - Customer-uploaded photos (none yet — placeholder grid, real photo upload comes later)
 - Parts allocated: name, supplier, cost (placeholder — parts system is task 10)
-- Earnings breakdown: customer pays £X → parts cost £Y → platform fee £Z (15%) → mechanic receives £W
+- Earnings breakdown: customer pays £X → parts cost £Y → platform fee £Z (commission rate) → mechanic receives £W
 - "Why you're a great match" reasons card: postcode proximity, specialism match, rating (text-based for now)
+- **Cancel job** and **Reschedule job** actions for confirmed jobs not yet in progress
+
+**Cancel job flow (mechanic-initiated):**
+1. Mechanic selects a reason (required)
+2. Cancellation reason is saved against the job record and is visible in the mechanic's job history in both the admin console and the mechanic's own dashboard
+3. Booking is re-dispatched to other mechanics via the standard offer process
+4. The original Stripe PaymentIntent is held (NOT cancelled) — it will be transferred to the replacement mechanic once they complete the job
+5. An automated email is sent to the customer: "Your original mechanic has had to cancel. We're finding you a suitable replacement and will confirm once accepted."
+6. A second email is sent to the customer once a replacement mechanic has accepted
+
+**Reschedule job flow (mechanic-initiated):**
+1. Mechanic proposes a new time slot with an optional note
+2. A notification is sent to the customer with the new proposed slot
+3. Customer can accept, decline, or propose another time
+4. If customer declines, the job is offered to other mechanics for redistribution (customer's choice)
+5. A new booking confirmation email is sent once a new time is agreed
 
 **Acceptance criteria:**
 
 - [ ] `app/(mechanic)/mechanic/jobs/[id]/page.tsx`
 - [ ] Renders all sections above
-- [ ] Earnings breakdown calculation correct (15% take-rate fixed for now)
+- [ ] Earnings breakdown reads commission rate from booking record (not hardcoded 15%)
 - [ ] Action buttons depending on status: Start journey (en_route → in_progress is on mobile only)
 - [ ] Customer phone number revealed only when status is 'en_route' or 'in_progress' (privacy)
+- [ ] Cancel job flow: reason prompt → cancellation saved to job record → redistribution triggered → customer email sent
+- [ ] Reschedule flow: propose new time → customer notified → accept/decline/counter path
 
 **Files touched:**
 - `app/(mechanic)/mechanic/jobs/[id]/page.tsx`

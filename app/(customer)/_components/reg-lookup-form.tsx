@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { ArrowRight, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
@@ -38,6 +39,7 @@ export function RegLookupForm({
   const [postcode, setPostcode] = useState(defaultPostcode);
   const [lookup, setLookup] = useState<LookupState | null>(null);
   const [, startTransition] = useTransition();
+  const router = useRouter();
 
   function handleSubmit() {
     const normalised = normaliseReg(reg);
@@ -125,6 +127,12 @@ export function RegLookupForm({
         status={lookup?.status ?? "loading"}
         details={lookup?.details}
         errorMessage={lookup?.errorMessage}
+        onContinue={() => {
+          const r = lookup?.reg ?? "";
+          const p = lookup?.postcode ?? "";
+          const url = `/book/vehicle?reg=${encodeURIComponent(r)}${p ? `&postcode=${encodeURIComponent(p)}` : ""}`;
+          router.push(url);
+        }}
       />
     </>
   );

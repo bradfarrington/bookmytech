@@ -2,7 +2,7 @@
 
 *Customer, Mechanic and Operations Journey · Platform Scope · Phased Build Plan*
 
-Book My Tech (BMT) is a two-sided marketplace that connects car owners with vetted mobile mechanics. A customer enters their registration plate, picks a service, sees a fixed price, and books a DBS-checked mechanic to come to their door — the entire booking takes under sixty seconds. The platform replaces the opaque pricing, slow phone-and-quote loops and lack of operational oversight that define the current UK mobile-mechanic market.
+Book My Tech (BMT) is a two-sided marketplace that connects car owners with vetted mobile mechanics. A customer enters their registration plate, picks a service, sees a fixed price, and books a vetted mechanic to come to their door — the entire booking takes under sixty seconds. The platform replaces the opaque pricing, slow phone-and-quote loops and lack of operational oversight that define the current UK mobile-mechanic market.
 
 This brief sets out the full scope of the platform across the three connected applications — customer, mechanic and admin — and the recommended phased build plan to take it from MVP to scale.
 
@@ -12,7 +12,7 @@ This brief sets out the full scope of the platform across the three connected ap
 | Booking core | 60-second booking flow with DVLA reg lookup, fixed transparent pricing, and matched mechanic by proximity, specialism and rating. |
 | Mechanic side | Live job feed with accept/decline, day schedule, in-progress checklist, earnings dashboard and document-verified onboarding. |
 | Operations console | Live job monitor, demand-vs-supply heatmap, mechanic approvals, pricing controls and analytics — single ops view. |
-| Commercial model | 15% take-rate by default, area multipliers, surge auto-engage, Pro-tier loyalty, and parts-margin layer wired in from day one. |
+| Commercial model | Per-service commission rate set in admin console, area-based labour pricing, Pro-tier loyalty, and parts-margin layer wired in from day one. |
 | Build approach | Five-phase plan: MVP launch (Wks 1–6), mechanic mobile + automation (7–10), commercial levers (11–14), retention (15–18), scale (19+). |
 
 ## 1. Context and purpose
@@ -37,11 +37,11 @@ Although the three surfaces look different, they read from the same underlying t
 
 ## 3. Customer journey
 
-The customer journey is built around the principle that a booking should feel instant. The desktop homepage opens with a dark gradient hero, headline copy, and an inline reg-plate plus postcode lookup field. The moment a postcode is entered, a live mechanic preview panel surfaces real mechanics in the area with their ratings, job count, ETA and fixed price — with a "best match" highlighted. A trust strip running below carries four badges (4.9-star average rating, DBS-checked, same-day availability, twelve-month guarantee), followed by a four-step "how it works" guide and three featured customer testimonials.
+The customer journey is built around the principle that a booking should feel instant. The desktop homepage opens with a dark gradient hero, headline copy, and an inline reg-plate plus postcode lookup field. The moment a postcode is entered, the customer is taken into the booking flow. Mechanic selection is handled automatically on the backend after the booking is placed. A trust strip running below carries four badges (4.9-star average rating, vetted professionals, same-day availability, twelve-month guarantee), followed by a four-step "how it works" guide and three featured customer testimonials.
 
 From there the customer moves into the mobile-first booking flow, which is structured as four steps with a progress stepper at the top of each screen and one decision per screen. The first step captures the vehicle through a UK-style number plate input — yellow background, GB badge — and DVLA auto-lookup pulls in make, model, engine, fuel type, year, MOT status, tax status and estimated mileage. The detected vehicle is shown in a highlighted card with a green check, and an "edit manually" fallback link covers edge cases.
 
-The second step is service selection. A search bar leads a six-category grid — full service, diagnostic (highlighted as the most-picked), brakes and tyres, battery, clutch and gears, and MOT pre-check — each with a starting price. A "not sure what's wrong?" card sits below as a soft entry point into the diagnostic flow. The third step shows the price and matched mechanic. A large gradient blue hero card displays the fixed price, the service name, and what is included (parts and labour, no call-out fee, twelve-month guarantee), alongside a transparency note clarifying that the customer is not charged until the job is finished and confirmed. The matched mechanic appears as a card with avatar, name, verified badge, star rating, job count, specialism and distance, with a "change" option.
+The second step is service selection. A search bar leads a six-category grid — full service, diagnostic (highlighted as the most-picked), brakes and tyres, battery, clutch and gears, and MOT pre-check — each with a starting price. A "not sure what's wrong?" card sits below as a soft entry point into the diagnostic flow. The third step shows the price and what is included. A large gradient blue hero card displays the fixed price, the service name, and what is included (parts and labour, no call-out fee, twelve-month guarantee), alongside a transparency note clarifying that a deposit is pre-authorised at booking and is only released once the job is complete and the customer has signed off. No money leaves the customer's account until the work is done. No mechanic is shown at this stage — the customer does not choose their mechanic. Once the booking is confirmed, the job is distributed on the backend to available mechanics in the area; the first to accept is assigned. The customer receives an email confirmation as soon as a mechanic accepts, at which point the mechanic's details are visible on the customer dashboard.
 
 The final step is the time slot. A horizontal date strip shows five days with available slot counts; a three-column time grid below shows the open times with "Popular" and "Last" badges. The customer's address is pre-filled in a card with parking type and special instructions, and a sticky CTA bar at the bottom shows the total to pre-authorise and a single confirm button. The intent throughout is to keep the customer moving — short copy, generous whitespace, no hidden fees, total surfaced early.
 
@@ -65,19 +65,26 @@ The admin console is desktop-only and built around a dark sidebar with three nav
 
 The overview dashboard is the team's home screen. Five KPI cards run across the top — live bookings, GMV today, take-rate, mechanics online, and average time-to-accept. A live monitor table below shows every active booking in real time with ID, service, customer, mechanic, area, status (en route, in progress, sourcing mechanic, complete) and value. A "needs your attention" panel surfaces flagged items — undersupplied areas, mechanic performance flags, open disputes — and a horizontal demand-by-area bar chart shows job volume against mechanic supply per zone, with warnings on undersupplied postcodes.
 
-Job monitoring expands the live view into a full filterable table — date range, area, service type, mechanic, status — with tabs for all, live, pending, complete and disputed jobs, plus export and manual booking buttons. Mechanic approvals uses a queue/detail split view: oldest applications first, with a verification checklist (ID, public liability insurance, DBS, trade qualification, bank and VAT, two references), each item with a status indicator and a "view" button, plus an auto-screen summary note and approve/reject buttons.
+Job monitoring expands the live view into a full filterable table — date range, area, service type, mechanic, status — with tabs for all, live, pending, complete and disputed jobs, plus export and manual booking buttons. Mechanic approvals uses a queue/detail split view: oldest applications first, with a verification checklist (ID, public liability insurance, trade insurance, trade qualification, bank and VAT, two references), each item with a status indicator and a "view" button, plus an auto-screen summary note and approve/reject/override buttons. The admin can override any outstanding queries and approve the mechanic immediately, granting a 28-day grace period in which the mechanic must supply any missing documents. Mechanics with documents outstanding beyond that grace period are automatically suspended from the distribution until they comply.
 
-Pricing controls let the team edit base service prices, area multipliers (London Z1–Z2 at ×1.15, rural at ×1.10, etc.), and toggle a surge pricing beta that auto-engages when demand exceeds three times supply. The analytics view runs on period selectors (7d, 30d, 90d, year), with KPI cards for GMV, net revenue, bookings and repeat rate, a GMV trend chart with prior-period overlay, a service mix breakdown, ranked top areas and top mechanics, and a five-stage conversion funnel from reg lookup started through to booked.
+Pricing controls let the team edit base service prices, commission rates per service, area labour multipliers (London Z1–Z2 at ×1.15, rural at ×1.10, etc.), cancellation fee tiers (before 24 h: £0; within 24 h: £30; mechanic already on the way: £50 — all configurable), and dummy parts pricing by area for development (to be replaced by a live API later). Surge pricing has been removed from the platform. The disputes section shows all open disputes across the platform. Disputes are visible to the admin and to the mechanic assigned to the disputed job — the admin monitors all correspondence but acts only as mediator and only gets involved if the parties cannot resolve it themselves. The admin can suspend mechanic accounts from the live distribution with a reason and a time frame, which immediately removes them from all new job offers until the suspension is lifted. The analytics view runs on period selectors (7d, 30d, 90d, year), with KPI cards for GMV, net revenue, bookings and repeat rate, a GMV trend chart with prior-period overlay, a service mix breakdown, ranked top areas and top mechanics, and a five-stage conversion funnel from reg lookup started through to booked.
 
 ## 6. Commercial model
 
-The default take-rate is 15% per job, with a lower rate for Pro-tier mechanics as a loyalty incentive. Area-based multipliers apply by postcode — premium areas at ×1.05–1.15, growth areas subsidised below the base rate. Surge pricing auto-engages when demand outstrips supply at a ×1.15 multiplier. Featured listings give mechanics a paid path to priority placement in customer-facing results. The data model is wired from day one to support future revenue layers — parts margin, B2B fleet contracts, insurance and warranty partnerships — so these can be turned on without re-platforming.
+Commission is set per service in the admin console, so different service types can carry different rates. Pro-tier mechanics earn a lower commission as a loyalty incentive. Area-based labour multipliers apply by postcode — premium areas at ×1.05–1.15, growth areas subsidised below the base rate. Parts pricing is area-specific and will be pulled from an API in production; dummy data is used during development. Surge pricing has been removed from the platform. Featured listings give mechanics a paid path to priority placement in customer-facing results.
+
+**Payment model:** at booking a deposit is pre-authorised on the customer's card. The payment remains pending until the mechanic marks the job complete, at which point the funds are released and split between the platform (commission) and the mechanic (remainder). If a mechanic cancels and the job is redistributed, the original pending payment is held and transferred to the replacement mechanic's details once the new job is complete, avoiding a second charge to the customer.
+
+**Cancellation fees:** if the customer cancels more than 24 hours before the appointment there is no charge. If they cancel within 24 hours the fee is £30. If they cancel after the mechanic is already on the way the fee is £50. All three thresholds are configurable in the admin console.
+
+The data model is wired from day one to support future revenue layers — parts margin, B2B fleet contracts, insurance and warranty partnerships — so these can be turned on without re-platforming.
 
 | Lever | Detail |
 | --- | --- |
-| Commission per job | Default 15% take-rate. Lower for Pro-tier mechanics as a loyalty incentive. |
-| Area multipliers | Postcode-based: ×1.05–1.15 in premium areas, subsidised in growth areas. |
-| Surge pricing | Auto-engages at ×1.15 when demand exceeds 3× supply. |
+| Commission per job | Configurable per service in admin console. Lower for Pro-tier mechanics as a loyalty incentive. |
+| Area labour multipliers | Postcode-based: ×1.05–1.15 in premium areas, subsidised in growth areas. |
+| Parts pricing | Area-specific; dummy data for development, live API in production. |
+| Cancellation fees | >24 h: £0 · within 24 h: £30 · mechanic on the way: £50 — all configurable. |
 | Featured listings | Paid placement for mechanics seeking priority in customer results. |
 | Future levers | Parts margin, fleet contracts, insurance partnerships — all data-modelled from day one. |
 
@@ -140,19 +147,41 @@ Phase five opens the platform up to national expansion and new revenue streams. 
 - Take-rate holds at 15%, with area multipliers protecting margin in premium postcodes.
 - Mechanic onboarding from application to approved takes under forty-eight hours, with automated document verification.
 
-## 11. Points that still need clarification
+## 11. Resolved decisions
 
-These are the open items to discuss on the kick-off call so they can be settled before phase one begins.
+The following items were open at the time of the initial brief. All have now been settled with the client.
 
-- The exact dispatch logic when the matched mechanic declines — fallback queue order, time-out before re-dispatch, and how the customer is communicated with during sourcing.
-- The commission split for parts versus labour, and how parts margin is shown to mechanics in the earnings breakdown.
-- The threshold for surge pricing engagement and whether the customer is shown the surge multiplier explicitly or just the final price.
-- The exact rules for when a booking can be cancelled by either party and the refund logic for pre-authorised payments.
-- The verification documents required for mechanic onboarding beyond the seven items in the approvals checklist, and which can be auto-screened versus manually reviewed.
-- The data points required for the analytics dashboard at launch versus phase three — what is essential for ops on day one and what can be layered in later.
-- The plan for handling disputes that involve parts cost, workmanship and customer expectation — escalation path and final arbitration owner.
-- The geographic launch sequence after the initial three London boroughs — which areas next, and the demand thresholds that trigger expansion.
+**Cancellations and rescheduling — customer-initiated**
+- If a customer wants to reschedule, they are asked for a reason and rescheduled with the already-assigned mechanic.
+- If a customer cancels, they are asked for a reason. Cancellation fees apply based on timing: more than 24 hours before the appointment — no charge; within 24 hours — £30; after the mechanic is already on the way — £50. All fee thresholds are configurable in the admin console.
+
+**Cancellations and rescheduling — mechanic-initiated**
+- If a mechanic reschedules, the customer receives a new confirmation and can accept, decline, or request an alternative time. If the customer declines, BMT offers to redistribute the job to another available mechanic.
+- If a mechanic cancels, a reason is recorded and saved against that mechanic's job history in both the admin console and the mechanic's own dashboard. The job is immediately redistributed to other mechanics via the standard offer process. The original pending payment is held rather than refunded and cancelled — it is transferred to the new mechanic's payout once the replacement job is complete, avoiding a second charge to the customer. An automated email is sent to the customer explaining that the original mechanic has cancelled and that BMT is finding a suitable replacement; a second email is sent once a replacement has accepted.
+
+**Commission**
+- Commission is determined per service in the admin console. There is no platform-wide flat rate.
+
+**Surge pricing**
+- Removed entirely from the booking flow and all other areas of the platform.
+
+**Payment model**
+- A deposit is pre-authorised (not captured) at booking. The payment remains pending until the mechanic marks the job complete. On completion the funds are released and split between the platform commission and the mechanic payout based on the per-service commission rate and the final job price.
+
+**Mechanic screening and onboarding documents**
+- Mechanics are screened on: qualifications, two forms of insurance (trade insurance and public liability insurance), and stated ability/specialisms on their application form.
+- Admins can override any outstanding queries in the approvals queue and approve a mechanic immediately, granting them a 28-day grace period to supply any missing documents.
+- DBS checks are removed from the platform entirely — mechanics are described as "vetted professionals" in all customer-facing copy.
+
+**Disputes**
+- Customers can raise a dispute from their job list on the customer dashboard.
+- Disputes are visible to and notifiable to both the admin team and the mechanic assigned to the disputed job.
+- The admin sees all correspondence but acts only as mediator — they get involved only if the parties cannot resolve the dispute themselves. BMT is the named mediator.
+- The admin can suspend mechanic accounts from the live distribution at any time, with a recorded reason and a defined time frame. Suspended mechanics are immediately removed from all new job offer distribution until the suspension is lifted or expires.
+
+**Pricing by area**
+- Each active area has set prices per service. Labour charges vary by area. Parts pricing also varies by area (to be pulled from an API in production; dummy data is used during development).
 
 ---
 
-*This brief describes the Book My Tech platform end-to-end as scoped for the kick-off call. The phased build plan, design system and tech stack are the recommended path; the points in section eleven are the items to settle before phase one begins.*
+*This brief describes the Book My Tech platform end-to-end. All open items from the initial scoping call have been resolved and are documented in section 11 above.*

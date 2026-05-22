@@ -6,7 +6,7 @@ Build the public-facing mechanic application flow ("become a BMT mechanic") and 
 
 ## Why this task
 
-Right now mechanics are added by hand by an admin. That doesn't scale. The brief (sections 4 and 5) describes a proper application flow with document verification — DBS, insurance, qualifications, references — and an approvals queue where ops can review and approve / reject. Onboarding target is under 48 hours from application to approved.
+Right now mechanics are added by hand by an admin. That doesn't scale. The brief (sections 4 and 5) describes a proper application flow with document verification — two forms of insurance, qualifications, references — and an approvals queue where ops can review and approve / reject. Onboarding target is under 48 hours from application to approved. There are no DBS checks on this platform; mechanics are described as "vetted professionals" in all customer-facing copy.
 
 ## Three sub-stages
 
@@ -24,11 +24,13 @@ A multi-step form at `/mechanics/apply` for prospective mechanics.
 4. **Documents** — upload:
    - Photo ID (passport or driving licence)
    - Proof of public liability insurance (PDF or image)
-   - DBS check certificate (or "apply for one" link if they don't have one)
+   - Proof of trade insurance (PDF or image)
    - Trade qualification (NVQ, IMI, City & Guilds, etc.)
    - Bank account details (sort code + account number, encrypted at rest)
    - VAT registration document (if applicable)
    - Two professional references (name, relationship, email, phone)
+
+   Note: DBS checks are not required and must not appear anywhere in the application flow or UI copy. Mechanics are described as "vetted professionals".
 5. **Review + submit** — show everything they entered, submit button creates the application
 
 **Schema:**
@@ -52,8 +54,8 @@ create table mechanic_applications (
   service_radius_miles integer default 10,
   -- Step 4 documents (Supabase Storage URLs)
   doc_photo_id text,
-  doc_insurance text,
-  doc_dbs text,
+  doc_public_liability_insurance text,
+  doc_trade_insurance text,
   doc_qualification text,
   doc_vat text,
   bank_sort_code_encrypted text,
@@ -62,7 +64,9 @@ create table mechanic_applications (
   reference_1_name text, reference_1_email text, reference_1_phone text, reference_1_relationship text,
   reference_2_name text, reference_2_email text, reference_2_phone text, reference_2_relationship text,
   -- Status
-  status text not null default 'submitted', -- 'submitted' | 'under_review' | 'approved' | 'rejected' | 'needs_info'
+  status text not null default 'submitted', -- 'submitted' | 'under_review' | 'approved' | 'approved_with_grace' | 'rejected' | 'needs_info'
+  -- approved_with_grace = admin override: mechanic is live but has 28 days to supply outstanding docs
+  grace_period_ends_at timestamptz, -- set when status='approved_with_grace'
   rejection_reason text,
   submitted_at timestamptz not null default now(),
   reviewed_at timestamptz,
@@ -106,10 +110,10 @@ The queue/detail split view from section 5 of the brief.
   - Filters: by status (submitted, under_review, needs_info, approved, rejected)
 - Right column: detail view of the selected application
   - All applicant info (name, contact, business, specialisms)
-  - Verification checklist with seven items (per brief):
+  - Verification checklist with seven items:
     1. Photo ID
     2. Public liability insurance
-    3. DBS check
+    3. Trade insurance
     4. Trade qualification
     5. Bank account details
     6. VAT registration (if applicable)
@@ -119,12 +123,13 @@ The queue/detail split view from section 5 of the brief.
     - "View" button → opens the document in a modal or new tab
     - Auto-screen note (e.g. "Insurance certificate expires Dec 2026 ✓")
   - Auto-screen summary at the top: "5 of 7 items auto-verified. 2 need manual review."
-  - Three action buttons at the bottom: **Approve**, **Reject**, **Request more info**
+  - Four action buttons at the bottom: **Approve**, **Approve with 28-day grace**, **Reject**, **Request more info**
+  - "Approve with 28-day grace" lets the admin accept the mechanic immediately despite outstanding documents, setting `status='approved_with_grace'` and `grace_period_ends_at = now() + 28 days`. The mechanic is live but a warning banner shows on their dashboard listing missing documents and the deadline. If the grace period expires without resolution, their account is auto-suspended from distribution.
 
 **Auto-screening (basic for this task):**
 
-- Insurance: check the file exists and is < 5MB
-- DBS: check the file exists
+- Public liability insurance: check the file exists and is < 5MB
+- Trade insurance: check the file exists and is < 5MB
 - ID: check the file exists
 - Qualification: check the file exists
 - Bank: check format (8-digit account, 6-digit sort code)
@@ -198,7 +203,7 @@ Once approved, mechanics need to keep documents up to date (insurance renewals, 
 create table mechanic_documents (
   id uuid primary key default gen_random_uuid(),
   mechanic_id uuid not null references mechanics(id) on delete cascade,
-  doc_type text not null, -- 'insurance' | 'dbs' | 'qualification' | 'id' | 'vat'
+  doc_type text not null, -- 'public_liability_insurance' | 'trade_insurance' | 'qualification' | 'id' | 'vat'
   file_url text not null,
   expires_at date,
   status text not null default 'pending_review', -- 'pending_review' | 'verified' | 'rejected' | 'expired'

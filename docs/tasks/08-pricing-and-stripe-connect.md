@@ -2,19 +2,21 @@
 
 **Status:** ⏳ Queued
 
-Build the dynamic pricing layer (area multipliers, surge, admin controls) and wire Stripe Connect for mechanic payouts. This is the commercial backbone of the platform — until this exists, mechanics aren't getting paid through the system and pricing is just whatever's in the services table.
+Build the dynamic pricing layer (area multipliers, per-service commission, admin controls) and wire Stripe Connect for mechanic payouts. This is the commercial backbone of the platform — until this exists, mechanics aren't getting paid through the system and pricing is just whatever's in the services table.
+
+**Surge pricing is not part of this platform.** Do not implement it, reference it, or leave hooks for it.
 
 ## Why this task
 
-The brief (section 6 + phase 3) calls out the commercial model as a day-one priority for the data model, but explicitly defers the *engine* to phase 3. By now we've got bookings flowing through and mechanics doing work — they need to be paid, and the platform needs to start protecting margin via area multipliers and surge.
+The brief (section 6 + phase 3) calls out the commercial model as a day-one priority for the data model, but explicitly defers the *engine* to phase 3. By now we've got bookings flowing through and mechanics doing work — they need to be paid, and the platform needs to start protecting margin via area multipliers.
 
-## Four sub-stages
+## Three sub-stages
 
 ---
 
 ### Stage 1 — Pricing engine
 
-Replace "starting_price_pence" as the booking total with a calculated total that accounts for area multiplier, surge multiplier, and (later) parts margin.
+Replace "starting_price_pence" as the booking total with a calculated total that accounts for area labour multiplier and per-service commission. Parts pricing uses dummy data keyed by area during development; a live parts API replaces it in production.
 
 **Schema:**
 
@@ -23,26 +25,27 @@ create table areas (
   id uuid primary key default gen_random_uuid(),
   name text not null, -- "London Z1-Z2", "Manchester central", etc.
   postcode_prefixes text[] not null, -- ['EC', 'WC', 'W1', 'SW1', ...]
-  base_multiplier numeric(4,3) not null default 1.000, -- 1.050 = +5%
-  surge_enabled boolean not null default false,
+  labour_multiplier numeric(4,3) not null default 1.000, -- 1.050 = +5% on labour portion
   is_active boolean not null default true,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 
-create table service_overrides (
+create table service_area_prices (
   id uuid primary key default gen_random_uuid(),
   service_id uuid references services(id) on delete cascade,
   area_id uuid references areas(id) on delete cascade,
-  override_price_pence integer, -- if set, overrides starting_price_pence * multiplier
+  override_price_pence integer, -- if set, overrides starting_price_pence * labour_multiplier
+  parts_price_pence integer,    -- dummy parts cost for this service in this area (dev only)
+  commission_rate numeric(5,4) not null default 0.1500, -- e.g. 0.1500 = 15%
   is_active boolean not null default true,
-  primary key (service_id, area_id) -- one override per service-area pair
+  unique (service_id, area_id)
 );
 
 alter table bookings add column area_id uuid references areas(id);
 alter table bookings add column base_price_pence integer;
-alter table bookings add column area_multiplier numeric(4,3) default 1.000;
-alter table bookings add column surge_multiplier numeric(4,3) default 1.000;
+alter table bookings add column labour_multiplier numeric(4,3) default 1.000;
+alter table bookings add column commission_rate numeric(5,4);
 alter table bookings add column platform_fee_pence integer;
 alter table bookings add column mechanic_payout_pence integer;
 ```
@@ -52,32 +55,35 @@ alter table bookings add column mechanic_payout_pence integer;
 ```ts
 function calculatePrice(serviceId, postcode): {
   basePence: number
-  areaMultiplier: number
-  surgeMultiplier: number
+  labourMultiplier: number
+  partsPence: number
   totalPence: number
-  platformFeePence: number  // 15% of (total - parts)
+  commissionRate: number
+  platformFeePence: number
   mechanicPayoutPence: number
 }
 ```
 
 Steps:
 
-1. Look up service starting_price_pence
-2. Resolve postcode → area (match postcode prefix against areas.postcode_prefixes)
-3. Check for service_override on (service, area); if present, use override_price_pence as base; else, base = starting_price * area.base_multiplier
-4. If area.surge_enabled and current demand/supply ratio > 3:1, apply 1.15 surge multiplier
-5. Calculate platform_fee = 15% of total (or 12% if mechanic.is_pro)
-6. mechanic_payout = total - platform_fee
-7. Return all parts
+1. Look up service `starting_price_pence`
+2. Resolve postcode → area (match postcode prefix against `areas.postcode_prefixes`)
+3. Look up `service_area_prices` for (service, area). If a row exists and `override_price_pence` is set, use it as base; otherwise base = `starting_price_pence * area.labour_multiplier`
+4. Add `parts_price_pence` from `service_area_prices` (dummy data; zero if not set)
+5. Resolve commission rate: use `service_area_prices.commission_rate` if set, else fall back to `platform_settings.take_rate_base`. Pro-tier mechanics use `platform_settings.take_rate_pro`.
+6. `platform_fee = round(total * commissionRate)`
+7. `mechanic_payout = total - platform_fee`
+8. Return all parts
 
 **Acceptance criteria:**
 
-- [ ] Schema migration with areas, service_overrides, booking pricing columns
+- [ ] Schema migration with areas, service_area_prices, booking pricing columns
 - [ ] Pricing engine function implemented and unit tested
 - [ ] Booking flow (`/book/match`) updated to call the pricing engine instead of using starting_price_pence directly
-- [ ] Booking row populated with base, multipliers, fees, payout breakdown
+- [ ] Booking row populated with base, multiplier, commission rate, fees, payout breakdown
 - [ ] Mechanic earnings breakdown in task 05 updated to read from booking pricing columns
 - [ ] Seed 4–5 areas: "London Z1-Z2" (×1.15), "London Z3-Z6" (×1.05), "Manchester" (×1.00), "Rural" (×1.10), "Default" (catch-all, ×1.00)
+- [ ] Seed dummy parts prices for each service/area combination
 
 **Files touched:**
 - `lib/pricing/calculate.ts`
@@ -95,10 +101,11 @@ Steps:
 **Layout:**
 
 - **Base service prices** — table of all services with editable starting prices. Inline edit, save on blur. Mirrors the services CRUD but focused on pricing.
-- **Area multipliers** — table of areas with editable multiplier, surge toggle, add/edit/delete areas
-- **Service overrides** — rare per-area-per-service price overrides. Add by selecting a service + area + override price.
-- **Surge pricing settings** — global toggle, demand:supply ratio threshold (default 3:1), surge multiplier (default 1.15)
-- **Take-rate** — base (15%) and Pro tier (12%) — editable
+- **Per-service commission** — each service has its own commission rate (shown as a percentage, stored as a decimal). Editable inline. Falls back to the platform default if not set.
+- **Area labour multipliers** — table of areas with editable labour multiplier, add/edit/delete areas. No surge toggle.
+- **Service/area price overrides and dummy parts costs** — per-service per-area overrides. Add by selecting a service + area + override price + parts cost (dummy for dev).
+- **Cancellation fee tiers** — three configurable thresholds: cancellation more than 24 h before appointment (default £0), within 24 h (default £30), mechanic already on the way (default £50).
+- **Default commission rates** — fallback take-rate base and Pro tier rate, used when no per-service rate is set.
 
 **Schema:**
 
@@ -110,15 +117,20 @@ create table platform_settings (
   updated_by uuid references profiles(id)
 );
 
--- Seeded keys: take_rate_base (0.15), take_rate_pro (0.12), surge_threshold (3.0), surge_multiplier (1.15)
+-- Seeded keys:
+--   take_rate_base (0.15)      — fallback commission rate
+--   take_rate_pro (0.12)       — Pro tier commission rate
+--   cancel_fee_before_24h (0)  — pence charged when cancelled >24h before slot
+--   cancel_fee_within_24h (3000) — pence charged when cancelled within 24h
+--   cancel_fee_mechanic_en_route (5000) — pence charged when mechanic is on the way
 ```
 
 **Acceptance criteria:**
 
-- [ ] `/admin/pricing` page with all four sections
+- [ ] `/admin/pricing` page with all six sections above
 - [ ] Each section has inline editing with optimistic UI and server actions
 - [ ] Changes audited — `pricing_audit_log` table records who changed what and when
-- [ ] Take-rate changes apply to *new* bookings only, not retroactively (enforce this in the pricing engine — use the rate from booking creation time)
+- [ ] Commission and fee changes apply to *new* bookings only, not retroactively (enforce this in the pricing engine — snapshot the rate onto the booking row at creation time)
 
 **Files touched:**
 - `app/(admin)/admin/pricing/page.tsx`
@@ -128,40 +140,7 @@ create table platform_settings (
 
 ---
 
-### Stage 3 — Surge engine
-
-A background job that monitors demand/supply per area and toggles surge on/off automatically.
-
-**How it works:**
-
-- A scheduled Supabase Edge Function runs every 5 minutes
-- For each active area, count:
-  - Demand: pending + recent bookings (last 30 min) in the area
-  - Supply: online mechanics in the area with matching specialisms
-- If demand:supply > threshold (configurable, default 3:1), set `area.surge_enabled = true`
-- If it drops below 2:1 (hysteresis to prevent flapping), set surge back off
-- Log surge state changes for analytics
-
-**Customer-facing surge UX:**
-
-- When surge is active in the customer's area, the booking flow shows a subtle note: "Higher demand in your area — small surcharge applied." No multiplier shown explicitly.
-- This is one of the open questions in section 11 of the brief — we're picking the "don't show multiplier explicitly" option. Easy to flip later.
-
-**Acceptance criteria:**
-
-- [ ] Edge function `surge-monitor` deployed with 5-minute cron schedule
-- [ ] Surge state changes logged in `surge_log` table
-- [ ] Booking flow shows the subtle surge note when active
-- [ ] Admin pricing page shows current surge state per area
-
-**Files touched:**
-- `supabase/functions/surge-monitor/index.ts`
-- `app/(customer)/book/match/_components/surge-note.tsx`
-- Schema migration (surge_log table)
-
----
-
-### Stage 4 — Stripe Connect for mechanic payouts
+### Stage 3 — Stripe Connect for mechanic payouts
 
 The mechanic-side payment rails. Mechanics onboard with Stripe Connect Express; the platform takes the fee and pays mechanics out.
 
@@ -184,10 +163,14 @@ alter table mechanics add column stripe_payouts_enabled boolean not null default
 
 **Capture flow (updates from task 06):**
 
-When the mechanic completes a job:
-1. Capture the PaymentIntent (already done in task 06)
-2. Create a transfer from the platform account to the mechanic's connected account for the mechanic_payout_pence amount
-3. Stripe handles the actual payout to the mechanic's bank on its standard schedule (or set instant payouts for Pro tier mechanics later)
+When the mechanic marks a job complete:
+1. Capture the PaymentIntent — the pre-authorised deposit is now charged (already done in task 06)
+2. Create a transfer from the platform account to the mechanic's connected account for `mechanic_payout_pence`
+3. The platform retains `platform_fee_pence` as commission
+4. Stripe handles the actual payout to the mechanic's bank on its standard schedule
+
+**Mechanic cancellation — payment hold behaviour:**
+If the originally assigned mechanic cancels, do NOT cancel the PaymentIntent. Keep it on hold. When a replacement mechanic accepts and completes the job, capture as normal but transfer to the replacement mechanic's `stripe_account_id`. This avoids charging the customer twice.
 
 **Earnings page updates:**
 
@@ -215,15 +198,15 @@ When the mechanic completes a job:
 
 ## What NOT to do in this task
 
+- Don't build surge pricing — it has been removed from the platform entirely
 - Don't build parts margin layer — task 10
 - Don't build Pro tier mechanic benefits — task 11
 - Don't build refund / dispute flow — task 12
 - Don't build instant payouts — standard Stripe schedule is fine
-- Don't try to be smart about surge — simple ratio-based with hysteresis is sufficient
 
 ## When complete
 
 - Update `docs/HANDOFF.md`
 - Commit and push
 
-The platform is now commercially live — bookings priced by area, mechanics paid via Stripe, surge active when demand spikes.
+The platform is now commercially live — bookings priced by area and per-service commission, mechanics paid via Stripe, customer deposits held and released on job completion.

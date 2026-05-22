@@ -39,9 +39,13 @@ Currently bookings are guest-only. Add proper customer signup + login + dashboar
   - Map preview showing mechanic location and customer address
   - Call mechanic / Message mechanic buttons (call only enabled when en_route or in_progress)
 - **Upcoming bookings** — list of scheduled jobs with time, service, mechanic
+  - Each has a **Cancel** and **Reschedule** button
+  - Cancel: customer is asked for a reason before confirming. Cancellation fee is calculated and displayed based on the timing rules (>24 h: £0, within 24 h: £30, mechanic en route: £50 — sourced from `platform_settings`). Customer confirms, booking is cancelled, fee (if any) is charged from the pre-authorised deposit, remainder is released.
+  - Reschedule: customer picks a new time slot. The same assigned mechanic is kept. A reason is requested. Customer is shown a new confirmation.
 - **Past jobs** — chronological list of completed jobs
   - Each has: service, mechanic, date, total paid, rating given
   - "Book again" button → one-tap rebook with the same service + mechanic preference
+  - "Raise dispute" button — visible for 48 hours after completion (links to dispute flow — built in task 12)
 - **Your vehicles** — saved vehicles from past bookings (auto-saved on first booking, editable)
 - **Profile menu** — account settings, payment methods, addresses, notification preferences, sign out
 
@@ -51,7 +55,9 @@ Currently bookings are guest-only. Add proper customer signup + login + dashboar
 - [ ] Guest-to-account linking on signup
 - [ ] `/dashboard` with all sections above
 - [ ] Active booking card uses Supabase Realtime to update status live
-- [ ] Past jobs list with rebook functionality
+- [ ] Cancel booking flow: reason prompt → fee preview → confirm → cancellation fee charged (if applicable), deposit remainder released
+- [ ] Reschedule booking flow: reason prompt → new time slot picker (same mechanic) → new confirmation email sent
+- [ ] Past jobs list with rebook functionality and 48-h dispute button
 - [ ] Saved vehicles (new table or stored as a JSON column on profiles)
 - [ ] Account settings page
 

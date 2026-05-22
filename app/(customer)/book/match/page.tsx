@@ -1,0 +1,78 @@
+import { redirect, notFound } from "next/navigation";
+import Link from "next/link";
+import { ArrowLeft, ChevronRight } from "lucide-react";
+import { createClient } from "@/lib/supabase/server";
+import { ProgressStepper } from "@/components/customer/progress-stepper";
+import { Button } from "@/components/ui/button";
+import { PriceHero } from "./_components/price-hero";
+
+interface MatchPageProps {
+  searchParams: Promise<{
+    reg?: string;
+    service?: string;
+    make?: string;
+    model?: string;
+  }>;
+}
+
+export default async function MatchPage({ searchParams }: MatchPageProps) {
+  const params = await searchParams;
+  const reg = params.reg ?? "";
+  const serviceSlug = params.service ?? "";
+
+  if (!reg.trim() || !serviceSlug.trim()) {
+    redirect("/book");
+  }
+
+  const supabase = await createClient();
+  const { data: service } = await supabase
+    .from("services")
+    .select("id, name, slug, starting_price_pence, description")
+    .eq("slug", serviceSlug)
+    .eq("is_active", true)
+    .single();
+
+  if (!service) notFound();
+
+  const vehicleParams = [
+    params.make ? `make=${encodeURIComponent(params.make)}` : null,
+    params.model ? `model=${encodeURIComponent(params.model)}` : null,
+  ]
+    .filter(Boolean)
+    .join("&");
+
+  const backHref = `/book/service?reg=${encodeURIComponent(reg)}${vehicleParams ? `&${vehicleParams}` : ""}`;
+  const slotHref = `/book/slot?reg=${encodeURIComponent(reg)}&service=${encodeURIComponent(serviceSlug)}${vehicleParams ? `&${vehicleParams}` : ""}`;
+
+  return (
+    <div className="flex flex-col gap-6">
+      <ProgressStepper currentStep={3} />
+
+      <div className="flex items-center gap-3">
+        <Link
+          href={backHref}
+          className="flex size-9 shrink-0 items-center justify-center rounded-full border border-border text-text-secondary hover:bg-surface"
+          aria-label="Back"
+        >
+          <ArrowLeft size={18} />
+        </Link>
+        <div>
+          <h1 className="text-2xl font-bold text-text-primary">Your price</h1>
+          <p className="text-sm text-text-secondary">{reg}</p>
+        </div>
+      </div>
+
+      <PriceHero
+        serviceName={service.name}
+        pricePence={service.starting_price_pence}
+        description={service.description}
+      />
+
+      <Link href={slotHref}>
+        <Button variant="primary" size="lg" fullWidth iconRight={ChevronRight}>
+          Pick a time
+        </Button>
+      </Link>
+    </div>
+  );
+}
