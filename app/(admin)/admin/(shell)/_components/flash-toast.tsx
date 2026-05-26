@@ -14,6 +14,9 @@ const FLASH_MESSAGES: Record<string, string> = {
   "category-created": "Category created.",
   "category-updated": "Category updated.",
   "category-deleted": "Category deleted.",
+  "mechanic-created": "Mechanic created. Invite email sent.",
+  "mechanic-updated": "Mechanic updated.",
+  "mechanic-deleted": "Mechanic deleted.",
 };
 
 export function FlashToast() {
