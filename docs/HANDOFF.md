@@ -98,31 +98,45 @@ You are working on **Book My Tech**, a UK mobile-mechanic booking platform. This
   - **Schema** — `supabase/migrations/0003_booking_flow.sql` adds `stripe_payment_intent_id`, `customer_email`, `customer_name`, `address_line_1`, `address_line_2`, `parking_type`, `special_instructions` to `bookings`, enables RLS, and installs five policies (insert open, customer SELECT/UPDATE scoped, admin SELECT/UPDATE via `public.is_admin()`). **Verify this has been applied to the Supabase project before testing end-to-end.**
   - **Resolved client decisions consumed** — `memory/project_resolved_decisions.md` (kickoff Q&A on 2026-05-22): no surge pricing; pre-auth held until job complete; "vetted professionals" copy throughout; mechanic is hidden from the customer during booking — assigned by backend dispatch after the booking is placed.
 
+- **Task 04 🚧 in progress** (`docs/tasks/04-admin-live-monitor.md`) — re-ordered against the original three-stage spec to keep the dashboard from ever demoing with zero data. Six steps; three committed, three remaining. Last commit: `0fddcfb`.
+  - **Step 1 ✅ Schema** (`c69e51b`) — migrations `0004_mechanics_and_booking_lifecycle.sql` and `0005_booking_events.sql` applied on 2026-05-26. Adds the `mechanics` extension table, lifecycle timestamps + `area` trigger + status CHECK on `bookings`, and the append-only `booking_events` audit table. All RLS uses `public.is_admin()` (pattern #1). Status enum kept as `'sourcing_mechanic' | 'confirmed' | 'en_route' | 'in_progress' | 'completed' | 'cancelled' | 'disputed'` (we kept `sourcing_mechanic` instead of the spec's `pending`).
+  - **Step 2 ✅ MJML email infra** (`0c2a1e0`) — `mjml` installed, `emails/{render,_layout,mechanic-invite}.ts` in place. All system emails route through MJML → Resend wrapper; we never use Supabase's built-in mailer. The existing booking-confirmation email in `app/actions/create-booking.ts` is still inline HTML — converting it is a follow-up, intentionally left for later so this step stayed scoped.
+  - **Step 3 ✅ Mechanic admin** (`0fddcfb`) — `/admin/mechanics` (list with status filter), `/admin/mechanics/new` (create form with email / name / phone / postcode / radius / specialism checkboxes / bio), `/admin/mechanics/[id]` (read-only detail). `app/actions/mechanics.ts → createMechanicAction` does the full service-role dance: createUser → flip profile to `role='mechanic'` → insert mechanics row (approved_at=now) → `auth.admin.generateLink` magic link → render MJML invite → Resend. Steps 4–5 in the action log failures rather than rolling back so a Resend hiccup doesn't kill the create. `app/auth/callback/route.ts` exchanges the magic-link code for a session (whitelisted `next` param). `app/(mechanic)/mechanic/page.tsx` is the magic-link landing — "Welcome, {firstName}, dashboard coming soon" with sign-out. `signOut` action now accepts a whitelisted `redirectTo` via FormData so admin and mechanic share it. ⚠️ **End-to-end verification not yet done** — see "Pick this up first" below.
+  - **Step 4 ⏳ Overview dashboard at `/admin`** — replaces the welcome-card placeholder. Five KPI cards (live bookings, GMV today, take-rate placeholder 15%, mechanics online, avg-time-to-accept placeholder), live monitor table backed by Supabase Realtime (`lib/supabase/realtime.ts` needs creating), "needs your attention" panel, demand-by-area horizontal bar chart using `recharts` (new dep).
+  - **Step 5 ⏳ Bookings admin** — `/admin/bookings` filterable list with CSV export, `/admin/bookings/[id]` detail with timeline (computed from `booking_events`), Stripe payment status via live `stripe.paymentIntents.retrieve`, action buttons (cancel with reason / reassign mechanic / mark disputed) — each writes a `booking_events` row.
+  - **Step 6 ⏳ Closeout** — mark Task 04 ✅, set current task to Task 05, commit, push.
+
 **What's not done:**
+- **Pick this up first when resuming:** the mechanic-invite flow from Step 3 was committed but not yet manually verified end-to-end. To test: ensure `NEXT_PUBLIC_SITE_URL=http://localhost:3000` is in `.env.local`, ensure Supabase Auth → URL Configuration has `http://localhost:3000/auth/callback` in Redirect URLs and `http://localhost:3000` as Site URL, restart dev, sign in as admin, `/admin/mechanics/new`, fill the form with a real email, submit, check inbox, click magic link, confirm `/mechanic` loads with the welcome screen. Common failure modes are documented in the agent transcript — most likely culprits are the Supabase URL allowlist or an unverified Resend sender. Domain `bookmytech.co.uk` was reported verified in Resend by the user on 2026-05-26.
 - **Partial-deposit model** — the brief / resolved-client-decisions describe a partial deposit pre-authorised at booking, with the remainder taken on completion. Current implementation pre-authorises the full service price. Customer-facing copy was switched to "amount pre-authorised" / "your card is pre-authorised" so we don't mislead. Revisit and reintroduce "deposit" wording when the partial-deposit split is built (likely alongside task 08 — Stripe Connect / mechanic payouts).
 - **`/signup` doesn't exist yet.** The confirmation page's "Create an account to track your booking" CTA links to `/signup` and 404s. Customer signup + tracking dashboard land in task 09.
-- **`RESEND_API_KEY` not configured.** The booking-confirmation email currently hits the console stub in `lib/email/send.ts`. Add the key and the real send wakes up — no code change needed.
+- **Booking-confirmation email is still inline HTML.** Convert to MJML using the same pattern as `emails/mechanic-invite.ts` whenever someone next touches `app/actions/create-booking.ts`.
 - **Admins-can-read-all-profiles RLS policy** — dropped during Task 02 Stage 1 because of recursion. When a feature needs it back (mechanic approvals etc.), reintroduce via the `public.is_admin()` `SECURITY DEFINER` function as documented in `docs/02-data-model.md` — never with an inline subquery on `profiles`.
-- **Mechanic / customer login** — same pattern as admin login but at `/login` (shared) or per-role. Lands at whichever task first needs it (mechanic onboarding is task 07).
+- **Customer login** — same pattern as admin login but at `/login` (shared) or per-role. Lands at whichever task first needs it (likely task 09).
 - **`middleware.ts` → `proxy.ts` rename** — Next 16 dev server logs the deprecation warning on startup. Trivial follow-up: rename the file and the exported function name from `middleware` to `proxy`.
 - **Tablet (768px) and mobile (375px) polish** — desktop (1280px) looks right; the 768/375 layouts were re-worked in commit `ac0afe7` but treat as a candidate for further design tweaks before going further on customer-facing pages.
 
 ## Current task
 
-**Next: Task 04 — admin live monitor + manual mechanic creation (`docs/tasks/04-admin-live-monitor.md`).** Task 03 fully complete. Three sub-stages:
+**Resuming Task 04 mid-flight.** Step 1 (schema), Step 2 (MJML), Step 3 (mechanic admin) are committed. **Before pushing on, manually verify the Step 3 mechanic-invite flow** end-to-end — see "Pick this up first" under "What's not done". After verification, proceed to **Step 4 — Overview dashboard at `/admin`**.
 
-1. **Schema** — `mechanics` extension table on top of `profiles`; new booking columns (`area`, `en_route_at`, `started_at`, `completed_at`). The status enum extends from `'sourcing_mechanic'` (already in use) to `'sourcing_mechanic' | 'confirmed' | 'en_route' | 'in_progress' | 'completed' | 'cancelled' | 'disputed'`. Note: Task 04's spec was originally written with `'pending'` as the first state — we're keeping `'sourcing_mechanic'` instead because it describes the real lifecycle phase better. The spec doc needs a small reconciliation pass once we start.
-2. **Overview dashboard** — replaces the placeholder at `/admin`. Five KPI cards, live monitor table backed by Supabase Realtime, "needs your attention" panel, demand-by-area bar chart (`recharts`).
-3. **All-bookings + mechanic admin** — filterable bookings table + detail page (cancel/reassign/mark-disputed), mechanics listing, manual mechanic-creation form (placeholder until proper onboarding lands in task 07).
-
-**Watch-outs for Task 04:**
-- **`mechanics` table RLS** — the spec sketch uses inline `EXISTS (SELECT FROM profiles WHERE role='admin')` subqueries. **Use `public.is_admin()` instead** (RLS pattern #1 in `docs/02-data-model.md`) to avoid the recursion bug we hit in Task 02.
-- **Status enum alignment.** Any UPDATE on the `status` column should use the agreed lifecycle. The seed data won't transition statuses automatically — `'sourcing_mechanic'` rows stay there until task 05 (mechanic dashboard) wires up acceptance.
-- **`recharts` is a new dependency.** Add it as part of Stage 2.
-- **Realtime needs a Supabase subscription.** No existing helper — Stage 2 introduces `lib/supabase/realtime.ts`.
-- **Mechanics seeded from manual creation only.** The booking flow currently doesn't reference any mechanic_id (per Task 03 spec — no mechanic data needed). Manual creation in Stage 3 gives us seedable rows for Stage 2's KPIs.
+**Watch-outs for the remaining steps:**
+- **Supabase Realtime** needs publication enabled per-table in Studio (Database → Replication). Flip it on for `bookings` before Step 4's live monitor table will actually update live.
+- **`recharts` is a new dep** — add it as part of Step 4.
+- **Stripe live read** in Step 5 — `stripe.paymentIntents.retrieve(stripe_payment_intent_id)` from the booking detail page. Needs `STRIPE_SECRET_KEY` in `.env.local` (already present).
+- **Cancel/reassign/dispute write events to `booking_events`** — the table is append-only; never UPDATE or DELETE rows there. If a fact was wrong, write a corrective `event_type = 'note'` row.
+- **Cancellation fees are out of scope** for Task 04. `cancelBooking` flips status to `'cancelled'` and logs the reason; the PI capture/refund logic lands in Task 12 when `platform_settings` fees exist. Stripe auto-releases the authorisation after 7 days if not captured, so the deferred capture is safe.
+- **CSV export** in Step 5 should be a server action returning a Response with `Content-Disposition` — avoid client-side generation to prevent PII leaking through analytics.
 - **`sonner` is wired** at the admin shell layout but not at the customer side yet. If the booking flow wants toasts, mount a separate `<Toaster />` somewhere in the customer tree.
-- **Customer auth doesn't exist yet.** Booking stays guest-only — the `bookings` table has `customer_id uuid NULL`. When customer login lands later, attach existing guest bookings via email match (the RLS policy already does the right thing once `auth.email()` returns the same address).
+
+## Picking up this project on a different machine
+
+1. `git pull` to get the latest commits (last known: `0fddcfb`).
+2. `npm install` to pick up any new deps (`mjml` was added in Step 2).
+3. Ensure `.env.local` exists with all required secrets — full list in this file under "Stack quirks worth knowing" plus `NEXT_PUBLIC_SITE_URL=http://localhost:3000` for local dev.
+4. Confirm Supabase Auth URL Configuration includes `http://localhost:3000/auth/callback` in Redirect URLs (one-time per Supabase project).
+5. `npm run build` once to confirm everything compiles. Should produce 26 routes including `/admin/mechanics`, `/admin/mechanics/[id]`, `/admin/mechanics/new`, `/auth/callback`, `/mechanic`.
+6. Read this section + the Task 04 sub-section in "What's done" + the "Pick this up first" item in "What's not done", then resume.
 
 ## Working principles
 
