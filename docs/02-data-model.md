@@ -59,23 +59,35 @@ Admin-managed list of categories that services are grouped under. Added in Task 
 
 ### `bookings`
 
-The core transaction record.
+The core transaction record. The columns below the divider were added in `0003_booking_flow.sql` to support guest bookings and Stripe pre-auth.
 
-| Column           | Type        | Notes                                    |
-|------------------|-------------|------------------------------------------|
-| id               | uuid PK     | default gen_random_uuid()                |
-| customer_id      | uuid FK     | → profiles(id), nullable for guest flows |
-| mechanic_id      | uuid FK     | → profiles(id), nullable until assigned  |
-| service_id       | uuid FK     | → services(id), required                 |
-| vehicle_reg      | text        | UK reg plate                             |
-| vehicle_make     | text        | from DVLA lookup                         |
-| vehicle_model    | text        | from DVLA lookup                         |
-| postcode         | text        | customer's postcode                      |
-| scheduled_at     | timestamptz | nullable until slot picked               |
-| status           | text        | 'pending' \| 'confirmed' \| etc.         |
-| total_pence      | integer     | final price                              |
-| created_at       | timestamptz | default now()                            |
-| updated_at       | timestamptz | default now()                            |
+| Column                     | Type        | Notes                                                                 |
+|----------------------------|-------------|-----------------------------------------------------------------------|
+| id                         | uuid PK     | default gen_random_uuid()                                             |
+| customer_id                | uuid FK     | → profiles(id), nullable for guest flows                              |
+| mechanic_id                | uuid FK     | → profiles(id), nullable until assigned                               |
+| service_id                 | uuid FK     | → services(id), required                                              |
+| vehicle_reg                | text        | UK reg plate                                                          |
+| vehicle_make               | text        | from DVLA lookup                                                      |
+| vehicle_model              | text        | from DVLA + DVSA MOT enrichment                                       |
+| postcode                   | text        | customer's postcode (uppercased on insert)                            |
+| scheduled_at               | timestamptz | nullable until slot picked                                            |
+| status                     | text        | `'sourcing_mechanic'` after Stripe pre-auth (see status lifecycle)    |
+| total_pence                | integer     | final price                                                           |
+| created_at                 | timestamptz | default now()                                                         |
+| updated_at                 | timestamptz | default now()                                                         |
+| —                          |             | *added in 0003_booking_flow.sql*                                      |
+| stripe_payment_intent_id   | text        | Stripe PaymentIntent id; pre-auth with `capture_method: 'manual'`     |
+| customer_email             | text        | guest-booking lookup key (RLS matches `auth.email()` once signed up)  |
+| customer_name              | text        | guest-booking name (no profile yet)                                   |
+| address_line_1             | text        | street address                                                        |
+| address_line_2             | text        | optional second line                                                  |
+| parking_type               | text        | `'driveway' \| 'street' \| 'car_park' \| 'other'`                     |
+| special_instructions       | text        | free-text from the customer                                           |
+
+**Status lifecycle (so far):** booking rows are inserted with `status = 'sourcing_mechanic'` *after* a successful Stripe pre-auth. Mechanic-acceptance, in-progress, completed, cancelled, and disputed states land in later tasks.
+
+**Guest-booking confirmation read:** `/book/confirmed/[id]` uses the service-role client (`lib/supabase/admin.ts`) — guests have no auth session, so the customer-scoped SELECT policy below would block the read. Lookup is by full UUID and surfaces only what the confirmation email already contains.
 
 ## RLS policies in effect
 
@@ -100,7 +112,14 @@ A `public.is_admin()` `SECURITY DEFINER` function is the single source of truth 
 - `UPDATE`: `Admins can update categories` — `using (public.is_admin()) with check (public.is_admin())`
 - `DELETE`: `Admins can delete categories` — `using (public.is_admin())`
 
-**`bookings`** — not yet defined. Will be added at the booking-flow task. Customers will read their own; mechanics will read assigned ones; admins read all (use `public.is_admin()` per pattern #1).
+**`bookings`** — defined in `0003_booking_flow.sql`.
+- `INSERT`: `Anyone can create a booking` — `with check (true)` (guest + signed-in flows; anti-spam will move to a separate gate later)
+- `SELECT`: `Customers can view own bookings` — `using (auth.uid() = customer_id or (customer_id is null and auth.email() = customer_email))` (guest bookings flip to email-match once the customer signs up under the same address)
+- `UPDATE`: `Customers can update own bookings` — same `using`/`with check` as the SELECT (intended for cancel/reschedule status updates)
+- `SELECT`: `Admins can view all bookings` — `using (public.is_admin())`
+- `UPDATE`: `Admins can update all bookings` — `using (public.is_admin()) with check (public.is_admin())`
+- ❌ **No mechanic-side policies yet.** Added when the mechanic dashboard lands (task 05).
+- The confirmation page uses the service-role client (see `lib/supabase/admin.ts`) to bypass these for the post-booking redirect read.
 
 ## RLS patterns to follow
 

@@ -108,7 +108,7 @@ The big "here's your price" moment. Gradient blue hero card only — **no mechan
   - Service name
   - Fixed price (the service's `starting_price_pence` for now — area multipliers come in task 08)
   - What's included: parts and labour, no call-out fee, 12-month guarantee
-  - Transparency note: "A deposit is pre-authorised now. No money leaves your account until the job is complete and you've signed off."
+  - Transparency note: "Your card is pre-authorised now. No money leaves your account until the job is complete and you've signed off." (The brief describes a long-term partial-deposit model; the implementation pre-authorises the full service price for now and the copy avoids the word "deposit" until that lands.)
 - [ ] A trust row beneath the hero: three icon+text items — "Vetted professional", "12-month guarantee", "No fix, no fee"
 - [ ] A short "How it works after you book" note — e.g. "Once confirmed, we'll match you with the best available mechanic in your area. You'll receive a confirmation email as soon as one accepts — usually within minutes."
 - [ ] Primary CTA "Pick a time" → navigates to `/book/slot?reg=...&service=<slug>`

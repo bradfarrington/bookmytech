@@ -28,6 +28,7 @@ interface ServiceGridProps {
   reg: string;
   make?: string;
   model?: string;
+  postcode?: string;
 }
 
 const PRIMARY_SLUGS = [
@@ -50,13 +51,14 @@ const SLUG_ICONS: Record<string, React.ElementType> = {
 
 const POPULAR_SLUG = "diagnostic";
 
-export function ServiceGrid({ services, reg, make, model }: ServiceGridProps) {
+export function ServiceGrid({ services, reg, make, model, postcode }: ServiceGridProps) {
   const [query, setQuery] = useState("");
   const [showAll, setShowAll] = useState(false);
 
   const vehicleParams = [
     make ? `make=${encodeURIComponent(make)}` : null,
     model ? `model=${encodeURIComponent(model)}` : null,
+    postcode ? `postcode=${encodeURIComponent(postcode)}` : null,
   ]
     .filter(Boolean)
     .join("&");

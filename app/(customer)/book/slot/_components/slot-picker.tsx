@@ -11,19 +11,30 @@ import {
 import { addDays, format, isToday, isTomorrow } from "date-fns";
 import { Loader2, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Pill } from "@/components/ui/pill";
+import { Select } from "@/components/ui/select";
 import { cn, formatPrice } from "@/lib/utils";
 import { createPaymentIntentAction, createBookingAction } from "@/app/actions/create-booking";
 import type { CreateBookingInput } from "@/app/actions/create-booking";
+
+type ParkingType = "driveway" | "street" | "car_park" | "other";
+
+const PARKING_OPTIONS: ReadonlyArray<{ value: ParkingType; label: string }> = [
+  { value: "driveway", label: "Driveway" },
+  { value: "street", label: "Street" },
+  { value: "car_park", label: "Car park" },
+  { value: "other", label: "Other" },
+];
 
 const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
   ? loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
   : null;
 
 const TIME_SLOTS = [
-  { label: "Morning", range: "8:00am – 12:00pm", hour: 8 },
-  { label: "Afternoon", range: "12:00pm – 5:00pm", hour: 12 },
-  { label: "Evening", range: "5:00pm – 8:00pm", hour: 17 },
-];
+  { label: "Morning", range: "8:00am – 12:00pm", hour: 8, badge: null },
+  { label: "Afternoon", range: "12:00pm – 5:00pm", hour: 12, badge: "Popular" },
+  { label: "Evening", range: "5:00pm – 8:00pm", hour: 17, badge: "Last" },
+] as const;
 
 function dayName(date: Date) {
   if (isToday(date)) return "Today";
@@ -35,6 +46,7 @@ interface SlotPickerProps {
   reg: string;
   make: string;
   model?: string;
+  defaultPostcode?: string;
   serviceName: string;
   serviceId: string;
   pricePence: number;
@@ -44,6 +56,7 @@ export function SlotPicker({
   reg,
   make,
   model,
+  defaultPostcode = "",
   serviceName,
   serviceId,
   pricePence,
@@ -52,13 +65,17 @@ export function SlotPicker({
   const [selectedDay, setSelectedDay] = useState(days[0]);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [addressLine1, setAddressLine1] = useState("");
-  const [parkingType, setParkingType] = useState("driveway");
+  const [postcode, setPostcode] = useState(defaultPostcode);
+  const [parkingType, setParkingType] = useState<ParkingType>("driveway");
   const [instructions, setInstructions] = useState("");
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [stripeError, setStripeError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  const canProceed = !!selectedSlot && addressLine1.trim().length > 3;
+  const canProceed =
+    !!selectedSlot &&
+    addressLine1.trim().length > 3 &&
+    postcode.trim().length >= 5;
 
   function handleProceedToPayment() {
     if (!canProceed) return;
@@ -83,6 +100,7 @@ export function SlotPicker({
           clientSecret={clientSecret}
           selectedSlot={selectedSlot}
           addressLine1={addressLine1}
+          postcode={postcode}
           parkingType={parkingType}
           instructions={instructions}
           reg={reg}
@@ -145,12 +163,19 @@ export function SlotPicker({
                 type="button"
                 onClick={() => setSelectedSlot(isoValue)}
                 className={cn(
-                  "flex flex-col items-center gap-1 rounded-xl border px-2 py-4 text-center transition-colors",
+                  "relative flex flex-col items-center gap-1 rounded-xl border px-2 py-4 text-center transition-colors",
                   active
                     ? "border-brand-blue bg-brand-blue text-white"
                     : "border-border bg-surface-card hover:border-brand-blue/50",
                 )}
               >
+                {slot.badge && !active && (
+                  <span className="absolute -top-2 left-1/2 -translate-x-1/2">
+                    <Pill tone={slot.badge === "Popular" ? "active" : "neutral"}>
+                      {slot.badge}
+                    </Pill>
+                  </span>
+                )}
                 <span className={cn("text-sm font-bold", active ? "text-white" : "text-text-primary")}>
                   {slot.label}
                 </span>
@@ -170,22 +195,28 @@ export function SlotPicker({
           type="text"
           value={addressLine1}
           onChange={(e) => setAddressLine1(e.target.value)}
-          placeholder="House number and street, postcode"
+          placeholder="House number and street"
           className="h-12 rounded-lg border border-border bg-surface-card px-3 text-sm text-text-primary outline-none transition-colors placeholder:text-text-muted focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/25"
+        />
+        <input
+          type="text"
+          value={postcode}
+          onChange={(e) => setPostcode(e.target.value.toUpperCase())}
+          placeholder="Postcode"
+          autoComplete="postal-code"
+          autoCapitalize="characters"
+          maxLength={8}
+          className="h-12 rounded-lg border border-border bg-surface-card px-3 text-sm font-bold uppercase tracking-[0.04em] text-text-primary outline-none transition-colors placeholder:font-medium placeholder:normal-case placeholder:tracking-normal placeholder:text-text-muted focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/25"
         />
 
         <div className="flex flex-col gap-1.5">
           <label className="text-sm font-semibold text-text-primary">Parking type</label>
-          <select
+          <Select<ParkingType>
             value={parkingType}
-            onChange={(e) => setParkingType(e.target.value)}
-            className="h-12 rounded-lg border border-border bg-surface-card px-3 text-sm text-text-primary outline-none transition-colors focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/25"
-          >
-            <option value="driveway">Driveway</option>
-            <option value="street">Street</option>
-            <option value="car_park">Car park</option>
-            <option value="other">Other</option>
-          </select>
+            onChange={setParkingType}
+            options={PARKING_OPTIONS}
+            aria-label="Parking type"
+          />
         </div>
 
         <div className="flex flex-col gap-1.5">
@@ -210,7 +241,7 @@ export function SlotPicker({
       {/* Sticky CTA */}
       <div className="sticky bottom-4 rounded-2xl border border-border bg-surface-card p-4 shadow-hero">
         <div className="mb-3 flex items-center justify-between">
-          <span className="text-sm text-text-secondary">Deposit to pre-authorise</span>
+          <span className="text-sm text-text-secondary">Amount to pre-authorise</span>
           <span className="text-xl font-bold text-text-primary">{formatPrice(pricePence)}</span>
         </div>
         <Button
@@ -237,6 +268,7 @@ interface CheckoutFormProps {
   clientSecret: string;
   selectedSlot: string;
   addressLine1: string;
+  postcode: string;
   parkingType: string;
   instructions: string;
   reg: string;
@@ -251,6 +283,7 @@ function CheckoutForm({
   clientSecret,
   selectedSlot,
   addressLine1,
+  postcode,
   parkingType,
   instructions,
   reg,
@@ -309,6 +342,7 @@ function CheckoutForm({
       customerEmail: email.trim(),
       customerName: name.trim(),
       addressLine1: addressLine1,
+      postcode: postcode.trim().toUpperCase(),
       parkingType,
       specialInstructions: instructions || undefined,
       stripePaymentIntentId: piId,

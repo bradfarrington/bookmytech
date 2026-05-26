@@ -16,6 +16,7 @@ export interface CreateBookingInput {
   customerName: string;
   addressLine1: string;
   addressLine2?: string;
+  postcode: string;
   parkingType: string;
   specialInstructions?: string;
   stripePaymentIntentId: string;
@@ -47,7 +48,7 @@ export async function createBookingAction(
       address_line_2: input.addressLine2 ?? null,
       parking_type: input.parkingType,
       special_instructions: input.specialInstructions ?? null,
-      postcode: input.addressLine1.toUpperCase(),
+      postcode: input.postcode,
     })
     .select("id")
     .single();
@@ -70,9 +71,9 @@ export async function createBookingAction(
           <tr><td style="padding: 8px 0; color: #64748b; font-size: 14px;">Vehicle</td><td style="padding: 8px 0; font-weight: 600;">${input.vehicleReg} — ${input.vehicleMake}${input.vehicleModel ? ` ${input.vehicleModel}` : ""}</td></tr>
           <tr><td style="padding: 8px 0; color: #64748b; font-size: 14px;">Service</td><td style="padding: 8px 0; font-weight: 600;">${input.serviceName}</td></tr>
           <tr><td style="padding: 8px 0; color: #64748b; font-size: 14px;">Date &amp; time</td><td style="padding: 8px 0; font-weight: 600;">${new Date(input.scheduledAt).toLocaleString("en-GB", { dateStyle: "full", timeStyle: "short" })}</td></tr>
-          <tr><td style="padding: 8px 0; color: #64748b; font-size: 14px;">Deposit pre-authorised</td><td style="padding: 8px 0; font-weight: 600;">${formatPrice(input.totalPence)}</td></tr>
+          <tr><td style="padding: 8px 0; color: #64748b; font-size: 14px;">Amount pre-authorised</td><td style="padding: 8px 0; font-weight: 600;">${formatPrice(input.totalPence)}</td></tr>
         </table>
-        <p style="color: #64748b; font-size: 14px;">No money has left your account yet. Your deposit will only be captured once the job is complete and you've signed off.</p>
+        <p style="color: #64748b; font-size: 14px;">No money has left your account yet. Your payment will only be captured once the job is complete and you've signed off.</p>
         <p style="color: #64748b; font-size: 14px;">Questions? Email us at <a href="mailto:help@bookmytech.co.uk">help@bookmytech.co.uk</a></p>
       </div>
     `,
@@ -99,7 +100,7 @@ export async function createPaymentIntentAction(amountPence: number): Promise<
       amount: amountPence,
       currency: "gbp",
       capture_method: "manual",
-      description: "Book My Tech — deposit pre-authorisation",
+      description: "Book My Tech — service pre-authorisation",
     });
     if (!intent.client_secret) {
       return { ok: false, error: "No client secret returned from Stripe." };

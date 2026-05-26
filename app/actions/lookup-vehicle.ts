@@ -7,6 +7,13 @@ import { normaliseReg } from "@/lib/utils";
 
 const UK_REG_REGEX = /^[A-Z0-9]{2,3} ?[A-Z0-9]{3,4}$/i;
 
+// In-memory cache keyed by reg. Booking flow refreshes the vehicle page on
+// back-navigation and form submits — without this, each refresh hits both
+// DVLA VES and DVSA MOT again. Successful lookups only; errors are not cached
+// so a transient API blip doesn't poison the cache.
+const CACHE_TTL_MS = 5 * 60 * 1000;
+const cache = new Map<string, { result: LookupResult; expiresAt: number }>();
+
 export async function lookupVehicleAction(reg: string): Promise<LookupResult> {
   const normalised = normaliseReg(reg);
   if (!normalised || !UK_REG_REGEX.test(normalised)) {
@@ -17,6 +24,11 @@ export async function lookupVehicleAction(reg: string): Promise<LookupResult> {
     };
   }
 
+  const cached = cache.get(normalised);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.result;
+  }
+
   // DVLA VES is authoritative for tax/MOT status; MOT History supplies model.
   // Run in parallel — MOT is a best-effort enrichment, so we never let a MOT
   // failure block the primary lookup.
@@ -25,11 +37,16 @@ export async function lookupVehicleAction(reg: string): Promise<LookupResult> {
     lookupMotVehicle(normalised),
   ]);
 
-  if (vesResult.ok && motResult.ok && motResult.model) {
-    return {
-      ok: true,
-      details: { ...vesResult.details, model: motResult.model },
-    };
+  const result: LookupResult =
+    vesResult.ok && motResult.ok && motResult.model
+      ? {
+          ok: true,
+          details: { ...vesResult.details, model: motResult.model },
+        }
+      : vesResult;
+
+  if (result.ok) {
+    cache.set(normalised, { result, expiresAt: Date.now() + CACHE_TTL_MS });
   }
-  return vesResult;
+  return result;
 }

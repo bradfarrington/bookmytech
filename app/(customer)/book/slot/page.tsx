@@ -11,6 +11,7 @@ interface SlotPageProps {
     service?: string;
     make?: string;
     model?: string;
+    postcode?: string;
   }>;
 }
 
@@ -36,6 +37,7 @@ export default async function SlotPage({ searchParams }: SlotPageProps) {
   const vehicleParams = [
     params.make ? `make=${encodeURIComponent(params.make)}` : null,
     params.model ? `model=${encodeURIComponent(params.model)}` : null,
+    params.postcode ? `postcode=${encodeURIComponent(params.postcode)}` : null,
   ]
     .filter(Boolean)
     .join("&");
@@ -64,6 +66,7 @@ export default async function SlotPage({ searchParams }: SlotPageProps) {
         reg={reg}
         make={(params.make ?? "").toUpperCase()}
         model={params.model}
+        defaultPostcode={(params.postcode ?? "").toUpperCase()}
         serviceName={service.name}
         serviceId={service.id}
         pricePence={service.starting_price_pence}

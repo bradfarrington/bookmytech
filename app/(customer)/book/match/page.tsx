@@ -12,6 +12,7 @@ interface MatchPageProps {
     service?: string;
     make?: string;
     model?: string;
+    postcode?: string;
   }>;
 }
 
@@ -37,6 +38,7 @@ export default async function MatchPage({ searchParams }: MatchPageProps) {
   const vehicleParams = [
     params.make ? `make=${encodeURIComponent(params.make)}` : null,
     params.model ? `model=${encodeURIComponent(params.model)}` : null,
+    params.postcode ? `postcode=${encodeURIComponent(params.postcode)}` : null,
   ]
     .filter(Boolean)
     .join("&");

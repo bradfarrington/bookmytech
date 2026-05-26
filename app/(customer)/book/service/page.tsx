@@ -10,6 +10,7 @@ interface ServicePageProps {
     reg?: string;
     make?: string;
     model?: string;
+    postcode?: string;
   }>;
 }
 
@@ -28,7 +29,7 @@ export default async function ServicePage({ searchParams }: ServicePageProps) {
     .eq("is_active", true)
     .order("display_order", { ascending: true });
 
-  const backHref = `/book/vehicle?reg=${encodeURIComponent(reg)}${params.make ? `&make=${encodeURIComponent(params.make)}` : ""}${params.model ? `&model=${encodeURIComponent(params.model)}` : ""}`;
+  const backHref = `/book/vehicle?reg=${encodeURIComponent(reg)}${params.make ? `&make=${encodeURIComponent(params.make)}` : ""}${params.model ? `&model=${encodeURIComponent(params.model)}` : ""}${params.postcode ? `&postcode=${encodeURIComponent(params.postcode)}` : ""}`;
 
   return (
     <div className="flex flex-col gap-6">
@@ -53,6 +54,7 @@ export default async function ServicePage({ searchParams }: ServicePageProps) {
         reg={reg}
         make={params.make}
         model={params.model}
+        postcode={params.postcode}
       />
     </div>
   );

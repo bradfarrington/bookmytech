@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { CheckCircle, Clock, ArrowRight } from "lucide-react";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { formatPrice } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,11 +12,12 @@ interface ConfirmedPageProps {
 
 export default async function ConfirmedPage({ params }: ConfirmedPageProps) {
   const { id } = await params;
-  const supabase = await createClient();
+  // Service-role read: guests have no auth session, so the customer-scoped
+  // RLS policy on `bookings` wouldn't let them see their own confirmation.
+  // Safe because (a) we look up by full UUID, (b) the page surfaces nothing
+  // not already in the customer's confirmation email.
+  const supabase = createAdminClient();
 
-  // Use service-role client for this read so guests can see their booking
-  // even without an auth session. For now use anon — booking was just inserted
-  // so it exists; RLS allows the lookup via customer_email check or anon insert.
   const { data: booking } = await supabase
     .from("bookings")
     .select("id, vehicle_reg, vehicle_make, vehicle_model, scheduled_at, total_pence, customer_name, address_line_1, status")
@@ -89,13 +90,13 @@ export default async function ConfirmedPage({ params }: ConfirmedPageProps) {
           {booking.address_line_1 && (
             <Row label="Address" value={booking.address_line_1} />
           )}
-          <Row label="Deposit pre-authorised" value={formatPrice(booking.total_pence)} />
+          <Row label="Amount pre-authorised" value={formatPrice(booking.total_pence)} />
         </dl>
       </Card>
 
       <Card className="bg-surface">
         <p className="text-sm text-text-secondary leading-relaxed">
-          No money has left your account. Your deposit will only be captured once
+          No money has left your account. Your payment will only be captured once
           your mechanic has completed the job and you&apos;ve signed off.
         </p>
       </Card>

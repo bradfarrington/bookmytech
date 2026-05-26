@@ -13,6 +13,7 @@ interface VehiclePageProps {
     make?: string;
     model?: string;
     year?: string;
+    postcode?: string;
   }>;
 }
 
@@ -25,7 +26,9 @@ export default async function VehiclePage({ searchParams }: VehiclePageProps) {
   }
 
   const reg = normaliseReg(raw);
-  const nextHref = `/book/service?reg=${encodeURIComponent(reg)}`;
+  const postcode = (params.postcode ?? "").trim();
+  const postcodeSuffix = postcode ? `&postcode=${encodeURIComponent(postcode)}` : "";
+  const nextHref = `/book/service?reg=${encodeURIComponent(reg)}${postcodeSuffix}`;
 
   // If we already have manually-entered vehicle details, skip the lookup
   if (params.make) {

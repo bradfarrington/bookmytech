@@ -40,7 +40,7 @@ export function PriceHero({ serviceName, pricePence, description }: PriceHeroPro
         </ul>
 
         <p className="mt-4 rounded-xl bg-white/15 px-4 py-3 text-[13px] leading-relaxed text-blue-100">
-          A deposit is pre-authorised now. No money leaves your account until the job
+          Your card is pre-authorised now. No money leaves your account until the job
           is complete and you&apos;ve signed off.
         </p>
       </div>
