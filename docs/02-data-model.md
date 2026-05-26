@@ -4,9 +4,9 @@ Supabase Postgres schema for Book My Tech. Row Level Security (RLS) is enabled o
 
 > **READ THE RLS PATTERNS SECTION BEFORE YOU WRITE A POLICY.** We've hit two non-obvious Postgres-RLS traps already (infinite recursion via inline subqueries, and "new row violates RLS" on UPDATE when the new state hides the row from SELECT). Both are documented under "RLS patterns to follow" below with concrete templates. Copy from those.
 
-## Current schema (as of Task 02 Stage 4)
+## Current schema (as of Task 04 Stage 1)
 
-Tables: `profiles`, `services`, `service_categories`, `bookings`. More will be added as later tasks need them (`mechanics`, `payments`, `reviews`, `disputes`).
+Tables: `profiles`, `services`, `service_categories`, `bookings`, `mechanics`, `booking_events`. More will be added as later tasks need them (`payments`, `reviews`, `disputes`, `platform_settings`).
 
 ### `profiles`
 
@@ -59,7 +59,7 @@ Admin-managed list of categories that services are grouped under. Added in Task 
 
 ### `bookings`
 
-The core transaction record. The columns below the divider were added in `0003_booking_flow.sql` to support guest bookings and Stripe pre-auth.
+The core transaction record. The columns below the first divider were added in `0003_booking_flow.sql` (guest bookings + Stripe pre-auth); the columns below the second divider were added in `0004_mechanics_and_booking_lifecycle.sql` (lifecycle timestamps + derived area).
 
 | Column                     | Type        | Notes                                                                 |
 |----------------------------|-------------|-----------------------------------------------------------------------|
@@ -72,7 +72,7 @@ The core transaction record. The columns below the divider were added in `0003_b
 | vehicle_model              | text        | from DVLA + DVSA MOT enrichment                                       |
 | postcode                   | text        | customer's postcode (uppercased on insert)                            |
 | scheduled_at               | timestamptz | nullable until slot picked                                            |
-| status                     | text        | `'sourcing_mechanic'` after Stripe pre-auth (see status lifecycle)    |
+| status                     | text        | CHECK-constrained — see "Status lifecycle" below                      |
 | total_pence                | integer     | final price                                                           |
 | created_at                 | timestamptz | default now()                                                         |
 | updated_at                 | timestamptz | default now()                                                         |
@@ -84,10 +84,69 @@ The core transaction record. The columns below the divider were added in `0003_b
 | address_line_2             | text        | optional second line                                                  |
 | parking_type               | text        | `'driveway' \| 'street' \| 'car_park' \| 'other'`                     |
 | special_instructions       | text        | free-text from the customer                                           |
+| —                          |             | *added in 0004_mechanics_and_booking_lifecycle.sql*                   |
+| area                       | text        | postcode district (outward code), derived by trigger from `postcode`  |
+| en_route_at                | timestamptz | when the mechanic started travelling                                  |
+| started_at                 | timestamptz | when the mechanic arrived / began work                                |
+| completed_at               | timestamptz | when the mechanic marked the job done                                 |
 
-**Status lifecycle (so far):** booking rows are inserted with `status = 'sourcing_mechanic'` *after* a successful Stripe pre-auth. Mechanic-acceptance, in-progress, completed, cancelled, and disputed states land in later tasks.
+**Status lifecycle:** CHECK constraint pins `status` to one of:
+
+| Value                | Meaning                                                                |
+|----------------------|------------------------------------------------------------------------|
+| `sourcing_mechanic`  | PI authorised, no mechanic assigned yet. **Default on insert.**        |
+| `confirmed`          | Mechanic accepted the job                                              |
+| `en_route`           | Mechanic on the way                                                    |
+| `in_progress`        | Mechanic on site, working                                              |
+| `completed`          | Mechanic marked complete, customer signed off                          |
+| `cancelled`          | Cancelled (by customer, admin, or PI auto-released)                    |
+| `disputed`           | Flagged by customer for admin review                                   |
+
+Status transitions and the timestamps in the second block are written through `app/actions/bookings.ts` (admin) and `app/actions/mechanic-bookings.ts` (mechanic, Task 05). Every transition writes a `booking_events` row.
+
+**Area derivation:** `area` is a trigger-managed column — never write it directly. `BEFORE INSERT OR UPDATE OF postcode` calls `public.derive_postcode_district()` which returns the outward code (`"SE15 5DT"` → `"SE15"`). This lets the admin demand chart group bookings by district without parsing postcodes at query time.
 
 **Guest-booking confirmation read:** `/book/confirmed/[id]` uses the service-role client (`lib/supabase/admin.ts`) — guests have no auth session, so the customer-scoped SELECT policy below would block the read. Lookup is by full UUID and surfaces only what the confirmation email already contains.
+
+### `mechanics`
+
+Extends `profiles` (1:1 by `id`) with marketplace-specific fields. A row exists for every user with `role = 'mechanic'`. Created in `0004_mechanics_and_booking_lifecycle.sql`.
+
+| Column                | Type           | Notes                                                                |
+|-----------------------|----------------|----------------------------------------------------------------------|
+| id                    | uuid PK / FK   | → profiles(id), cascades on delete                                   |
+| status                | text           | CHECK in `('offline', 'online', 'on_job')`, default `'offline'`      |
+| service_radius_miles  | integer        | CHECK between 1 and 100, default 10                                  |
+| base_postcode         | text           | mechanic's home base — drives dispatch matching (Task 05)            |
+| bio                   | text           | nullable, shown to customers post-assignment                         |
+| specialisms           | text[]         | array of service slugs the mechanic is qualified for                 |
+| rating                | numeric(3,2)   | CHECK 0–5, derived from completed-job reviews (Task 11 wires this)   |
+| job_count             | integer        | cumulative completed-job count, incremented on completion            |
+| is_pro                | boolean        | Pro-tier flag (Task 11) — defaults false, ignored elsewhere          |
+| approved_at           | timestamptz    | nullable until admin (or onboarding flow) approves the mechanic      |
+| created_at            | timestamptz    | default now()                                                        |
+| updated_at            | timestamptz    | maintained by `public.touch_updated_at` trigger                      |
+
+**Status meaning:** `'offline'` = not taking jobs; `'online'` = available for dispatch; `'on_job'` = currently assigned to an in-progress booking. The mechanic toggles this from their dashboard (Task 05); admin can override.
+
+### `booking_events`
+
+Append-only audit log for every meaningful change on a booking. Powers the admin booking-detail timeline and gives us a real audit trail for the eventual disputes flow (Task 12). Created in `0005_booking_events.sql`.
+
+| Column        | Type         | Notes                                                                       |
+|---------------|--------------|-----------------------------------------------------------------------------|
+| id            | uuid PK      | default gen_random_uuid()                                                   |
+| booking_id    | uuid FK      | → bookings(id), cascades on delete                                          |
+| event_type    | text         | CHECK in the enum below                                                     |
+| actor_id      | uuid FK      | → profiles(id), nullable (system-generated events have no actor)            |
+| actor_role    | text         | CHECK in `('customer', 'mechanic', 'admin', 'system')` or null              |
+| reason        | text         | free-text reason for cancellations, disputes, reassignments                 |
+| payload       | jsonb        | structured extras (`{ from: 'confirmed', to: 'en_route' }` etc.)            |
+| created_at    | timestamptz  | default now()                                                               |
+
+**Event types:** `'created' | 'status_changed' | 'mechanic_assigned' | 'mechanic_reassigned' | 'cancelled' | 'disputed' | 'payment_authorised' | 'payment_captured' | 'note'`.
+
+**Append-only.** Never UPDATE or DELETE rows here — if a fact about an event was wrong, write a corrective event (typically `'note'`). The composite index on `(booking_id, created_at desc)` supports the timeline render.
 
 ## RLS policies in effect
 
@@ -120,6 +179,20 @@ A `public.is_admin()` `SECURITY DEFINER` function is the single source of truth 
 - `UPDATE`: `Admins can update all bookings` — `using (public.is_admin()) with check (public.is_admin())`
 - ❌ **No mechanic-side policies yet.** Added when the mechanic dashboard lands (task 05).
 - The confirmation page uses the service-role client (see `lib/supabase/admin.ts`) to bypass these for the post-booking redirect read.
+
+**`mechanics`** — defined in `0004_mechanics_and_booking_lifecycle.sql`.
+- `SELECT`: `Mechanics can view own record` — `using (auth.uid() = id)`
+- `SELECT`: `Admins can view all mechanics` — `using (public.is_admin())`
+- `INSERT`: `Admins can insert mechanics` — `with check (public.is_admin())` (manual creation only until proper onboarding lands in task 07)
+- `UPDATE`: `Admins can update mechanics` — `using (public.is_admin()) with check (public.is_admin())`
+- `UPDATE`: `Mechanics can update own status` — `using (auth.uid() = id) with check (auth.uid() = id)` (lets the mechanic toggle online/offline/on_job from their dashboard without admin involvement)
+- `DELETE`: `Admins can delete mechanics` — `using (public.is_admin())`
+
+**`booking_events`** — defined in `0005_booking_events.sql`. Append-only — there's no UPDATE or DELETE policy.
+- `SELECT`: `Admins can view all booking events` — `using (public.is_admin())`
+- `INSERT`: `Admins can insert booking events` — `with check (public.is_admin())` (server actions run under the admin's session; system-generated events are written via the service-role client)
+- `SELECT`: `Customers can view events on own bookings` — `using (exists (select 1 from bookings b where b.id = booking_events.booking_id and (b.customer_id = auth.uid() or (b.customer_id is null and b.customer_email = auth.email()))))` (cross-table EXISTS is safe — `booking_events` ≠ `bookings`, so no recursion. Composite index on `(booking_id, created_at desc)` supports the lookup.)
+- ❌ **No mechanic-side policy yet.** Added in Task 05 when the assigned-mechanic relationship is wired through.
 
 ## RLS patterns to follow
 
