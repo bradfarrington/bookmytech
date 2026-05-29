@@ -146,7 +146,7 @@ export async function createMechanicAction(
     options: { redirectTo },
   });
 
-  if (linkErr || !linkData?.properties?.action_link) {
+  if (linkErr || !linkData?.properties?.hashed_token) {
     // The mechanic exists — they just won't get the invite email. Admin can
     // re-send via a future "Resend invite" button. Don't roll back the whole
     // create — that would be worse.
@@ -155,9 +155,18 @@ export async function createMechanicAction(
     redirect(`/admin/mechanics?flash=mechanic-created&email_warning=1`);
   }
 
+  // Build our own callback URL keyed by the token hash rather than emailing
+  // Supabase's raw action_link. The raw link hits /auth/v1/verify, which
+  // returns tokens in the URL fragment (implicit flow) — invisible to our
+  // server-side callback route. A token_hash link lets the callback redeem
+  // the session server-side via verifyOtp and set the SSR cookies.
+  const actionLink = `${siteUrl}/auth/callback?token_hash=${encodeURIComponent(
+    linkData.properties.hashed_token,
+  )}&type=magiclink&next=/mechanic`;
+
   const { subject, html } = await renderMechanicInviteEmail({
     name: parsed.data.fullName,
-    actionLink: linkData.properties.action_link,
+    actionLink,
   });
 
   await sendEmail({ to: parsed.data.email, subject, html }).catch((err) => {
