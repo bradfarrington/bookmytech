@@ -1,6 +1,6 @@
 # Task 04 — Admin live monitor + manual mechanic creation
 
-**Status:** ⏳ Queued
+**Status:** ✅ Complete (2026-05-29). Built across six steps. Routes landed at `/admin/jobs` (not `/admin/bookings`) to match the existing nav. See `docs/HANDOFF.md` → Task 04 for per-step detail and the two follow-ups (enable Realtime replication on `bookings`; live-fire the booking actions).
 
 Build the admin overview dashboard and the live monitor that the brief describes in section 5. Add the ability to manually create mechanic profiles from admin (proper onboarding flow comes later in task 07).
 
