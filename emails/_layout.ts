@@ -22,6 +22,10 @@ const SURFACE = "#F8FAFC";
 const SURFACE_CARD = "#FFFFFF";
 const BORDER = "#E2E8F0";
 
+// Email clients can't load relative/localhost assets, so the logo is served
+// from a public Supabase Storage bucket (same project, reachable everywhere).
+const LOGO_URL = `${(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").replace(/\/$/, "")}/storage/v1/object/public/email-assets/logo-no-bg.png`;
+
 export function layout({ preheader, content }: LayoutInput): string {
   return `
 <mjml>
@@ -42,9 +46,7 @@ export function layout({ preheader, content }: LayoutInput): string {
     <!-- Header -->
     <mj-section background-color="${SURFACE_CARD}" padding="28px 24px 16px">
       <mj-column>
-        <mj-text font-size="20px" font-weight="800" letter-spacing="-0.02em" color="${TEXT_PRIMARY}">
-          Book My Tech
-        </mj-text>
+        <mj-image src="${LOGO_URL}" alt="Book My Tech" width="200px" align="left" padding="0" />
       </mj-column>
     </mj-section>
 

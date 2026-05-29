@@ -38,10 +38,6 @@ export async function renderMechanicInviteEmail({
             Sign in to Book My Tech
           </mj-button>
           <mj-text color="#64748B" font-size="12px" padding-top="16px">
-            If the button doesn't work, paste this link into your browser:<br />
-            <a href="${safeLink}">${safeLink}</a>
-          </mj-text>
-          <mj-text color="#64748B" font-size="12px">
             This link expires in 24 hours. If you didn't expect this invite, you
             can ignore this email.
           </mj-text>

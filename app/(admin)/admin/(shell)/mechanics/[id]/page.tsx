@@ -49,6 +49,8 @@ export default async function MechanicDetailPage({
   const admin = createAdminClient();
   const { data: userData } = await admin.auth.admin.getUserById(id);
   const email = userData?.user?.email ?? null;
+  // Invited until they've signed in at least once via the magic-link invite.
+  const activated = Boolean(userData?.user?.last_sign_in_at);
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
@@ -73,10 +75,20 @@ export default async function MechanicDetailPage({
             )}
           </div>
           <div className="mt-2 flex items-center gap-2">
-            <Pill tone={statusTone(mechanic.status)}>
-              {statusLabel(mechanic.status)}
-            </Pill>
-            {mechanic.approved_at ? (
+            {activated ? (
+              <Pill tone={statusTone(mechanic.status)}>
+                {statusLabel(mechanic.status)}
+              </Pill>
+            ) : (
+              <Pill tone="pending" title="Invite sent — not yet accepted">
+                Invited
+              </Pill>
+            )}
+            {!activated ? (
+              <span className="text-xs text-text-muted">
+                Invite sent {new Date(mechanic.created_at).toLocaleDateString("en-GB")} · awaiting sign-in
+              </span>
+            ) : mechanic.approved_at ? (
               <span className="text-xs text-text-muted">
                 Approved {new Date(mechanic.approved_at).toLocaleDateString("en-GB")}
               </span>

@@ -13,6 +13,8 @@ export interface MechanicRow {
   email: string;
   base_postcode: string | null;
   status: "online" | "offline" | "on_job";
+  /** True once the mechanic has accepted the invite (signed in at least once). */
+  activated: boolean;
   rating: number;
   job_count: number;
   is_pro: boolean;
@@ -24,10 +26,11 @@ interface MechanicsTableProps {
   mechanics: MechanicRow[];
 }
 
-type StatusFilter = "all" | "online" | "offline" | "on_job";
+type StatusFilter = "all" | "invited" | "online" | "offline" | "on_job";
 
 const STATUS_FILTER_OPTIONS: ReadonlyArray<{ value: StatusFilter; label: string }> = [
   { value: "all", label: "All statuses" },
+  { value: "invited", label: "Invited" },
   { value: "online", label: "Online" },
   { value: "offline", label: "Offline" },
   { value: "on_job", label: "On job" },
@@ -49,7 +52,10 @@ export function MechanicsTable({ mechanics }: MechanicsTableProps) {
 
   const filtered = useMemo(() => {
     if (statusFilter === "all") return mechanics;
-    return mechanics.filter((m) => m.status === statusFilter);
+    // "Invited" is a lifecycle state (not yet accepted), orthogonal to the
+    // online/offline/on_job presence stored in `status`.
+    if (statusFilter === "invited") return mechanics.filter((m) => !m.activated);
+    return mechanics.filter((m) => m.activated && m.status === statusFilter);
   }, [mechanics, statusFilter]);
 
   if (mechanics.length === 0) {
@@ -107,7 +113,13 @@ export function MechanicsTable({ mechanics }: MechanicsTableProps) {
                     <p className="text-xs text-text-muted">{mechanic.email}</p>
                   </td>
                   <td className="px-5 py-3">
-                    <Pill tone={statusTone(mechanic.status)}>{statusLabel(mechanic.status)}</Pill>
+                    {mechanic.activated ? (
+                      <Pill tone={statusTone(mechanic.status)}>{statusLabel(mechanic.status)}</Pill>
+                    ) : (
+                      <Pill tone="pending" title="Invite sent — not yet accepted">
+                        Invited
+                      </Pill>
+                    )}
                   </td>
                   <td className="px-5 py-3">
                     {mechanic.base_postcode ? (

@@ -22,7 +22,9 @@ export default async function AdminMechanicsListPage() {
     )
     .order("created_at", { ascending: false });
 
-  let emailsById = new Map<string, string>();
+  // Per-mechanic auth facts. `last_sign_in_at` is the invite-acceptance signal:
+  // null until they first click the magic link and sign in.
+  const authById = new Map<string, { email: string | null; lastSignInAt: string | null }>();
   if (rows && rows.length > 0) {
     const admin = createAdminClient();
     const { data: usersPage } = await admin.auth.admin.listUsers({
@@ -31,18 +33,23 @@ export default async function AdminMechanicsListPage() {
     });
     const ids = new Set(rows.map((r) => r.id));
     for (const u of usersPage?.users ?? []) {
-      if (u.email && ids.has(u.id)) emailsById.set(u.id, u.email);
+      if (ids.has(u.id)) {
+        authById.set(u.id, { email: u.email ?? null, lastSignInAt: u.last_sign_in_at ?? null });
+      }
     }
   }
 
   const mechanics: MechanicRow[] = (rows ?? []).map((r) => {
     const profile = Array.isArray(r.profile) ? r.profile[0] : r.profile;
+    const auth = authById.get(r.id);
     return {
       id: r.id,
       full_name: profile?.full_name ?? null,
-      email: emailsById.get(r.id) ?? "—",
+      email: auth?.email ?? "—",
       base_postcode: r.base_postcode,
       status: r.status as MechanicRow["status"],
+      // Invited until they've signed in at least once via the magic link.
+      activated: Boolean(auth?.lastSignInAt),
       rating: typeof r.rating === "number" ? r.rating : Number(r.rating ?? 0),
       job_count: r.job_count,
       is_pro: r.is_pro,
