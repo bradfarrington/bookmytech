@@ -1,6 +1,8 @@
 # Task 05 — Mechanic dashboard (desktop web)
 
-**Status:** ⏳ Queued
+**Status:** 🚧 In progress — Stage 1 ✅ (2026-06-01). Mechanic auth + shell shipped.
+
+> **Dispatch model correction (owner, 2026-06-01):** dispatch is **broadcast, first-to-accept** — the job is offered simultaneously to every eligible online mechanic whose service area covers the job address (matching specialism), and the first to Accept wins; the customer never picks a mechanic. There is **no** sequential "offer to closest, wait 60s, pass to next" and **no** auto-widening of radius. Offers stay open until accepted; the only escalation is to **notify the admin** if a booking is still unaccepted after a sensible threshold (minutes, not seconds — exact value TBD at Stage 2 build). The Stage 2 spec text below is superseded by this where they conflict.
 
 Build the mechanic-facing desktop dashboard. By the end of this task, a mechanic can log in, see live job offers, accept or decline them, view their schedule and earnings, and update their availability.
 
@@ -30,14 +32,14 @@ Mirror the admin auth pattern. Sidebar nav is lighter (not dark) for mechanic �
 
 **Acceptance criteria:**
 
-- [ ] `/mechanic/login` — login form (re-uses the auth pattern from task 02, similar layout)
-- [ ] `middleware.ts` updated: gate `/mechanic/*` to authenticated users with role='mechanic'
-- [ ] `app/(mechanic)/mechanic/layout.tsx` — mechanic shell with:
-  - Left sidebar (light theme, not dark): Jobs, Schedule, Earnings, Reviews, Availability, Profile, Documents
-  - Top bar: mechanic's name + avatar, online/offline toggle (updates `mechanics.status`), sign-out
-- [ ] Online/offline toggle is a real-time UI control — flipping it updates the mechanics table immediately
-- [ ] Placeholder pages for unbuilt nav items (Reviews, Documents) — built in later tasks
-- [ ] Schema: add `online_at` and `last_seen_at` timestamptz columns to `mechanics` for tracking session activity
+- [x] `/mechanic/login` — login form (re-uses the auth pattern from task 02, similar layout). `signInMechanic` action checks `role='mechanic'` and redirects to `/mechanic/jobs`.
+- [x] `middleware.ts` updated: gate `/mechanic/*` to authenticated users with role='mechanic' (mirrors the admin gate; bounces signed-in mechanics off the login page to `/mechanic/jobs`)
+- [x] Mechanic shell with light sidebar + top bar. **Deviation:** the shell lives at `app/(mechanic)/mechanic/(shell)/layout.tsx` (a route group), not `mechanic/layout.tsx`, so `/mechanic/login` stays outside the shell — same pattern as the admin `(shell)` group.
+  - [x] Left sidebar (light theme, not dark): Jobs, Schedule, Earnings, Reviews, Availability, Profile, Documents
+  - [x] Top bar: mechanic's name, online/offline toggle (updates `mechanics.status`), sign-out (sign-out is in the sidebar footer, mirroring admin)
+- [x] Online/offline toggle is a real-time UI control — optimistic flip, `setOwnAvailability` server action writes `mechanics.status` + `online_at`/`last_seen_at` under the mechanic's own session (RLS "Mechanics can update own status"). `on_job` renders locked.
+- [x] Placeholder pages for unbuilt nav items — all seven nav targets stubbed via `MechanicPlaceholderPage`; replaced stage-by-stage. `/mechanic` redirects to `/mechanic/jobs`.
+- [x] Schema: `online_at` and `last_seen_at` timestamptz columns added to `mechanics` (`0007_mechanic_session_tracking.sql`). **⚠️ Apply 0007 before testing the toggle.**
 
 **Files touched:**
 - `app/(mechanic)/mechanic/login/page.tsx`

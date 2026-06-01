@@ -4,9 +4,10 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
 // Accepts an optional `redirectTo` via FormData so the same action serves the
-// admin sidebar (→ /admin/login) and the mechanic placeholder (→ /). Whitelist
-// the destinations to prevent open-redirect abuse from any stray form.
-const ALLOWED_REDIRECTS = new Set(["/admin/login", "/"]);
+// admin sidebar (→ /admin/login), the mechanic dashboard (→ /mechanic/login)
+// and the public site (→ /). Whitelist the destinations to prevent
+// open-redirect abuse from any stray form.
+const ALLOWED_REDIRECTS = new Set(["/admin/login", "/mechanic/login", "/"]);
 
 export async function signOut(formData?: FormData) {
   const raw = formData?.get("redirectTo");

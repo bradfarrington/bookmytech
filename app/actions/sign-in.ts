@@ -42,3 +42,41 @@ export async function signIn(
 
   redirect("/admin");
 }
+
+export async function signInMechanic(
+  _prevState: SignInState,
+  formData: FormData,
+): Promise<SignInState> {
+  const email = String(formData.get("email") ?? "").trim();
+  const password = String(formData.get("password") ?? "");
+
+  if (!email || !password) {
+    return { error: "Enter your email and password." };
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  });
+
+  if (error || !data.user) {
+    return { error: "That email and password didn't match." };
+  }
+
+  // Mirror the admin guard: block non-mechanic accounts at submission. The
+  // middleware re-checks role on every /mechanic/* request — this is the
+  // friendlier point-of-entry error.
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", data.user.id)
+    .single();
+
+  if (profile?.role !== "mechanic") {
+    await supabase.auth.signOut();
+    return { error: "This account isn't set up as a mechanic." };
+  }
+
+  redirect("/mechanic/jobs");
+}

@@ -33,6 +33,9 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const isAdminArea = pathname === "/admin" || pathname.startsWith("/admin/");
   const isAdminLogin = pathname === "/admin/login";
+  const isMechanicArea =
+    pathname === "/mechanic" || pathname.startsWith("/mechanic/");
+  const isMechanicLogin = pathname === "/mechanic/login";
 
   // /admin/* role gate — exempt the login page itself
   if (isAdminArea && !isAdminLogin) {
@@ -58,6 +61,33 @@ export async function middleware(request: NextRequest) {
       .single();
     if (profile?.role === "admin") {
       return redirectKeepingCookies(request, response, "/admin");
+    }
+  }
+
+  // /mechanic/* role gate — same shape as admin, exempt the login page
+  if (isMechanicArea && !isMechanicLogin) {
+    if (!user) {
+      return redirectKeepingCookies(request, response, "/mechanic/login");
+    }
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+    if (profile?.role !== "mechanic") {
+      return redirectKeepingCookies(request, response, "/");
+    }
+  }
+
+  // Already-signed-in mechanic landing on /mechanic/login → bounce to dashboard
+  if (isMechanicLogin && user) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+    if (profile?.role === "mechanic") {
+      return redirectKeepingCookies(request, response, "/mechanic/jobs");
     }
   }
 
