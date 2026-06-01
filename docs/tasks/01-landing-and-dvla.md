@@ -134,7 +134,7 @@ All 9 sections shipped at `app/(customer)/page.tsx`, composed from `app/(custome
 - [x] **Bonus — MOT History API integration** (`lib/dvla/mot-client.ts`): OAuth2 client-credentials with module-level token cache (refreshes ~60s before expiry), supplies the `model` field DVLA VES doesn't return
 - [x] Plate validation via regex (`/^[A-Z0-9]{2,3} ?[A-Z0-9]{3,4}$/i`) plus `normaliseReg()` — `zod` not needed for a single-field shape
 - [x] Hero + final-CTA reg inputs both submit through the same `RegLookupForm` component, which calls the server action and opens the result modal
-- [ ] `/book?reg=<reg>` redirect on success — deferred until the booking flow exists; "Continue to booking" button in the modal currently closes it
+- [x] `/book?reg=<reg>` redirect on success — wired in Task 03: the modal's "Continue to booking" button (`onContinue`) routes to `/book/vehicle?reg=<reg>&postcode=<postcode>`
 
 **The live mechanic preview card** in the hero — this is currently hard-coded in the JSX with three mechanics. Keep it hard-coded as seed data for this task. When mechanics actually exist in the system (much later task), this will be replaced with a real query.
 

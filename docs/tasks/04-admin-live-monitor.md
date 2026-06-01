@@ -65,8 +65,8 @@ alter table bookings add column completed_at timestamptz;
 
 **Acceptance criteria:**
 
-- [ ] Migration SQL written and run against Supabase
-- [ ] `docs/02-data-model.md` updated to reflect new tables / columns
+- [x] Migration SQL written and run against Supabase
+- [x] `docs/02-data-model.md` updated to reflect new tables / columns
 
 ---
 
@@ -96,13 +96,13 @@ The admin home screen at `/admin`. Replace the placeholder built in task 02.
 
 **Acceptance criteria:**
 
-- [ ] `app/(admin)/admin/page.tsx` rebuilt with the full overview
-- [ ] Five KPI cards rendering real data
-- [ ] Live monitor table fetches via server component on initial load, then subscribes to Supabase Realtime for updates
-- [ ] Status pills coloured per design system (blue for live, green for complete, amber for pending, red for disputed)
-- [ ] "Needs your attention" panel renders empty states gracefully
-- [ ] Demand-by-area chart uses `recharts`, pulls aggregated data from a Supabase view or RPC
-- [ ] Page fully responsive, but desktop-optimised (admin is desktop-only per brief)
+- [x] `app/(admin)/admin/page.tsx` rebuilt with the full overview
+- [x] Five KPI cards rendering real data
+- [x] Live monitor table fetches via server component on initial load, then subscribes to Supabase Realtime for updates
+- [x] Status pills coloured per design system (blue for live, green for complete, amber for pending, red for disputed)
+- [x] "Needs your attention" panel renders empty states gracefully
+- [x] Demand-by-area chart uses `recharts`, pulls aggregated data from a Supabase view or RPC
+- [x] Page fully responsive, but desktop-optimised (admin is desktop-only per brief)
 
 **Files touched:**
 - `app/(admin)/admin/page.tsx`
@@ -152,14 +152,14 @@ The full filterable bookings table and a basic mechanic admin.
 
 **Acceptance criteria:**
 
-- [ ] `app/(admin)/admin/bookings/page.tsx` + filters + tabs
-- [ ] `app/(admin)/admin/bookings/[id]/page.tsx` with timeline, payment status, actions
-- [ ] `app/(admin)/admin/mechanics/page.tsx` listing
-- [ ] `app/(admin)/admin/mechanics/[id]/page.tsx` detail (basic — full profile editing comes in task 05)
-- [ ] `app/(admin)/admin/mechanics/new/page.tsx` create form
-- [ ] Server actions: `cancelBooking`, `reassignMechanic`, `markDisputed`, `createMechanic`
-- [ ] CSV export server action
-- [ ] All seeded fake mechanics from task 03 visible in `/admin/mechanics` — clean up seed data if needed
+- [x] `app/(admin)/admin/jobs/page.tsx` + filters + tabs (landed at `/admin/jobs`, not `/admin/bookings`)
+- [x] `app/(admin)/admin/jobs/[id]/page.tsx` with timeline, payment status, actions
+- [x] `app/(admin)/admin/mechanics/page.tsx` listing
+- [x] `app/(admin)/admin/mechanics/[id]/page.tsx` detail (basic — full profile editing comes in task 05)
+- [x] `app/(admin)/admin/mechanics/new/page.tsx` create form
+- [x] Server actions: `cancelBooking`, `reassignMechanic`, `markDisputed`, `createMechanic`
+- [x] CSV export server action
+- [x] All seeded fake mechanics from task 03 visible in `/admin/mechanics` — clean up seed data if needed
 
 **Files touched:**
 - `app/(admin)/admin/bookings/page.tsx`

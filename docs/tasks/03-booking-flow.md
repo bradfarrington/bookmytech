@@ -1,6 +1,6 @@
 # Task 03 — Customer booking flow
 
-**Status:** ⏳ Queued
+**Status:** ✅ Complete (2026-05-26). Guest customer can complete a booking end-to-end (reg → vehicle → service → price → slot → Stripe pre-auth → confirmation). Verified manually with the Stripe test card. Booking rows insert with `status = 'sourcing_mechanic'` (pre-auth held, no mechanic assigned yet) — Task 04 extends the status enum from this baseline. See `docs/HANDOFF.md` → Task 03.
 
 Build the four-step mobile-first booking flow at `/book`. By the end of this task, a customer can land on the homepage, enter their reg, walk through service / mechanic / time slot selection, pre-authorise via Stripe, and land on a confirmation screen.
 
@@ -34,17 +34,17 @@ The structural scaffolding for the four-step flow. URL-driven step state — eac
 
 **Acceptance criteria:**
 
-- [ ] `app/(customer)/book/layout.tsx` — wraps all booking steps with the progress stepper, max-width container, mobile-first padding
-- [ ] `components/customer/progress-stepper.tsx` — four-step horizontal stepper at the top of each booking screen. Current step highlighted in brand blue, completed steps with check icons, future steps muted.
-- [ ] Routes:
+- [x] `app/(customer)/book/layout.tsx` — wraps all booking steps with the progress stepper, max-width container, mobile-first padding
+- [x] `components/customer/progress-stepper.tsx` — four-step horizontal stepper at the top of each booking screen. Current step highlighted in brand blue, completed steps with check icons, future steps muted.
+- [x] Routes:
   - `/book` — redirects to `/book/vehicle?reg=...` if a reg query param is present, else to a "enter your reg" entry screen
   - `/book/vehicle` — step 1
   - `/book/service` — step 2
   - `/book/match` — step 3 (price + matched mechanic)
   - `/book/slot` — step 4 (time slot + confirm) — no mechanic param needed
   - `/book/confirmed/[id]` — confirmation screen (after successful pre-auth)
-- [ ] Booking state passed between steps via URL params (reg, service slug, mechanic id, slot timestamp) — no client-side global state library
-- [ ] Each step has a sticky back button (top left) and a sticky primary CTA (bottom on mobile, inline on desktop) — single decision per screen, per the brief
+- [x] Booking state passed between steps via URL params (reg, service slug, mechanic id, slot timestamp) — no client-side global state library
+- [x] Each step has a sticky back button (top left) and a sticky primary CTA (bottom on mobile, inline on desktop) — single decision per screen, per the brief
 
 **Why URL-driven state:** lets users bookmark / refresh / share their progress, and avoids needing any global state library. Server components can read the URL params and load whatever data the step needs.
 
@@ -62,12 +62,12 @@ The DVLA-fetched vehicle, displayed in a confirmation card.
 
 **Acceptance criteria:**
 
-- [ ] Server component reads `reg` from search params, calls the DVLA client (built in task 01), renders the result
-- [ ] If DVLA lookup fails or reg is invalid, show an error state with retry / re-enter input
-- [ ] On success, render a card showing: vehicle make, model, colour, year, fuel type, engine capacity. Green check icon. "Yes, this is my car" primary CTA. "Edit manually" link for fallback.
-- [ ] "Edit manually" opens a small form for make / model / year — used when DVLA can't find the vehicle or the data is wrong
-- [ ] CTA submits via server action and navigates to `/book/service?reg=...` (passing the reg through)
-- [ ] Vehicle details cached in a short-lived server-side cache (5 minutes) keyed by reg, so we're not hitting DVLA on every step refresh
+- [x] Server component reads `reg` from search params, calls the DVLA client (built in task 01), renders the result
+- [x] If DVLA lookup fails or reg is invalid, show an error state with retry / re-enter input
+- [x] On success, render a card showing: vehicle make, model, colour, year, fuel type, engine capacity. Green check icon. "Yes, this is my car" primary CTA. "Edit manually" link for fallback.
+- [x] "Edit manually" opens a small form for make / model / year — used when DVLA can't find the vehicle or the data is wrong
+- [x] CTA submits via server action and navigates to `/book/service?reg=...` (passing the reg through)
+- [x] Vehicle details cached in a short-lived server-side cache (5 minutes) keyed by reg, so we're not hitting DVLA on every step refresh
 
 **Files touched:**
 - `app/(customer)/book/vehicle/page.tsx`
@@ -82,13 +82,13 @@ The service catalogue, presented as a category grid.
 
 **Acceptance criteria:**
 
-- [ ] Server component fetches all active services from the DB
-- [ ] Search bar at the top, filters the grid client-side as the user types
-- [ ] Six-category grid showing primary services (Full Service, Diagnostic, Brakes & Tyres, Battery, Clutch & Gears, MOT Pre-check) with starting prices and an icon per category
-- [ ] "Diagnostic" highlighted as the most-picked (subtle "Most popular" badge)
-- [ ] "Not sure what's wrong?" card sits below the grid, links to a diagnostic flow (for now, just selects the Diagnostic service)
-- [ ] Tapping a service card navigates to `/book/match?reg=...&service=<slug>`
-- [ ] Below-the-fold: an expandable section showing all other services (not just the six main categories)
+- [x] Server component fetches all active services from the DB
+- [x] Search bar at the top, filters the grid client-side as the user types
+- [x] Six-category grid showing primary services (Full Service, Diagnostic, Brakes & Tyres, Battery, Clutch & Gears, MOT Pre-check) with starting prices and an icon per category
+- [x] "Diagnostic" highlighted as the most-picked (subtle "Most popular" badge)
+- [x] "Not sure what's wrong?" card sits below the grid, links to a diagnostic flow (for now, just selects the Diagnostic service)
+- [x] Tapping a service card navigates to `/book/match?reg=...&service=<slug>`
+- [x] Below-the-fold: an expandable section showing all other services (not just the six main categories)
 
 **Files touched:**
 - `app/(customer)/book/service/page.tsx`
@@ -103,16 +103,16 @@ The big "here's your price" moment. Gradient blue hero card only — **no mechan
 
 **Acceptance criteria:**
 
-- [ ] Server component fetches the service by slug and renders the screen
-- [ ] Large gradient blue hero card displaying:
+- [x] Server component fetches the service by slug and renders the screen
+- [x] Large gradient blue hero card displaying:
   - Service name
   - Fixed price (the service's `starting_price_pence` for now — area multipliers come in task 08)
   - What's included: parts and labour, no call-out fee, 12-month guarantee
   - Transparency note: "Your card is pre-authorised now. No money leaves your account until the job is complete and you've signed off." (The brief describes a long-term partial-deposit model; the implementation pre-authorises the full service price for now and the copy avoids the word "deposit" until that lands.)
-- [ ] A trust row beneath the hero: three icon+text items — "Vetted professional", "12-month guarantee", "No fix, no fee"
-- [ ] A short "How it works after you book" note — e.g. "Once confirmed, we'll match you with the best available mechanic in your area. You'll receive a confirmation email as soon as one accepts — usually within minutes."
-- [ ] Primary CTA "Pick a time" → navigates to `/book/slot?reg=...&service=<slug>`
-- [ ] No mechanic card, no "change mechanic" option, no mechanic seed data needed for this step
+- [x] A trust row beneath the hero: three icon+text items — "Vetted professional", "12-month guarantee", "No fix, no fee"
+- [x] A short "How it works after you book" note — e.g. "Once confirmed, we'll match you with the best available mechanic in your area. You'll receive a confirmation email as soon as one accepts — usually within minutes."
+- [x] Primary CTA "Pick a time" → navigates to `/book/slot?reg=...&service=<slug>`
+- [x] No mechanic card, no "change mechanic" option, no mechanic seed data needed for this step
 
 **Files touched:**
 - `app/(customer)/book/match/page.tsx`
@@ -126,29 +126,29 @@ The final step. Pick a slot, see total, confirm.
 
 **Acceptance criteria:**
 
-- [ ] Horizontal date strip showing the next 5 days, each with an available-slot count (use fake availability for now — every day has 5–8 slots; real availability comes when mechanics have set their hours)
-- [ ] Three-column time grid below the selected date, showing morning / afternoon / evening slots. Each slot is a tappable button. "Popular" badge on the middle slot, "Last" badge on the final slot of the day.
-- [ ] Selected slot highlighted in brand blue
-- [ ] Address card pre-filled (for guest-bookings, use the postcode from earlier — full address entry is a free-text form here; geocoding comes in a later task)
-- [ ] Parking type select (driveway / street / car park / other)
-- [ ] Special instructions textarea
-- [ ] Sticky bottom CTA bar showing: total price, "Confirm booking" button
-- [ ] On confirm:
+- [x] Horizontal date strip showing the next 5 days, each with an available-slot count (use fake availability for now — every day has 5–8 slots; real availability comes when mechanics have set their hours)
+- [x] Three-column time grid below the selected date, showing morning / afternoon / evening slots. Each slot is a tappable button. "Popular" badge on the middle slot, "Last" badge on the final slot of the day.
+- [x] Selected slot highlighted in brand blue
+- [x] Address card pre-filled (for guest-bookings, use the postcode from earlier — full address entry is a free-text form here; geocoding comes in a later task)
+- [x] Parking type select (driveway / street / car park / other)
+- [x] Special instructions textarea
+- [x] Sticky bottom CTA bar showing: total price, "Confirm booking" button
+- [x] On confirm:
   1. Insert booking row in DB with status='pending_mechanic' (awaiting mechanic acceptance — no mechanic_id yet)
   2. Call Stripe to create a PaymentIntent with `capture_method: 'manual'` (pre-auth, no capture yet)
   3. Pass the client_secret to Stripe Elements for card entry — show a Stripe-hosted card form in a modal
   4. On successful pre-auth, update booking row with stripe_payment_intent_id and status='sourcing_mechanic'
   5. Send confirmation email via Resend — subject: "Booking received — we're finding your mechanic"
   6. Redirect to `/book/confirmed/[booking-id]`
-- [ ] If Stripe pre-auth fails, surface the error and let the customer retry
+- [x] If Stripe pre-auth fails, surface the error and let the customer retry
 
 **Stripe setup (needed for this stage):**
 
-- [ ] Create a Stripe account if one doesn't exist (test mode is fine for development)
-- [ ] Install `stripe` and `@stripe/stripe-js` and `@stripe/react-stripe-js`
-- [ ] Add `STRIPE_SECRET_KEY` and `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` to `.env.local`
-- [ ] Wrapper at `lib/stripe/server.ts` (server-side Stripe instance)
-- [ ] Stripe Connect setup is for mechanic payouts later — for this task, just plain Stripe Payments with manual capture
+- [x] Create a Stripe account if one doesn't exist (test mode is fine for development)
+- [x] Install `stripe` and `@stripe/stripe-js` and `@stripe/react-stripe-js`
+- [x] Add `STRIPE_SECRET_KEY` and `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` to `.env.local`
+- [x] Wrapper at `lib/stripe/server.ts` (server-side Stripe instance)
+- [x] Stripe Connect setup is for mechanic payouts later — for this task, just plain Stripe Payments with manual capture
 
 **Schema changes — booking row needs:**
 
@@ -166,12 +166,12 @@ Also relax the customer_id constraint (it's already nullable) — guest bookings
 
 **Confirmation screen:**
 
-- [ ] `/book/confirmed/[id]` — renders:
+- [x] `/book/confirmed/[id]` — renders:
   - Booking reference number
   - Full booking summary: vehicle, service, time slot, address, total pre-authorised
   - A "finding your mechanic" status card — animated/pulsing, e.g. "We're matching you with the best available mechanic in your area. You'll get an email confirmation as soon as they accept — usually within minutes."
   - No mechanic card — the mechanic is unknown at this point
-- [ ] "Create an account to track your booking" CTA at the bottom — links to signup (signup screen doesn't exist yet, placeholder href is fine)
+- [x] "Create an account to track your booking" CTA at the bottom — links to signup (signup screen doesn't exist yet, placeholder href is fine)
 
 **Files touched:**
 - `app/(customer)/book/slot/page.tsx`
