@@ -1,6 +1,6 @@
 # Task 05 — Mechanic dashboard (desktop web)
 
-**Status:** 🚧 In progress — Stages 1 & 2 ✅ (2026-06-01). Mechanic auth + shell, and the jobs page (KPIs + live broadcast offers feed + dispatch) shipped.
+**Status:** 🚧 In progress — Stages 1–3 ✅ (2026-06-01). Auth + shell, jobs page (KPIs + live broadcast offers + dispatch), daily schedule timeline + free SVG service-area map shipped.
 
 > **Dispatch model correction (owner, 2026-06-01):** dispatch is **broadcast, first-to-accept** — the job is offered simultaneously to every eligible online mechanic whose service area covers the job address (matching specialism), and the first to Accept wins; the customer never picks a mechanic. There is **no** sequential "offer to closest, wait 60s, pass to next" and **no** auto-widening of radius. Offers stay open until accepted; the only escalation is to **notify the admin** if a booking is still unaccepted after a sensible threshold (minutes, not seconds — exact value TBD at Stage 2 build). The Stage 2 spec text below is superseded by this where they conflict.
 
@@ -135,18 +135,21 @@ Runs alongside the offers feed on the jobs page.
 - Customer pins for active bookings in the area
 - "X mechanics active in this area" counter
 
+**Status: ✅ Stage 3 complete (2026-06-01).**
+
 **Acceptance criteria:**
 
-- [ ] Schedule timeline renders today's bookings, sorted by scheduled_at
-- [ ] Status dots reflect actual booking status
-- [ ] Map renders with Google Maps JS API, radius circle and pins shown
-- [ ] `GOOGLE_MAPS_API_KEY` added to `.env.local` (mechanic must apply for one if not already)
-- [ ] Postcode → lat/lng resolved via Google Geocoding (cache results — postcodes don't change)
+- [x] Schedule timeline renders today's confirmed jobs, sorted by `scheduled_at`; each row links to the job detail (`/mechanic/jobs/[id]`, built in Stage 4). Earnings shown as the mechanic's share.
+- [x] Status dots reflect actual booking status (completed = green, in_progress = pulsing blue, en_route = blue, confirmed = grey); the earliest upcoming job is flagged "Next up".
+- [x] Map renders with radius circle + job pins. **Deviation (cost):** uses a free inline **SVG** map (no Google billing, no API key) instead of the Google Maps JS API — pins are projected from real lat/lng offsets (`lib/maps/project.ts`). Structured so a live Google/Leaflet layer can drop in later without touching dispatch or geocoding. Pins are the mechanic's own upcoming jobs (RLS-safe); the "X mechanics active" counter is replaced with "N upcoming jobs in your radius" since a mechanic can't see other mechanics under RLS.
+- [x] ~~`GOOGLE_MAPS_API_KEY`~~ — **not needed** (no Google dependency). Can be added later if a live map is wanted.
+- [x] Postcode → lat/lng resolved + cached — via free **postcodes.io** (`lib/geo/postcodes.ts`), in-process cache (built in Stage 2, reused here).
 
-**Files touched:**
-- `app/(mechanic)/mechanic/jobs/_components/schedule.tsx`
-- `app/(mechanic)/mechanic/jobs/_components/area-map.tsx` (client)
-- `lib/maps/client.ts`, `lib/maps/geocode.ts`
+**Files touched (actual):**
+- `app/(mechanic)/mechanic/(shell)/jobs/_components/schedule.tsx`
+- `app/(mechanic)/mechanic/(shell)/jobs/_components/area-map.tsx` (client)
+- `lib/maps/project.ts` (lat/lng→miles projection). Geocoding consolidated in `lib/geo/postcodes.ts` rather than a separate `lib/maps/geocode.ts`.
+- `app/(mechanic)/mechanic/(shell)/jobs/page.tsx` (two-column layout + schedule/pin queries)
 
 ---
 
