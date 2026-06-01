@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { sendEmail } from "@/lib/email/send";
 import { formatPrice } from "@/lib/utils";
+import { dispatchBooking } from "@/lib/dispatch/dispatch";
 
 export interface CreateBookingInput {
   vehicleReg: string;
@@ -55,6 +56,16 @@ export async function createBookingAction(
 
   if (error || !data) {
     return { ok: false, error: error?.message ?? "Failed to create booking" };
+  }
+
+  // Broadcast the job to every eligible online mechanic (first-to-accept wins).
+  // Awaited so the offers exist by the time the confirmation page loads, but a
+  // dispatch failure must never fail the booking — the admin can still see and
+  // hand-assign an undispatched booking.
+  try {
+    await dispatchBooking(data.id);
+  } catch (err) {
+    console.error("Dispatch failed for booking", data.id, err);
   }
 
   // Fire and forget — don't block the redirect on email

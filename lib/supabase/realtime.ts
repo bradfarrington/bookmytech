@@ -25,3 +25,35 @@ export function subscribeToBookings(onChange: () => void): () => void {
     supabase.removeChannel(channel);
   };
 }
+
+// Subscribe to a mechanic's own job_offers. Fires on insert (new offer arrives)
+// and on update (an offer was accepted/declined/superseded → drops off the
+// feed). Filtered server-side to this mechanic, and RLS ("Mechanics can view
+// own offers") also scopes it.
+//
+// Requires Realtime replication on `public.job_offers` — migration 0008 adds
+// the table to the supabase_realtime publication, so this works once 0008 is
+// applied. Returns an unsubscribe function for useEffect cleanup.
+export function subscribeToMyOffers(
+  mechanicId: string,
+  onChange: () => void,
+): () => void {
+  const supabase = createClient();
+  const channel = supabase
+    .channel(`mechanic-offers-${mechanicId}`)
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "job_offers",
+        filter: `mechanic_id=eq.${mechanicId}`,
+      },
+      () => onChange(),
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}

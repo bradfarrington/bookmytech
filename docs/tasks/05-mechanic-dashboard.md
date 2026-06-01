@@ -1,6 +1,6 @@
 # Task 05 — Mechanic dashboard (desktop web)
 
-**Status:** 🚧 In progress — Stage 1 ✅ (2026-06-01). Mechanic auth + shell shipped.
+**Status:** 🚧 In progress — Stages 1 & 2 ✅ (2026-06-01). Mechanic auth + shell, and the jobs page (KPIs + live broadcast offers feed + dispatch) shipped.
 
 > **Dispatch model correction (owner, 2026-06-01):** dispatch is **broadcast, first-to-accept** — the job is offered simultaneously to every eligible online mechanic whose service area covers the job address (matching specialism), and the first to Accept wins; the customer never picks a mechanic. There is **no** sequential "offer to closest, wait 60s, pass to next" and **no** auto-widening of radius. Offers stay open until accepted; the only escalation is to **notify the admin** if a booking is still unaccepted after a sensible threshold (minutes, not seconds — exact value TBD at Stage 2 build). The Stage 2 spec text below is superseded by this where they conflict.
 
@@ -92,26 +92,28 @@ For now, keep it simple. When a booking is created, an offer is sent to the *clo
 
 This is a "v1 dispatch" — smart dispatch (multi-factor scoring, fallback queues) is task 09.
 
+**Status: ✅ Stage 2 complete (2026-06-01).** Built to the **broadcast / first-to-accept** model (see the correction note at the top of this file), which supersedes the spec's sequential-dispatch wording below.
+
 **Acceptance criteria:**
 
-- [ ] `app/(mechanic)/mechanic/jobs/page.tsx` — main jobs view
-- [ ] Four KPI cards rendering real data
-- [ ] Offers feed renders active offers, sorted by expiry (most urgent first)
-- [ ] Realtime subscription: new offers appear automatically, expired/responded offers removed
-- [ ] Accept action: updates the offer, assigns the mechanic to the booking, updates booking status to 'confirmed'
-- [ ] Decline action: updates the offer, triggers the edge function to re-dispatch to next mechanic
-- [ ] Edge function `dispatch-offer` deployed: finds next closest mechanic, creates offer with 60s expiry
-- [ ] Expiry countdown ticks down in real time on the client
+- [x] `app/(mechanic)/mechanic/(shell)/jobs/page.tsx` — main jobs view (server component; KPIs + offers feed)
+- [x] Four KPI cards rendering real data — today's earnings (mechanic share via `lib/earnings.ts`), jobs this week (completed since Monday), 30-day acceptance rate (accepted/(accepted+declined)), customer rating (`mechanics.rating`, "—" until Task 11)
+- [x] Offers feed renders live offers (those with `response is null`), newest first. **Deviation:** not "sorted by expiry" — there is no expiry in the broadcast model.
+- [x] Realtime subscription: `subscribeToMyOffers` (filtered to the mechanic) refreshes the feed; new offers appear, and accepted/declined/superseded offers drop off. Needs replication on `job_offers` — migration 0008 adds it to the `supabase_realtime` publication.
+- [x] Accept action (`acceptOffer`): atomic first-to-accept (guarded UPDATE on the still-`sourcing`/unassigned booking), assigns the mechanic, sets status `confirmed`, supersedes sibling offers, writes a `mechanic_assigned` event. Race-loser gets a friendly "another mechanic just accepted" + their offer is superseded.
+- [x] Decline action (`declineOffer`): marks only that mechanic's offer `declined`. **Deviation (owner):** does NOT re-dispatch — every other eligible mechanic still holds their live offer (broadcast model).
+- [x] ~~Edge function `dispatch-offer`~~ → **superseded.** Dispatch is a **server-side module** (`lib/dispatch/dispatch.ts`) called from `createBookingAction`, so it ships with the app on Vercel (no separate Deno/Supabase deploy). It broadcasts an offer to every eligible online mechanic: specialism match + job postcode inside `service_radius_miles` (geocoded via free **postcodes.io**, `lib/geo/postcodes.ts`, with same-district fallback when geocoding is unavailable).
+- [x] ~~Expiry countdown~~ → **superseded** by an "offered Xm ago" label (`offer-card.tsx`, ticks every 30s). Offers stay live until accepted/cancelled.
+- [x] **Admin escalation (owner model):** `/api/cron/dispatch-sweep` flags any booking still unaccepted after **5 minutes** (idempotent `dispatch_stalled` note event) and emails the admin a summary. Cron wired in `vercel.json` (`*/5 * * * *`). **⚠️ Vercel Hobby only runs crons daily — on Hobby, trigger via Supabase pg_cron / external scheduler hitting the route; protect with `CRON_SECRET`.**
 
-**Files touched:**
-- `app/(mechanic)/mechanic/jobs/page.tsx`
-- `app/(mechanic)/mechanic/jobs/_components/kpi-cards.tsx`
-- `app/(mechanic)/mechanic/jobs/_components/offer-feed.tsx`
-- `app/(mechanic)/mechanic/jobs/_components/offer-card.tsx`
-- `app/(mechanic)/mechanic/jobs/_components/countdown.tsx` (client)
-- `app/actions/job-offers.ts`
-- `supabase/functions/dispatch-offer/index.ts`
-- Schema migration
+**Schema:** `0008_job_offers.sql` — `job_offers` table + RLS (mechanic reads own, admin reads all; writes are service-role only), `bookings.commission_rate` (default 0.150, earnings read from here), mechanic-side SELECT policies on `bookings` (assigned + offered) and `booking_events` (assigned), `job_offers` added to the realtime publication. **⚠️ Apply 0008 before testing.**
+
+**Files touched (actual):**
+- `app/(mechanic)/mechanic/(shell)/jobs/page.tsx` + `_components/{kpi-cards,offer-feed,offer-card}.tsx`
+- `app/actions/job-offers.ts`, `app/actions/create-booking.ts` (dispatch hook)
+- `lib/dispatch/dispatch.ts`, `lib/geo/postcodes.ts`, `lib/earnings.ts`, `lib/supabase/realtime.ts` (added `subscribeToMyOffers`)
+- `app/api/cron/dispatch-sweep/route.ts`, `vercel.json`
+- `supabase/migrations/0008_job_offers.sql`
 
 ---
 
