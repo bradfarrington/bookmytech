@@ -1,6 +1,6 @@
 # Task 05 — Mechanic dashboard (desktop web)
 
-**Status:** 🚧 In progress — Stages 1–5 ✅ (Stages 1–3 2026-06-01, Stages 4–5 2026-06-03). Auth + shell, jobs page (KPIs + live broadcast offers + dispatch), daily schedule timeline + free SVG service-area map, job-detail view (cancel + reschedule-propose, mechanic-side + Task-09 stubs), and the earnings page (KPIs + recharts chart + seed payouts) shipped. Remaining: Stage 6 (availability + profile).
+**Status:** ✅ Complete (2026-06-03). All six stages shipped — auth + light shell, jobs page (KPIs + live broadcast offers + dispatch), daily schedule timeline + free SVG service-area map, job-detail view (cancel + reschedule-propose; mechanic-side, with the customer accept/decline path + "replacement accepted" email stubbed for Task 09), earnings page (KPIs + recharts chart + seed payouts), and availability + profile settings (working hours, service-radius slider with live map, specialisms grid, profile edit + avatar upload to Supabase Storage). Cross-cutting deviation: every page lives under the `app/(mechanic)/mechanic/(shell)/` route group (URLs unchanged) so login stays outside the shell. ⚠️ Apply migrations `0007`–`0010` before testing.
 
 > **Dispatch model correction (owner, 2026-06-01):** dispatch is **broadcast, first-to-accept** — the job is offered simultaneously to every eligible online mechanic whose service area covers the job address (matching specialism), and the first to Accept wins; the customer never picks a mechanic. There is **no** sequential "offer to closest, wait 60s, pass to next" and **no** auto-widening of radius. Offers stay open until accepted; the only escalation is to **notify the admin** if a booking is still unaccepted after a sensible threshold (minutes, not seconds — exact value TBD at Stage 2 build). The Stage 2 spec text below is superseded by this where they conflict.
 
@@ -269,19 +269,21 @@ create table mechanic_availability (
 );
 ```
 
+**Status: ✅ Stage 6 complete (2026-06-03).** Both settings pages live under the `(shell)` route group (URLs unchanged).
+
 **Acceptance criteria:**
 
-- [ ] `app/(mechanic)/mechanic/availability/page.tsx`
-- [ ] `app/(mechanic)/mechanic/profile/page.tsx`
-- [ ] Server actions for updating availability, profile, photo upload
-- [ ] Specialism toggle updates `mechanics.specialisms` array
-- [ ] Photo upload writes to Supabase Storage, URL saved to `profiles.avatar_url`
+- [x] `app/(mechanic)/mechanic/availability/page.tsx` — **Deviation (path):** under `(shell)`. Working-hours table (day-by-day on/off toggle + time range), service-radius slider (2–20 mi) with a **live SVG map preview** (reuses the Stage 3 `AreaMap`, no Google billing), and a specialisms grid. Each specialism tile badges the mechanic's **own** offers for that service in the last 7 days — **deviation (RLS):** a true area-wide "12 jobs this week" count isn't visible to a mechanic (same limit as Stage 3's map), so it shows own-offer demand instead.
+- [x] `app/(mechanic)/mechanic/profile/page.tsx` — **Deviation (path):** under `(shell)`. Edit name / phone / bio, profile-photo upload, base postcode shown **read-only / admin-locked** ("contact support to change"), and a read-only stats strip: status, rating, total jobs, member since, Pro tier.
+- [x] Server actions for updating availability, profile, photo upload — `app/actions/mechanic-profile.ts`: `updateProfile`, `updateAvailability` (upserts `mechanic_availability`), `updateServiceRadius`, `updateSpecialisms`, `uploadAvatar`. Profile/availability/radius/specialisms run under the mechanic's session (existing own-row `mechanics` UPDATE + new `profiles` self-update + own-row `mechanic_availability` policies); avatar upload uses the service-role client for the Storage write.
+- [x] Specialism toggle updates `mechanics.specialisms` array — specialisms are service slugs (consistent with dispatch eligibility + the admin mechanic form).
+- [x] Photo upload writes to Supabase Storage, URL saved to `profiles.avatar_url` — uploads to the public `avatars` bucket at `{mechanicId}/avatar.{ext}` (upsert), cache-busted public URL saved to `profiles.avatar_url`. Validates type (JPG/PNG/WebP) + 5 MB cap.
 
 **Files touched:**
-- `app/(mechanic)/mechanic/availability/page.tsx`
-- `app/(mechanic)/mechanic/profile/page.tsx`
+- `app/(mechanic)/mechanic/(shell)/availability/page.tsx` + `_components/availability-editor.tsx`
+- `app/(mechanic)/mechanic/(shell)/profile/page.tsx` + `_components/profile-form.tsx`
 - `app/actions/mechanic-profile.ts`
-- Schema migration
+- `supabase/migrations/0010_mechanic_availability_and_avatars.sql` — `mechanic_availability` table + RLS, `profiles.avatar_url` + a `profiles` self-update policy, public `avatars` storage bucket. **⚠️ Apply 0010 before testing Stage 6.**
 
 ## What NOT to do in this task
 
