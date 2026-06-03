@@ -1,6 +1,6 @@
 # Task 05 — Mechanic dashboard (desktop web)
 
-**Status:** 🚧 In progress — Stages 1–3 ✅ (2026-06-01). Auth + shell, jobs page (KPIs + live broadcast offers + dispatch), daily schedule timeline + free SVG service-area map shipped.
+**Status:** 🚧 In progress — Stages 1–4 ✅ (Stages 1–3 2026-06-01, Stage 4 2026-06-03). Auth + shell, jobs page (KPIs + live broadcast offers + dispatch), daily schedule timeline + free SVG service-area map, and the job-detail view (cancel + reschedule-propose, mechanic-side + Task-09 stubs) shipped. Remaining: Stage 5 (earnings page), Stage 6 (availability + profile).
 
 > **Dispatch model correction (owner, 2026-06-01):** dispatch is **broadcast, first-to-accept** — the job is offered simultaneously to every eligible online mechanic whose service area covers the job address (matching specialism), and the first to Accept wins; the customer never picks a mechanic. There is **no** sequential "offer to closest, wait 60s, pass to next" and **no** auto-widening of radius. Offers stay open until accepted; the only escalation is to **notify the admin** if a booking is still unaccepted after a sensible threshold (minutes, not seconds — exact value TBD at Stage 2 build). The Stage 2 spec text below is superseded by this where they conflict.
 
@@ -184,21 +184,29 @@ When a mechanic clicks into an offer or scheduled job.
 4. If customer declines, the job is offered to other mechanics for redistribution (customer's choice)
 5. A new booking confirmation email is sent once a new time is agreed
 
+**Status: ✅ Stage 4 complete (2026-06-03).** Built to the **mechanic-side + stubs** scope (owner, 2026-06-03): the full mechanic detail view, cancel, and reschedule-propose all ship; the *customer's* accept/decline/counter response to a reschedule, and the second "replacement accepted" email, are stubbed with TODOs pointing at Task 09 (customer dashboard).
+
 **Acceptance criteria:**
 
-- [ ] `app/(mechanic)/mechanic/jobs/[id]/page.tsx`
-- [ ] Renders all sections above
-- [ ] Earnings breakdown reads commission rate from booking record (not hardcoded 15%)
-- [ ] Action buttons depending on status: Start journey (en_route → in_progress is on mobile only)
-- [ ] Customer phone number revealed only when status is 'en_route' or 'in_progress' (privacy)
-- [ ] Cancel job flow: reason prompt → cancellation saved to job record → redistribution triggered → customer email sent
-- [ ] Reschedule flow: propose new time → customer notified → accept/decline/counter path
+- [x] `app/(mechanic)/mechanic/jobs/[id]/page.tsx` — **Deviation (path):** lives under the `(shell)` route group at `app/(mechanic)/mechanic/(shell)/jobs/[id]/page.tsx` so the mechanic shell (sidebar + top bar) wraps it — same group deviation already used in Stage 1. URL is unchanged (`/mechanic/jobs/[id]`). RLS-scoped: only renders bookings the mechanic is assigned to OR holds a live offer for (0008 policies); anything else → `notFound()`.
+- [x] Renders all sections above — status pill, service headline, four info tiles, customer notes, photo placeholder grid, parts placeholder, earnings breakdown, "why you're a great match", timeline, actions.
+- [x] Earnings breakdown reads commission rate from booking record (not hardcoded 15%) — via `lib/earnings.ts` `calcEarnings`, rate from `bookings.commission_rate`. **Deviation (file):** the calc helper is the existing `lib/earnings.ts` (built Stage 2), not a new `lib/utils/earnings.ts` — reused rather than duplicated. Presentational card is `_components/earnings-breakdown.tsx`.
+- [x] Action buttons depending on status — `confirmed` shows Cancel + Reschedule; `en_route`/`in_progress` show a "manage from the mobile app" note (Start journey is Task 06, mobile-only); `completed`/`cancelled`/`disputed` show a closed-state note.
+- [x] Customer phone number revealed only when status is `en_route` or `in_progress` (privacy) — gated in the page; otherwise a locked "revealed once you're en route" message. **Note:** a `customer_phone` column was added (0009) but the Task 03 checkout doesn't collect it yet, so it shows "Not provided" until that lands — TODO in the migration.
+- [x] Cancel job flow: reason prompt → cancellation saved to job record → redistribution triggered → customer email sent — `cancelOwnJob` (`app/actions/mechanic-jobs.ts`): saves `cancellation_reason` + a `cancelled` event, clears `mechanic_id`, resets to `sourcing_mechanic`, re-broadcasts via `dispatchBooking`, leaves the Stripe PI **held** (not cancelled), and emails the customer (email 1 of 2). **Stub:** email 2 ("a replacement has accepted") is a TODO in `cancelOwnJob` for Task 09 / `acceptOffer`.
+- [x] Reschedule flow: propose new time → customer notified → accept/decline/counter path — `proposeReschedule` saves `reschedule_proposed_at`/`reschedule_note`/`reschedule_status='proposed'` + a `reschedule_proposed` event and emails the customer the new slot. **Stub:** the customer's accept/decline/counter UI is Task 09 — the proposal sits in `reschedule_status='proposed'` until then; the detail page surfaces a "proposed — awaiting customer" banner.
 
 **Files touched:**
-- `app/(mechanic)/mechanic/jobs/[id]/page.tsx`
-- `app/(mechanic)/mechanic/jobs/[id]/_components/job-detail.tsx`
-- `app/(mechanic)/mechanic/jobs/[id]/_components/earnings-breakdown.tsx`
-- `lib/utils/earnings.ts` (calculation helper)
+- `app/(mechanic)/mechanic/(shell)/jobs/[id]/page.tsx` (data loader, RLS-scoped)
+- `app/(mechanic)/mechanic/(shell)/jobs/[id]/_components/job-detail.tsx` (presentational; reuses the admin `Timeline`)
+- `app/(mechanic)/mechanic/(shell)/jobs/[id]/_components/earnings-breakdown.tsx`
+- `app/(mechanic)/mechanic/(shell)/jobs/[id]/_components/job-actions.tsx` (client — cancel + reschedule)
+- `app/actions/mechanic-jobs.ts` (`cancelOwnJob`, `proposeReschedule` — service-role writes after ownership check)
+- `lib/jobs/estimates.ts` (per-service duration estimate for the "Estimated time" tile)
+- `lib/earnings.ts` (reused, not the spec's `lib/utils/earnings.ts`)
+- `supabase/migrations/0009_mechanic_job_actions.sql` — adds `customer_phone`, `cancellation_reason`, `reschedule_proposed_at`, `reschedule_note`, `reschedule_status` to `bookings`; extends the `booking_events` type enum with `reschedule_proposed`. **⚠️ Apply 0009 before testing Stage 4.**
+
+> **Mileage deviation:** the brief's "service name + vehicle + mileage (mileage estimated from DVLA data)" headline omits mileage — no mileage is captured at booking and the DVLA lookup (Task 01) doesn't return it. Headline shows service + vehicle + reg; revisit if a mileage estimate source is added.
 
 ---
 
