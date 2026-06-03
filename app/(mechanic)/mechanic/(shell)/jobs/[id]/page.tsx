@@ -79,6 +79,22 @@ export default async function MechanicJobDetailPage({ params }: PageProps) {
     createdAt: e.created_at,
   }));
 
+  // --- Job evidence (mechanic photos + sign-off signature) -----------------
+  const { data: mediaRows } = await supabase
+    .from("booking_media")
+    .select("id, kind, storage_path, created_at")
+    .eq("booking_id", id)
+    .order("created_at", { ascending: true });
+
+  const publicUrl = (path: string) =>
+    supabase.storage.from("job-media").getPublicUrl(path).data.publicUrl;
+
+  const photos = (mediaRows ?? [])
+    .filter((m) => m.kind === "photo")
+    .map((m) => ({ id: m.id, url: publicUrl(m.storage_path) }));
+  const signatureRow = (mediaRows ?? []).find((m) => m.kind === "signature");
+  const signatureUrl = signatureRow ? publicUrl(signatureRow.storage_path) : null;
+
   // --- Match reasons --------------------------------------------------------
   const specialisms: string[] = Array.isArray(mechanic?.specialisms) ? mechanic.specialisms : [];
   const slug = service?.slug ?? null;
@@ -145,6 +161,9 @@ export default async function MechanicJobDetailPage({ params }: PageProps) {
     rescheduleProposedAt: booking.reschedule_proposed_at,
     scheduledAt: booking.scheduled_at,
     events,
+    photos,
+    signatureUrl,
+    hasSignature: signatureUrl != null,
   };
 
   return <JobDetail {...detail} />;

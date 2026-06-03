@@ -2,7 +2,6 @@ import Link from "next/link";
 import {
   ArrowLeft,
   Car,
-  Wrench,
   MapPin,
   CalendarClock,
   Clock,
@@ -13,6 +12,7 @@ import {
   Lock,
   StickyNote,
   ImageIcon,
+  PenLine,
   Package,
   Sparkles,
   ListChecks,
@@ -28,6 +28,7 @@ import { formatPrice } from "@/lib/utils";
 import { Timeline, type TimelineEvent } from "@/app/(admin)/admin/(shell)/jobs/[id]/_components/timeline";
 import { EarningsBreakdown } from "./earnings-breakdown";
 import { JobActions } from "./job-actions";
+import { PhotoUploader, type JobPhoto } from "./photo-uploader";
 
 export interface JobDetailProps {
   bookingId: string;
@@ -58,6 +59,10 @@ export interface JobDetailProps {
   rescheduleProposedAt: string | null;
   scheduledAt: string | null;
   events: TimelineEvent[];
+  // Job evidence (mechanic-captured)
+  photos: JobPhoto[];
+  signatureUrl: string | null;
+  hasSignature: boolean;
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -93,7 +98,12 @@ export function JobDetail(props: JobDetailProps) {
     matchReasons,
     cancellationReason,
     events,
+    photos,
+    signatureUrl,
+    hasSignature,
   } = props;
+
+  const canEditPhotos = ["confirmed", "en_route", "in_progress"].includes(status);
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
@@ -194,23 +204,30 @@ export function JobDetail(props: JobDetailProps) {
             )}
           </Card>
 
-          {/* Photos — placeholder until customer photo upload ships */}
+          {/* Job photos — mechanic-captured evidence of the work */}
           <Card className="space-y-3 p-6">
-            <CardTitle icon={ImageIcon}>Customer photos</CardTitle>
-            <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="flex aspect-square items-center justify-center rounded-xl border border-dashed border-border bg-surface text-text-disabled"
-                >
-                  <ImageIcon size={18} />
-                </div>
-              ))}
-            </div>
-            <p className="text-xs text-text-muted">
-              Customer photo uploads arrive in a later release.
-            </p>
+            <CardTitle icon={ImageIcon}>Job photos</CardTitle>
+            <PhotoUploader bookingId={bookingId} photos={photos} canEdit={canEditPhotos} />
+            {canEditPhotos && (
+              <p className="text-xs text-text-muted">
+                Snap before/after shots or any issues you spot. Visible to the
+                customer and our team.
+              </p>
+            )}
           </Card>
+
+          {/* Sign-off — the captured customer signature, once the job is done */}
+          {signatureUrl && (
+            <Card className="space-y-3 p-6">
+              <CardTitle icon={PenLine}>Customer sign-off</CardTitle>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={signatureUrl}
+                alt="Customer signature"
+                className="h-32 w-full rounded-xl border border-border bg-white object-contain"
+              />
+            </Card>
+          )}
 
           {/* Parts — placeholder until the parts system (Task 10) */}
           <Card className="space-y-3 p-6">
@@ -266,6 +283,7 @@ export function JobDetail(props: JobDetailProps) {
               scheduledAt={props.scheduledAt}
               rescheduleStatus={props.rescheduleStatus}
               rescheduleProposedAt={props.rescheduleProposedAt}
+              hasSignature={hasSignature}
             />
           </Card>
         </div>

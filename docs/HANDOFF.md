@@ -123,7 +123,15 @@ You are working on **Book My Tech**, a UK mobile-mechanic booking platform. This
 
 **Task 05 ✅ complete (2026-06-03).** The full mechanic desktop dashboard shipped — auth + light shell, jobs page (KPIs + live broadcast offers + dispatch), daily schedule + SVG service-area map, job-detail view at `/mechanic/jobs/[id]` (cancel + reschedule-propose; the customer's accept/decline of a reschedule + the "replacement accepted" email are stubbed for Task 09), earnings page (`/mechanic/earnings` — KPIs + recharts chart + seed payouts), and availability + profile settings (`/mechanic/availability`, `/mechanic/profile` — working hours, radius slider with live map, specialisms grid, profile edit + avatar upload to Storage). Every mechanic page lives under the `(shell)` route group; URLs are unchanged. ⚠️ **Apply migrations `0007`–`0010`** before testing (mechanic session tracking, job offers, job actions, availability + avatars/storage bucket).
 
-**Next up: Task 06 — Mechanic mobile PWA** (`docs/tasks/06-mechanic-mobile-pwa.md`). The field-work counterpart to the desktop dashboard: the live job lifecycle (start journey → en route → in progress → complete) that the desktop view deliberately defers to mobile. Read the task doc before starting.
+**Current: Task 06 — Mechanic mobile PWA** (`docs/tasks/06-mechanic-mobile-pwa.md`). The field-work counterpart to the desktop dashboard.
+
+⚡ **Interim delivery (2026-06-03):** the **live job lifecycle** (start journey → en route → in progress → complete + Stripe capture) was shipped early on the **desktop** dashboard — the status enum and `en_route_at`/`started_at`/`completed_at` columns already existed (0004), so no mobile app was needed to drive them. See the "Interim delivery" block at the top of the Task 06 md. What shipped:
+- `app/actions/job-progress.ts` — `startJourney` / `beginWork` / `completeAndCharge` (the last captures the manual-capture Stripe pre-auth + emails a receipt; capture failure leaves the job retryable).
+- `jobs/[id]/_components/job-actions.tsx` — the old "use the mobile app" placeholder is now real Start journey / Begin work / Complete & charge buttons.
+- `book/confirmed/[id]` — now a live customer status tracker (`_components/booking-tracker.tsx`): Booked → Mechanic confirmed (reveals mechanic name/avatar/rating) → On the way → Work in progress → Complete. Refresh-based.
+- **Job photos + customer signature on the web view** — `0011_job_media.sql` adds a `booking_media` table + public `job-media` bucket; `app/actions/job-media.ts` (`uploadJobPhoto` / `deleteJobPhoto` / `saveSignature`) and the `photo-uploader.tsx` / `signature-pad.tsx` components wire it into the job-detail. Completion is gated on a captured signature (a dependency-free `<canvas>` pad, not the `signature_pad` library). ⚠️ **Apply migration `0011`** before testing.
+
+Still open for the **real mobile build**: PWA shell + install, push notifications, offline IndexedDB sync, GPS live-location, and the Reviews/Me tabs (Stage 5). Read the task doc before continuing.
 
 **Carry-over watch-outs:**
 - **Supabase Realtime** — enable replication on `public.bookings` in Studio (Database → Replication) for the admin live monitor to update live. Task 05's mechanic job-offer feed will likely want the same on whatever table drives offers.

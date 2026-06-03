@@ -3,10 +3,13 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { CalendarClock, Ban, Smartphone, CheckCircle2 } from "lucide-react";
+import { CalendarClock, Ban, CheckCircle2, Navigation, Wrench, BadgePoundSterling } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { cancelOwnJob, proposeReschedule } from "@/app/actions/mechanic-jobs";
+import { startJourney, beginWork, completeAndCharge } from "@/app/actions/job-progress";
+import { saveSignature } from "@/app/actions/job-media";
+import { SignaturePad } from "./signature-pad";
 
 interface JobActionsProps {
   bookingId: string;
@@ -14,6 +17,7 @@ interface JobActionsProps {
   scheduledAt: string | null;
   rescheduleStatus: string | null;
   rescheduleProposedAt: string | null;
+  hasSignature: boolean;
 }
 
 const CANCEL_REASONS = [
@@ -42,23 +46,125 @@ export function JobActions({
   scheduledAt,
   rescheduleStatus,
   rescheduleProposedAt,
+  hasSignature,
 }: JobActionsProps) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const [signing, setSigning] = useState(false);
 
   const [reason, setReason] = useState("");
   const [reasonDetails, setReasonDetails] = useState("");
   const [newTime, setNewTime] = useState(() => toLocalInput(scheduledAt));
   const [note, setNote] = useState("");
 
-  // Live job (en_route / in_progress) — handled on the mobile app, not here.
-  if (status === "en_route" || status === "in_progress") {
+  // Live job lifecycle. Each transition fires its server action and refreshes;
+  // the customer's tracker reads the same status. (GPS live-location tracking
+  // is still the mobile app's job — this is the status flag only.)
+  function runLive(
+    action: (id: string) => Promise<{ ok: boolean; error?: string }>,
+    success: string,
+  ) {
+    startTransition(async () => {
+      const res = await action(bookingId);
+      if (res.ok) {
+        toast.success(success);
+        router.refresh();
+      } else {
+        toast.error(res.error ?? "Something went wrong.");
+      }
+    });
+  }
+
+  if (status === "en_route") {
     return (
-      <p className="flex items-start gap-2 text-sm text-text-muted">
-        <Smartphone size={16} className="mt-0.5 shrink-0 text-brand-blue" />
-        This job is live. Start journey, arrival and completion are handled in
-        the Book My Tech mobile app.
-      </p>
+      <div className="space-y-3">
+        <div className="flex items-start gap-2 rounded-xl border border-brand-blue/20 bg-blue-50 px-3.5 py-3 text-sm text-blue-700">
+          <Navigation size={16} className="mt-0.5 shrink-0 text-brand-blue" />
+          You&apos;re marked as <strong>on the way</strong>. The customer can see
+          this on their tracker.
+        </div>
+        <Button
+          size="sm"
+          fullWidth
+          iconLeft={Wrench}
+          disabled={pending}
+          onClick={() => runLive(beginWork, "Job started — the customer's been updated.")}
+        >
+          I&apos;ve arrived — begin work
+        </Button>
+      </div>
+    );
+  }
+
+  if (status === "in_progress") {
+    // Capture the customer's signature, then complete + charge in one go. If a
+    // signature already exists (e.g. a previous capture attempt failed), we can
+    // complete directly without making them sign again.
+    function handleSignAndComplete(blob: Blob) {
+      const fd = new FormData();
+      fd.append("file", new File([blob], "signature.png", { type: "image/png" }));
+      startTransition(async () => {
+        const sig = await saveSignature(bookingId, fd);
+        if (!sig.ok) {
+          toast.error(sig.error);
+          return;
+        }
+        const done = await completeAndCharge(bookingId);
+        if (done.ok) {
+          toast.success("Job complete — payment captured.");
+          setSigning(false);
+          router.refresh();
+        } else {
+          // Signature is saved; surface the error and refresh so a retry can
+          // skip re-signing.
+          toast.error(done.error);
+          router.refresh();
+        }
+      });
+    }
+
+    return (
+      <div className="space-y-3">
+        <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-3 text-sm text-amber-700">
+          <Wrench size={16} className="mt-0.5 shrink-0 text-amber-600" />
+          Work is <strong>in progress</strong>. When you&apos;re finished, get the
+          customer to sign off — that completes the job and captures payment.
+        </div>
+
+        {signing ? (
+          <div className="space-y-2">
+            <SignaturePad
+              onSave={handleSignAndComplete}
+              saving={pending}
+              saveLabel="Sign off, complete & charge"
+            />
+            <Button variant="ghost" size="sm" fullWidth disabled={pending} onClick={() => setSigning(false)}>
+              Cancel
+            </Button>
+          </div>
+        ) : (
+          <>
+            <Button size="sm" fullWidth iconLeft={BadgePoundSterling} disabled={pending} onClick={() => setSigning(true)}>
+              Complete job &amp; charge customer
+            </Button>
+            {hasSignature && (
+              <Button
+                variant="secondary"
+                size="sm"
+                fullWidth
+                disabled={pending}
+                onClick={() => runLive(completeAndCharge, "Job complete — payment captured.")}
+              >
+                Use saved signature — complete &amp; charge
+              </Button>
+            )}
+            <p className="text-xs text-text-muted">
+              Completing captures the pre-authorised amount. You&apos;re paid out
+              24h after sign-off.
+            </p>
+          </>
+        )}
+      </div>
     );
   }
 
@@ -120,6 +226,25 @@ export function JobActions({
 
   return (
     <div className="space-y-5">
+      {/* Start the live job. Hidden while a reschedule is awaiting the customer
+          so the slot isn't started under a contested time. */}
+      {!pendingProposal && (
+        <div>
+          <Button
+            size="sm"
+            fullWidth
+            iconLeft={Navigation}
+            disabled={pending}
+            onClick={() => runLive(startJourney, "You're on the way — the customer's been notified.")}
+          >
+            Start journey
+          </Button>
+          <p className="mt-1.5 text-xs text-text-muted">
+            Marks you as on the way and shows the customer your live status.
+          </p>
+        </div>
+      )}
+
       {pendingProposal && (
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-3">
           <p className="text-xs font-semibold text-amber-800">
@@ -198,8 +323,8 @@ export function JobActions({
           Cancel job
         </button>
         <p className="mt-1.5 text-xs text-text-muted">
-          The job is re-offered to other mechanics. The customer's payment stays
-          held (not charged) and transfers to the replacement.
+          The job is re-offered to other mechanics. The customer&apos;s payment
+          stays held (not charged) and transfers to the replacement.
         </p>
       </div>
     </div>

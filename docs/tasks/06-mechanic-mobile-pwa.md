@@ -1,8 +1,20 @@
 # Task 06 — Mechanic mobile PWA
 
-**Status:** ⏳ Queued
+**Status:** ⏳ Queued (partially delivered early — see "Interim delivery" below)
 
 Build the phone-optimised mobile experience the mechanic uses in the field. Brief covers this in section 4 (second half). Delivered as a Progressive Web App — installable to home screen, push notifications, offline-capable for the in-progress checklist.
+
+## Interim delivery (2026-06-03) — live lifecycle on desktop
+
+Ahead of the full PWA, the **job status lifecycle** (Stage 4's status transitions) was shipped on the existing **desktop** mechanic dashboard, because the booking status enum and lifecycle timestamps (`en_route_at` / `started_at` / `completed_at`) already existed from migration 0004 — no mobile app was needed to write them. This lets a mechanic drive a job forward today and lets the customer watch it happen, without waiting for the PWA.
+
+What landed:
+- `app/actions/job-progress.ts` — `startJourney` (confirmed → en_route), `beginWork` (en_route → in_progress), `completeAndCharge` (in_progress → completed). The last **captures the Stripe pre-authorisation** (manual capture) and emails the customer a receipt. Capture failure is fatal — the job stays open and retryable; if Stripe isn't configured (dev) it completes without capturing.
+- The desktop job-detail view's old "handled in the mobile app" placeholder (`jobs/[id]/_components/job-actions.tsx`) is replaced with real **Start journey / Begin work / Complete & charge** buttons, gated by current status.
+- The customer's `book/confirmed/[id]` page is now a **live status tracker** (`_components/booking-tracker.tsx`): a step rail that progresses Booked → Mechanic confirmed (reveals mechanic name/avatar/rating) → On the way → Work in progress → Complete, with status-aware copy and a completed-state receipt note. Refresh-based (no Realtime yet).
+- **Job photos + sign-off signature on the web view** (`0011_job_media.sql`, `app/actions/job-media.ts`, `_components/photo-uploader.tsx`, `_components/signature-pad.tsx`): the mechanic uploads job photos (camera-capable file input) during an active job, and completion is gated on an on-screen customer **signature** — a dependency-free `<canvas>` pad whose PNG is saved to a public `job-media` bucket. `completeAndCharge` refuses to complete until a signature row exists. Photos + signature are shown back in the job-detail view.
+
+**Still deferred to the real mobile build:** GPS live-location tracking, offline (IndexedDB) sync, push notifications, and the whole PWA shell. The desktop UI is responsive (the job-detail page already stacks to one column below `lg`) but not the bespoke 375px-first PWA layout.
 
 ## Why this task
 
@@ -129,17 +141,17 @@ Once a job is accepted and the mechanic is heading to it, the screen guides them
 
 **Acceptance criteria:**
 
-- [ ] `app/(mechanic)/mechanic/jobs/[id]/in-progress/page.tsx` — step-by-step flow
-- [ ] Each step is a screen with: title, instructions, photos field (where relevant), CTA to advance to next step
-- [ ] Status updates in `bookings` table at each transition
-- [ ] Photos uploaded to Supabase Storage, linked to booking
-- [ ] Signature pad at step 5 — use `signature_pad` library, save as PNG to Supabase Storage
-- [ ] On "Complete + charge":
-  1. Capture the Stripe PaymentIntent (manual capture from task 03 pre-auth)
-  2. Set booking status='completed', completed_at=now()
-  3. Show payout timing: "Paid 24h after sign-off"
-  4. Trigger receipt email to customer
-- [ ] Offline support — if the mechanic loses signal mid-job, the checklist state persists locally and syncs when reconnected (use IndexedDB via `idb` library, with a sync server action that runs when online)
+- [ ] `app/(mechanic)/mechanic/jobs/[id]/in-progress/page.tsx` — step-by-step flow *(deferred — interim delivery puts the transitions on the desktop job-detail view via `job-actions.tsx`, not a dedicated mobile checklist screen)*
+- [ ] Each step is a screen with: title, instructions, photos field (where relevant), CTA to advance to next step *(deferred to mobile build)*
+- [x] Status updates in `bookings` table at each transition *(via `app/actions/job-progress.ts`)*
+- [x] Photos uploaded to Supabase Storage, linked to booking *(via `job-media` bucket + `booking_media` table, `uploadJobPhoto`; shown in job-detail)*
+- [x] Signature pad at step 5 — ~~use `signature_pad` library~~, save as PNG to Supabase Storage *(hand-rolled dependency-free `<canvas>` pad instead of the library; PNG → `job-media` bucket; gates completion)*
+- [x] On "Complete + charge":
+  1. [x] Capture the Stripe PaymentIntent (manual capture from task 03 pre-auth)
+  2. [x] Set booking status='completed', completed_at=now()
+  3. [x] Show payout timing: "Paid 24h after sign-off" *(shown in the desktop complete button's helper text)*
+  4. [x] Trigger receipt email to customer
+- [ ] Offline support — if the mechanic loses signal mid-job, the checklist state persists locally and syncs when reconnected (use IndexedDB via `idb` library, with a sync server action that runs when online) *(deferred to mobile build)*
 
 **Files touched:**
 - `app/(mechanic)/mechanic/jobs/[id]/in-progress/page.tsx`

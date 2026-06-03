@@ -1,14 +1,20 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { CheckCircle, Clock, ArrowRight } from "lucide-react";
+import { CheckCircle, ArrowRight } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatPrice } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { BookingTracker, type BookingMechanic } from "./_components/booking-tracker";
 
 interface ConfirmedPageProps {
   params: Promise<{ id: string }>;
 }
+
+// Reflect live status as the mechanic drives the job forward (the tracker reads
+// the same booking the mechanic mutates). Mechanic actions revalidate this
+// path; a refresh always shows the latest.
+export const dynamic = "force-dynamic";
 
 export default async function ConfirmedPage({ params }: ConfirmedPageProps) {
   const { id } = await params;
@@ -20,11 +26,28 @@ export default async function ConfirmedPage({ params }: ConfirmedPageProps) {
 
   const { data: booking } = await supabase
     .from("bookings")
-    .select("id, vehicle_reg, vehicle_make, vehicle_model, scheduled_at, total_pence, customer_name, address_line_1, status")
+    .select("id, vehicle_reg, vehicle_make, vehicle_model, scheduled_at, total_pence, customer_name, address_line_1, status, mechanic_id")
     .eq("id", id)
     .single();
 
   if (!booking) notFound();
+
+  // Reveal the mechanic once one is assigned (confirmed and beyond). Name +
+  // avatar from profiles, rating from mechanics.
+  let mechanic: BookingMechanic | null = null;
+  if (booking.mechanic_id) {
+    const [{ data: profile }, { data: mech }] = await Promise.all([
+      supabase.from("profiles").select("full_name, avatar_url").eq("id", booking.mechanic_id).single(),
+      supabase.from("mechanics").select("rating").eq("id", booking.mechanic_id).single(),
+    ]);
+    if (profile) {
+      mechanic = {
+        name: profile.full_name ?? "Your mechanic",
+        avatarUrl: profile.avatar_url ?? null,
+        rating: mech?.rating ?? null,
+      };
+    }
+  }
 
   const ref = booking.id.slice(0, 8).toUpperCase();
   const slotDate = booking.scheduled_at
@@ -57,24 +80,8 @@ export default async function ConfirmedPage({ params }: ConfirmedPageProps) {
         </div>
       </div>
 
-      {/* Finding mechanic status */}
-      <div className="rounded-2xl border border-brand-blue/20 bg-blue-50 p-5">
-        <div className="flex items-start gap-3">
-          <div className="relative mt-0.5 shrink-0">
-            <Clock size={20} className="text-brand-blue" />
-            <span className="absolute -right-0.5 -top-0.5 size-2.5 animate-ping rounded-full bg-brand-blue opacity-75" />
-            <span className="absolute -right-0.5 -top-0.5 size-2.5 rounded-full bg-brand-blue" />
-          </div>
-          <div>
-            <p className="font-semibold text-brand-blue">Finding your mechanic</p>
-            <p className="mt-1 text-sm text-blue-700 leading-relaxed">
-              We&apos;re matching you with the best available mechanic in your area.
-              You&apos;ll receive an email confirmation as soon as one accepts —
-              usually within minutes.
-            </p>
-          </div>
-        </div>
-      </div>
+      {/* Live status tracker */}
+      <BookingTracker status={booking.status} mechanic={mechanic} />
 
       {/* Booking summary */}
       <Card>
@@ -90,14 +97,18 @@ export default async function ConfirmedPage({ params }: ConfirmedPageProps) {
           {booking.address_line_1 && (
             <Row label="Address" value={booking.address_line_1} />
           )}
-          <Row label="Amount pre-authorised" value={formatPrice(booking.total_pence)} />
+          <Row
+            label={booking.status === "completed" ? "Amount charged" : "Amount pre-authorised"}
+            value={formatPrice(booking.total_pence)}
+          />
         </dl>
       </Card>
 
       <Card className="bg-surface">
         <p className="text-sm text-text-secondary leading-relaxed">
-          No money has left your account. Your payment will only be captured once
-          your mechanic has completed the job and you&apos;ve signed off.
+          {booking.status === "completed"
+            ? "Your payment has now been captured and a receipt has been emailed to you."
+            : "No money has left your account. Your payment will only be captured once your mechanic has completed the job."}
         </p>
       </Card>
 
