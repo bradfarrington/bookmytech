@@ -1,6 +1,6 @@
 # Task 05 — Mechanic dashboard (desktop web)
 
-**Status:** 🚧 In progress — Stages 1–4 ✅ (Stages 1–3 2026-06-01, Stage 4 2026-06-03). Auth + shell, jobs page (KPIs + live broadcast offers + dispatch), daily schedule timeline + free SVG service-area map, and the job-detail view (cancel + reschedule-propose, mechanic-side + Task-09 stubs) shipped. Remaining: Stage 5 (earnings page), Stage 6 (availability + profile).
+**Status:** 🚧 In progress — Stages 1–5 ✅ (Stages 1–3 2026-06-01, Stages 4–5 2026-06-03). Auth + shell, jobs page (KPIs + live broadcast offers + dispatch), daily schedule timeline + free SVG service-area map, job-detail view (cancel + reschedule-propose, mechanic-side + Task-09 stubs), and the earnings page (KPIs + recharts chart + seed payouts) shipped. Remaining: Stage 6 (availability + profile).
 
 > **Dispatch model correction (owner, 2026-06-01):** dispatch is **broadcast, first-to-accept** — the job is offered simultaneously to every eligible online mechanic whose service area covers the job address (matching specialism), and the first to Accept wins; the customer never picks a mechanic. There is **no** sequential "offer to closest, wait 60s, pass to next" and **no** auto-widening of radius. Offers stay open until accepted; the only escalation is to **notify the admin** if a booking is still unaccepted after a sensible threshold (minutes, not seconds — exact value TBD at Stage 2 build). The Stage 2 spec text below is superseded by this where they conflict.
 
@@ -222,18 +222,20 @@ When a mechanic clicks into an offer or scheduled job.
 
 **Note:** Payouts are part of Stripe Connect — full implementation is task 08 (when we wire mechanic-side Stripe). For now, fake the payouts table with seed data.
 
+**Status: ✅ Stage 5 complete (2026-06-03).** Pages live under the `(shell)` route group (same deviation as Stages 1–4); URLs unchanged.
+
 **Acceptance criteria:**
 
-- [ ] `app/(mechanic)/mechanic/earnings/page.tsx`
-- [ ] KPI cards calculated from `bookings` where status='completed' and mechanic_id matches
-- [ ] Chart uses `recharts`
-- [ ] Period selector switches the chart data
-- [ ] Payouts table renders seed data with masked bank details
+- [x] `app/(mechanic)/mechanic/earnings/page.tsx` — **Deviation (path):** `app/(mechanic)/mechanic/(shell)/earnings/page.tsx` (shell group). Replaces the Stage 1 placeholder.
+- [x] KPI cards calculated from `bookings` where status='completed' and mechanic_id matches — four cards: this-month earnings (mechanic share via `lib/earnings.ts`), jobs completed this month, average per job, projected end-of-month (linear run-rate from month-to-date). All zero-state aware ("—" when no completed jobs).
+- [x] Chart uses `recharts` — `_components/earnings-chart.tsx` (client), an `AreaChart` of the daily mechanic-share series with brand-blue gradient fill, matching the admin `demand-chart.tsx` conventions.
+- [x] Period selector switches the chart data — 7d / 30d / 90d segmented control. The page builds the full 90-day zero-filled daily series once; the selector slices the tail client-side (no refetch).
+- [x] Payouts table renders seed data with masked bank details — `_components/payouts-table.tsx`. Rows are derived from **real** weekly mechanic-share sums (current week → Pending, settled weeks → Paid, account `•••• 4242`); falls back to clearly-labelled seed rows when the mechanic has no completed jobs yet. Header flags it as a preview — live payouts arrive with Stripe Connect (Task 08).
 
 **Files touched:**
-- `app/(mechanic)/mechanic/earnings/page.tsx`
-- `app/(mechanic)/mechanic/earnings/_components/earnings-chart.tsx`
-- `app/(mechanic)/mechanic/earnings/_components/payouts-table.tsx`
+- `app/(mechanic)/mechanic/(shell)/earnings/page.tsx`
+- `app/(mechanic)/mechanic/(shell)/earnings/_components/earnings-chart.tsx`
+- `app/(mechanic)/mechanic/(shell)/earnings/_components/payouts-table.tsx`
 
 ---
 
