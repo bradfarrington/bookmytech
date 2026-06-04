@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Radio } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Pill } from "@/components/ui/pill";
 import { formatPrice } from "@/lib/utils";
-import { subscribeToBookings } from "@/lib/supabase/realtime";
+import { useStayFresh } from "@/lib/use-stay-fresh";
 
 export interface MonitorRow {
   id: string;
@@ -71,11 +71,9 @@ export function LiveMonitor({ rows }: { rows: MonitorRow[] }) {
   const [tab, setTab] = useState<Tab>("live");
   const router = useRouter();
 
-  // Re-run the server component on any bookings change so KPIs, this table,
-  // and the demand chart all refresh together from a single source of truth.
-  useEffect(() => {
-    return subscribeToBookings(() => router.refresh());
-  }, [router]);
+  // Poll the server component so KPIs, this table, and the demand chart all
+  // refresh together from a single source of truth (no Realtime/replication).
+  useStayFresh(() => router.refresh(), 15_000);
 
   const filtered = useMemo(
     () => rows.filter((r) => matchesTab(r.status, tab)),

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { Send } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { subscribeToMessages } from "@/lib/supabase/realtime";
+import { useStayFresh } from "@/lib/use-stay-fresh";
 import { sendMessage, markMessagesRead } from "@/app/actions/messages";
 import { cn } from "@/lib/utils";
 
@@ -24,7 +24,9 @@ interface MessagesThreadProps {
 
 // A booking's message thread, shared by the customer dashboard + the mechanic
 // job view. Reads run client-side under RLS; sends go through the sendMessage
-// server action. Realtime keeps both sides live.
+// server action. Kept live by polling (useStayFresh) — no Supabase Realtime, so
+// no table replication needed. Chat wants snappier refresh than the page status,
+// so it polls more often.
 export function MessagesThread({
   bookingId,
   viewerRole,
@@ -46,16 +48,17 @@ export function MessagesThread({
     setMessages((data as Msg[]) ?? []);
   }, [bookingId]);
 
-  // Initial load + mark the counterpart's messages read, then keep live.
+  // Initial load + mark the counterpart's messages read.
   useEffect(() => {
     load();
     markMessagesRead(bookingId).catch(() => {});
-    const unsub = subscribeToMessages(bookingId, () => {
-      load();
-      markMessagesRead(bookingId).catch(() => {});
-    });
-    return unsub;
   }, [bookingId, load]);
+
+  // Poll for new messages while the thread is open (and on tab refocus).
+  useStayFresh(() => {
+    load();
+    markMessagesRead(bookingId).catch(() => {});
+  }, 8_000);
 
   // Stick to the bottom as new messages arrive.
   useEffect(() => {

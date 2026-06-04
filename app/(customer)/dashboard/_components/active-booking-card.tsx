@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Phone, MessageSquare, Star, MapPin, Clock } from "lucide-react";
-import { subscribeToBooking } from "@/lib/supabase/realtime";
+import { useStayFresh } from "@/lib/use-stay-fresh";
 import { MessagesThread } from "@/components/messages/messages-thread";
 import { RescheduleProposal } from "@/components/customer/reschedule-proposal";
 import {
@@ -21,18 +21,17 @@ interface ActiveBookingCardProps {
 
 const LIVE = ["en_route", "in_progress"];
 
-// The prominent top card. Live-updates via Realtime as the mechanic drives the
-// job forward. Call is enabled only once the mechanic is en route / on site;
-// messaging is always available once a mechanic is assigned. (Live GPS map +
-// ETA are deferred to the native app — we show the booked slot + status here.)
+// The prominent top card. Stays current by polling (useStayFresh) as the
+// mechanic drives the job forward — no Supabase Realtime, so no table
+// replication needed. Call is enabled only once the mechanic is en route / on
+// site; messaging is always available once a mechanic is assigned. (Live GPS map
+// + ETA are deferred to the native app — we show the booked slot + status here.)
 export function ActiveBookingCard({ booking, mechanic }: ActiveBookingCardProps) {
   const router = useRouter();
   const [showMessages, setShowMessages] = useState(false);
 
-  // Refresh the server component when this booking changes (status, reschedule).
-  useEffect(() => {
-    return subscribeToBooking(booking.id, () => router.refresh());
-  }, [booking.id, router]);
+  // Re-run the server component periodically so status + reschedule changes show.
+  useStayFresh(() => router.refresh(), 20_000);
 
   const callable = LIVE.includes(booking.status) && !!mechanic?.phone;
   const vehicle = [booking.vehicleMake, booking.vehicleModel].filter(Boolean).join(" ");

@@ -1,12 +1,11 @@
 "use client";
 
-import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Inbox } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Pill } from "@/components/ui/pill";
 import { Icon } from "@/components/ui/icon";
-import { subscribeToMyOffers } from "@/lib/supabase/realtime";
+import { useStayFresh } from "@/lib/use-stay-fresh";
 import { OfferCard } from "./offer-card";
 
 export interface OfferView {
@@ -23,19 +22,18 @@ export interface OfferView {
 }
 
 export function OfferFeed({
-  mechanicId,
   offers,
 }: {
-  mechanicId: string;
+  // mechanicId is still accepted by callers but no longer needed — the server
+  // re-query scopes offers to the signed-in mechanic via RLS.
+  mechanicId?: string;
   offers: OfferView[];
 }) {
   const router = useRouter();
 
-  // New offers (insert) and resolved offers (accepted/declined/superseded
-  // update) both refresh the server component, which re-queries live offers.
-  useEffect(() => {
-    return subscribeToMyOffers(mechanicId, () => router.refresh());
-  }, [mechanicId, router]);
+  // Poll for new + resolved offers (first-to-accept is time-sensitive, so this
+  // refreshes faster than the rest of the dashboard). No Realtime/replication.
+  useStayFresh(() => router.refresh(), 10_000);
 
   return (
     <Card padded={false}>

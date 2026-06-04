@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Zap, Clock, MapPin, Wrench, Car, StickyNote, Check, X } from "lucide-react";
 import { formatPrice } from "@/lib/utils";
 import { acceptOffer, declineOffer } from "@/app/actions/job-offers";
-import { subscribeToMyOffers } from "@/lib/supabase/realtime";
+import { useStayFresh } from "@/lib/use-stay-fresh";
 
 interface OfferScreenProps {
   offerId: string;
@@ -25,16 +25,14 @@ interface OfferScreenProps {
 const SWIPE_THRESHOLD = 120; // px of left-drag to trigger decline
 
 export function OfferScreen(props: OfferScreenProps) {
-  const { offerId, bookingId, mechanicId, serviceName, vehicle, reg, whenLabel, where, distanceLabel, notes, earningsPence } = props;
+  const { offerId, bookingId, serviceName, vehicle, reg, whenLabel, where, distanceLabel, notes, earningsPence } = props;
   const router = useRouter();
   const [pending, startTransition] = useTransition();
 
-  // If another mechanic accepts (or the offer is withdrawn) while this screen
-  // is open, the offer row updates → refresh, and the server re-renders the
-  // "no longer available" state.
-  useEffect(() => {
-    return subscribeToMyOffers(mechanicId, () => router.refresh());
-  }, [mechanicId, router]);
+  // If another mechanic accepts (or the offer is withdrawn) while this screen is
+  // open, polling re-runs the server component, which re-renders the "no longer
+  // available" state. Time-sensitive, so it polls quickly. No Realtime needed.
+  useStayFresh(() => router.refresh(), 8_000);
 
   function handleAccept() {
     startTransition(async () => {

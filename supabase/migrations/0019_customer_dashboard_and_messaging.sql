@@ -96,17 +96,8 @@ create policy "Admins read all messages" on public.messages
 -- Inserts go through the sendMessage server action (service-role) after it has
 -- verified the caller is party to the booking — same privileged-write pattern
 -- as job offers / job actions. No INSERT/UPDATE policy for browser sessions.
-
--- Realtime: both sides subscribe to their booking's thread. Needs the table in
--- the supabase_realtime publication (same as job_offers in 0008).
-do $$
-begin
-  if not exists (
-    select 1 from pg_publication_tables
-     where pubname = 'supabase_realtime'
-       and schemaname = 'public'
-       and tablename = 'messages'
-  ) then
-    execute 'alter publication supabase_realtime add table public.messages';
-  end if;
-end $$;
+--
+-- NOTE: the thread is kept live by client-side polling (lib/use-stay-fresh.ts),
+-- NOT Supabase Realtime — so `messages` is deliberately NOT added to the
+-- supabase_realtime publication. Nothing in the app depends on table
+-- replication being enabled.
