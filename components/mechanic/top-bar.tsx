@@ -1,13 +1,15 @@
 import { Bell } from "lucide-react";
 import { Icon } from "@/components/ui/icon";
 import { OnlineToggle } from "@/components/mechanic/online-toggle";
+import { MechanicMobileNav } from "@/components/mechanic/mobile-nav";
 
 export interface MechanicTopBarProps {
   firstName: string;
+  userName: string;
   status: "online" | "offline" | "on_job";
 }
 
-export function MechanicTopBar({ firstName, status }: MechanicTopBarProps) {
+export function MechanicTopBar({ firstName, userName, status }: MechanicTopBarProps) {
   // Rendered server-side at request time, so the date is stable for hydration.
   const today = new Date().toLocaleDateString("en-GB", {
     weekday: "long",
@@ -16,13 +18,16 @@ export function MechanicTopBar({ firstName, status }: MechanicTopBarProps) {
   });
 
   return (
-    <header className="flex h-[72px] shrink-0 items-center gap-4 border-b border-border bg-surface-card px-7">
+    <header className="flex h-[72px] shrink-0 items-center gap-3 border-b border-border bg-surface-card px-4 pt-[env(safe-area-inset-top)] md:gap-4 md:px-7">
+      {/* Mobile: hamburger opens the nav drawer (desktop uses the sidebar). */}
+      <MechanicMobileNav userName={userName} />
+
       <div className="min-w-0">
-        <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-text-muted">
+        <p className="hidden text-[11px] font-bold uppercase tracking-[0.1em] text-text-muted sm:block">
           Mechanic dashboard
         </p>
-        <p className="truncate text-lg font-bold tracking-tight text-text-primary">
-          Hi {firstName} · {today}
+        <p className="truncate text-base font-bold tracking-tight text-text-primary md:text-lg">
+          Hi {firstName} <span className="hidden sm:inline">· {today}</span>
         </p>
       </div>
 

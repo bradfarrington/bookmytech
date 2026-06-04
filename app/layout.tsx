@@ -28,6 +28,9 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: "#2563EB",
+  // Let content extend under the notch / home indicator so env(safe-area-inset-*)
+  // padding (used in the mechanic shell + nav drawer) takes effect.
+  viewportFit: "cover",
 };
 
 export default function RootLayout({

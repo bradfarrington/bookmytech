@@ -47,8 +47,10 @@ export default async function MechanicShellLayout({
     <div className="flex min-h-dvh bg-surface text-text-primary">
       <MechanicSidebar userName={displayName} />
       <div className="flex min-w-0 flex-1 flex-col">
-        <MechanicTopBar firstName={firstName} status={status} />
-        <main className="flex-1 overflow-auto p-7">{children}</main>
+        <MechanicTopBar firstName={firstName} userName={displayName} status={status} />
+        <main className="flex-1 overflow-auto p-4 pb-[max(1rem,env(safe-area-inset-bottom))] md:p-7">
+          {children}
+        </main>
       </div>
       <Toaster richColors position="top-right" closeButton />
       <InstallPrompt />

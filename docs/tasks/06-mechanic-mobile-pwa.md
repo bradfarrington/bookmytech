@@ -69,18 +69,17 @@ Bottom-tab navigation. Single-handed reach. Designed for 375px width primarily.
 
 **Acceptance criteria:**
 
-- [ ] Mobile-only layout at `app/(mechanic)/mechanic/layout.tsx` — sidebar hidden, bottom tabs shown when viewport < 768px
-- [ ] Or alternative: separate `app/(mechanic)/mobile/*` route group that mirrors but reshapes — your call, but single-layout-with-responsive is preferred for simplicity
-- [ ] Bottom tab bar component (client, persists across navigation)
-- [ ] Day view fully built at the mobile breakpoint
-- [ ] Tap targets minimum 44px (iOS guideline)
-- [ ] Safe area insets respected (notch / home indicator) using `env(safe-area-inset-*)` CSS vars
+- [x] Single-layout-with-responsive (preferred option): the desktop sidebar is `hidden md:flex`; below `md` a **hamburger + slide-in drawer** (`components/mechanic/mobile-nav.tsx`) carries the same nav. Shared nav source: `components/mechanic/nav-items.ts`.
+- [ ] ~~Bottom tab bar component~~ — **DEFERRED to the real app build** per the mobile-nav scope decision (responsive web, not an app shell). The drawer replaces it for now.
+- [x] Day view built at the mobile breakpoint — `jobs/_components/day-view-header.tsx`: greeting + daily summary ("N jobs lined up · £X booked") + circular earnings-goal ring (`components/mechanic/earnings-ring.tsx`). "Up next" + subsequent job rows are the existing `Schedule` component (next item already highlighted). *Earnings target is a fixed default (`DAILY_TARGET_PENCE`); making it editable in the profile is a small follow-up (needs a column).*
+- [x] Tap targets minimum 44px — drawer trigger/links and buttons are `size-11` / `min-h-11` (44px).
+- [x] Safe area insets respected — `env(safe-area-inset-*)` on the top bar, main scroll area, and drawer; `viewportFit: "cover"` added to the root `viewport` export.
 
-**Files touched:**
-- `components/mechanic/bottom-tabs.tsx`
-- `app/(mechanic)/mechanic/page.tsx` updates for mobile
-- `app/(mechanic)/mechanic/_components/day-view.tsx`
-- `app/(mechanic)/mechanic/_components/earnings-ring.tsx`
+**Files touched (actual):**
+- `components/mechanic/nav-items.ts` (shared), `components/mechanic/mobile-nav.tsx` (drawer, replaces the planned bottom-tabs), `components/mechanic/earnings-ring.tsx`
+- `components/mechanic/sidebar.tsx` (desktop-only), `components/mechanic/top-bar.tsx` (hamburger + responsive)
+- `app/(mechanic)/mechanic/(shell)/layout.tsx` (responsive padding + safe area), `app/layout.tsx` (viewportFit)
+- `app/(mechanic)/mechanic/(shell)/jobs/page.tsx` + `jobs/_components/day-view-header.tsx`
 
 ---
 

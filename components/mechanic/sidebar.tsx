@@ -3,37 +3,12 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  Calendar,
-  FileText,
-  Inbox,
-  LogOut,
-  type LucideIcon,
-  PoundSterling,
-  SlidersHorizontal,
-  Star,
-  User,
-} from "lucide-react";
+import { LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Icon } from "@/components/ui/icon";
 import { Avatar } from "@/components/ui/avatar";
 import { signOut } from "@/app/actions/sign-out";
-
-interface NavItem {
-  label: string;
-  href: string;
-  icon: LucideIcon;
-}
-
-const NAV_ITEMS: readonly NavItem[] = [
-  { label: "Jobs", href: "/mechanic/jobs", icon: Inbox },
-  { label: "Schedule", href: "/mechanic/schedule", icon: Calendar },
-  { label: "Earnings", href: "/mechanic/earnings", icon: PoundSterling },
-  { label: "Reviews", href: "/mechanic/reviews", icon: Star },
-  { label: "Availability", href: "/mechanic/availability", icon: SlidersHorizontal },
-  { label: "Profile", href: "/mechanic/profile", icon: User },
-  { label: "Documents", href: "/mechanic/documents", icon: FileText },
-];
+import { MECHANIC_NAV_ITEMS, isNavItemActive } from "@/components/mechanic/nav-items";
 
 export interface MechanicSidebarProps {
   userName: string;
@@ -41,11 +16,13 @@ export interface MechanicSidebarProps {
   avatarTint?: number;
 }
 
+// Desktop-only (hidden below md). On narrow viewports the same nav appears in
+// the slide-in drawer (components/mechanic/mobile-nav.tsx).
 export function MechanicSidebar({ userName, avatarTint = 0 }: MechanicSidebarProps) {
   const pathname = usePathname();
 
   return (
-    <aside className="flex w-60 shrink-0 flex-col border-r border-border bg-surface-card">
+    <aside className="hidden w-60 shrink-0 flex-col border-r border-border bg-surface-card md:flex">
       <div className="flex h-[88px] items-center justify-center border-b border-border px-5">
         <Image
           src="/logo.png"
@@ -58,10 +35,8 @@ export function MechanicSidebar({ userName, avatarTint = 0 }: MechanicSidebarPro
       </div>
 
       <nav className="flex-1 overflow-y-auto p-2.5">
-        {NAV_ITEMS.map((item) => {
-          // Treat sub-routes (/mechanic/jobs/[id]) as keeping the parent active.
-          const isActive =
-            pathname === item.href || pathname.startsWith(`${item.href}/`);
+        {MECHANIC_NAV_ITEMS.map((item) => {
+          const isActive = isNavItemActive(pathname, item.href);
           return (
             <Link
               key={item.href}

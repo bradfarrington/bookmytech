@@ -7,6 +7,17 @@ import { KpiCards, type MechanicKpis } from "./_components/kpi-cards";
 import { OfferFeed, type OfferView } from "./_components/offer-feed";
 import { Schedule, type ScheduleItem } from "./_components/schedule";
 import { AreaMap, type AreaPin } from "./_components/area-map";
+import { DayViewHeader } from "./_components/day-view-header";
+
+// Daily earnings goal for the day-view ring. A fixed default for now; making it
+// editable per-mechanic in the profile is a small follow-up (needs a column).
+const DAILY_TARGET_PENCE = 24_000;
+
+function greetingFor(hour: number): string {
+  if (hour < 12) return "Morning";
+  if (hour < 18) return "Afternoon";
+  return "Evening";
+}
 
 // One-to-one Supabase joins arrive typed as arrays; normalise to a single row.
 function one<T>(value: T | T[] | null | undefined): T | null {
@@ -92,11 +103,15 @@ export default async function MechanicJobsPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/mechanic/login");
 
-  const { data: mechanic } = await supabase
-    .from("mechanics")
-    .select("base_postcode, service_radius_miles, rating")
-    .eq("id", user.id)
-    .single();
+  const [{ data: mechanic }, { data: profile }] = await Promise.all([
+    supabase
+      .from("mechanics")
+      .select("base_postcode, service_radius_miles, rating")
+      .eq("id", user.id)
+      .single(),
+    supabase.from("profiles").select("full_name").eq("id", user.id).single(),
+  ]);
+  const firstName = profile?.full_name?.trim().split(/\s+/)[0] || "there";
 
   const baseCoords: LatLng | null = await geocodePostcode(mechanic?.base_postcode);
   const radiusMiles = mechanic?.service_radius_miles ?? 10;
@@ -154,6 +169,8 @@ export default async function MechanicJobsPage() {
   const scheduleItems: ScheduleItem[] = [];
   const pins: AreaPin[] = [];
   let nextAssigned = true; // first upcoming item is "next up"
+  let jobsToday = 0; // upcoming jobs scheduled for today
+  let bookedTodayPence = 0; // mechanic's share of today's upcoming jobs
 
   for (const b of (bookingRows ?? []) as ScheduleRow[]) {
     const whenMs = b.scheduled_at ? new Date(b.scheduled_at).getTime() : 0;
@@ -162,6 +179,10 @@ export default async function MechanicJobsPage() {
 
     if (whenMs >= todayStartMs && whenMs < tomorrowStartMs) {
       const isUpcoming = UPCOMING_STATUSES.includes(status);
+      if (isUpcoming) {
+        jobsToday += 1;
+        bookedTodayPence += mechanicSharePence(b.total_pence ?? 0, b.commission_rate ?? 0.15);
+      }
       const isNext = isUpcoming && nextAssigned;
       if (isNext) nextAssigned = false;
       scheduleItems.push({
@@ -230,6 +251,15 @@ export default async function MechanicJobsPage() {
 
   return (
     <div className="space-y-6">
+      <DayViewHeader
+        firstName={firstName}
+        greeting={greetingFor(new Date().getHours())}
+        jobsToday={jobsToday}
+        bookedTodayPence={bookedTodayPence}
+        earnedTodayPence={todayEarningsPence}
+        targetPence={DAILY_TARGET_PENCE}
+      />
+
       <KpiCards kpis={kpis} />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
