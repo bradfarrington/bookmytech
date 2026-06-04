@@ -4,6 +4,7 @@ import { ArrowLeft, ChevronRight } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { ProgressStepper } from "@/components/customer/progress-stepper";
 import { Button } from "@/components/ui/button";
+import { calculatePrice } from "@/lib/pricing/calculate";
 import { PriceHero } from "./_components/price-hero";
 
 interface MatchPageProps {
@@ -34,6 +35,11 @@ export default async function MatchPage({ searchParams }: MatchPageProps) {
     .single();
 
   if (!service) notFound();
+
+  // Price via the engine (area multiplier + parts + commission). With no
+  // postcode yet the engine falls back to the Default area (×1.00); the slot
+  // step re-prices once the customer confirms their postcode.
+  const price = await calculatePrice(service.id, params.postcode ?? "");
 
   const vehicleParams = [
     params.make ? `make=${encodeURIComponent(params.make)}` : null,
@@ -66,7 +72,7 @@ export default async function MatchPage({ searchParams }: MatchPageProps) {
 
       <PriceHero
         serviceName={service.name}
-        pricePence={service.starting_price_pence}
+        pricePence={price.totalPence}
         description={service.description}
       />
 

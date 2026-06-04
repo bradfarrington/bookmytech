@@ -13,6 +13,7 @@ export const dynamic = "force-dynamic";
 interface CompletedRow {
   total_pence: number | null;
   commission_rate: number | null;
+  mechanic_payout_pence: number | null;
   completed_at: string | null;
 }
 
@@ -49,7 +50,7 @@ export default async function MechanicEarningsPage() {
   const since = new Date(Date.now() - CHART_DAYS * MS_DAY).toISOString();
   const { data: completedRows } = await supabase
     .from("bookings")
-    .select("total_pence, commission_rate, completed_at")
+    .select("total_pence, commission_rate, mechanic_payout_pence, completed_at")
     .eq("mechanic_id", user.id)
     .eq("status", "completed")
     .gte("completed_at", since)
@@ -72,7 +73,11 @@ export default async function MechanicEarningsPage() {
 
   for (const c of completed) {
     if (!c.completed_at) continue;
-    const share = mechanicSharePence(c.total_pence ?? 0, c.commission_rate ?? 0.15);
+    // Prefer the payout snapshotted on the booking at creation (Task 08);
+    // fall back to the live calc for legacy rows predating the column.
+    const share =
+      c.mechanic_payout_pence ??
+      mechanicSharePence(c.total_pence ?? 0, c.commission_rate ?? 0.15);
     const when = new Date(c.completed_at);
 
     const key = localISODate(when);

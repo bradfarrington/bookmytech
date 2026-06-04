@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { ProgressStepper } from "@/components/customer/progress-stepper";
+import { calculatePrice } from "@/lib/pricing/calculate";
 import { SlotPicker } from "./_components/slot-picker";
 
 interface SlotPageProps {
@@ -33,6 +34,10 @@ export default async function SlotPage({ searchParams }: SlotPageProps) {
     .single();
 
   if (!service) notFound();
+
+  // Initial estimate from the URL postcode; the picker re-prices for real when
+  // the customer confirms their postcode and the PaymentIntent is created.
+  const price = await calculatePrice(service.id, params.postcode ?? "");
 
   const vehicleParams = [
     params.make ? `make=${encodeURIComponent(params.make)}` : null,
@@ -69,7 +74,7 @@ export default async function SlotPage({ searchParams }: SlotPageProps) {
         defaultPostcode={(params.postcode ?? "").toUpperCase()}
         serviceName={service.name}
         serviceId={service.id}
-        pricePence={service.starting_price_pence}
+        pricePence={price.totalPence}
       />
     </div>
   );

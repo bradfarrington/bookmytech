@@ -69,6 +69,10 @@ export function SlotPicker({
   const [parkingType, setParkingType] = useState<ParkingType>("driveway");
   const [instructions, setInstructions] = useState("");
   const [clientSecret, setClientSecret] = useState<string | null>(null);
+  // The server prices the booking from (service, entered postcode) when the
+  // PaymentIntent is created — that figure (not the URL estimate) is the amount
+  // actually pre-authorised and charged.
+  const [quotedPence, setQuotedPence] = useState(pricePence);
   const [stripeError, setStripeError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -81,11 +85,12 @@ export function SlotPicker({
     if (!canProceed) return;
     setStripeError(null);
     startTransition(async () => {
-      const result = await createPaymentIntentAction(pricePence);
+      const result = await createPaymentIntentAction({ serviceId, postcode });
       if (!result.ok) {
         setStripeError(result.error);
         return;
       }
+      setQuotedPence(result.totalPence);
       setClientSecret(result.clientSecret);
     });
   }
@@ -108,7 +113,7 @@ export function SlotPicker({
           model={model}
           serviceName={serviceName}
           serviceId={serviceId}
-          pricePence={pricePence}
+          pricePence={quotedPence}
         />
       </Elements>
     );
@@ -338,7 +343,6 @@ function CheckoutForm({
       serviceName,
       serviceId,
       scheduledAt: selectedSlot,
-      totalPence: pricePence,
       customerEmail: email.trim(),
       customerName: name.trim(),
       addressLine1: addressLine1,

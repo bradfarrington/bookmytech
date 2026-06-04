@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { sendEmail } from "@/lib/email/send";
 import { formatPrice } from "@/lib/utils";
 import { dispatchBooking } from "@/lib/dispatch/dispatch";
+import { calculatePrice } from "@/lib/pricing/calculate";
 
 export interface CreateBookingInput {
   vehicleReg: string;
@@ -12,7 +13,6 @@ export interface CreateBookingInput {
   serviceName: string;
   serviceId: string;
   scheduledAt: string; // ISO string
-  totalPence: number;
   customerEmail: string;
   customerName: string;
   addressLine1: string;
@@ -31,6 +31,19 @@ export async function createBookingAction(
   const { data: session } = await supabase.auth.getSession();
   const customerId = session?.session?.user?.id ?? null;
 
+  // Recompute the canonical price server-side from (service, postcode) — never
+  // trust a client-supplied total. The same inputs produced the PaymentIntent
+  // amount moments earlier, so this matches what was pre-authorised. The full
+  // breakdown is snapshotted onto the row so later pricing changes never apply
+  // retroactively.
+  let price;
+  try {
+    price = await calculatePrice(input.serviceId, input.postcode);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Pricing failed";
+    return { ok: false, error: message };
+  }
+
   const { data, error } = await supabase
     .from("bookings")
     .insert({
@@ -41,7 +54,14 @@ export async function createBookingAction(
       vehicle_model: input.vehicleModel ?? null,
       scheduled_at: input.scheduledAt,
       status: "sourcing_mechanic",
-      total_pence: input.totalPence,
+      total_pence: price.totalPence,
+      area_id: price.areaId,
+      base_price_pence: price.basePence,
+      labour_multiplier: price.labourMultiplier,
+      parts_price_pence: price.partsPence,
+      commission_rate: price.commissionRate,
+      platform_fee_pence: price.platformFeePence,
+      mechanic_payout_pence: price.mechanicPayoutPence,
       stripe_payment_intent_id: input.stripePaymentIntentId,
       customer_email: input.customerEmail,
       customer_name: input.customerName,
@@ -82,7 +102,7 @@ export async function createBookingAction(
           <tr><td style="padding: 8px 0; color: #64748b; font-size: 14px;">Vehicle</td><td style="padding: 8px 0; font-weight: 600;">${input.vehicleReg} — ${input.vehicleMake}${input.vehicleModel ? ` ${input.vehicleModel}` : ""}</td></tr>
           <tr><td style="padding: 8px 0; color: #64748b; font-size: 14px;">Service</td><td style="padding: 8px 0; font-weight: 600;">${input.serviceName}</td></tr>
           <tr><td style="padding: 8px 0; color: #64748b; font-size: 14px;">Date &amp; time</td><td style="padding: 8px 0; font-weight: 600;">${new Date(input.scheduledAt).toLocaleString("en-GB", { dateStyle: "full", timeStyle: "short" })}</td></tr>
-          <tr><td style="padding: 8px 0; color: #64748b; font-size: 14px;">Amount pre-authorised</td><td style="padding: 8px 0; font-weight: 600;">${formatPrice(input.totalPence)}</td></tr>
+          <tr><td style="padding: 8px 0; color: #64748b; font-size: 14px;">Amount pre-authorised</td><td style="padding: 8px 0; font-weight: 600;">${formatPrice(price.totalPence)}</td></tr>
         </table>
         <p style="color: #64748b; font-size: 14px;">No money has left your account yet. Your payment will only be captured once the job is complete and you've signed off.</p>
         <p style="color: #64748b; font-size: 14px;">Questions? Email us at <a href="mailto:help@bookmytech.co.uk">help@bookmytech.co.uk</a></p>
@@ -93,9 +113,23 @@ export async function createBookingAction(
   return { ok: true, bookingId: data.id };
 }
 
-export async function createPaymentIntentAction(amountPence: number): Promise<
-  { ok: true; clientSecret: string } | { ok: false; error: string }
+export async function createPaymentIntentAction(input: {
+  serviceId: string;
+  postcode: string;
+}): Promise<
+  { ok: true; clientSecret: string; totalPence: number } | { ok: false; error: string }
 > {
+  // Price the booking server-side from (service, postcode) so the pre-auth
+  // amount is the canonical total, not a figure the client could tamper with.
+  let totalPence: number;
+  try {
+    const price = await calculatePrice(input.serviceId, input.postcode);
+    totalPence = price.totalPence;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Pricing failed";
+    return { ok: false, error: message };
+  }
+
   // Lazy import — Stripe throws if STRIPE_SECRET_KEY is missing at module load.
   // Returning a friendly error here lets the flow work without Stripe keys set.
   let stripe;
@@ -108,7 +142,7 @@ export async function createPaymentIntentAction(amountPence: number): Promise<
 
   try {
     const intent = await stripe.paymentIntents.create({
-      amount: amountPence,
+      amount: totalPence,
       currency: "gbp",
       capture_method: "manual",
       description: "Book My Tech — service pre-authorisation",
@@ -116,7 +150,7 @@ export async function createPaymentIntentAction(amountPence: number): Promise<
     if (!intent.client_secret) {
       return { ok: false, error: "No client secret returned from Stripe." };
     }
-    return { ok: true, clientSecret: intent.client_secret };
+    return { ok: true, clientSecret: intent.client_secret, totalPence };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Stripe error";
     return { ok: false, error: message };
