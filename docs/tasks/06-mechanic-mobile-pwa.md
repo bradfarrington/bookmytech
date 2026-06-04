@@ -1,6 +1,6 @@
 # Task 06 — Mechanic mobile PWA
 
-**Status:** ⏳ Queued (partially delivered early — see "Interim delivery" below)
+**Status:** ✅ Complete (2026-06-04) — web-buildable scope shipped. PWA shell (Stage 1), responsive mobile + day view (Stage 2), offer-screen UI (Stage 3), live job lifecycle + photos/signature + Stripe capture (Stage 4, on the responsive desktop view), and reviews (Stage 5). **Deliberately deferred to the native-app build** (not done here, by decision): push notifications / FCM, offline IndexedDB sync, GPS live-location, the bottom-tab app shell, and the Me tab. The mobile experience is a responsive website, not an app shell. Notifications are email + SMS, not push. See the per-stage "deviation" notes below and the Interim-delivery block.
 
 Build the phone-optimised mobile experience the mechanic uses in the field. Brief covers this in section 4 (second half). Delivered as a Progressive Web App — installable to home screen, push notifications, offline-capable for the in-progress checklist.
 
