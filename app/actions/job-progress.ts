@@ -176,6 +176,10 @@ export async function completeAndCharge(bookingId: string): Promise<JobProgressR
 
   // --- Capture the pre-authorisation ---------------------------------------
   let captured = false;
+  // The charge created by the capture; used as the transfer's source_transaction
+  // so Stripe releases the mechanic's payout from these exact funds as they
+  // settle — no need for the platform balance to be topped up manually.
+  let chargeId: string | null = null;
   // Hoisted so the same client drives the payout transfer below.
   let stripe: typeof import("@/lib/stripe/server").stripe | null = null;
   try {
@@ -186,8 +190,12 @@ export async function completeAndCharge(bookingId: string): Promise<JobProgressR
   }
   if (booking.stripe_payment_intent_id && stripe) {
     try {
-      await stripe.paymentIntents.capture(booking.stripe_payment_intent_id);
+      const intent = await stripe.paymentIntents.capture(booking.stripe_payment_intent_id);
       captured = true;
+      chargeId =
+        typeof intent.latest_charge === "string"
+          ? intent.latest_charge
+          : (intent.latest_charge?.id ?? null);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Stripe capture failed";
       return { ok: false, error: `Couldn't take payment: ${message}. The job stays open — try again.` };
@@ -237,6 +245,9 @@ export async function completeAndCharge(bookingId: string): Promise<JobProgressR
         amount: payoutPence,
         currency: "gbp",
         destination: mechanicAccount.stripe_account_id,
+        // Release the payout from the funds of this booking's own charge as they
+        // settle — keeps payouts automatic without managing the platform balance.
+        ...(chargeId ? { source_transaction: chargeId } : {}),
         transfer_group: bookingId,
         metadata: { booking_id: bookingId, mechanic_id: guard.mechanicId },
       });

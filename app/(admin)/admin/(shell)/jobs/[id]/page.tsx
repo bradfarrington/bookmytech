@@ -11,6 +11,7 @@ import {
   CreditCard,
   ListChecks,
   Settings2,
+  Split,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
@@ -18,6 +19,7 @@ import { Card } from "@/components/ui/card";
 import { Pill } from "@/components/ui/pill";
 import { Overline } from "@/components/ui/overline";
 import { formatPrice } from "@/lib/utils";
+import { calcEarnings } from "@/lib/earnings";
 import { Timeline, type TimelineEvent } from "./_components/timeline";
 import { BookingActions } from "./_components/booking-actions";
 
@@ -92,7 +94,9 @@ export default async function BookingDetailPage({ params }: PageProps) {
   const { data: booking } = await supabase
     .from("bookings")
     .select(
-      `id, status, area, postcode, total_pence, customer_name, customer_email,
+      `id, status, area, postcode, total_pence, base_price_pence, parts_price_pence,
+       commission_rate, platform_fee_pence, mechanic_payout_pence,
+       customer_name, customer_email,
        vehicle_reg, vehicle_make, vehicle_model, service_id, mechanic_id,
        scheduled_at, created_at, address_line_1, address_line_2, parking_type,
        special_instructions, stripe_payment_intent_id`,
@@ -136,6 +140,21 @@ export default async function BookingDetailPage({ params }: PageProps) {
   }));
 
   const pay = paymentMeta(paymentStatus);
+
+  // Commission/payout split. Prefer the values snapshotted on the booking at
+  // creation; fall back to recomputing for legacy rows that predate them.
+  const hasSnapshot =
+    booking.platform_fee_pence != null && booking.mechanic_payout_pence != null;
+  const rate = booking.commission_rate ?? 0.15;
+  const fallback = calcEarnings(booking.total_pence ?? 0, rate, booking.parts_price_pence ?? 0);
+  const split = {
+    customerPence: booking.total_pence ?? 0,
+    partsPence: booking.parts_price_pence ?? 0,
+    platformFeePence: hasSnapshot ? booking.platform_fee_pence! : fallback.platformFeePence,
+    mechanicPence: hasSnapshot ? booking.mechanic_payout_pence! : fallback.mechanicPence,
+    ratePct: Math.round(rate * 1000) / 10,
+    snapshot: hasSnapshot,
+  };
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
@@ -253,6 +272,44 @@ export default async function BookingDetailPage({ params }: PageProps) {
             ) : (
               <p className="text-sm text-text-muted">No payment intent on this booking.</p>
             )}
+          </Card>
+
+          <Card className="space-y-3 p-6">
+            <CardTitle icon={Split}>Split</CardTitle>
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-sm text-text-secondary">Customer pays</span>
+              <span className="text-sm font-semibold text-text-primary">
+                {formatPrice(split.customerPence)}
+              </span>
+            </div>
+            {split.partsPence > 0 && (
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-sm text-text-secondary">of which parts</span>
+                <span className="text-sm text-text-muted">{formatPrice(split.partsPence)}</span>
+              </div>
+            )}
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-sm text-text-secondary">
+                Platform commission ({split.ratePct}%)
+              </span>
+              <span className="text-sm font-semibold text-success">
+                {formatPrice(split.platformFeePence)}
+              </span>
+            </div>
+            <div className="flex items-center justify-between gap-3 border-t border-border pt-3">
+              <span className="text-sm text-text-secondary">Mechanic payout</span>
+              <span className="text-sm font-semibold text-text-primary">
+                {formatPrice(split.mechanicPence)}
+              </span>
+            </div>
+            <p className="text-xs text-text-muted">
+              Commission is taken on the total; the mechanic&apos;s payout covers the
+              parts they front.{" "}
+              {split.snapshot
+                ? "Locked at booking time."
+                : "Estimated — predates the pricing snapshot."}{" "}
+              Paid out automatically on completion.
+            </p>
           </Card>
 
           <Card className="space-y-4 p-6">
