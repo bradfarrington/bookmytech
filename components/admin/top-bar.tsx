@@ -33,6 +33,8 @@ const CRUMBS: Record<string, readonly [string, string]> = {
   "/admin/parts/new": ["Parts", "New part"],
   "/admin/parts/[id]/edit": ["Parts", "Edit part"],
   "/admin/parts/import": ["Parts", "Import"],
+  "/admin/areas/setup": ["Areas", "Launch a city"],
+  "/admin/areas/[id]": ["Areas", "Area detail"],
 };
 
 // Looks up the crumb for a pathname, falling back to a patterned match where

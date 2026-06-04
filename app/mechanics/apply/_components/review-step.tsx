@@ -89,6 +89,7 @@ export function ReviewStep({ services }: { services: ServiceLookup[] }) {
         bankSortCode: bank.sortCode,
         bankAccountNumber: bank.accountNumber,
         references: data.references,
+        sourceAreaSlug: data.sourceAreaSlug || undefined,
       });
       if (!result.ok) {
         setError(result.error);

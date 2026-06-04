@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
+import { Suspense } from "react";
 import { ApplicationProvider } from "./_components/application-provider";
 import { ApplyProgress } from "./_components/apply-progress";
+import { AreaCapture } from "./_components/area-capture";
 
 export const metadata: Metadata = {
   title: "Become a Book My Tech mechanic",
@@ -28,6 +30,9 @@ export default function ApplyLayout({ children }: { children: React.ReactNode })
       </header>
 
       <ApplicationProvider>
+        <Suspense fallback={null}>
+          <AreaCapture />
+        </Suspense>
         <main className="mx-auto max-w-2xl px-4 py-8 sm:py-12">
           <ApplyProgress />
           {children}

@@ -1,6 +1,6 @@
 # Task 10 — Analytics + parts margin + multi-city tooling
 
-**Status:** ⏳ In progress — Stage 1 ✅ (analytics, `0020`) · Stage 2 ✅ (parts margin, `0021`), both 2026-06-04. Stage 3 queued.
+**Status:** ✅ Complete (2026-06-04) — Stage 1 (analytics, `0020`) · Stage 2 (parts margin, `0021`) · Stage 3 (multi-city, `0022`). Deviations: demand heatmap is a self-contained postcode-district heat grid (not a Google-Maps overlay — no Maps key wired); commission stays on the whole total (owner decision, vs the spec's service-only split); parts are configured per-service in admin (vs a customer/mechanic ad-hoc picker).
 
 Three loosely-related features that round out the operations and commercial layers. The analytics dashboard (brief section 5), the parts margin revenue layer (brief section 6 + phase 4), and the multi-city expansion tooling (brief phase 3).
 
@@ -186,11 +186,11 @@ A multi-step form for adding a new operational area:
 
 **Acceptance criteria:**
 
-- [ ] Area setup wizard (5-step)
-- [ ] Areas overview with per-area metrics
-- [ ] Demand heatmap rendering (Google Maps with overlay or a chart library with geographic plotting)
-- [ ] Public area-specific recruitment pages
-- [ ] Applications tagged with originating area
+- [x] Area setup wizard (5-step) — `/admin/areas/setup` (`AreaWizard`): Area definition → Pricing → Recruitment → Demand seeding → Launch checklist, then Save-as-planned / Create-&-activate. Writes via `createArea` (`app/actions/areas.ts`).
+- [x] Areas overview with per-area metrics — `/admin/areas` (replaced placeholder): status pills + mechanics (vs target) / bookings / active demand / GMV per area; per-area dashboard at `/admin/areas/[id]` with KPIs, recruitment link, launch checklist, applications, and a status control (active/planned/paused — `setAreaStatus` keeps the engine's `is_active` gate in sync).
+- [x] Demand heatmap rendering — `components/admin/demand-heatmap.tsx`: a dependency-free postcode-district heat grid (tiles scaled by demand, amber ring where undersupplied). **Deviation:** not a Google-Maps geographic overlay (no Maps Platform key wired) — uses the booking `area` outward-code as the grid, which the spec explicitly allows as an alternative.
+- [x] Public area-specific recruitment pages — `/mechanics/[area-slug]` (read via service-role so planned areas recruit pre-launch; paused areas 404). Area-specific headline/blurb, benefits, requirements, Apply CTA.
+- [x] Applications tagged with originating area — `0022` adds `mechanic_applications.source_area_id`; the recruitment CTA carries `?area=<slug>`, `AreaCapture` persists it through the multi-step apply flow, and `submitApplication` resolves the slug → `area_id`. Surfaced on the area detail page.
 
 **Files touched:**
 - `app/(admin)/admin/areas/page.tsx`

@@ -20,6 +20,7 @@ const FLASH_MESSAGES: Record<string, string> = {
   "part-created": "Part created.",
   "part-updated": "Part updated.",
   "part-deleted": "Part deleted.",
+  "area-created": "Area created.",
 };
 
 export function FlashToast() {

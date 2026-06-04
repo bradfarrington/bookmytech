@@ -24,6 +24,8 @@ export interface ReferenceData {
 
 export interface ApplicationData {
   draftId: string;
+  // Originating recruitment area (slug), set from /mechanics/<area> → apply.
+  sourceAreaSlug: string;
   // Step 1
   fullName: string;
   email: string;
@@ -48,6 +50,7 @@ const emptyRef = (): ReferenceData => ({ name: "", relationship: "", email: "", 
 function blank(draftId: string): ApplicationData {
   return {
     draftId,
+    sourceAreaSlug: "",
     fullName: "",
     email: "",
     phone: "",

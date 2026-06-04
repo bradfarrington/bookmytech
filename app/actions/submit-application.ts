@@ -88,6 +88,8 @@ export interface SubmitApplicationInput {
   bankSortCode: string;
   bankAccountNumber: string;
   references: [ApplicationReference, ApplicationReference];
+  /** Slug of the recruitment area the applicant came from (Task 10 Stage 3). */
+  sourceAreaSlug?: string;
 }
 
 export type SubmitApplicationResult =
@@ -148,11 +150,23 @@ export async function submitApplication(
 
   const admin = createAdminClient();
 
+  // Resolve the originating recruitment area (if any) to an id for tagging.
+  let sourceAreaId: string | null = null;
+  if (input.sourceAreaSlug) {
+    const { data: area } = await admin
+      .from("areas")
+      .select("id")
+      .eq("slug", input.sourceAreaSlug.trim().toLowerCase())
+      .maybeSingle();
+    sourceAreaId = area?.id ?? null;
+  }
+
   const { data: row, error } = await admin
     .from("mechanic_applications")
     .insert({
       email,
       full_name: fullName,
+      source_area_id: sourceAreaId,
       phone,
       postcode,
       years_experience: Number.isFinite(years as number) ? years : null,
