@@ -7,7 +7,12 @@ import { createClient } from "@/lib/supabase/server";
 // admin sidebar (→ /admin/login), the mechanic dashboard (→ /mechanic/login)
 // and the public site (→ /). Whitelist the destinations to prevent
 // open-redirect abuse from any stray form.
-const ALLOWED_REDIRECTS = new Set(["/admin/login", "/mechanic/login", "/"]);
+const ALLOWED_REDIRECTS = new Set([
+  "/admin/login",
+  "/mechanic/login",
+  "/login",
+  "/",
+]);
 
 export async function signOut(formData?: FormData) {
   const raw = formData?.get("redirectTo");

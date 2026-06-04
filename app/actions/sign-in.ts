@@ -43,6 +43,48 @@ export async function signIn(
   redirect("/admin");
 }
 
+export async function signInCustomer(
+  _prevState: SignInState,
+  formData: FormData,
+): Promise<SignInState> {
+  const email = String(formData.get("email") ?? "").trim();
+  const password = String(formData.get("password") ?? "");
+
+  if (!email || !password) {
+    return { error: "Enter your email and password." };
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  });
+
+  if (error || !data.user) {
+    return { error: "That email and password didn't match." };
+  }
+
+  // Customers carry role='customer' (the handle_new_user default). Block
+  // admin/mechanic accounts from the customer dashboard so they land in the
+  // right place — middleware re-checks role on every /dashboard request.
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", data.user.id)
+    .single();
+
+  if (profile?.role === "admin") {
+    await supabase.auth.signOut();
+    return { error: "That's an admin account — sign in at /admin." };
+  }
+  if (profile?.role === "mechanic") {
+    await supabase.auth.signOut();
+    return { error: "That's a mechanic account — sign in at /mechanic/login." };
+  }
+
+  redirect("/dashboard");
+}
+
 export async function signInMechanic(
   _prevState: SignInState,
   formData: FormData,

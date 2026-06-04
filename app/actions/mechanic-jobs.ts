@@ -114,8 +114,8 @@ export async function cancelOwnJob(
   }
 
   // Email 1 of 2: tell the customer we're sourcing a replacement. Email 2
-  // ("a replacement has accepted") is sent when the next mechanic accepts —
-  // TODO(Task 09): wire that into acceptOffer alongside the customer dashboard.
+  // ("a replacement has accepted") fires from acceptOffer (job-offers.ts) when
+  // the next mechanic accepts — it detects the prior 'cancelled' event.
   if (booking.customer_email) {
     sendEmail({
       to: booking.customer_email,

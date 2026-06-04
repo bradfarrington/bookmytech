@@ -26,6 +26,61 @@ export function subscribeToBookings(onChange: () => void): () => void {
   };
 }
 
+// Subscribe to a single booking row (the customer's active-booking card + the
+// mechanic's job detail). Fires on any update so live status changes — en route,
+// in progress, reschedule responses — refresh the view. RLS scopes the channel
+// to rows the session can read. Returns an unsubscribe function.
+export function subscribeToBooking(
+  bookingId: string,
+  onChange: () => void,
+): () => void {
+  const supabase = createClient();
+  const channel = supabase
+    .channel(`booking-${bookingId}`)
+    .on(
+      "postgres_changes",
+      {
+        event: "UPDATE",
+        schema: "public",
+        table: "bookings",
+        filter: `id=eq.${bookingId}`,
+      },
+      () => onChange(),
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}
+
+// Subscribe to a booking's message thread (both customer + mechanic sides).
+// Fires on insert (a new message) and update (read receipts). RLS ("read own /
+// assigned booking messages") scopes it. Returns an unsubscribe function.
+export function subscribeToMessages(
+  bookingId: string,
+  onChange: () => void,
+): () => void {
+  const supabase = createClient();
+  const channel = supabase
+    .channel(`messages-${bookingId}`)
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "messages",
+        filter: `booking_id=eq.${bookingId}`,
+      },
+      () => onChange(),
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}
+
 // Subscribe to a mechanic's own job_offers. Fires on insert (new offer arrives)
 // and on update (an offer was accepted/declined/superseded → drops off the
 // feed). Filtered server-side to this mechanic, and RLS ("Mechanics can view

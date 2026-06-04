@@ -11,6 +11,7 @@ import {
   Phone,
   Lock,
   StickyNote,
+  MessageSquare,
   ImageIcon,
   PenLine,
   Package,
@@ -190,6 +191,13 @@ export function JobDetail(props: JobDetailProps) {
                 )}
               </div>
             </div>
+            {["confirmed", "en_route", "in_progress"].includes(status) && (
+              <Link href={`/mechanic/jobs/${bookingId}/messages`}>
+                <Button variant="secondary" size="sm" iconLeft={MessageSquare} fullWidth>
+                  Message customer
+                </Button>
+              </Link>
+            )}
           </Card>
 
           {/* Customer notes */}

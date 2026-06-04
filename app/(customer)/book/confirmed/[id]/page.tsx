@@ -2,10 +2,12 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { CheckCircle, ArrowRight } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
 import { formatPrice } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { BookingTracker, type BookingMechanic } from "./_components/booking-tracker";
+import { RescheduleProposal } from "@/components/customer/reschedule-proposal";
 
 interface ConfirmedPageProps {
   params: Promise<{ id: string }>;
@@ -26,11 +28,24 @@ export default async function ConfirmedPage({ params }: ConfirmedPageProps) {
 
   const { data: booking } = await supabase
     .from("bookings")
-    .select("id, vehicle_reg, vehicle_make, vehicle_model, scheduled_at, total_pence, customer_name, address_line_1, status, mechanic_id")
+    .select("id, vehicle_reg, vehicle_make, vehicle_model, scheduled_at, total_pence, customer_name, customer_email, address_line_1, status, mechanic_id, reschedule_status, reschedule_proposed_at, reschedule_note")
     .eq("id", id)
     .single();
 
   if (!booking) notFound();
+
+  // Is the viewer already signed in? If so, route them to their dashboard
+  // instead of nudging them to create an account.
+  const sessionClient = await createClient();
+  const {
+    data: { user },
+  } = await sessionClient.auth.getUser();
+  const signedIn = Boolean(user);
+
+  const signupHref = `/signup?${new URLSearchParams({
+    ...(booking.customer_name ? { name: booking.customer_name } : {}),
+    ...(booking.customer_email ? { email: booking.customer_email } : {}),
+  }).toString()}`;
 
   // Reveal the mechanic once one is assigned (confirmed and beyond). Name +
   // avatar from profiles, rating from mechanics.
@@ -80,6 +95,16 @@ export default async function ConfirmedPage({ params }: ConfirmedPageProps) {
         </div>
       </div>
 
+      {/* Mechanic-proposed reschedule awaiting the customer's response */}
+      {booking.reschedule_status === "proposed" && booking.reschedule_proposed_at && (
+        <RescheduleProposal
+          bookingId={booking.id}
+          proposedAt={booking.reschedule_proposed_at}
+          currentAt={booking.scheduled_at}
+          note={booking.reschedule_note}
+        />
+      )}
+
       {/* Live status tracker */}
       <BookingTracker bookingId={booking.id} status={booking.status} mechanic={mechanic} />
 
@@ -112,9 +137,9 @@ export default async function ConfirmedPage({ params }: ConfirmedPageProps) {
         </p>
       </Card>
 
-      <Link href="/signup">
+      <Link href={signedIn ? "/dashboard" : signupHref}>
         <Button variant="secondary" size="lg" fullWidth iconRight={ArrowRight}>
-          Create an account to track your booking
+          {signedIn ? "Go to your dashboard" : "Create an account to track your booking"}
         </Button>
       </Link>
 

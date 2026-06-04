@@ -36,6 +36,16 @@ export async function middleware(request: NextRequest) {
   const isMechanicArea =
     pathname === "/mechanic" || pathname.startsWith("/mechanic/");
   const isMechanicLogin = pathname === "/mechanic/login";
+  const isDashboard =
+    pathname === "/dashboard" || pathname.startsWith("/dashboard/");
+  const isCustomerAuth = pathname === "/login" || pathname === "/signup";
+
+  // Route a signed-in user to the area their role belongs to.
+  const areaForRole = (role: string | undefined): string | null => {
+    if (role === "admin") return "/admin";
+    if (role === "mechanic") return "/mechanic/jobs";
+    return null; // customer (or unknown) stays put
+  };
 
   // /admin/* role gate — exempt the login page itself
   if (isAdminArea && !isAdminLogin) {
@@ -77,6 +87,38 @@ export async function middleware(request: NextRequest) {
     if (profile?.role !== "mechanic") {
       return redirectKeepingCookies(request, response, "/");
     }
+  }
+
+  // /dashboard customer gate — must be signed in; admins/mechanics get routed
+  // to their own area rather than the customer dashboard.
+  if (isDashboard) {
+    if (!user) {
+      return redirectKeepingCookies(request, response, "/login");
+    }
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+    const elsewhere = areaForRole(profile?.role);
+    if (elsewhere) {
+      return redirectKeepingCookies(request, response, elsewhere);
+    }
+  }
+
+  // Already-signed-in user landing on /login or /signup → send them to where
+  // they belong (their dashboard, or their admin/mechanic area).
+  if (isCustomerAuth && user) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+    return redirectKeepingCookies(
+      request,
+      response,
+      areaForRole(profile?.role) ?? "/dashboard",
+    );
   }
 
   // Already-signed-in mechanic landing on /mechanic/login → bounce to dashboard

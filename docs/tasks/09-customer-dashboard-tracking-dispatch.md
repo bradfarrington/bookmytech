@@ -1,6 +1,6 @@
 # Task 09 — Customer dashboard + live tracking + smart dispatch
 
-**Status:** ⏳ Queued
+**Status:** 🟡 Partial — Stage 1 + messaging-only Stage 2 shipped (2026-06-04). The two Task 05 carry-over stubs are done (customer reschedule accept/decline; replacement-accepted email). **Stage 2 live GPS tracking + map + Distance-Matrix ETA are deferred to the native-app build** (owner decision — GPS stays out of the web build), and the **Twilio SMS fallback is stubbed** (SMS sender not built yet). **Stage 3 (smart dispatch) is not started** — carried forward as its own piece. Deviations: customer auth lives at `/login` + `/signup` under the `(customer)` group; saved vehicles are **derived from past bookings** (distinct reg) rather than an editable table; the 48-h "raise dispute" button opens a pre-filled support email until the Task 12 dispute flow exists.
 
 Build the customer-side post-booking experience (dashboard, live tracking, in-app messaging, review prompt) and upgrade dispatch from "closest mechanic" to multi-factor smart matching.
 
@@ -51,15 +51,15 @@ Currently bookings are guest-only. Add proper customer signup + login + dashboar
 
 **Acceptance criteria:**
 
-- [ ] `/signup` and `/login` pages
-- [ ] Guest-to-account linking on signup
-- [ ] `/dashboard` with all sections above
-- [ ] Active booking card uses Supabase Realtime to update status live
-- [ ] Cancel booking flow: reason prompt → fee preview → confirm → cancellation fee charged (if applicable), deposit remainder released
-- [ ] Reschedule booking flow: reason prompt → new time slot picker (same mechanic) → new confirmation email sent
-- [ ] Past jobs list with rebook functionality and 48-h dispute button
-- [ ] Saved vehicles (new table or stored as a JSON column on profiles)
-- [ ] Account settings page
+- [x] `/signup` and `/login` pages — under the `(customer)` group; middleware gates `/dashboard` and bounces signed-in users to the right area
+- [x] Guest-to-account linking on signup — `link-guest-bookings.ts` stamps `customer_id` onto matching guest bookings by email
+- [x] `/dashboard` with all sections above
+- [x] Active booking card uses Supabase Realtime to update status live (`subscribeToBooking`)
+- [x] Cancel booking flow: reason prompt → fee preview → confirm → cancellation fee charged (partial Stripe capture of the pre-auth) / £0 → hold cancelled; fee tiers from `platform_settings`
+- [x] Reschedule booking flow: reason prompt → new time slot picker (same mechanic) → new confirmation email sent (applied directly; mechanic notified)
+- [x] Past jobs list with rebook functionality and 48-h dispute button (dispute button opens a pre-filled support email until Task 12)
+- [x] Saved vehicles — **derived from past bookings** (distinct reg), one-tap rebook. Editable saved-vehicle store deferred.
+- [x] Account settings page (`/dashboard/settings` — name + phone; payment methods / addresses / notification prefs flagged "coming soon")
 
 **Files touched:**
 - `app/signup/page.tsx`, `app/login/page.tsx`
@@ -119,12 +119,12 @@ create table messages (
 
 **Acceptance criteria:**
 
-- [ ] Mechanic location updates start when status='en_route', stop when 'in_progress' or beyond
-- [ ] Customer dashboard shows live mechanic pin on map
-- [ ] ETA calculated via Google Distance Matrix, refreshed every minute
-- [ ] In-app messaging works both directions with Realtime
-- [ ] SMS fallback for unread messages > 5 min
-- [ ] Twilio account set up, `TWILIO_*` env vars added
+- [ ] ~~Mechanic location updates start when status='en_route'~~ — **DEFERRED to the native app** (GPS out of the web build, owner decision)
+- [ ] ~~Customer dashboard shows live mechanic pin on map~~ — **DEFERRED** (no GPS; the active card shows booked slot + live status instead)
+- [ ] ~~ETA calculated via Google Distance Matrix, refreshed every minute~~ — **DEFERRED** (depends on GPS)
+- [x] In-app messaging works both directions with Realtime — `messages` table (0019) + `MessagesThread`; customer in the active card, mechanic at `/mechanic/jobs/[id]/messages`
+- [ ] SMS fallback for unread messages > 5 min — **STUBBED** (`lib/sms/send-sms.ts` logs; real Twilio send + the 5-min unread sweep land when SMS infra is built)
+- [ ] Twilio account set up, `TWILIO_*` env vars added — **DEFERRED** (paired with the SMS-fallback build)
 
 **Files touched:**
 - `app/(mechanic)/mechanic/jobs/[id]/in-progress/_components/step-1-on-the-way.tsx` (updated to start tracking)
@@ -174,6 +174,8 @@ For this task, picking the "show a soft sourcing state" option:
 - If sourcing exceeds 5 minutes, fall through to admin manual assignment with a customer email apology + £5 credit
 
 **Acceptance criteria:**
+
+**Stage 3 is NOT started** — carried forward as a standalone follow-up. Current dispatch stays the broadcast first-to-accept model from Task 05 (`lib/dispatch/dispatch.ts` + the `dispatch-sweep` cron).
 
 - [ ] Dispatch edge function (from task 05) rewritten with scoring algorithm
 - [ ] Configurable weights stored in `platform_settings` (so they can be tuned without redeploying)

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { sendEmail } from "@/lib/email/send";
 
 export type OfferActionResult =
   | { ok: true; bookingId?: string }
@@ -87,10 +88,21 @@ export async function acceptOffer(offerId: string): Promise<OfferActionResult> {
     .neq("id", offerId)
     .is("response", null);
 
+  // Was this booking previously assigned-then-cancelled? A prior 'cancelled'
+  // event means a mechanic dropped it and it was re-dispatched — so this accept
+  // is a *replacement*, and the customer gets the "we found you a replacement"
+  // email (the second half of the pair started in mechanic-jobs.ts → cancelOwnJob).
+  const { count: priorCancellations } = await admin
+    .from("booking_events")
+    .select("id", { count: "exact", head: true })
+    .eq("booking_id", offer.booking_id)
+    .eq("event_type", "cancelled");
+  const isReplacement = (priorCancellations ?? 0) > 0;
+
   // Append-only audit.
   await admin.from("booking_events").insert({
     booking_id: offer.booking_id,
-    event_type: "mechanic_assigned",
+    event_type: isReplacement ? "mechanic_reassigned" : "mechanic_assigned",
     actor_id: guard.mechanicId,
     actor_role: "mechanic",
     payload: {
@@ -98,10 +110,72 @@ export async function acceptOffer(offerId: string): Promise<OfferActionResult> {
       via: "offer_accept",
       status_from: "sourcing_mechanic",
       status_to: "confirmed",
+      replacement: isReplacement,
     },
   });
 
+  // Confirmation email to the customer. On a first assignment this is the
+  // "your mechanic is confirmed" note; on a replacement it reassures them their
+  // replacement has accepted and nothing else changes.
+  const { data: booking } = await admin
+    .from("bookings")
+    .select("customer_email, customer_name, scheduled_at, service:services(name)")
+    .eq("id", offer.booking_id)
+    .single();
+  if (booking?.customer_email) {
+    const { data: profile } = await admin
+      .from("profiles")
+      .select("full_name")
+      .eq("id", guard.mechanicId)
+      .single();
+    const mechanicName = profile?.full_name ?? "Your mechanic";
+    const serviceName =
+      (Array.isArray(booking.service)
+        ? booking.service[0]?.name
+        : (booking.service as { name?: string } | null)?.name) ?? "your service";
+    const slotLabel = booking.scheduled_at
+      ? new Date(booking.scheduled_at).toLocaleString("en-GB", {
+          dateStyle: "full",
+          timeStyle: "short",
+        })
+      : "your booked time";
+    sendEmail({
+      to: booking.customer_email,
+      subject: isReplacement
+        ? "Good news — your replacement mechanic is confirmed"
+        : "Your mechanic is confirmed",
+      html: `
+        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+          <h1 style="color: #1e3a8a;">${
+            isReplacement
+              ? "We've found your replacement mechanic"
+              : "Your mechanic is confirmed"
+          }</h1>
+          <p>Hi ${booking.customer_name ?? "there"},</p>
+          <p>${
+            isReplacement
+              ? `Thanks for your patience — <strong>${mechanicName}</strong> has accepted your job and will be taking over.`
+              : `<strong>${mechanicName}</strong> has accepted your booking.`
+          }</p>
+          <table style="width:100%; border-collapse: collapse; margin: 20px 0;">
+            <tr><td style="padding: 8px 0; color: #64748b; font-size: 14px;">Service</td><td style="padding: 8px 0; font-weight: 600;">${serviceName}</td></tr>
+            <tr><td style="padding: 8px 0; color: #64748b; font-size: 14px;">Date &amp; time</td><td style="padding: 8px 0; font-weight: 600;">${slotLabel}</td></tr>
+          </table>
+          <p style="color: #64748b; font-size: 14px;">${
+            isReplacement
+              ? "Your existing pre-authorisation stays in place — no new charge."
+              : "We'll let you know the moment they set off."
+          }</p>
+          <p style="color: #64748b; font-size: 14px;">Track your booking any time from your account.</p>
+        </div>
+      `,
+    }).catch(console.error);
+  }
+
   revalidatePath("/mechanic/jobs");
+  // The customer's tracker + dashboard reflect the new assignment.
+  revalidatePath(`/book/confirmed/${offer.booking_id}`);
+  revalidatePath("/dashboard");
   return { ok: true, bookingId: offer.booking_id };
 }
 
