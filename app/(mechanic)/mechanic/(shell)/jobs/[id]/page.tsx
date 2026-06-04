@@ -35,6 +35,7 @@ export default async function MechanicJobDetailPage({ params }: PageProps) {
     .from("bookings")
     .select(
       `id, status, mechanic_id, scheduled_at, created_at, total_pence, commission_rate,
+       platform_fee_pence, mechanic_payout_pence,
        vehicle_reg, vehicle_make, vehicle_model, postcode, area,
        address_line_1, address_line_2,
        customer_name, customer_phone, special_instructions,
@@ -95,6 +96,27 @@ export default async function MechanicJobDetailPage({ params }: PageProps) {
   const signatureRow = (mediaRows ?? []).find((m) => m.kind === "signature");
   const signatureUrl = signatureRow ? publicUrl(signatureRow.storage_path) : null;
 
+  // --- Parts on this job (mechanic reads via RLS; only BMT-price columns) ----
+  const { data: partRows } = await supabase
+    .from("booking_parts")
+    .select("id, part_name, quantity, unit_price_pence, total_pence, sourcing, status")
+    .eq("booking_id", id)
+    .order("created_at", { ascending: true });
+
+  const jobParts = (partRows ?? []).map((p) => ({
+    id: p.id,
+    name: p.part_name,
+    quantity: p.quantity,
+    unitPricePence: p.unit_price_pence,
+    totalPence: p.total_pence,
+    sourcing: (p.sourcing === "bmt" ? "bmt" : "self") as "self" | "bmt",
+    status: p.status,
+  }));
+  const partsPence = jobParts.reduce((s, p) => s + p.totalPence, 0);
+  const bmtPartsPence = jobParts
+    .filter((p) => p.sourcing === "bmt")
+    .reduce((s, p) => s + p.totalPence, 0);
+
   // --- Match reasons --------------------------------------------------------
   const specialisms: string[] = Array.isArray(mechanic?.specialisms) ? mechanic.specialisms : [];
   const slug = service?.slug ?? null;
@@ -147,7 +169,9 @@ export default async function MechanicJobDetailPage({ params }: PageProps) {
     whenLabel,
     distanceLabel,
     durationLabel: estimatedDurationLabel(slug),
-    earningsPence: mechanicSharePence(booking.total_pence ?? 0, booking.commission_rate ?? 0.15),
+    earningsPence:
+      mechanicSharePence(booking.total_pence ?? 0, booking.commission_rate ?? 0.15) -
+      bmtPartsPence,
     customerName: booking.customer_name ?? "",
     customerPhone: booking.customer_phone,
     phoneRevealed: REVEAL_PHONE_STATUSES.includes(booking.status),
@@ -155,6 +179,9 @@ export default async function MechanicJobDetailPage({ params }: PageProps) {
     address,
     totalPence: booking.total_pence ?? 0,
     commissionRate: booking.commission_rate ?? 0.15,
+    parts: jobParts,
+    partsPence,
+    bmtPartsPence,
     matchReasons,
     cancellationReason: booking.cancellation_reason,
     rescheduleStatus: booking.reschedule_status,

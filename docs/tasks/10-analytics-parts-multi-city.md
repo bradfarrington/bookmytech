@@ -1,6 +1,6 @@
 # Task 10 — Analytics + parts margin + multi-city tooling
 
-**Status:** ⏳ In progress — Stage 1 ✅ (2026-06-04, analytics dashboard + funnel tracking, migration `0020`). Stages 2 & 3 queued.
+**Status:** ⏳ In progress — Stage 1 ✅ (analytics, `0020`) · Stage 2 ✅ (parts margin, `0021`), both 2026-06-04. Stage 3 queued.
 
 Three loosely-related features that round out the operations and commercial layers. The analytics dashboard (brief section 5), the parts margin revenue layer (brief section 6 + phase 4), and the multi-city expansion tooling (brief phase 3).
 
@@ -133,14 +133,19 @@ create table booking_parts (
 
 The "what you receive" calculation in the mechanic earnings breakdown now reflects parts. Service revenue and parts revenue are split — platform fee is on the service portion only (15%), parts are pass-through to mechanic at BMT_price_pence (margin already kept).
 
+**Owner decisions consumed (2026-06-04):**
+- **Commission stays on the whole total** (base + parts) — the existing model is kept, NOT switched to service-only. Parts margin (supplier→BMT) is platform revenue realised at sourcing and tracked for admin reporting.
+- **Parts are configured on the service in admin** ("the service knows it needs parts"). A booking of that service auto-snapshots the configured parts as line items and includes them in the price/pre-auth. There is no customer parts-picker and no ad-hoc mechanic part-adding in this task.
+- **Mechanic sourcing toggle** is the BMT-vs-self choice on the job: `self` (default) matches today's payout exactly; `bmt` reduces that booking's `mechanic_payout_pence` by the BMT-sourced lines (BMT supplies & keeps that money). Existing bookings untouched.
+
 **Acceptance criteria:**
 
-- [ ] Parts schema migration
-- [ ] `/admin/parts` catalogue CRUD with CSV import
-- [ ] Booking flow updated for services that require parts — customer sees parts itemised
-- [ ] Mechanic flow lets them order parts from BMT or source themselves
-- [ ] Earnings breakdown correctly splits service revenue from parts pass-through
-- [ ] Seed 30-50 common parts (brake pads, batteries, oil filters, etc.)
+- [x] Parts schema migration — `0021`: `parts` (admin-only RLS — supplier cost/margin are platform secrets), `service_parts` (service→parts config), `booking_parts` (per-booking line items; only BMT-price columns, safe to expose to customer/mechanic under RLS).
+- [x] `/admin/parts` catalogue CRUD with CSV import — list (search + category/stock filters + margin %), create/edit form with a **live margin calculator** (margin £, gross margin %, markup %), stock toggle, delete (blocked if on a booking). CSV import at `/admin/parts/import` (upsert on SKU, per-row summary). "Parts" added to the sidebar + breadcrumbs.
+- [x] Booking flow updated for services that require parts — customer sees parts itemised — `/book/match` shows a "What's included" breakdown (labour + each part + fixed price), read via service-role so only BMT prices surface.
+- [x] Mechanic flow lets them order parts from BMT or source themselves — Parts card on the mechanic job detail; per-line "I'll source it" / "Order via BMT" toggle (`setPartSourcing`) that re-prices the payout server-side.
+- [x] Earnings breakdown correctly splits service revenue from parts pass-through — `EarningsBreakdown` shows the platform fee (on total), deducts BMT-sourced parts, and notes self-sourced parts included in the payout. Commission stays on the whole total per the owner decision.
+- [x] Seed 30-50 common parts — 40 seeded (brake pads/discs, batteries, filters, oils, ignition, wipers, belts, clutch, suspension, cooling, electrical, tyres, exhaust) + 7 sample service→part mappings. (brake pads, batteries, oil filters, etc.)
 
 **Files touched:**
 - `app/(admin)/admin/parts/page.tsx` + CRUD pages

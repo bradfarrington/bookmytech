@@ -194,11 +194,18 @@ export async function calculatePrice(
   const commissionRate =
     sap?.commission_rate ?? serviceRate ?? (await getTakeRateBase(db));
 
+  // Parts cost: real admin-configured parts (Task 10 Stage 2) supersede the
+  // legacy per-(service,area) dummy `parts_price_pence`. Fall back to the dummy
+  // only when a service has no configured parts, so pre-parts behaviour holds.
+  const { configuredPartsTotalPence } = await import("@/lib/parts/service-parts");
+  const configuredParts = await configuredPartsTotalPence(serviceId, db);
+  const partsPence = configuredParts > 0 ? configuredParts : (sap?.parts_price_pence ?? 0);
+
   return computePrice({
     startingPricePence: service.starting_price_pence,
     labourMultiplier: area?.labour_multiplier ?? 1,
     overridePricePence: sap?.override_price_pence ?? null,
-    partsPence: sap?.parts_price_pence ?? 0,
+    partsPence,
     commissionRate,
     areaId: area?.id ?? null,
   });

@@ -7,7 +7,10 @@ import { Button } from "@/components/ui/button";
 import { calculatePrice } from "@/lib/pricing/calculate";
 import { TrackOnMount } from "@/components/analytics/track-on-mount";
 import { FUNNEL_EVENTS } from "@/lib/analytics/events";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { getConfiguredParts } from "@/lib/parts/service-parts";
 import { PriceHero } from "./_components/price-hero";
+import { PartsSection, type PartLine } from "./_components/parts-section";
 
 interface MatchPageProps {
   searchParams: Promise<{
@@ -42,6 +45,19 @@ export default async function MatchPage({ searchParams }: MatchPageProps) {
   // postcode yet the engine falls back to the Default area (×1.00); the slot
   // step re-prices once the customer confirms their postcode.
   const price = await calculatePrice(service.id, params.postcode ?? "");
+
+  // Configured parts for itemisation. Read via the service-role client because
+  // `parts`/`service_parts` are admin-only under RLS and the booker is a guest.
+  // Only the BMT (sale) price is passed to the client — never supplier cost.
+  const configuredParts = await getConfiguredParts(service.id, createAdminClient());
+  const partLines: PartLine[] = configuredParts.map((p) => ({
+    name: p.name,
+    quantity: p.quantity,
+    unitPricePence: p.unitPricePence,
+    totalPence: p.totalPence,
+  }));
+  const partsPence = partLines.reduce((s, p) => s + p.totalPence, 0);
+  const labourPence = price.totalPence - partsPence;
 
   const vehicleParams = [
     params.make ? `make=${encodeURIComponent(params.make)}` : null,
@@ -80,6 +96,12 @@ export default async function MatchPage({ searchParams }: MatchPageProps) {
         serviceName={service.name}
         pricePence={price.totalPence}
         description={service.description}
+      />
+
+      <PartsSection
+        parts={partLines}
+        labourPence={labourPence}
+        totalPence={price.totalPence}
       />
 
       <Link href={slotHref}>

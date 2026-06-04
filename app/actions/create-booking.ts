@@ -80,6 +80,34 @@ export async function createBookingAction(
     return { ok: false, error: error?.message ?? "Failed to create booking" };
   }
 
+  // Snapshot the service's configured parts as booking line items so the
+  // customer/mechanic see them itemised and the mechanic can pick sourcing
+  // later. Uses the service-role client because parts/service_parts are
+  // admin-only under RLS. Default sourcing = 'self' (matches the snapshotted
+  // payout). Non-fatal — a parts hiccup must never fail the booking.
+  try {
+    const { createAdminClient } = await import("@/lib/supabase/admin");
+    const { getConfiguredParts } = await import("@/lib/parts/service-parts");
+    const admin = createAdminClient();
+    const parts = await getConfiguredParts(input.serviceId, admin);
+    if (parts.length > 0) {
+      await admin.from("booking_parts").insert(
+        parts.map((p) => ({
+          booking_id: data.id,
+          part_id: p.partId,
+          part_name: p.name,
+          quantity: p.quantity,
+          unit_price_pence: p.unitPricePence,
+          total_pence: p.totalPence,
+          sourcing: "self",
+          status: "pending",
+        })),
+      );
+    }
+  } catch (err) {
+    console.error("Failed to snapshot booking parts for", data.id, err);
+  }
+
   // Record the final funnel step (server-side so it's never lost to navigation).
   void trackEvent(FUNNEL_EVENTS.bookingConfirmed, {
     bookingId: data.id,

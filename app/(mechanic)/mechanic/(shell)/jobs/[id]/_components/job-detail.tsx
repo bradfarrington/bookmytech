@@ -30,6 +30,7 @@ import { Timeline, type TimelineEvent } from "@/app/(admin)/admin/(shell)/jobs/[
 import { EarningsBreakdown } from "./earnings-breakdown";
 import { JobActions } from "./job-actions";
 import { PhotoUploader, type JobPhoto } from "./photo-uploader";
+import { PartsOrder, type JobPart } from "./parts-order";
 
 export interface JobDetailProps {
   bookingId: string;
@@ -52,6 +53,10 @@ export interface JobDetailProps {
   // Earnings
   totalPence: number;
   commissionRate: number;
+  // Parts
+  parts: JobPart[];
+  partsPence: number;
+  bmtPartsPence: number;
   // Match reasons
   matchReasons: Array<{ label: string; detail: string }>;
   // Lifecycle
@@ -261,8 +266,18 @@ export function JobDetail(props: JobDetailProps) {
             <EarningsBreakdown
               totalPence={props.totalPence}
               commissionRate={props.commissionRate}
+              partsPence={props.partsPence}
+              bmtPartsPence={props.bmtPartsPence}
             />
           </Card>
+
+          {/* Parts */}
+          {props.parts.length > 0 && (
+            <Card className="space-y-4 p-6">
+              <CardTitle icon={Package}>Parts</CardTitle>
+              <PartsOrder parts={props.parts} canEdit={canEditPhotos} />
+            </Card>
+          )}
 
           {/* Why you're a great match */}
           <Card className="space-y-3 p-6">

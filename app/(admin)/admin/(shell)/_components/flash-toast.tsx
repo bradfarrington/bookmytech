@@ -17,6 +17,9 @@ const FLASH_MESSAGES: Record<string, string> = {
   "mechanic-created": "Mechanic created. Invite email sent.",
   "mechanic-updated": "Mechanic updated.",
   "mechanic-deleted": "Mechanic deleted.",
+  "part-created": "Part created.",
+  "part-updated": "Part updated.",
+  "part-deleted": "Part deleted.",
 };
 
 export function FlashToast() {
