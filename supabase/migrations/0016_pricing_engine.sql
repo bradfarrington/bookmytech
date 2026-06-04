@@ -41,7 +41,9 @@ create table if not exists public.service_area_prices (
   area_id             uuid references public.areas(id) on delete cascade,
   override_price_pence integer,  -- if set, overrides starting_price_pence * labour_multiplier
   parts_price_pence    integer,  -- dummy parts cost for this service in this area (dev only)
-  commission_rate      numeric(5,4) not null default 0.1500, -- e.g. 0.1500 = 15%
+  -- per-(service,area) commission override. NULL = inherit the per-service rate
+  -- (services.commission_rate), then the platform default (take_rate_base).
+  commission_rate      numeric(5,4),
   is_active            boolean not null default true,
   created_at           timestamptz not null default now(),
   updated_at           timestamptz not null default now(),
@@ -57,6 +59,14 @@ drop trigger if exists touch_service_area_prices on public.service_area_prices;
 create trigger touch_service_area_prices
   before update on public.service_area_prices
   for each row execute function public.touch_updated_at();
+
+-- ---------------------------------------------------------------------------
+-- services — per-service commission rate (editable in the admin pricing page).
+-- NULL = use the platform default take rate. Sits between the per-cell override
+-- and the platform default in the engine's commission resolution.
+-- ---------------------------------------------------------------------------
+alter table public.services
+  add column if not exists commission_rate numeric(5,4);
 
 -- ---------------------------------------------------------------------------
 -- bookings — snapshot the full pricing breakdown at creation time so later

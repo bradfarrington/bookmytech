@@ -158,7 +158,7 @@ export async function calculatePrice(
 
   const { data: service, error: serviceError } = await db
     .from("services")
-    .select("id, starting_price_pence")
+    .select("id, starting_price_pence, commission_rate")
     .eq("id", serviceId)
     .single();
   if (serviceError || !service) {
@@ -188,10 +188,11 @@ export async function calculatePrice(
     sap = data ?? null;
   }
 
-  // Commission: per-(service,area) cell rate if a row exists, else the platform
-  // default take rate (platform_settings.take_rate_base, seeded in Stage 2).
+  // Commission resolution, most-specific wins:
+  //   per-(service,area) cell override → per-service rate → platform default.
+  const serviceRate = (service as { commission_rate: number | null }).commission_rate;
   const commissionRate =
-    sap?.commission_rate ?? (await getTakeRateBase(db));
+    sap?.commission_rate ?? serviceRate ?? (await getTakeRateBase(db));
 
   return computePrice({
     startingPricePence: service.starting_price_pence,
