@@ -3,19 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { REVIEW_TAGS } from "@/lib/reviews/tags";
 
 export type ReviewResult = { ok: true } | { ok: false; error: string };
-
-// Quick-tag chips offered on the customer review form. Kept here so the form
-// and any validation share one source of truth.
-export const REVIEW_TAGS = [
-  "Punctual",
-  "Friendly",
-  "Great value",
-  "Knowledgeable",
-  "Tidy & clean",
-  "Went the extra mile",
-] as const;
 
 /**
  * Customer submits a review for a completed booking. Called from the public

@@ -3,6 +3,7 @@ import { Toaster } from "sonner";
 import { createClient } from "@/lib/supabase/server";
 import { MechanicSidebar } from "@/components/mechanic/sidebar";
 import { MechanicTopBar } from "@/components/mechanic/top-bar";
+import { InstallPrompt } from "@/components/pwa/install-prompt";
 
 type MechanicStatus = "online" | "offline" | "on_job";
 
@@ -50,6 +51,7 @@ export default async function MechanicShellLayout({
         <main className="flex-1 overflow-auto p-7">{children}</main>
       </div>
       <Toaster richColors position="top-right" closeButton />
+      <InstallPrompt />
     </div>
   );
 }

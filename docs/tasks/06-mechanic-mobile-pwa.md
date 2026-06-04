@@ -34,20 +34,21 @@ Make the existing Next.js app installable as a PWA. The desktop and mobile route
 
 **Acceptance criteria:**
 
-- [ ] `public/manifest.json` — name, short_name, icons (192, 512), theme_color (#2563EB), background_color, display: 'standalone', start_url: '/mechanic'
-- [ ] Icons generated at multiple sizes (use a tool like RealFaviconGenerator or just hand-crank a couple of sizes)
-- [ ] Service worker registered via `next-pwa` or `@serwist/next` (pick one — `@serwist/next` is the more modern choice)
-- [ ] Service worker caches static assets and gives the app an offline fallback page
-- [ ] iOS install meta tags in `app/layout.tsx` (Apple touch icon, status bar style, "Add to Home Screen" support)
-- [ ] Install prompt logic — show a custom install banner on the mechanic dashboard if the user hasn't installed yet (using `beforeinstallprompt` event)
-- [ ] Verify install works on iOS Safari (Add to Home Screen) and Android Chrome (install prompt)
+- [x] ~~`public/manifest.json`~~ — manifest via Next 16's built-in `app/manifest.ts` metadata route (served at `/manifest.webmanifest`, auto-linked). name, short_name, icons (192, 512, maskable), theme_color (#2563EB), background_color, display: 'standalone', start_url: '/mechanic'
+- [x] Icons generated at multiple sizes — `public/icons/{icon-192,icon-512,icon-maskable-512,apple-touch-icon}.png`, hand-cranked from `logo.png` with `sips`
+- [x] ~~Service worker via `next-pwa`/`@serwist/next`~~ — **deviation: hand-rolled `public/sw.js`**. The Next PWA guide warns Serwist "currently requires webpack configuration" and this app builds with **Turbopack**, so a plugin SW would fight the build. Registered via `components/pwa/service-worker-register.tsx` (production-only).
+- [x] Service worker caches static assets and gives the app an offline fallback page (`public/offline.html`; network-first navigation → offline fallback, cache-first static assets, cross-origin/API left untouched)
+- [x] iOS install meta tags in `app/layout.tsx` (Apple touch icon, `appleWebApp` status-bar style; theme-color via `viewport` export)
+- [x] Install prompt logic — custom banner (`components/pwa/install-prompt.tsx`) mounted in the mechanic shell, using `beforeinstallprompt` on Android/Chromium + manual "Add to Home Screen" instructions on iOS; dismissable; hidden when already standalone
+- [ ] Verify install works on iOS Safari (Add to Home Screen) and Android Chrome (install prompt) *(needs a real device + HTTPS — not verifiable in this environment; production build passes and `/manifest.webmanifest` generates)*
 
-**Files touched:**
-- `public/manifest.json`
-- `public/icons/*`
-- `next.config.js` (PWA config)
-- `app/layout.tsx` (meta tags)
-- `components/mechanic/install-prompt.tsx`
+**Files touched (actual):**
+- `app/manifest.ts` (not `public/manifest.json`)
+- `public/icons/*`, `public/sw.js`, `public/offline.html`
+- `next.config.ts` (sw.js + security headers)
+- `app/layout.tsx` (meta tags, theme-color, SW registration)
+- `components/pwa/install-prompt.tsx`, `components/pwa/service-worker-register.tsx`
+- `app/(mechanic)/mechanic/(shell)/layout.tsx` (mounts the install prompt)
 
 ---
 
@@ -55,7 +56,9 @@ Make the existing Next.js app installable as a PWA. The desktop and mobile route
 
 Bottom-tab navigation. Single-handed reach. Designed for 375px width primarily.
 
-**Bottom tabs (per brief):** Jobs · Schedule · Earnings · Reviews · Me
+> ⚠️ **Scope decision (2026-06-04):** until the native iOS/Android apps are built, the mobile experience is a **responsive website on a phone, not an app-style shell**. So **do NOT build the bottom-tab drawer below** — instead make the existing sidebar/top-bar nav reflow responsively for narrow viewports. The day view, earnings ring, and responsive layout are still in scope. The bottom-tab spec is kept here as the design for when the real app is built.
+
+**Bottom tabs (per brief — DEFERRED to the real app build):** Jobs · Schedule · Earnings · Reviews · Me
 
 **Day view (default tab):**
 

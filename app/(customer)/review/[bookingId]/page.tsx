@@ -3,7 +3,7 @@ import Image from "next/image";
 import { notFound } from "next/navigation";
 import { CheckCircle, Clock } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { REVIEW_TAGS } from "@/app/actions/reviews";
+import { REVIEW_TAGS } from "@/lib/reviews/tags";
 import { ReviewForm } from "./_components/review-form";
 
 interface ReviewPageProps {
