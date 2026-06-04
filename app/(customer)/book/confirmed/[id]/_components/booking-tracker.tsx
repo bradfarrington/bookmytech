@@ -1,6 +1,11 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Check, Clock, Navigation, Wrench, PartyPopper, Star } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { useStayFresh } from "@/lib/use-stay-fresh";
 
 export interface BookingMechanic {
   name: string;
@@ -12,6 +17,8 @@ interface BookingTrackerProps {
   bookingId: string;
   status: string;
   mechanic: BookingMechanic | null;
+  /** ISO booking-creation time — drives the escalating "finding your mechanic" copy. */
+  createdAt: string | null;
 }
 
 // The happy-path lifecycle, in order. cancelled / disputed are handled outside
@@ -55,7 +62,51 @@ const BANNERS: Record<string, { title: string; body: string; icon: LucideIcon }>
   },
 };
 
-export function BookingTracker({ bookingId, status, mechanic }: BookingTrackerProps) {
+// Escalating "finding your mechanic" copy. The job is broadcast to every
+// eligible mechanic first-come-first-serve; until one accepts we reassure the
+// customer, ramping the message at 60s and again at 5min (the same 5-min mark
+// the dispatch-sweep cron flags the booking to admin).
+function sourcingBanner(elapsedSec: number): { title: string; body: string; icon: LucideIcon } {
+  if (elapsedSec >= 300) {
+    return {
+      title: "This is taking a little longer",
+      body: "Sorry this is taking longer than usual. Our team has been alerted and will make sure you're matched shortly — we'll be in touch by email. There's nothing you need to do.",
+      icon: Clock,
+    };
+  }
+  if (elapsedSec >= 60) {
+    return {
+      title: "Still finding your mechanic",
+      body: "We're still looking — this should only be a moment longer. Hang tight, there's nothing you need to do.",
+      icon: Clock,
+    };
+  }
+  return {
+    title: "Finding your mechanic",
+    body: "We're matching you with the best available mechanic in your area — usually within seconds. You'll get an email the moment one accepts.",
+    icon: Clock,
+  };
+}
+
+export function BookingTracker({ bookingId, status, mechanic, createdAt }: BookingTrackerProps) {
+  const router = useRouter();
+  const terminal =
+    status === "completed" || status === "cancelled" || status === "disputed";
+
+  // Poll so a guest on the confirmation page sees status changes (mechanic
+  // accepts, sets off, completes) without a manual refresh. Stops once terminal.
+  useStayFresh(() => {
+    if (!terminal) router.refresh();
+  }, terminal ? 0 : 15_000);
+
+  // Tick while sourcing so the copy above escalates with elapsed time.
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    if (status !== "sourcing_mechanic") return;
+    const t = setInterval(() => setNowMs(Date.now()), 15_000);
+    return () => clearInterval(t);
+  }, [status]);
+
   if (status === "cancelled") {
     return (
       <div className="rounded-2xl border border-red-200 bg-red-50 p-5">
@@ -80,7 +131,13 @@ export function BookingTracker({ bookingId, status, mechanic }: BookingTrackerPr
   }
 
   const currentIndex = ORDER.indexOf(status);
-  const banner = BANNERS[status] ?? BANNERS.sourcing_mechanic;
+  const elapsedSec = createdAt
+    ? Math.max(0, (nowMs - new Date(createdAt).getTime()) / 1000)
+    : 0;
+  const banner =
+    status === "sourcing_mechanic"
+      ? sourcingBanner(elapsedSec)
+      : (BANNERS[status] ?? BANNERS.sourcing_mechanic);
   const live = status === "en_route" || status === "in_progress";
 
   return (

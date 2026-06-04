@@ -1,6 +1,6 @@
 # Task 09 — Customer dashboard + live tracking + smart dispatch
 
-**Status:** 🟡 Partial — Stage 1 + messaging-only Stage 2 shipped (2026-06-04). The two Task 05 carry-over stubs are done (customer reschedule accept/decline; replacement-accepted email). **Stage 2 live GPS tracking + map + Distance-Matrix ETA are deferred to the native-app build** (owner decision — GPS stays out of the web build), and the **Twilio SMS fallback is stubbed** (SMS sender not built yet). **Stage 3 (smart dispatch) is not started** — carried forward as its own piece. Deviations: customer auth lives at `/login` + `/signup` under the `(customer)` group; saved vehicles are **derived from past bookings** (distinct reg) rather than an editable table; the 48-h "raise dispute" button opens a pre-filled support email until the Task 12 dispute flow exists.
+**Status:** ✅ Complete (2026-06-04). Stage 1 (customer accounts + dashboard) and **messaging-only** Stage 2 shipped, plus both Task 05 carry-over stubs (customer reschedule accept/decline; replacement-accepted email). **Stage 3 (smart dispatch) is closed by owner decision** — the broadcast first-come-first-serve model is kept as-is; the scoring algorithm, sequential/tiered offering, and tunable weights are **dropped**, Pro-tier dispatch priority is **deferred to later** (Task 11), the admin "needs attention" escalation for stalled bookings **already shipped in Task 05** (`/api/cron/dispatch-sweep`), and the customer sourcing screen now has the **timed escalation copy** (≥60s / ≥5min) — the £5-credit fallthrough is deferred until a customer-credits system exists. **Deferred (not dropped):** Stage 2 live GPS tracking + map + Distance-Matrix ETA (native-app build), and the **Twilio SMS fallback — moved to the END of the roadmap** (stubbed in `lib/sms/send-sms.ts`; build last, after the core tasks). The whole app was also moved off Supabase Realtime to **polling** (`lib/use-stay-fresh.ts`) — no table replication required anywhere. Deviations: customer auth at `/login` + `/signup` under the `(customer)` group; saved vehicles are **derived from past bookings** (distinct reg) rather than an editable table; the 48-h "raise dispute" button opens a pre-filled support email until the Task 12 dispute flow exists.
 
 Build the customer-side post-booking experience (dashboard, live tracking, in-app messaging, review prompt) and upgrade dispatch from "closest mechanic" to multi-factor smart matching.
 
@@ -123,8 +123,8 @@ create table messages (
 - [ ] ~~Customer dashboard shows live mechanic pin on map~~ — **DEFERRED** (no GPS; the active card shows booked slot + live status instead)
 - [ ] ~~ETA calculated via Google Distance Matrix, refreshed every minute~~ — **DEFERRED** (depends on GPS)
 - [x] In-app messaging works both directions with Realtime — `messages` table (0019) + `MessagesThread`; customer in the active card, mechanic at `/mechanic/jobs/[id]/messages`
-- [ ] SMS fallback for unread messages > 5 min — **STUBBED** (`lib/sms/send-sms.ts` logs; real Twilio send + the 5-min unread sweep land when SMS infra is built)
-- [ ] Twilio account set up, `TWILIO_*` env vars added — **DEFERRED** (paired with the SMS-fallback build)
+- [ ] SMS fallback for unread messages > 5 min — **MOVED TO END OF ROADMAP** (`lib/sms/send-sms.ts` stub logs; real Twilio send + the 5-min unread sweep are the last thing built, after the core tasks)
+- [ ] Twilio account set up, `TWILIO_*` env vars added — **MOVED TO END OF ROADMAP** (paired with the SMS-fallback build)
 
 **Files touched:**
 - `app/(mechanic)/mechanic/jobs/[id]/in-progress/_components/step-1-on-the-way.tsx` (updated to start tracking)
@@ -175,14 +175,15 @@ For this task, picking the "show a soft sourcing state" option:
 
 **Acceptance criteria:**
 
-**Stage 3 is NOT started** — carried forward as a standalone follow-up. Current dispatch stays the broadcast first-to-accept model from Task 05 (`lib/dispatch/dispatch.ts` + the `dispatch-sweep` cron).
+**Stage 3 CLOSED by owner decision (2026-06-04): keep broadcast, first-come-first-serve.** The job is broadcast simultaneously to every mechanic whose area covers it; first to accept wins. No scoring, no sequential/tiered hand-off, no auto-widening. See `lib/dispatch/dispatch.ts` + the `dispatch-sweep` cron (both Task 05).
 
-- [ ] Dispatch edge function (from task 05) rewritten with scoring algorithm
-- [ ] Configurable weights stored in `platform_settings` (so they can be tuned without redeploying)
-- [ ] Fallback queue handling
-- [ ] Admin "needs attention" panel surfaces stalled dispatches
-- [ ] Customer sourcing screen + escalation flow
-- [ ] Unit tests for the scoring function
+- [ ] ~~Dispatch rewritten with scoring algorithm~~ — **DROPPED** (broadcast first-come-first-serve kept; no scoring)
+- [ ] ~~Configurable weights in `platform_settings`~~ — **DROPPED** (no scoring to weight)
+- [ ] ~~Fallback queue handling~~ — **DROPPED** (sequential offering is the opposite of broadcast)
+- [x] Admin "needs attention" panel surfaces stalled dispatches — **already shipped in Task 05** (`/api/cron/dispatch-sweep` flags any booking unaccepted after 5 min + emails admin)
+- [x] Customer sourcing screen + escalation flow — confirmation tracker shows "Finding your mechanic" with **timed escalation copy at ≥60s and ≥5min**; the £5-credit fallthrough is **deferred** (needs a customer-credits system that doesn't exist yet)
+- [ ] ~~Unit tests for the scoring function~~ — **N/A** (no scoring function)
+- ⏳ Pro-tier dispatch priority — **DEFERRED to later** (owner: "Pro plans receiving jobs before anyone else can come later"; fits Task 11)
 
 **Files touched:**
 - `supabase/functions/dispatch-offer/index.ts` (rewritten)

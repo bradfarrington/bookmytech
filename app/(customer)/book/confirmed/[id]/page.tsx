@@ -28,7 +28,7 @@ export default async function ConfirmedPage({ params }: ConfirmedPageProps) {
 
   const { data: booking } = await supabase
     .from("bookings")
-    .select("id, vehicle_reg, vehicle_make, vehicle_model, scheduled_at, total_pence, customer_name, customer_email, address_line_1, status, mechanic_id, reschedule_status, reschedule_proposed_at, reschedule_note")
+    .select("id, vehicle_reg, vehicle_make, vehicle_model, scheduled_at, created_at, total_pence, customer_name, customer_email, address_line_1, status, mechanic_id, reschedule_status, reschedule_proposed_at, reschedule_note")
     .eq("id", id)
     .single();
 
@@ -106,7 +106,12 @@ export default async function ConfirmedPage({ params }: ConfirmedPageProps) {
       )}
 
       {/* Live status tracker */}
-      <BookingTracker bookingId={booking.id} status={booking.status} mechanic={mechanic} />
+      <BookingTracker
+        bookingId={booking.id}
+        status={booking.status}
+        mechanic={mechanic}
+        createdAt={booking.created_at}
+      />
 
       {/* Booking summary */}
       <Card>
