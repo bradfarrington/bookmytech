@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendEmail } from "@/lib/email/send";
-import { formatPrice } from "@/lib/utils";
+import { formatPrice, siteUrl } from "@/lib/utils";
 
 export type JobProgressResult = { ok: true } | { ok: false; error: string };
 
@@ -226,6 +226,15 @@ export async function completeAndCharge(bookingId: string): Promise<JobProgressR
     (Array.isArray(booking.service) ? booking.service[0]?.name : (booking.service as { name?: string } | null)?.name) ??
     "your service";
   if (booking.customer_email) {
+    // One-tap rating links: each star deep-links into the review form with the
+    // rating pre-selected (?rating=N).
+    const reviewUrl = `${siteUrl()}/review/${bookingId}`;
+    const starLinks = [1, 2, 3, 4, 5]
+      .map(
+        (n) =>
+          `<a href="${reviewUrl}?rating=${n}" style="text-decoration:none;font-size:28px;color:#f59e0b;">★</a>`,
+      )
+      .join("&nbsp;");
     sendEmail({
       to: booking.customer_email,
       subject: "Your job is complete — receipt",
@@ -242,8 +251,11 @@ export async function completeAndCharge(bookingId: string): Promise<JobProgressR
               ? "Your card has now been charged — your pre-authorisation has been taken."
               : "Payment will be settled shortly."
           }</p>
-          <p style="color: #64748b; font-size: 14px;">We'd love a quick review of
-          your mechanic — you'll get a separate email with a one-tap rating link.</p>
+          <div style="margin: 24px 0; padding: 20px; background: #f8fafc; border-radius: 12px; text-align: center;">
+            <p style="margin: 0 0 8px; font-weight: 600; color: #0f172a;">How did your mechanic do?</p>
+            <p style="margin: 0 0 12px;">${starLinks}</p>
+            <a href="${reviewUrl}" style="color: #2563eb; font-size: 14px; font-weight: 600;">Leave a review</a>
+          </div>
         </div>
       `,
     }).catch(console.error);

@@ -81,7 +81,7 @@ export default async function ConfirmedPage({ params }: ConfirmedPageProps) {
       </div>
 
       {/* Live status tracker */}
-      <BookingTracker status={booking.status} mechanic={mechanic} />
+      <BookingTracker bookingId={booking.id} status={booking.status} mechanic={mechanic} />
 
       {/* Booking summary */}
       <Card>

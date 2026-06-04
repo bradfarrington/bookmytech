@@ -51,3 +51,13 @@ export function slugify(input: string): string {
     .replace(/-+/g, "-")
     .replace(/^-|-$/g, "");
 }
+
+// Absolute site origin for links in emails (which have no request context).
+// Prefers an explicit NEXT_PUBLIC_SITE_URL, falls back to the Vercel-provided
+// deployment host, then localhost for dev. No trailing slash.
+export function siteUrl(): string {
+  const explicit = process.env.NEXT_PUBLIC_SITE_URL;
+  if (explicit) return explicit.replace(/\/$/, "");
+  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
+  return "http://localhost:3000";
+}

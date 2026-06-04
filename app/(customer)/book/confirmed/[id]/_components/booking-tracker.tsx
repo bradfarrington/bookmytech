@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Check, Clock, Navigation, Wrench, PartyPopper, Star } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -8,6 +9,7 @@ export interface BookingMechanic {
 }
 
 interface BookingTrackerProps {
+  bookingId: string;
   status: string;
   mechanic: BookingMechanic | null;
 }
@@ -53,7 +55,7 @@ const BANNERS: Record<string, { title: string; body: string; icon: LucideIcon }>
   },
 };
 
-export function BookingTracker({ status, mechanic }: BookingTrackerProps) {
+export function BookingTracker({ bookingId, status, mechanic }: BookingTrackerProps) {
   if (status === "cancelled") {
     return (
       <div className="rounded-2xl border border-red-200 bg-red-50 p-5">
@@ -115,6 +117,15 @@ export function BookingTracker({ status, mechanic }: BookingTrackerProps) {
               {banner.title}
             </p>
             <p className="mt-1 text-sm leading-relaxed text-text-secondary">{banner.body}</p>
+            {status === "completed" && (
+              <Link
+                href={`/review/${bookingId}`}
+                className="mt-3 inline-flex h-10 items-center gap-1.5 rounded-button bg-brand-blue px-4 text-sm font-semibold text-white transition-colors hover:bg-brand-blue-dark"
+              >
+                <Star size={15} className="fill-white" />
+                Rate your mechanic
+              </Link>
+            )}
           </div>
         </div>
       </div>

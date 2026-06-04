@@ -199,10 +199,12 @@ create table reviews (
 
 **Acceptance criteria:**
 
-- [ ] Reviews tab fully built
-- [ ] Customer review prompt added to the booking flow's confirmation screen and via email after completion (one-tap rating + optional tags + comment)
-- [ ] Me tab quick-access menu
-- [ ] Pro tier logic (placeholder for now — Pro tier launches in retention task 11)
+- [x] Reviews tab fully built *(`/mechanic/reviews` — average + count + responded KPIs, rating filter chips, per-review respond/edit reply; `0012_reviews.sql` + `app/actions/reviews.ts`)*
+- [x] Customer review prompt added to the booking flow's confirmation screen and via email after completion (one-tap rating + optional tags + comment) *(form at `/review/[bookingId]`; CTA on the confirmed-page tracker once completed; receipt email has one-tap star deep-links `?rating=N`)*
+- [ ] Me tab quick-access menu *(deferred — the Me tab is a mobile bottom-tab destination; lands with the PWA shell. Profile/Availability/Earnings/Documents already exist as their own desktop nav items.)*
+- [ ] Pro tier logic (placeholder for now — Pro tier launches in retention task 11) *(deferred to Task 11)*
+
+**Note:** the customer's `mechanics.rating` is recomputed (avg of all their reviews) by `submitReview`. Reviews are append-only via service-role; one review per booking (unique constraint + action guard); the mechanic's single reply goes through `respondToReview`.
 
 **Files touched:**
 - `app/(mechanic)/mechanic/reviews/page.tsx`
