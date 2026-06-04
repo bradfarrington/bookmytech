@@ -48,10 +48,10 @@ const COLUMNS: FooterColumn[] = [
   {
     heading: "For Mechanics",
     links: [
-      { label: "Become a mechanic", href: "#" },
+      { label: "Become a mechanic", href: "/mechanics/apply" },
       { label: "Pro tier", href: "#" },
       { label: "Help centre", href: "#" },
-      { label: "Mechanic login", href: "#" },
+      { label: "Mechanic login", href: "/mechanic/login" },
     ],
   },
   {

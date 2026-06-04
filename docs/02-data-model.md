@@ -148,6 +148,14 @@ Append-only audit log for every meaningful change on a booking. Powers the admin
 
 **Append-only.** Never UPDATE or DELETE rows here — if a fact about an event was wrong, write a corrective event (typically `'note'`). The composite index on `(booking_id, created_at desc)` supports the timeline render.
 
+### `mechanic_applications`
+
+Backs the public `/mechanics/apply` wizard and the `/admin/approvals` queue. Created in `0013_mechanic_applications.sql` (Task 07 Stage 1). The row is inserted only on final submit; documents are uploaded to the **private** `mechanic-docs` storage bucket before submit (under a client-generated draft UUID) and their object keys land in the `doc_*` columns. Bank details are **AES-256-GCM encrypted** at the application level (`lib/crypto/encrypt.ts`, key in `APP_ENCRYPTION_KEY`) — never plain text.
+
+Key columns: contact (`email` UNIQUE, `full_name`, `phone`, `postcode`, `years_experience`); business (`business_type` ∈ `sole_trader`/`limited_company`, `business_name`, `business_number`, `vat_registered`); `specialisms text[]`, `service_radius_miles`; document keys (`doc_photo_id`, `doc_public_liability_insurance`, `doc_trade_insurance`, `doc_qualification`, `doc_vat`); `bank_sort_code_encrypted`, `bank_account_number_encrypted`; two references (`reference_1_*`, `reference_2_*`); workflow (`status`, `grace_period_ends_at`, `rejection_reason`, `needs_info_note`, `resubmit_token`, `submitted_at`, `reviewed_at`, `reviewed_by`).
+
+**Status:** `'submitted' | 'under_review' | 'approved' | 'approved_with_grace' | 'rejected' | 'needs_info'`. `approved_with_grace` = admin override: mechanic goes live immediately but `grace_period_ends_at = now() + 28 days`; if unresolved by then they're auto-suspended from dispatch.
+
 ## RLS policies in effect
 
 A `public.is_admin()` `SECURITY DEFINER` function is the single source of truth for "is the current user an admin?" used by every admin policy. Definition lives in `supabase/migrations/0002_service_categories.sql` for fresh-environment safety.
@@ -193,6 +201,11 @@ A `public.is_admin()` `SECURITY DEFINER` function is the single source of truth 
 - `INSERT`: `Admins can insert booking events` — `with check (public.is_admin())` (server actions run under the admin's session; system-generated events are written via the service-role client)
 - `SELECT`: `Customers can view events on own bookings` — `using (exists (select 1 from bookings b where b.id = booking_events.booking_id and (b.customer_id = auth.uid() or (b.customer_id is null and b.customer_email = auth.email()))))` (cross-table EXISTS is safe — `booking_events` ≠ `bookings`, so no recursion. Composite index on `(booking_id, created_at desc)` supports the lookup.)
 - ❌ **No mechanic-side policy yet.** Added in Task 05 when the assigned-mechanic relationship is wired through.
+
+**`mechanic_applications`** — defined in `0013_mechanic_applications.sql`. Admin-only table; applicant-facing reads/writes go through the **service-role client** in server actions (applicants are guests with no session), so only admin policies exist. There is intentionally **no public SELECT or INSERT** — the rows hold PII.
+- `SELECT`: `Admins can view all applications` — `using (public.is_admin())`
+- `UPDATE`: `Admins can update applications` — `using (public.is_admin()) with check (public.is_admin())`
+- Documents live in the **private** `mechanic-docs` bucket (`public = false`). No per-object storage policies: uploads are service-role (in `submit-application.ts`); admins read via 1-hour signed URLs minted in `approvals.ts`.
 
 ## RLS patterns to follow
 
