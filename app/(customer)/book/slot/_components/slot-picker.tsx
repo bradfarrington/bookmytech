@@ -16,6 +16,7 @@ import { Select } from "@/components/ui/select";
 import { cn, formatPrice } from "@/lib/utils";
 import { createPaymentIntentAction, createBookingAction } from "@/app/actions/create-booking";
 import type { CreateBookingInput } from "@/app/actions/create-booking";
+import { track, FUNNEL_EVENTS } from "@/lib/analytics/track";
 
 type ParkingType = "driveway" | "street" | "car_park" | "other";
 
@@ -83,6 +84,7 @@ export function SlotPicker({
 
   function handleProceedToPayment() {
     if (!canProceed) return;
+    track(FUNNEL_EVENTS.slotPicked, { serviceId, slot: selectedSlot });
     setStripeError(null);
     startTransition(async () => {
       const result = await createPaymentIntentAction({ serviceId, postcode });

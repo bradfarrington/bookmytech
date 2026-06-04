@@ -1,6 +1,6 @@
 # Task 10 — Analytics + parts margin + multi-city tooling
 
-**Status:** ⏳ Queued
+**Status:** ⏳ In progress — Stage 1 ✅ (2026-06-04, analytics dashboard + funnel tracking, migration `0020`). Stages 2 & 3 queued.
 
 Three loosely-related features that round out the operations and commercial layers. The analytics dashboard (brief section 5), the parts margin revenue layer (brief section 6 + phase 4), and the multi-city expansion tooling (brief phase 3).
 
@@ -53,13 +53,13 @@ A `trackEvent(name, properties)` helper on the client + server fires these. Add 
 
 **Acceptance criteria:**
 
-- [ ] `funnel_events` table + tracking helper
-- [ ] Booking flow instrumented with 5 funnel events
-- [ ] `/admin/analytics` page with period selector
-- [ ] All four KPIs + four charts rendering
-- [ ] Period comparison overlay on GMV chart
-- [ ] All data fetched server-side via aggregation queries (Supabase RPC for complex ones)
-- [ ] Page loads in < 2 seconds even with 30d of data
+- [x] `funnel_events` table + tracking helper — migration `0020`; `trackEvent` server action (`app/actions/track-event.ts`, service-role insert + `bmt_sid` cookie) + client `track()` wrapper (`lib/analytics/track.ts`).
+- [x] Booking flow instrumented with 5 funnel events — `reg_lookup_started` (hero reg form), `service_selected` (service grid clicks), `price_viewed` (`/book/match` via `TrackOnMount`), `slot_picked` (slot picker → proceed-to-payment), `booking_confirmed` (server-side in `createBookingAction`).
+- [x] `/admin/analytics` page with period selector — 7d / 30d / 90d / year, URL-driven (`?period=`).
+- [x] All four KPIs + four charts rendering — KPIs (GMV, net revenue, bookings, repeat rate, each with vs-previous delta); charts = GMV trend line, service-mix donut, top areas, top mechanics; plus the 5-stage conversion funnel.
+- [x] Period comparison overlay on GMV chart — current (solid brand) vs previous (dashed muted), index-aligned + gap-filled buckets (`lib/analytics/periods.ts`, unit-tested).
+- [x] All data fetched server-side via aggregation queries (Supabase RPC for complex ones) — `analytics_funnel` (distinct-session counts) + `analytics_gmv_series` (bucketed GMV/net) are SECURITY DEFINER RPCs; KPIs/mix/top-boards aggregate a single bounded bookings fetch in JS (house pattern, mirrors the overview page).
+- [x] Page loads in < 2 seconds even with 30d of data — RPCs run in Postgres; the JS aggregation is over one bounded (≤5000-row) fetch. (Not load-tested with 30d of synthetic data — there isn't that volume yet — but the query shapes are O(n) over a capped set.)
 
 **Files touched:**
 - `app/(admin)/admin/analytics/page.tsx`

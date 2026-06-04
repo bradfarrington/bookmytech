@@ -8,6 +8,7 @@ import { Icon } from "@/components/ui/icon";
 import { RegPlateInput } from "@/components/ui/reg-plate-input";
 import { cn, normaliseReg } from "@/lib/utils";
 import { lookupVehicleAction } from "@/app/actions/lookup-vehicle";
+import { track, FUNNEL_EVENTS } from "@/lib/analytics/track";
 import type { VehicleDetails } from "@/lib/dvla/types";
 import {
   VehicleLookupModal,
@@ -45,6 +46,7 @@ export function RegLookupForm({
     const normalised = normaliseReg(reg);
     if (!normalised) return;
     const trimmedPostcode = postcode.trim();
+    track(FUNNEL_EVENTS.regLookupStarted, { reg: normalised });
     setLookup({
       reg: normalised,
       postcode: trimmedPostcode,

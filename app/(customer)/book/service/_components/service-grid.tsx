@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { cn, formatPrice } from "@/lib/utils";
 import { Pill } from "@/components/ui/pill";
+import { track, FUNNEL_EVENTS } from "@/lib/analytics/track";
 
 interface Service {
   id: string;
@@ -68,6 +69,10 @@ export function ServiceGrid({ services, reg, make, model, postcode }: ServiceGri
     return vehicleParams ? `${base}&${vehicleParams}` : base;
   }
 
+  function onSelect(slug: string) {
+    track(FUNNEL_EVENTS.serviceSelected, { service: slug });
+  }
+
   const filtered = query.trim()
     ? services.filter((s) =>
         s.name.toLowerCase().includes(query.toLowerCase()),
@@ -99,6 +104,7 @@ export function ServiceGrid({ services, reg, make, model, postcode }: ServiceGri
               key={service.id}
               service={service}
               href={serviceHref(service.slug)}
+              onSelect={() => onSelect(service.slug)}
               popular={service.slug === POPULAR_SLUG}
             />
           ))}
@@ -109,6 +115,7 @@ export function ServiceGrid({ services, reg, make, model, postcode }: ServiceGri
       {!query && (
         <a
           href={serviceHref("diagnostic")}
+          onClick={() => onSelect("diagnostic")}
           className="flex items-center justify-between gap-3 rounded-2xl border border-dashed border-brand-blue/40 bg-blue-50/50 p-4 transition-colors hover:bg-blue-50"
         >
           <div>
@@ -137,6 +144,7 @@ export function ServiceGrid({ services, reg, make, model, postcode }: ServiceGri
                   key={service.id}
                   service={service}
                   href={serviceHref(service.slug)}
+                  onSelect={() => onSelect(service.slug)}
                 />
               ))}
             </div>
@@ -156,10 +164,12 @@ export function ServiceGrid({ services, reg, make, model, postcode }: ServiceGri
 function ServiceCard({
   service,
   href,
+  onSelect,
   popular = false,
 }: {
   service: Service;
   href: string;
+  onSelect?: () => void;
   popular?: boolean;
 }) {
   const IconComp = SLUG_ICONS[service.slug] ?? Wrench;
@@ -167,6 +177,7 @@ function ServiceCard({
   return (
     <a
       href={href}
+      onClick={onSelect}
       className={cn(
         "group relative flex flex-col gap-3 rounded-2xl border bg-surface-card p-4 shadow-card transition-all hover:-translate-y-0.5 hover:shadow-md",
         popular ? "border-brand-blue/30" : "border-border",

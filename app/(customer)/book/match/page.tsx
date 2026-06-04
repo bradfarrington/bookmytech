@@ -5,6 +5,8 @@ import { createClient } from "@/lib/supabase/server";
 import { ProgressStepper } from "@/components/customer/progress-stepper";
 import { Button } from "@/components/ui/button";
 import { calculatePrice } from "@/lib/pricing/calculate";
+import { TrackOnMount } from "@/components/analytics/track-on-mount";
+import { FUNNEL_EVENTS } from "@/lib/analytics/events";
 import { PriceHero } from "./_components/price-hero";
 
 interface MatchPageProps {
@@ -54,6 +56,10 @@ export default async function MatchPage({ searchParams }: MatchPageProps) {
 
   return (
     <div className="flex flex-col gap-6">
+      <TrackOnMount
+        event={FUNNEL_EVENTS.priceViewed}
+        properties={{ service: serviceSlug }}
+      />
       <ProgressStepper currentStep={3} />
 
       <div className="flex items-center gap-3">

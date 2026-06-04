@@ -5,6 +5,8 @@ import { sendEmail } from "@/lib/email/send";
 import { formatPrice } from "@/lib/utils";
 import { dispatchBooking } from "@/lib/dispatch/dispatch";
 import { calculatePrice } from "@/lib/pricing/calculate";
+import { trackEvent } from "@/app/actions/track-event";
+import { FUNNEL_EVENTS } from "@/lib/analytics/events";
 
 export interface CreateBookingInput {
   vehicleReg: string;
@@ -77,6 +79,13 @@ export async function createBookingAction(
   if (error || !data) {
     return { ok: false, error: error?.message ?? "Failed to create booking" };
   }
+
+  // Record the final funnel step (server-side so it's never lost to navigation).
+  void trackEvent(FUNNEL_EVENTS.bookingConfirmed, {
+    bookingId: data.id,
+    serviceId: input.serviceId,
+    totalPence: price.totalPence,
+  });
 
   // Broadcast the job to every eligible online mechanic (first-to-accept wins).
   // Awaited so the offers exist by the time the confirmation page loads, but a
