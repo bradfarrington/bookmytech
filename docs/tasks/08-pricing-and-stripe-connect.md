@@ -1,6 +1,6 @@
 # Task 08 — Pricing engine + Stripe Connect payouts
 
-**Status:** ⏳ Queued
+**Status:** ✅ Complete (2026-06-04) — all three stages shipped. Migrations `0016`–`0018`. Key deviations: (1) **commission is charged on the whole total** (base + parts), not labour-only — owner decision, supersedes the earlier `lib/earnings.ts` model; (2) `service_area_prices.commission_rate` is **nullable** (null = inherit) and a per-service `services.commission_rate` was added, so the engine resolves commission per-cell → per-service → platform default; (3) Stripe Connect accounts are created **lazily** on the mechanic's first "Connect bank account" click (via the `/mechanic/onboarding/stripe` page + "Get paid" nav item), not at approval time; (4) **Pro-tier** commission isn't applied at booking creation because no mechanic is assigned yet under broadcast dispatch — `take_rate_pro` is seeded/editable but wiring it onto bookings is deferred to Task 11.
 
 Build the dynamic pricing layer (area multipliers, per-service commission, admin controls) and wire Stripe Connect for mechanic payouts. This is the commercial backbone of the platform — until this exists, mechanics aren't getting paid through the system and pricing is just whatever's in the services table.
 
@@ -77,13 +77,13 @@ Steps:
 
 **Acceptance criteria:**
 
-- [ ] Schema migration with areas, service_area_prices, booking pricing columns
-- [ ] Pricing engine function implemented and unit tested
-- [ ] Booking flow (`/book/match`) updated to call the pricing engine instead of using starting_price_pence directly
-- [ ] Booking row populated with base, multiplier, commission rate, fees, payout breakdown
-- [ ] Mechanic earnings breakdown in task 05 updated to read from booking pricing columns
-- [ ] Seed 4–5 areas: "London Z1-Z2" (×1.15), "London Z3-Z6" (×1.05), "Manchester" (×1.00), "Rural" (×1.10), "Default" (catch-all, ×1.00)
-- [ ] Seed dummy parts prices for each service/area combination
+- [x] Schema migration with areas, service_area_prices, booking pricing columns (`0016`)
+- [x] Pricing engine function implemented and unit tested (`lib/pricing/calculate.ts`, 16 Vitest cases; pure `computePrice`/`resolveArea` + async `calculatePrice`)
+- [x] Booking flow (`/book/match`) updated to call the pricing engine instead of using starting_price_pence directly (also `/book/slot`)
+- [x] Booking row populated with base, multiplier, commission rate, fees, payout breakdown — recomputed server-side at PI creation **and** insert so a client can't tamper with the price
+- [x] Mechanic earnings breakdown in task 05 updated to read from booking pricing columns (`mechanic_payout_pence`)
+- [x] Seed 4–5 areas: "London Z1-Z2" (×1.15), "London Z3-Z6" (×1.05), "Manchester" (×1.00), "Rural" (×1.10), "Default" (catch-all, ×1.00)
+- [x] Seed dummy parts prices for each service/area combination
 
 **Files touched:**
 - `lib/pricing/calculate.ts`
@@ -127,10 +127,10 @@ create table platform_settings (
 
 **Acceptance criteria:**
 
-- [ ] `/admin/pricing` page with all six sections above
-- [ ] Each section has inline editing with optimistic UI and server actions
-- [ ] Changes audited — `pricing_audit_log` table records who changed what and when
-- [ ] Commission and fee changes apply to *new* bookings only, not retroactively (enforce this in the pricing engine — snapshot the rate onto the booking row at creation time)
+- [x] `/admin/pricing` page with all six sections above
+- [x] Each section has inline editing with optimistic UI and server actions (reusable `InlineNumber`/`InlineText` cells)
+- [x] Changes audited — `pricing_audit_log` table records who changed what and when (`0017`)
+- [x] Commission and fee changes apply to *new* bookings only, not retroactively (engine snapshots the rate onto the booking row at creation time)
 
 **Files touched:**
 - `app/(admin)/admin/pricing/page.tsx`
@@ -180,13 +180,13 @@ If the originally assigned mechanic cancels, do NOT cancel the PaymentIntent. Ke
 
 **Acceptance criteria:**
 
-- [ ] Stripe Connect set up (test mode), Express onboarding URL generation working
-- [ ] Mechanic onboarding step added: "Connect bank account" → redirects to Stripe → returns to BMT
-- [ ] Webhook handler at `/api/webhooks/stripe` handles `account.updated` to keep `stripe_*` columns in sync
-- [ ] Mechanic without Stripe completed cannot toggle online (UI disables it with explanation)
-- [ ] Capture flow updated to create transfers
-- [ ] Earnings page reads real Stripe transfer data
-- [ ] Test the flow end-to-end with Stripe test bank accounts
+- [x] Stripe Connect set up (test mode), Express onboarding URL generation working (`lib/stripe/connect.ts`)
+- [x] Mechanic onboarding step added: "Connect bank account" → redirects to Stripe → returns to BMT (`/mechanic/onboarding/stripe` + "Get paid" nav item)
+- [x] Webhook handler at `/api/webhooks/stripe` handles `account.updated` to keep `stripe_*` columns in sync (signature-verified via `STRIPE_WEBHOOK_SECRET`)
+- [x] Mechanic without Stripe completed cannot toggle online (server gate in `mechanic-status.ts` + UI routes to onboarding with explanation)
+- [x] Capture flow updated to create transfers (`completeAndCharge` transfers `mechanic_payout_pence` to the current/replacement mechanic's account; failure is non-fatal + logged)
+- [x] Earnings page reads real Stripe transfer data (falls back to the weekly preview when not yet connected)
+- [ ] Test the flow end-to-end with Stripe test bank accounts — **deferred to manual verification** (needs a running app + `STRIPE_WEBHOOK_SECRET` from `stripe listen`; build + typecheck pass, no live test-mode run done in this session)
 
 **Files touched:**
 - `app/(mechanic)/mechanic/onboarding/stripe/page.tsx`
