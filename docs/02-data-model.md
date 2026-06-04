@@ -156,6 +156,8 @@ Key columns: contact (`email` UNIQUE, `full_name`, `phone`, `postcode`, `years_e
 
 **Status:** `'submitted' | 'under_review' | 'approved' | 'approved_with_grace' | 'rejected' | 'needs_info'`. `approved_with_grace` = admin override: mechanic goes live immediately but `grace_period_ends_at = now() + 28 days`; if unresolved by then they're auto-suspended from dispatch.
 
+`0014_application_verification.sql` adds a `verification jsonb` map (e.g. `{ "doc_photo_id": true }`) recording the admin's manual per-item "verified" toggles, which override the auto-screen verdict in the approvals checklist.
+
 ## RLS policies in effect
 
 A `public.is_admin()` `SECURITY DEFINER` function is the single source of truth for "is the current user an admin?" used by every admin policy. Definition lives in `supabase/migrations/0002_service_categories.sql` for fresh-environment safety.
