@@ -85,47 +85,35 @@ Bottom-tab navigation. Single-handed reach. Designed for 375px width primarily.
 
 ### Stage 3 — Incoming offer screen + push notifications
 
-The urgent moment. A new job offer comes in — the mechanic needs to see it instantly and decide in 60 seconds.
+The urgent moment. A new job offer comes in — the mechanic needs to see it and decide fast.
 
-**UI:**
+> ⚠️ **Two scope corrections (2026-06-04):**
+> 1. **No countdown / expiry timer.** Dispatch is broadcast **first-to-accept** — the first mechanic to accept wins and the offer is superseded for everyone else (see `acceptOffer` in `app/actions/job-offers.ts`). So there's no per-offer timer and no auto-decline; the urgency is "first to accept wins," and the screen live-updates to a "no longer available" state if someone else grabs it.
+> 2. **No push notifications.** Notifications go via **email + SMS** (SMS not yet built), not web push — push is deferred to the native app. So this stage is the **offer-screen UI only**.
 
-- Full-screen takeover when an offer arrives (if the app is open)
-- Bright urgency bar with expiry countdown
-- Earnings highlight card — large gradient blue, payout amount in big numbers
-- Four info tiles: when, where (distance), service, vehicle
-- Customer notes preview (truncated)
-- Accept and Decline buttons (large, thumb-reachable)
-- Swipe-to-decline gesture as alternative
+**UI (built):**
 
-**Push notifications:**
-
-- Firebase Cloud Messaging via Expo (per brief stack)
-- Web Push API used directly — Expo isn't strictly needed for web PWA; FCM works via `firebase` JS SDK
-- Mechanic grants notification permission on first open
-- When an offer is created (via the dispatch edge function from task 05), trigger an FCM message to the targeted mechanic
-- Notification body: "New job: £89 · 3.2 mi · Diagnostic"
-- Tapping the notification opens the app to the offer screen
+- Focused full-screen offer route at `/mechanic/offer/[id]` (outside the `(shell)` group → no sidebar/top-bar). Reached by tapping an offer card in the feed.
+- Urgency bar — "First to accept wins — be quick" (pulsing dot, no timer).
+- Earnings highlight card — large gradient-blue, payout in big numbers.
+- Four info tiles: when, where (+ distance), service, vehicle.
+- Customer notes preview (truncated, `line-clamp-4`).
+- Accept / Decline buttons (large, thumb-reachable, sticky bottom with safe-area padding).
+- Swipe-to-decline gesture (pointer drag-left past a threshold) with a tappable Decline fallback.
+- Realtime: subscribes to the mechanic's offers; if the offer is accepted-elsewhere/withdrawn it refreshes to a "no longer available" screen.
 
 **Acceptance criteria:**
 
-- [ ] Firebase project created, FCM enabled
-- [ ] Service worker registered for receiving push messages
-- [ ] Mechanic device token stored in `mechanics.fcm_token` (column added)
-- [ ] Dispatch edge function from task 05 updated to also send FCM push when an offer is created
-- [ ] Offer screen built with the urgent UI
-- [ ] Countdown ticks down in real time, auto-declines at 0
-- [ ] Accept → assigns the booking and transitions to job-in-progress view
-- [ ] Decline → triggers re-dispatch to next mechanic
-- [ ] Verify push notifications work on installed PWA (iOS 16.4+ supports web push; Android Chrome supports it natively)
+- [x] Offer screen built with the urgent UI
+- [x] ~~Countdown ticks down… auto-declines at 0~~ — **removed**: first-to-accept model has no countdown (see correction above)
+- [x] Accept → assigns the booking (`acceptOffer`) and routes to the job view (`/mechanic/jobs/[id]`)
+- [x] Decline → `declineOffer` (drops it from this mechanic's feed; broadcast model means no "re-dispatch to next" — every other eligible mechanic already holds the offer)
+- [ ] ~~Firebase/FCM, device token, push send, push verify~~ — **DEFERRED**: notifications are email + SMS, push waits for the native app
 
-**Files touched:**
-- `app/(mechanic)/mechanic/offer/[id]/page.tsx`
-- `app/(mechanic)/mechanic/offer/[id]/_components/urgent-bar.tsx`
-- `app/(mechanic)/mechanic/offer/[id]/_components/earnings-highlight.tsx`
-- `lib/push/firebase.ts`
-- `lib/push/register-device.ts`
-- `supabase/functions/dispatch-offer/index.ts` (updated to send FCM)
-- Schema migration (fcm_token column)
+**Files touched (actual):**
+- `app/(mechanic)/mechanic/offer/[id]/page.tsx` + `_components/offer-screen.tsx` (urgent bar + earnings highlight inlined rather than separate files)
+- `app/(mechanic)/mechanic/(shell)/jobs/_components/offer-card.tsx` (card links to the offer screen)
+- *(no push files, no fcm_token migration — push deferred)*
 
 ---
 

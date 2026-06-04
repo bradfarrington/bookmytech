@@ -140,7 +140,9 @@ You are working on **Book My Tech**, a UK mobile-mechanic booking platform. This
 **Mobile nav decision (2026-06-04):** the mobile experience is a **responsive website on a phone, NOT an app-style shell** — the bottom-tab drawer in Task 06 Stage 2 is **deferred to the real app build**; the responsive hamburger drawer covers it for now.
 **Notifications decision (2026-06-04):** customer/admin/mechanic notifications go via **email + SMS** (SMS sender not yet built), **not web push** — so Task 06 Stage 3 is **offer-screen UI only**; skip the push half until the native app.
 
-Still open: Stage 3 **offer-screen UI** (skip push), the **Me tab**, offline IndexedDB sync, GPS live-location, and the deferred bottom-tab app shell. An editable per-mechanic daily earnings target (Stage 2 ring) is a small follow-up. Read the task doc before continuing.
+- **Stage 3 — offer-screen UI** (no countdown, no push) — focused full-screen offer at `/mechanic/offer/[id]` (outside the `(shell)` group): urgency bar ("first to accept wins", no timer), gradient earnings highlight, four info tiles, truncated customer notes, large Accept/Decline + swipe-to-decline, and realtime that flips to a "no longer available" state if another mechanic accepts first. Reuses `acceptOffer`/`declineOffer`; offer cards in the feed now link to it. No countdown (broadcast first-to-accept) and no push (email/SMS instead).
+
+Still open: the **Me tab**, offline IndexedDB sync, GPS live-location, and the deferred bottom-tab app shell + push notifications. An editable per-mechanic daily earnings target (Stage 2 ring) is a small follow-up. Read the task doc before continuing.
 
 **Carry-over watch-outs:**
 - **Supabase Realtime** — enable replication on `public.bookings` in Studio (Database → Replication) for the admin live monitor to update live. Task 05's mechanic job-offer feed will likely want the same on whatever table drives offers.

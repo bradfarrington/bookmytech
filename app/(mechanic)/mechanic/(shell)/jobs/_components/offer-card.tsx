@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { MapPin, Wrench, Zap } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -61,7 +62,10 @@ export function OfferCard({ offer }: { offer: OfferView }) {
         <Icon icon={Wrench} size={20} className="text-brand-blue" />
       </div>
 
-      <div className="min-w-0 flex-1">
+      <Link
+        href={`/mechanic/offer/${offer.id}`}
+        className="min-w-0 flex-1 rounded-lg transition-colors hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue"
+      >
         <div className="mb-1 flex items-center gap-2">
           <h3 className="truncate text-sm font-bold text-text-primary">
             {offer.serviceName}
@@ -84,7 +88,7 @@ export function OfferCard({ offer }: { offer: OfferView }) {
           <span aria-hidden>·</span>
           <span>{offer.slot}</span>
         </div>
-      </div>
+      </Link>
 
       <div className="shrink-0 text-right">
         <div className="text-[11px] font-semibold text-text-muted">You earn</div>
