@@ -1,6 +1,6 @@
 # Task 07 — Mechanic onboarding + admin approvals queue
 
-**Status:** ⏳ Queued
+**Status:** ✅ Complete (2026-06-04) — all three stages shipped. Public application wizard at `/mechanics/apply`, admin approvals queue at `/admin/approvals`, and documents management at `/mechanic/documents` + `/admin/documents`. Deviations: (1) Approve emails a **magic-link** sign-in (reusing Task 04's proven flow) rather than a temp-password-with-forced-reset — no reset screen exists, so this is more robust; (2) admin/mechanic pages live under their existing `(shell)` route groups (URLs unchanged: `/admin/approvals`, `/admin/documents`, `/mechanic/documents`). ⚠️ Apply migrations `0013`–`0015`; set `APP_ENCRYPTION_KEY` (bank encryption) and ideally `ADMIN_ALERT_EMAIL` + `CRON_SECRET` in prod.
 
 Build the public-facing mechanic application flow ("become a BMT mechanic") and the admin approvals queue that processes those applications. Replaces the manual mechanic creation from task 04.
 
@@ -78,14 +78,14 @@ Bank details are encrypted at the application level using Supabase Vault (or a s
 
 **Acceptance criteria:**
 
-- [ ] `/mechanics/apply` route accessible without login (it's the entry point for new mechanics)
-- [ ] Five-step form with URL-driven state — `/mechanics/apply/step-1` ... `/mechanics/apply/review`
-- [ ] Each step validates before allowing progression
-- [ ] Documents upload to Supabase Storage with proper access policies (only applicant and admins can read)
-- [ ] Bank details encrypted before storage (use `crypto` for AES-256, key in env var, or Supabase Vault if you can get it working)
-- [ ] On submit: row inserted in `mechanic_applications` with status='submitted', confirmation email sent
-- [ ] Email confirmation to applicant: "Application received, we'll review within 48 hours"
-- [ ] Email alert to admins when a new application arrives
+- [x] `/mechanics/apply` route accessible without login (it's the entry point for new mechanics)
+- [x] Five-step form with URL-driven state — `/mechanics/apply/step-1` ... `/mechanics/apply/review`
+- [x] Each step validates before allowing progression
+- [x] Documents upload to Supabase Storage with proper access policies (only applicant and admins can read)
+- [x] Bank details encrypted before storage (use `crypto` for AES-256, key in env var, or Supabase Vault if you can get it working)
+- [x] On submit: row inserted in `mechanic_applications` with status='submitted', confirmation email sent
+- [x] Email confirmation to applicant: "Application received, we'll review within 48 hours"
+- [x] Email alert to admins when a new application arrives
 
 **Files touched:**
 - `app/mechanics/apply/page.tsx` (or `/mechanics/apply/step-1/page.tsx` etc.)
@@ -160,13 +160,13 @@ True OCR-based verification is a future enhancement; for now, file presence + fo
 
 **Acceptance criteria:**
 
-- [ ] `/admin/approvals` queue/detail split layout
-- [ ] All seven verification items render with view/verify controls
-- [ ] Approve action creates auth user + profile + mechanic and sends email
-- [ ] Reject action with mandatory reason
-- [ ] Needs-info flow with a public resubmit link
-- [ ] Filter tabs working
-- [ ] Documents open securely (Supabase Storage signed URLs, 1-hour expiry)
+- [x] `/admin/approvals` queue/detail split layout
+- [x] All seven verification items render with view/verify controls
+- [x] Approve action creates auth user + profile + mechanic and sends email
+- [x] Reject action with mandatory reason
+- [x] Needs-info flow with a public resubmit link
+- [x] Filter tabs working
+- [x] Documents open securely (Supabase Storage signed URLs, 1-hour expiry)
 
 **Files touched:**
 - `app/(admin)/admin/approvals/page.tsx`
@@ -215,11 +215,11 @@ create table mechanic_documents (
 
 **Acceptance criteria:**
 
-- [ ] Mechanic documents page with expiry warnings
-- [ ] Admin documents page with filtering
-- [ ] Replacement flow: mechanic uploads, document enters pending_review, admin approves/rejects
-- [ ] Email alert to mechanic 30 days before expiry, then 7 days, then on expiry day
-- [ ] If a document expires and isn't replaced, mechanic auto-set to offline (can't receive new jobs until docs current)
+- [x] Mechanic documents page with expiry warnings
+- [x] Admin documents page with filtering
+- [x] Replacement flow: mechanic uploads, document enters pending_review, admin approves/rejects
+- [x] Email alert to mechanic 30 days before expiry, then 7 days, then on expiry day
+- [x] If a document expires and isn't replaced, mechanic auto-set to offline (can't receive new jobs until docs current)
 
 **Files touched:**
 - `app/(mechanic)/mechanic/documents/page.tsx`

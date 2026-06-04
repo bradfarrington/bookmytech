@@ -3,7 +3,6 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { decrypt } from "@/lib/crypto/encrypt";
 import { sendEmail } from "@/lib/email/send";
 import { siteUrl } from "@/lib/utils";
 import { renderApplicationApprovedEmail } from "@/emails/application-approved";
@@ -165,6 +164,32 @@ async function provisionMechanic(
   if (mechErr) {
     await admin.auth.admin.deleteUser(userId).catch(() => {});
     return { ok: false, error: `Couldn't create mechanic profile: ${mechErr.message}` };
+  }
+
+  // Seed the mechanic's documents from the application's uploads so the
+  // /mechanic/documents + /admin/documents views aren't empty post-approval.
+  // Already-reviewed, so status='verified'. Best-effort — a failure here (e.g.
+  // 0015 not yet applied) must not strand an otherwise-approved mechanic.
+  try {
+    const docSeed: { column: string; docType: string }[] = [
+      { column: "doc_photo_id", docType: "id" },
+      { column: "doc_public_liability_insurance", docType: "public_liability_insurance" },
+      { column: "doc_trade_insurance", docType: "trade_insurance" },
+      { column: "doc_qualification", docType: "qualification" },
+      { column: "doc_vat", docType: "vat" },
+    ];
+    const rows = docSeed
+      .filter((d) => app[d.column])
+      .map((d) => ({
+        mechanic_id: userId,
+        doc_type: d.docType,
+        file_url: String(app[d.column]),
+        status: "verified" as const,
+        reviewed_at: new Date().toISOString(),
+      }));
+    if (rows.length) await admin.from("mechanic_documents").insert(rows);
+  } catch (err) {
+    console.error("approve: failed to seed mechanic_documents", err);
   }
 
   // Magic-link sign-in (token_hash → server callback), same as the invite flow.

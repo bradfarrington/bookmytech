@@ -74,3 +74,41 @@ export const ACCEPTED_DOC_ACCEPT = ".pdf,.jpg,.jpeg,.png,.webp";
 export const MAX_DOC_BYTES = 10 * 1024 * 1024; // 10 MB
 // Auto-screen flags insurance files larger than this (Stage 2).
 export const INSURANCE_MAX_OK_BYTES = 5 * 1024 * 1024;
+
+// ---------------------------------------------------------------------------
+// Active-mechanic document types (Stage 3, mechanic_documents table). Distinct
+// key set from the application doc columns — these track renewable, expiring
+// documents on file for an approved mechanic.
+// ---------------------------------------------------------------------------
+export type MechanicDocType =
+  | "public_liability_insurance"
+  | "trade_insurance"
+  | "qualification"
+  | "id"
+  | "vat";
+
+export interface MechanicDocDef {
+  type: MechanicDocType;
+  label: string;
+  /** Whether an expiry date is expected (insurance renews; ID/qual may not). */
+  expires: boolean;
+}
+
+export const MECHANIC_DOC_DEFS: readonly MechanicDocDef[] = [
+  { type: "public_liability_insurance", label: "Public liability insurance", expires: true },
+  { type: "trade_insurance", label: "Trade insurance", expires: true },
+  { type: "qualification", label: "Trade qualification", expires: false },
+  { type: "id", label: "Photo ID", expires: true },
+  { type: "vat", label: "VAT registration", expires: false },
+] as const;
+
+export const MECHANIC_DOC_LABEL: Record<MechanicDocType, string> = Object.fromEntries(
+  MECHANIC_DOC_DEFS.map((d) => [d.type, d.label]),
+) as Record<MechanicDocType, string>;
+
+// Documents that, when expired, must take a mechanic offline (can't receive
+// new jobs until current). Qualifications/VAT don't gate dispatch.
+export const DISPATCH_GATING_DOC_TYPES: MechanicDocType[] = [
+  "public_liability_insurance",
+  "trade_insurance",
+];

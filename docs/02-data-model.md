@@ -158,6 +158,10 @@ Key columns: contact (`email` UNIQUE, `full_name`, `phone`, `postcode`, `years_e
 
 `0014_application_verification.sql` adds a `verification jsonb` map (e.g. `{ "doc_photo_id": true }`) recording the admin's manual per-item "verified" toggles, which override the auto-screen verdict in the approvals checklist.
 
+### `mechanic_documents`
+
+Active-mechanic document store for renewals (Task 07 Stage 3, `0015_mechanic_documents.sql`). One row per uploaded artifact: `mechanic_id` FK (→ `mechanics`, cascade), `doc_type` (`public_liability_insurance` | `trade_insurance` | `qualification` | `id` | `vat`), `file_url` (object key in the private `mechanic-docs` bucket, under `documents/{mechanic_id}/`), `expires_at date`, `status` (`pending_review` | `verified` | `rejected` | `expired`), `uploaded_at`, `reviewed_at`, `reviewed_by`, `created_at`, `updated_at`. On approval, the mechanic's application docs are seeded here as `verified`. Mechanic replacement uploads enter `pending_review`; admin approves/rejects. The daily `/api/cron/document-expiry` sweep emails the mechanic at 30/7/0 days, marks expired docs `expired`, and sets the mechanic **offline** when a dispatch-gating doc (insurance) expires.
+
 ## RLS policies in effect
 
 A `public.is_admin()` `SECURITY DEFINER` function is the single source of truth for "is the current user an admin?" used by every admin policy. Definition lives in `supabase/migrations/0002_service_categories.sql` for fresh-environment safety.
@@ -208,6 +212,13 @@ A `public.is_admin()` `SECURITY DEFINER` function is the single source of truth 
 - `SELECT`: `Admins can view all applications` — `using (public.is_admin())`
 - `UPDATE`: `Admins can update applications` — `using (public.is_admin()) with check (public.is_admin())`
 - Documents live in the **private** `mechanic-docs` bucket (`public = false`). No per-object storage policies: uploads are service-role (in `submit-application.ts`); admins read via 1-hour signed URLs minted in `approvals.ts`.
+
+**`mechanic_documents`** — defined in `0015_mechanic_documents.sql`. Mechanic reads/inserts own; admin reads/manages all (pattern #1 for the admin check; mechanic predicate is self-scoped).
+- `SELECT`: `Mechanics view own documents` — `using (auth.uid() = mechanic_id)`
+- `INSERT`: `Mechanics insert own documents` — `with check (auth.uid() = mechanic_id)` (storage write itself is service-role)
+- `SELECT`: `Admins view all documents` — `using (public.is_admin())`
+- `UPDATE`: `Admins update documents` — `using (public.is_admin()) with check (public.is_admin())` (approve/reject + expiry sweep)
+- `DELETE`: `Admins delete documents` — `using (public.is_admin())`
 
 ## RLS patterns to follow
 
