@@ -7,9 +7,11 @@ export interface MechanicTopBarProps {
   firstName: string;
   userName: string;
   status: "online" | "offline" | "on_job";
+  /** Stripe payouts enabled — required before the mechanic can go online. */
+  payoutsEnabled: boolean;
 }
 
-export function MechanicTopBar({ firstName, userName, status }: MechanicTopBarProps) {
+export function MechanicTopBar({ firstName, userName, status, payoutsEnabled }: MechanicTopBarProps) {
   // Rendered server-side at request time, so the date is stable for hydration.
   const today = new Date().toLocaleDateString("en-GB", {
     weekday: "long",
@@ -33,7 +35,7 @@ export function MechanicTopBar({ firstName, userName, status }: MechanicTopBarPr
 
       <div className="flex-1" />
 
-      <OnlineToggle initialStatus={status} />
+      <OnlineToggle initialStatus={status} payoutsEnabled={payoutsEnabled} />
 
       <button
         type="button"

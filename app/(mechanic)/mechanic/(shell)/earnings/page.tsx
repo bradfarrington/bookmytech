@@ -47,6 +47,12 @@ export default async function MechanicEarningsPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/mechanic/login");
 
+  const { data: mechanic } = await supabase
+    .from("mechanics")
+    .select("stripe_account_id")
+    .eq("id", user.id)
+    .single();
+
   const since = new Date(Date.now() - CHART_DAYS * MS_DAY).toISOString();
   const { data: completedRows } = await supabase
     .from("bookings")
@@ -112,8 +118,11 @@ export default async function MechanicEarningsPage() {
 
   const monthLabel = todayStart.toLocaleDateString("en-GB", { month: "long" });
 
-  // --- Payouts (seed) -------------------------------------------------------
-  const payouts = buildPayoutRows(byWeek);
+  // --- Payouts --------------------------------------------------------------
+  // Real Stripe transfer history once the mechanic is connected; otherwise the
+  // weekly-accrual preview (Task 08 Stage 3).
+  const stripePayouts = await fetchStripePayouts(mechanic?.stripe_account_id ?? null);
+  const payouts = stripePayouts ?? buildPayoutRows(byWeek);
 
   return (
     <div className="space-y-6">
@@ -211,4 +220,42 @@ function buildPayoutRows(byWeek: Map<string, number>): PayoutRow[] {
       accountMask: MASK,
     };
   });
+}
+
+// Real payout history from Stripe transfers to the mechanic's connected
+// account. Returns null (→ caller uses the preview) when the mechanic isn't
+// connected or Stripe isn't configured. Transfers move funds to the connected
+// balance immediately, so they show as Paid.
+async function fetchStripePayouts(accountId: string | null): Promise<PayoutRow[] | null> {
+  if (!accountId) return null;
+  let stripe;
+  try {
+    stripe = (await import("@/lib/stripe/server")).stripe;
+  } catch {
+    return null;
+  }
+  try {
+    const { data: transfers } = await stripe.transfers.list({
+      destination: accountId,
+      limit: 12,
+    });
+    return transfers.map((t) => {
+      const when = new Date(t.created * 1000);
+      return {
+        id: t.id,
+        dateLabel: when.toLocaleDateString("en-GB", {
+          weekday: "short",
+          day: "numeric",
+          month: "short",
+        }),
+        amountPence: t.amount,
+        status: "paid" as const,
+        periodLabel: when.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }),
+        accountMask: "Stripe",
+      };
+    });
+  } catch (err) {
+    console.error("Failed to fetch Stripe transfers", err);
+    return null;
+  }
 }

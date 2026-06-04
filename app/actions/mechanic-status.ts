@@ -23,6 +23,22 @@ export async function setOwnAvailability(
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Not signed in." };
 
+  // Gate: a mechanic can't go online until Stripe payouts are enabled —
+  // otherwise we'd dispatch jobs we can't pay them for (Task 08 Stage 3).
+  if (status === "online") {
+    const { data: mechanic } = await supabase
+      .from("mechanics")
+      .select("stripe_payouts_enabled")
+      .eq("id", user.id)
+      .single();
+    if (!mechanic?.stripe_payouts_enabled) {
+      return {
+        ok: false,
+        error: "Connect your bank account before going online — Settings → Get paid.",
+      };
+    }
+  }
+
   const now = new Date().toISOString();
   const patch: Record<string, string> = { status, last_seen_at: now };
   // Stamp online_at only on the offline→online transition so it reflects the

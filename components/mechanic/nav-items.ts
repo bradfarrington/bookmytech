@@ -1,5 +1,6 @@
 import {
   Calendar,
+  CreditCard,
   FileText,
   Inbox,
   PoundSterling,
@@ -26,6 +27,7 @@ export const MECHANIC_NAV_ITEMS: readonly MechanicNavItem[] = [
   { label: "Availability", href: "/mechanic/availability", icon: SlidersHorizontal },
   { label: "Profile", href: "/mechanic/profile", icon: User },
   { label: "Documents", href: "/mechanic/documents", icon: FileText },
+  { label: "Get paid", href: "/mechanic/onboarding/stripe", icon: CreditCard },
 ];
 
 // Sub-routes (e.g. /mechanic/jobs/[id]) keep their parent nav item active.

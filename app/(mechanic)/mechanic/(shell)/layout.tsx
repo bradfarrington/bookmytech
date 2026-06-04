@@ -34,7 +34,7 @@ export default async function MechanicShellLayout({
 
   const { data: mechanic } = await supabase
     .from("mechanics")
-    .select("status")
+    .select("status, stripe_payouts_enabled")
     .eq("id", user.id)
     .single();
 
@@ -42,12 +42,18 @@ export default async function MechanicShellLayout({
     profile?.full_name?.trim() || user.email?.split("@")[0] || "Mechanic";
   const firstName = displayName.split(/\s+/)[0];
   const status = (mechanic?.status as MechanicStatus | undefined) ?? "offline";
+  const payoutsEnabled = Boolean(mechanic?.stripe_payouts_enabled);
 
   return (
     <div className="flex min-h-dvh bg-surface text-text-primary">
       <MechanicSidebar userName={displayName} />
       <div className="flex min-w-0 flex-1 flex-col">
-        <MechanicTopBar firstName={firstName} userName={displayName} status={status} />
+        <MechanicTopBar
+          firstName={firstName}
+          userName={displayName}
+          status={status}
+          payoutsEnabled={payoutsEnabled}
+        />
         <main className="flex-1 overflow-auto p-4 pb-[max(1rem,env(safe-area-inset-bottom))] md:p-7">
           {children}
         </main>

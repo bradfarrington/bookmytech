@@ -152,7 +152,8 @@ export async function completeAndCharge(bookingId: string): Promise<JobProgressR
     .from("bookings")
     .select(
       `id, status, mechanic_id, customer_email, customer_name, total_pence,
-       stripe_payment_intent_id, service:services(name)`,
+       mechanic_payout_pence, stripe_payment_intent_id, service:services(name),
+       mechanic:mechanics(stripe_account_id)`,
     )
     .eq("id", bookingId)
     .single();
@@ -175,23 +176,21 @@ export async function completeAndCharge(bookingId: string): Promise<JobProgressR
 
   // --- Capture the pre-authorisation ---------------------------------------
   let captured = false;
-  if (booking.stripe_payment_intent_id) {
-    let stripe;
+  // Hoisted so the same client drives the payout transfer below.
+  let stripe: typeof import("@/lib/stripe/server").stripe | null = null;
+  try {
+    stripe = (await import("@/lib/stripe/server")).stripe;
+  } catch {
+    // No STRIPE_SECRET_KEY (dev) — proceed without capturing or transferring.
+    stripe = null;
+  }
+  if (booking.stripe_payment_intent_id && stripe) {
     try {
-      const mod = await import("@/lib/stripe/server");
-      stripe = mod.stripe;
-    } catch {
-      // No STRIPE_SECRET_KEY (dev) — proceed without capturing.
-      stripe = null;
-    }
-    if (stripe) {
-      try {
-        await stripe.paymentIntents.capture(booking.stripe_payment_intent_id);
-        captured = true;
-      } catch (err) {
-        const message = err instanceof Error ? err.message : "Stripe capture failed";
-        return { ok: false, error: `Couldn't take payment: ${message}. The job stays open — try again.` };
-      }
+      await stripe.paymentIntents.capture(booking.stripe_payment_intent_id);
+      captured = true;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Stripe capture failed";
+      return { ok: false, error: `Couldn't take payment: ${message}. The job stays open — try again.` };
     }
   }
 
@@ -219,6 +218,46 @@ export async function completeAndCharge(bookingId: string): Promise<JobProgressR
       actor_role: "mechanic",
       payload: { amount_pence: booking.total_pence },
     });
+  }
+
+  // --- Pay the mechanic (Stripe Connect transfer) --------------------------
+  // After capturing the customer's payment on the platform account, transfer
+  // the mechanic's snapshotted share to their connected account; the platform
+  // retains the fee. The transfer goes to whoever currently holds the job, so a
+  // replacement mechanic is paid correctly. A failed transfer is NON-fatal —
+  // the money is already captured and the job is complete — so we log it for
+  // reconciliation/retry rather than blocking sign-off.
+  const mechanicAccount = (
+    Array.isArray(booking.mechanic) ? booking.mechanic[0] : booking.mechanic
+  ) as { stripe_account_id: string | null } | null;
+  const payoutPence = booking.mechanic_payout_pence ?? 0;
+  if (captured && stripe && mechanicAccount?.stripe_account_id && payoutPence > 0) {
+    try {
+      const transfer = await stripe.transfers.create({
+        amount: payoutPence,
+        currency: "gbp",
+        destination: mechanicAccount.stripe_account_id,
+        transfer_group: bookingId,
+        metadata: { booking_id: bookingId, mechanic_id: guard.mechanicId },
+      });
+      await admin.from("booking_events").insert({
+        booking_id: bookingId,
+        event_type: "payout_transferred",
+        actor_id: guard.mechanicId,
+        actor_role: "mechanic",
+        payload: { amount_pence: payoutPence, transfer_id: transfer.id },
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "transfer failed";
+      console.error("Mechanic payout transfer failed for booking", bookingId, message);
+      await admin.from("booking_events").insert({
+        booking_id: bookingId,
+        event_type: "note",
+        actor_id: guard.mechanicId,
+        actor_role: "mechanic",
+        payload: { note: `Payout transfer failed: ${message}`, amount_pence: payoutPence },
+      });
+    }
   }
 
   // --- Receipt email --------------------------------------------------------
