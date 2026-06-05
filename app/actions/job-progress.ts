@@ -311,6 +311,24 @@ export async function completeAndCharge(bookingId: string): Promise<JobProgressR
     }).catch(console.error);
   }
 
+  // --- Proactive service reminders ------------------------------------------
+  // Seed this car's future reminders (MOT due, annual service, seasonal, brake
+  // follow-up) now that the job is done. Best-effort — the daily scheduler cron
+  // also back-fills, and a reminder hiccup must never fail completion.
+  try {
+    const { scheduleRemindersForBooking, REMINDER_BOOKING_SELECT } = await import(
+      "@/lib/reminders/schedule-booking"
+    );
+    const { data: full } = await admin
+      .from("bookings")
+      .select(REMINDER_BOOKING_SELECT)
+      .eq("id", bookingId)
+      .single();
+    if (full) await scheduleRemindersForBooking(full, admin);
+  } catch (err) {
+    console.error("Failed to schedule reminders for", bookingId, err);
+  }
+
   revalidate(bookingId);
   return { ok: true };
 }

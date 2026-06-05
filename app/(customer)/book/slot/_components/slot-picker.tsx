@@ -51,6 +51,7 @@ interface SlotPickerProps {
   serviceName: string;
   serviceId: string;
   pricePence: number;
+  preferredMechanicId?: string;
 }
 
 export function SlotPicker({
@@ -61,6 +62,7 @@ export function SlotPicker({
   serviceName,
   serviceId,
   pricePence,
+  preferredMechanicId,
 }: SlotPickerProps) {
   const days = Array.from({ length: 7 }, (_, i) => addDays(new Date(), i));
   const [selectedDay, setSelectedDay] = useState(days[0]);
@@ -116,6 +118,7 @@ export function SlotPicker({
           serviceName={serviceName}
           serviceId={serviceId}
           pricePence={quotedPence}
+          preferredMechanicId={preferredMechanicId}
         />
       </Elements>
     );
@@ -284,6 +287,7 @@ interface CheckoutFormProps {
   serviceName: string;
   serviceId: string;
   pricePence: number;
+  preferredMechanicId?: string;
 }
 
 function CheckoutForm({
@@ -299,6 +303,7 @@ function CheckoutForm({
   serviceName,
   serviceId,
   pricePence,
+  preferredMechanicId,
 }: CheckoutFormProps) {
   const stripe = useStripe();
   const elements = useElements();
@@ -352,6 +357,7 @@ function CheckoutForm({
       parkingType,
       specialInstructions: instructions || undefined,
       stripePaymentIntentId: piId,
+      preferredMechanicId: preferredMechanicId || undefined,
     };
 
     const result = await createBookingAction(input);

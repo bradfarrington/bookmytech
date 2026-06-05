@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, ChevronRight } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { DashboardHeader } from "../_components/dashboard-header";
@@ -46,16 +46,27 @@ export default async function SettingsPage() {
           />
         </div>
 
-        {/* Payment methods + addresses + notification preferences are managed at
-            booking time for now; richer management lands with the partial-deposit
-            + saved-cards work. Surface them as a clear placeholder rather than a
-            dead link. */}
+        <Link
+          href="/dashboard/settings/reminders"
+          className="flex items-center justify-between gap-4 rounded-2xl border border-border bg-surface-card p-6 transition-colors hover:border-brand-blue/40"
+        >
+          <div>
+            <h2 className="text-sm font-bold uppercase tracking-wide text-text-muted">Reminders</h2>
+            <p className="mt-2 text-sm text-text-secondary">
+              Choose whether we remind you about your MOT, annual service and
+              seasonal checks — and how we reach you.
+            </p>
+          </div>
+          <ChevronRight size={18} className="shrink-0 text-text-muted" />
+        </Link>
+
+        {/* Saved cards + addresses still land with the partial-deposit/saved-cards
+            work; surface them as a clear placeholder rather than a dead link. */}
         <div className="rounded-2xl border border-dashed border-border bg-surface-card p-6">
-          <h2 className="text-sm font-bold uppercase tracking-wide text-text-muted">Payment &amp; notifications</h2>
+          <h2 className="text-sm font-bold uppercase tracking-wide text-text-muted">Payment &amp; addresses</h2>
           <p className="mt-2 text-sm text-text-secondary">
-            Saved cards, addresses and notification preferences are coming soon.
-            For now your card is entered securely at booking time, and we&apos;ll
-            email and text you booking updates.
+            Saved cards and addresses are coming soon. For now your card is
+            entered securely at booking time.
           </p>
         </div>
       </main>

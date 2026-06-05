@@ -13,6 +13,7 @@ interface SlotPageProps {
     make?: string;
     model?: string;
     postcode?: string;
+    pref?: string;
   }>;
 }
 
@@ -75,6 +76,7 @@ export default async function SlotPage({ searchParams }: SlotPageProps) {
         serviceName={service.name}
         serviceId={service.id}
         pricePence={price.totalPence}
+        preferredMechanicId={params.pref}
       />
     </div>
   );

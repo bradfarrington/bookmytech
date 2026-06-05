@@ -37,7 +37,7 @@ export async function dispatchBooking(bookingId: string): Promise<DispatchResult
   const { data: booking } = await admin
     .from("bookings")
     .select(
-      "id, postcode, area, status, mechanic_id, service:services(slug)",
+      "id, postcode, area, status, mechanic_id, preferred_mechanic_id, service:services(slug)",
     )
     .eq("id", bookingId)
     .single();
@@ -99,9 +99,28 @@ export async function dispatchBooking(bookingId: string): Promise<DispatchResult
 
   if (!eligible.length) return { offered: 0, usedFallback };
 
+  // Same-mechanic rebooking (Task 11 Stage 1): when the customer asked for their
+  // previous mechanic and that mechanic is currently eligible + online, offer
+  // the job to them ALONE — first refusal. If they don't accept, the existing
+  // 5-minute dispatch-stall escalation surfaces it to the admin (we deliberately
+  // don't auto-rebroadcast in this task). When the preferred mechanic isn't
+  // available right now, fall through to the normal broadcast.
+  const preferredId = (booking as { preferred_mechanic_id: string | null }).preferred_mechanic_id;
+  let recipients = eligible;
+  if (preferredId && eligible.includes(preferredId)) {
+    recipients = [preferredId];
+    await admin.from("booking_events").insert({
+      booking_id: bookingId,
+      event_type: "note",
+      actor_role: "system",
+      reason: "Offered exclusively to the customer's preferred mechanic (rebook).",
+      payload: { kind: "preferred_exclusive_offer", mechanic_id: preferredId },
+    });
+  }
+
   // Upsert so a re-dispatch (or a race) can't create duplicate offers — the
   // unique (booking_id, mechanic_id) constraint backs this.
-  const rows = eligible.map((mechanic_id) => ({
+  const rows = recipients.map((mechanic_id) => ({
     booking_id: bookingId,
     mechanic_id,
   }));
@@ -109,5 +128,5 @@ export async function dispatchBooking(bookingId: string): Promise<DispatchResult
     .from("job_offers")
     .upsert(rows, { onConflict: "booking_id,mechanic_id", ignoreDuplicates: true });
 
-  return { offered: eligible.length, usedFallback };
+  return { offered: recipients.length, usedFallback };
 }

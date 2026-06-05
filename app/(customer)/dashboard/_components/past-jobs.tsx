@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { Star, RotateCcw, ShieldAlert } from "lucide-react";
+import { Star, ShieldAlert } from "lucide-react";
 import { formatPrice } from "@/lib/utils";
+import { RebookControl } from "./rebook-control";
 import { STATUS_LABELS, type DashboardBooking, type MechanicLite } from "./types";
 
 interface PastJobsProps {
@@ -39,11 +40,6 @@ export function PastJobs({ jobs, mechanics, ratedByBooking }: PastJobsProps) {
             job.completedAt != null &&
             Date.now() - new Date(job.completedAt).getTime() < DISPUTE_WINDOW_MS;
 
-          const rebookHref = `/book/vehicle?${new URLSearchParams({
-            reg: job.vehicleReg,
-            ...(job.postcode ? { postcode: job.postcode } : {}),
-          }).toString()}`;
-
           const disputeHref = `mailto:help@bookmytech.co.uk?subject=${encodeURIComponent(
             `Dispute — booking ${job.id.slice(0, 8).toUpperCase()}`,
           )}`;
@@ -76,15 +72,17 @@ export function PastJobs({ jobs, mechanics, ratedByBooking }: PastJobsProps) {
                 </div>
               </div>
 
-              <div className="mt-3 flex flex-wrap gap-2">
+              <div className="mt-3 flex flex-wrap items-end gap-3">
                 {!cancelled && (
-                  <Link
-                    href={rebookHref}
-                    className="inline-flex h-9 items-center gap-1.5 rounded-button border border-brand-blue px-3 text-sm font-medium text-brand-blue transition-colors hover:bg-blue-50"
-                  >
-                    <RotateCcw size={15} />
-                    Book again
-                  </Link>
+                  <RebookControl
+                    reg={job.vehicleReg}
+                    postcode={job.postcode}
+                    serviceSlug={job.serviceSlug}
+                    make={job.vehicleMake}
+                    model={job.vehicleModel}
+                    mechanicId={job.mechanicId}
+                    mechanicName={mechanic?.name ?? null}
+                  />
                 )}
                 {inDisputeWindow && (
                   <a

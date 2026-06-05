@@ -1,14 +1,14 @@
-# Task 11 — Retention: rebooking, reminders, Pro tier
+# Task 11 — Retention: rebooking, reminders, loyalty
 
-**Status:** ⏳ Queued
+**Status:** 🟡 In progress — Stage 1 (rebooking + reminders) and Stage 3 (referrals + loyalty) only. **Stage 2 (Mechanic Pro tier) was moved to [Task 13 — Final integrations](13-final-integrations.md)** (owner decision 2026-06-05): the Pro tier depends on the dispatch layer + mature ratings/disputes data and is cleaner to switch on last, alongside the SMS infrastructure. The stage headings below keep their original **Stage 1 / Stage 3** numbers so cross-references elsewhere still resolve; there is intentionally no Stage 2 here.
 
 Brief phase 4. The features that drive customers back for repeat bookings and reward mechanics for sticking with the platform. Repeat-customer rate target is ≥ 42% within 90 days of launch.
 
 ## Why this task
 
-A marketplace lives or dies on retention. The brief sets a clear repeat-booking target (42% within 90 days) — without active retention mechanics, that won't happen. Three independent features here, all aimed at making the platform sticky.
+A marketplace lives or dies on retention. The brief sets a clear repeat-booking target (42% within 90 days) — without active retention mechanics, that won't happen. Two independent features here (rebooking + reminders, and referrals + loyalty), both aimed at making the platform sticky. The third — the mechanic Pro tier — moved to Task 13.
 
-## Three sub-stages — independent
+## Sub-stages — independent
 
 ---
 
@@ -58,12 +58,18 @@ In account settings, customer can opt out of reminders or pick channels (email /
 
 **Acceptance criteria:**
 
-- [ ] Rebook flow with same-mechanic preference
-- [ ] Reminder scheduler: edge function runs daily, queues reminders due in next 24h
-- [ ] Reminder sender: edge function runs hourly, sends queued reminders
-- [ ] Email + push notification templates per reminder type
-- [ ] Customer preferences UI
-- [ ] Reminder click-through tracked (links contain unique tokens that mark `acted_on_at`)
+- [x] Rebook flow with same-mechanic preference — one-tap `RebookControl` on past jobs deep-links to `/book/slot` (vehicle/service/postcode pre-filled, skipping reg lookup + service pick) with a "same mechanic if available" toggle that threads `?pref=<mechanicId>` → `bookings.preferred_mechanic_id`. `dispatchBooking` offers the job **exclusively** to that mechanic when they're online + eligible; otherwise it broadcasts normally. (No mechanic-specific availability calendar — uses the standard 7-day slot picker; "next available slot for that mechanic" simplified, broadcast model.)
+- [x] Reminder scheduler: runs daily — `/api/cron/schedule-reminders` (`0 6 * * *`) back-fills future reminders from recently-completed bookings; reminders are also seeded inline at completion (`completeAndCharge`). **Deviation:** a Next API cron route, not a Supabase edge function (project convention — see HANDOFF).
+- [x] Reminder sender: runs hourly — `/api/cron/send-reminders` (`0 * * * *`) sends due-and-unsent reminders on the customer's chosen channels, stamps `sent_at`. (Same edge-function → API-route deviation.)
+- [x] Email templates per reminder type — one parameterised MJML template (`emails/reminder.ts`) driven by `REMINDER_META` (MOT / annual service / winter battery / summer air-con / brake follow-up). **Push deferred** to the native app per the notifications decision — email now, SMS channel wired but stubbed until Task 13.
+- [x] Customer preferences UI — `/dashboard/settings/reminders` (master on/off + email + SMS channel toggles; `profiles.reminders_enabled/reminder_via_email/reminder_via_sms`), linked from the settings page.
+- [x] Reminder click-through tracked — each row has a unique `token`; the CTA points at `/r/<token>`, which stamps `acted_on_at` and deep-links into a pre-filled rebook.
+
+**Implementation notes / deviations:**
+- "Edge function" in the spec → **Next.js API cron routes** + `vercel.json` (the whole app uses this pattern; there are no Supabase edge functions). Both crons honour `CRON_SECRET`.
+- **Push channel dropped** (deferred to the native app, per project memory); reminders go email + SMS only, and the SMS sender is the Task 13 stub today.
+- Pure `deriveReminders` is unit-tested (`lib/reminders/derive.test.ts`, 5 cases; `npm test` now 36). MOT expiry isn't persisted on bookings, so the scheduler does a best-effort DVLA/DVSA lookup per car.
+- Migration `0023` adds `bookings.preferred_mechanic_id`, the `profiles` reminder-pref columns, and `reminder_schedules` (admin + own-customer SELECT RLS; privileged service-role writes). ⚠️ **Apply `0023`** before testing.
 
 **Files touched:**
 - `app/(customer)/dashboard/_components/past-jobs.tsx` (rebook updates)
@@ -75,72 +81,12 @@ In account settings, customer can opt out of reminders or pick channels (email /
 
 ---
 
-### Stage 2 — Mechanic Pro tier
+### Stage 2 — Mechanic Pro tier → MOVED to Task 13
 
-Loyalty programme for active, high-rated mechanics.
-
-**Eligibility:**
-
-Calculated nightly. A mechanic enters Pro tier when:
-
-- ≥ 50 completed jobs all-time
-- ≥ 4.8 average rating (last 30 jobs)
-- ≥ 90% acceptance rate (last 30 days)
-- 0 open disputes
-- All documents current
-
-If any criterion drops below threshold (with a grace period — 14 days at 4.7 rating before they drop), they exit Pro tier.
-
-**Benefits:**
-
-- **Lower take-rate** — 12% vs 15% (already in pricing engine from task 08)
-- **Priority job access** — Pro mechanics see new offers 5 seconds before non-Pro mechanics for the same job (gives them first refusal)
-- **Pro badge** — shown in customer-facing mechanic cards, signals quality
-- **Instant payouts** — Stripe instant payouts enabled (1% Stripe fee, BMT absorbs)
-- **Featured listing** — Pro mechanics promoted in customer area searches
-- **Direct support** — separate support channel, faster response
-
-**UI surfaces:**
-
-- `/mechanic/pro` — landing page explaining Pro tier, the mechanic's current progress towards it, what they'd unlock
-- Pro badge in the mechanic header (top bar) once active
-- Pro tier progress card on the dashboard ("You're 3 jobs from Pro tier" / "Your rating needs to be 4.8 to maintain Pro — currently 4.79")
-- Customer-facing: Pro mechanics show a verified Pro badge on their card
-
-**Schema:**
-
-```sql
-alter table mechanics add column pro_since timestamptz;
-alter table mechanics add column pro_lost_at timestamptz;
-
-create table pro_tier_history (
-  id uuid primary key default gen_random_uuid(),
-  mechanic_id uuid not null references mechanics(id) on delete cascade,
-  event_type text not null, -- 'gained' | 'lost' | 'maintained_check'
-  metrics jsonb, -- snapshot of the criteria values at check time
-  occurred_at timestamptz not null default now()
-);
-```
-
-**Acceptance criteria:**
-
-- [ ] Pro tier eligibility check edge function (runs nightly)
-- [ ] Take-rate already wired (from task 08) — verify it's 12% for Pro mechanics
-- [ ] Priority job offer logic in dispatch (Pro mechanics get 5s head start)
-- [ ] Stripe instant payouts enabled for Pro accounts
-- [ ] `/mechanic/pro` info page
-- [ ] Pro badge in customer-facing UI
-- [ ] Pro tier progress card on mechanic dashboard
-- [ ] Email when gaining / losing Pro tier
-
-**Files touched:**
-- `supabase/functions/pro-tier-check/index.ts`
-- `app/(mechanic)/mechanic/pro/page.tsx`
-- `app/(mechanic)/mechanic/_components/pro-progress-card.tsx`
-- `supabase/functions/dispatch-offer/index.ts` (Pro priority logic)
-- `lib/stripe/instant-payouts.ts`
-- `emails/pro-tier-gained.tsx`, `emails/pro-tier-lost.tsx`
-- Schema migration
+The mechanic Pro tier (loyalty programme, 12% take-rate, 5s dispatch priority,
+instant payouts, Pro badges, nightly eligibility check) has been **moved to
+[Task 13 — Final integrations, Stage A](13-final-integrations.md#stage-a--mechanic-pro-tier)**.
+The full spec lives there. Nothing Pro-related is built in Task 11.
 
 ---
 

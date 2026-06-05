@@ -23,6 +23,8 @@ export interface CreateBookingInput {
   parkingType: string;
   specialInstructions?: string;
   stripePaymentIntentId: string;
+  /** Rebook "same mechanic if available" — dispatch offers this mechanic first. */
+  preferredMechanicId?: string;
 }
 
 export async function createBookingAction(
@@ -72,6 +74,7 @@ export async function createBookingAction(
       parking_type: input.parkingType,
       special_instructions: input.specialInstructions ?? null,
       postcode: input.postcode,
+      preferred_mechanic_id: input.preferredMechanicId ?? null,
     })
     .select("id")
     .single();

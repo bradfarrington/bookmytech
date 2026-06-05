@@ -42,7 +42,7 @@ export default async function DashboardPage() {
       `id, status, scheduled_at, created_at, completed_at, total_pence,
        vehicle_reg, vehicle_make, vehicle_model, address_line_1, postcode,
        mechanic_id, reschedule_status, reschedule_proposed_at, reschedule_note,
-       service:services(name)`,
+       service:services(name, slug)`,
     )
     .or(`customer_id.eq.${user.id},customer_email.eq.${email}`)
     .order("scheduled_at", { ascending: false });
@@ -66,6 +66,9 @@ export default async function DashboardPage() {
     serviceName:
       (Array.isArray(b.service) ? b.service[0]?.name : (b.service as { name?: string } | null)?.name) ??
       "Service",
+    serviceSlug:
+      (Array.isArray(b.service) ? b.service[0]?.slug : (b.service as { slug?: string } | null)?.slug) ??
+      null,
   }));
 
   // Resolve the assigned mechanics in one round-trip each (profile + rating).
