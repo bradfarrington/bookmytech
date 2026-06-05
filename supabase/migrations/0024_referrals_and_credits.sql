@@ -8,13 +8,15 @@
 --   2. customer_credits — a money LEDGER (positive grants, negative redemptions).
 --      Balance = sum of unexpired rows. £10 referral rewards + redemptions at
 --      checkout live here. Customer reads own; admin reads all; service-role writes.
---   3. bookings credit + deferred-payment columns:
---      - credit_applied_pence: how much account credit reduced the charge.
---      - payment_mode: 'preauth' (default, card held now), 'deferred' (Trusted
---        Customer — card saved via SetupIntent, charged at completion), or
---        'free' (credit covered the whole total — no card taken).
---      - stripe_setup_intent_id / stripe_payment_method_id / stripe_customer_id:
---        saved-card refs for the deferred (capture-on-completion) flow.
+--   3. bookings credit columns:
+--      - credit_applied_pence: how much account credit reduced the held amount.
+--      - payment_mode: 'preauth' (default — the full remaining amount is held at
+--        booking, captured on completion) or 'free' (account credit covered the
+--        whole total, so there is genuinely nothing to authorise — no card).
+--
+-- NOTE: the pre-authorisation hold is ALWAYS taken at booking (owner decision
+-- 2026-06-05) — there is no "trusted customer skips the hold" path. Credit only
+-- ever reduces the amount held; 'free' is solely the credit-covers-everything edge.
 --
 -- Idempotent: safe to re-run.
 
@@ -73,12 +75,9 @@ create policy "Admins read all credits" on public.customer_credits
 -- service-role client in the signup action, completeAndCharge, and checkout.
 
 -- ---------------------------------------------------------------------------
--- 3. bookings — credit + deferred-payment columns
+-- 3. bookings — credit columns
 -- ---------------------------------------------------------------------------
 alter table public.bookings
-  add column if not exists credit_applied_pence    integer not null default 0,
-  add column if not exists payment_mode            text not null default 'preauth'
-    check (payment_mode in ('preauth', 'deferred', 'free')),
-  add column if not exists stripe_setup_intent_id  text,
-  add column if not exists stripe_payment_method_id text,
-  add column if not exists stripe_customer_id      text;
+  add column if not exists credit_applied_pence integer not null default 0,
+  add column if not exists payment_mode         text not null default 'preauth'
+    check (payment_mode in ('preauth', 'free'));

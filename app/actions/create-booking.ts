@@ -8,14 +8,11 @@ import { dispatchBooking } from "@/lib/dispatch/dispatch";
 import { calculatePrice } from "@/lib/pricing/calculate";
 import { trackEvent } from "@/app/actions/track-event";
 import { FUNNEL_EVENTS } from "@/lib/analytics/events";
-import {
-  availableCreditPence,
-  redeemCreditForBooking,
-  completedBookingCount,
-  isTrusted,
-} from "@/lib/credits/credits";
+import { availableCreditPence, redeemCreditForBooking } from "@/lib/credits/credits";
 
-export type PaymentMode = "preauth" | "deferred" | "free";
+// The pre-auth hold is ALWAYS taken at booking (owner decision 2026-06-05).
+// 'free' is only the credit-covers-the-whole-total edge — nothing to authorise.
+export type PaymentMode = "preauth" | "free";
 
 export interface CreateBookingInput {
   vehicleReg: string;
@@ -31,18 +28,14 @@ export interface CreateBookingInput {
   postcode: string;
   parkingType: string;
   specialInstructions?: string;
-  /** Present for preauth bookings (the manual-capture pre-auth). */
+  /** Present for preauth bookings (the manual-capture pre-auth hold). */
   stripePaymentIntentId?: string;
   /** Rebook "same mechanic if available" — dispatch offers this mechanic first. */
   preferredMechanicId?: string;
   // --- Stage 3: credit + payment mode (server-decided in prepareCheckout) -----
   paymentMode?: PaymentMode;
-  /** Credit the charge was reduced by at prepare time (clamped on redeem). */
+  /** Credit the held amount was reduced by at prepare time (clamped on redeem). */
   creditAppliedPence?: number;
-  /** Saved-card refs for the Trusted-Customer deferred (charge-on-completion) flow. */
-  stripeSetupIntentId?: string;
-  stripePaymentMethodId?: string;
-  stripeCustomerId?: string;
 }
 
 export async function createBookingAction(
@@ -53,8 +46,9 @@ export async function createBookingAction(
   const { data: session } = await supabase.auth.getSession();
   const customerId = session?.session?.user?.id ?? null;
 
-  // Credit + deferred payment only apply to signed-in customers. Defensively
-  // collapse anything else back to the plain pre-auth path a guest would take.
+  // Account credit (and the 'free' mode it can unlock) only applies to signed-in
+  // customers. Defensively collapse anything else to the plain pre-auth path a
+  // guest takes.
   const mode: PaymentMode = customerId ? (input.paymentMode ?? "preauth") : "preauth";
   const passedCredit = customerId ? Math.max(0, Math.round(input.creditAppliedPence ?? 0)) : 0;
 
@@ -98,9 +92,6 @@ export async function createBookingAction(
       postcode: input.postcode,
       preferred_mechanic_id: input.preferredMechanicId ?? null,
       payment_mode: mode,
-      stripe_setup_intent_id: input.stripeSetupIntentId ?? null,
-      stripe_payment_method_id: input.stripePaymentMethodId ?? null,
-      stripe_customer_id: input.stripeCustomerId ?? null,
     })
     .select("id")
     .single();
@@ -165,9 +156,7 @@ export async function createBookingAction(
   const payLine =
     mode === "free"
       ? `Covered in full by your account credit (${formatPrice(price.totalPence)}). Nothing to pay.`
-      : mode === "deferred"
-        ? `Amount due on completion${passedCredit > 0 ? ` (after ${formatPrice(passedCredit)} credit)` : ""}: ${formatPrice(chargedPence)}. As a Trusted Customer, nothing is held now — you pay when the job's done.`
-        : `Amount pre-authorised${passedCredit > 0 ? ` (after ${formatPrice(passedCredit)} credit)` : ""}: ${formatPrice(chargedPence)}`;
+      : `Amount pre-authorised${passedCredit > 0 ? ` (after ${formatPrice(passedCredit)} credit)` : ""}: ${formatPrice(chargedPence)}`;
   sendEmail({
     to: input.customerEmail,
     subject: "Booking received — we're finding your mechanic",
@@ -183,11 +172,7 @@ export async function createBookingAction(
           <tr><td style="padding: 8px 0; color: #64748b; font-size: 14px;">Date &amp; time</td><td style="padding: 8px 0; font-weight: 600;">${new Date(input.scheduledAt).toLocaleString("en-GB", { dateStyle: "full", timeStyle: "short" })}</td></tr>
         </table>
         <p style="font-weight: 600;">${payLine}</p>
-        <p style="color: #64748b; font-size: 14px;">${
-          mode === "deferred"
-            ? "Your card is saved securely and only charged once the job is complete and you've signed off."
-            : "No money has left your account yet. Your payment will only be captured once the job is complete and you've signed off."
-        }</p>
+        <p style="color: #64748b; font-size: 14px;">No money has left your account yet. Your payment will only be captured once the job is complete and you've signed off.</p>
         <p style="color: #64748b; font-size: 14px;">Questions? Email us at <a href="mailto:help@bookmytech.co.uk">help@bookmytech.co.uk</a></p>
       </div>
     `,
@@ -199,26 +184,26 @@ export async function createBookingAction(
 export type PrepareCheckoutResult =
   | {
       ok: true;
-      mode: "preauth" | "deferred";
+      mode: "preauth";
       clientSecret: string;
       totalPence: number;
       creditAppliedPence: number;
       chargePence: number;
-      stripeCustomerId?: string;
     }
   | { ok: true; mode: "free"; totalPence: number; creditAppliedPence: number; chargePence: 0 }
   | { ok: false; error: string };
 
 /**
- * Price the booking and decide how it gets paid (Stage 3). Server-authoritative
- * — the client never sets the amount, the credit, or the mode.
+ * Price the booking, apply any account credit, and set up payment (Stage 3).
+ * Server-authoritative — the client never sets the amount, the credit, or the mode.
  *
- *   • Guests / non-trusted customers → 'preauth': a manual-capture PaymentIntent
- *     for (total − credit) is held now and captured on completion (unchanged
- *     behaviour for guests, who have no credit).
- *   • Trusted Customers (3+ completed) → 'deferred': no hold — we save their card
- *     via a SetupIntent and charge (total − credit) on completion.
- *   • Credit covers the whole total → 'free': no card taken at all.
+ * The pre-authorisation hold is ALWAYS taken at booking (owner decision
+ * 2026-06-05) — trusted/loyalty status never skips it:
+ *   • 'preauth' (default) → a manual-capture PaymentIntent for (total − credit)
+ *     is held now and captured on completion. Guests have no credit, so this is
+ *     the unchanged guest path.
+ *   • 'free' → the only no-card case: account credit covers the whole total, so
+ *     there is genuinely nothing to authorise.
  */
 export async function prepareCheckout(input: {
   serviceId: string;
@@ -238,21 +223,15 @@ export async function prepareCheckout(input: {
   } = await supabase.auth.getUser();
   const customerId = user?.id ?? null;
 
-  // Credit + trusted status (signed-in only).
+  // Account credit (signed-in only) reduces the amount held — never the payout.
   let creditApplied = 0;
-  let trusted = false;
   if (customerId) {
     const admin = createAdminClient();
-    const [avail, completed] = await Promise.all([
-      availableCreditPence(admin, customerId),
-      completedBookingCount(admin, customerId),
-    ]);
-    creditApplied = Math.min(avail, totalPence);
-    trusted = isTrusted(completed);
+    creditApplied = Math.min(await availableCreditPence(admin, customerId), totalPence);
   }
   const chargePence = Math.max(0, totalPence - creditApplied);
 
-  // Fully credit-covered → no card needed.
+  // Fully credit-covered → nothing to authorise, no card needed.
   if (chargePence === 0) {
     return { ok: true, mode: "free", totalPence, creditAppliedPence: creditApplied, chargePence: 0 };
   }
@@ -266,30 +245,6 @@ export async function prepareCheckout(input: {
   }
 
   try {
-    if (trusted) {
-      // Trusted Customer: save the card now, charge on completion. The SetupIntent
-      // is attached to a Stripe customer so we can charge off-session later.
-      const customer = await stripe.customers.create({
-        email: user?.email ?? undefined,
-        metadata: { bmt_customer_id: customerId ?? "" },
-      });
-      const setup = await stripe.setupIntents.create({
-        customer: customer.id,
-        usage: "off_session",
-        metadata: { bmt_customer_id: customerId ?? "" },
-      });
-      if (!setup.client_secret) return { ok: false, error: "No client secret from Stripe." };
-      return {
-        ok: true,
-        mode: "deferred",
-        clientSecret: setup.client_secret,
-        totalPence,
-        creditAppliedPence: creditApplied,
-        chargePence,
-        stripeCustomerId: customer.id,
-      };
-    }
-
     const intent = await stripe.paymentIntents.create({
       amount: chargePence,
       currency: "gbp",

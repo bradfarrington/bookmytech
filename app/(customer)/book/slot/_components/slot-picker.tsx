@@ -77,9 +77,9 @@ export function SlotPicker({
   const [postcode, setPostcode] = useState(defaultPostcode);
   const [parkingType, setParkingType] = useState<ParkingType>("driveway");
   const [instructions, setInstructions] = useState("");
-  // The server prices + decides the payment mode (pre-auth / deferred / free)
-  // and the credit applied when the customer confirms — that, not the URL
-  // estimate, is authoritative.
+  // The server prices, applies any account credit, and decides the payment mode
+  // (pre-auth hold, or 'free' when credit covers the whole total) when the
+  // customer confirms — that, not the URL estimate, is authoritative.
   const [checkout, setCheckout] = useState<ReadyCheckout | null>(null);
   const [stripeError, setStripeError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -122,7 +122,7 @@ export function SlotPicker({
     if (checkout.mode === "free") {
       return <FreeCheckoutForm {...common} checkout={checkout} />;
     }
-    // pre-auth or deferred (Trusted Customer saved-card) — both use Stripe Elements.
+    // Pre-auth: place the manual-capture hold via Stripe Elements.
     return (
       <Elements
         stripe={stripePromise}
@@ -332,12 +332,10 @@ function PriceSummary({
   totalPence,
   creditAppliedPence,
   chargePence,
-  deferred,
 }: {
   totalPence: number;
   creditAppliedPence: number;
   chargePence: number;
-  deferred?: boolean;
 }) {
   return (
     <div className="rounded-xl border border-border bg-surface p-4 text-sm">
@@ -352,27 +350,25 @@ function PriceSummary({
         </div>
       )}
       <div className="mt-2 flex items-center justify-between border-t border-border pt-2 text-base font-bold text-text-primary">
-        <span>{deferred ? "Due on completion" : "To pay"}</span>
+        <span>To pay</span>
         <span>{formatPrice(chargePence)}</span>
       </div>
     </div>
   );
 }
 
-// --- Stripe checkout form: pre-auth (hold now) OR deferred (save card) ------
+// --- Stripe checkout form: pre-auth hold (always taken at booking) ----------
 
 function CheckoutForm({
   checkout,
   ...c
-}: ConfirmCommon & { checkout: Extract<ReadyCheckout, { mode: "preauth" | "deferred" }> }) {
+}: ConfirmCommon & { checkout: Extract<ReadyCheckout, { mode: "preauth" }> }) {
   const stripe = useStripe();
   const elements = useElements();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-
-  const deferred = checkout.mode === "deferred";
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -384,62 +380,32 @@ function CheckoutForm({
     setSubmitting(true);
     setError(null);
 
-    let extra: Partial<CreateBookingInput>;
+    // Place the manual-capture hold now (captured on completion). The hold is
+    // always taken — credit only reduces its amount.
+    const { error: confirmError, paymentIntent } = await stripe.confirmPayment({
+      elements,
+      confirmParams: { payment_method_data: { billing_details: { name, email } } },
+      redirect: "if_required",
+    });
+    if (confirmError) {
+      setError(confirmError.message ?? "Payment failed. Please try again.");
+      setSubmitting(false);
+      return;
+    }
+    if (!paymentIntent) {
+      setError("Something went wrong. Please try again.");
+      setSubmitting(false);
+      return;
+    }
+    const piId = checkout.clientSecret.split("_secret_")[0];
 
-    if (deferred) {
-      // Trusted Customer: save the card (no hold). We charge on completion.
-      const { error: setupError, setupIntent } = await stripe.confirmSetup({
-        elements,
-        confirmParams: { payment_method_data: { billing_details: { name, email } } },
-        redirect: "if_required",
-      });
-      if (setupError) {
-        setError(setupError.message ?? "Couldn't save your card. Please try again.");
-        setSubmitting(false);
-        return;
-      }
-      if (!setupIntent) {
-        setError("Something went wrong. Please try again.");
-        setSubmitting(false);
-        return;
-      }
-      const pmId =
-        typeof setupIntent.payment_method === "string"
-          ? setupIntent.payment_method
-          : (setupIntent.payment_method?.id ?? null);
-      extra = {
-        paymentMode: "deferred",
-        creditAppliedPence: checkout.creditAppliedPence,
-        stripeSetupIntentId: setupIntent.id,
-        stripePaymentMethodId: pmId ?? undefined,
-        stripeCustomerId: checkout.stripeCustomerId,
-      };
-    } else {
-      // Pre-auth: place the manual-capture hold now.
-      const { error: confirmError, paymentIntent } = await stripe.confirmPayment({
-        elements,
-        confirmParams: { payment_method_data: { billing_details: { name, email } } },
-        redirect: "if_required",
-      });
-      if (confirmError) {
-        setError(confirmError.message ?? "Payment failed. Please try again.");
-        setSubmitting(false);
-        return;
-      }
-      if (!paymentIntent) {
-        setError("Something went wrong. Please try again.");
-        setSubmitting(false);
-        return;
-      }
-      const piId = checkout.clientSecret.split("_secret_")[0];
-      extra = {
+    const result = await createBookingAction(
+      bookingInputFrom(c, name, email, {
         paymentMode: "preauth",
         creditAppliedPence: checkout.creditAppliedPence,
         stripePaymentIntentId: piId,
-      };
-    }
-
-    const result = await createBookingAction(bookingInputFrom(c, name, email, extra));
+      }),
+    );
     if (!result.ok) {
       setError(result.error);
       setSubmitting(false);
@@ -459,7 +425,6 @@ function CheckoutForm({
         totalPence={checkout.totalPence}
         creditAppliedPence={checkout.creditAppliedPence}
         chargePence={checkout.chargePence}
-        deferred={deferred}
       />
 
       <div className="flex flex-col gap-3">
@@ -483,9 +448,7 @@ function CheckoutForm({
       </div>
 
       <div>
-        <p className="mb-3 text-sm font-semibold text-text-primary">
-          {deferred ? "Card details (saved, not charged)" : "Payment details"}
-        </p>
+        <p className="mb-3 text-sm font-semibold text-text-primary">Payment details</p>
         <div className="rounded-xl border border-border p-4">
           <PaymentElement />
         </div>
@@ -503,16 +466,10 @@ function CheckoutForm({
         disabled={!stripe || submitting}
         iconLeft={submitting ? Loader2 : Lock}
       >
-        {submitting
-          ? "Processing…"
-          : deferred
-            ? "Save card & confirm booking"
-            : `Pre-authorise ${formatPrice(checkout.chargePence)}`}
+        {submitting ? "Processing…" : `Pre-authorise ${formatPrice(checkout.chargePence)}`}
       </Button>
       <p className="text-center text-[11px] text-text-muted">
-        {deferred
-          ? "As a Trusted Customer, nothing is held now — your card is charged only when the job is complete."
-          : "No money is taken now. Your card is pre-authorised only — charged when the job is complete."}
+        No money is taken now. Your card is pre-authorised only — charged when the job is complete.
       </p>
     </form>
   );

@@ -1,6 +1,6 @@
 import "server-only";
 import type { createAdminClient } from "@/lib/supabase/admin";
-import { CREDIT_EXPIRY_DAYS, TRUSTED_THRESHOLD } from "./constants";
+import { CREDIT_EXPIRY_DAYS } from "./constants";
 
 type Admin = ReturnType<typeof createAdminClient>;
 
@@ -88,7 +88,7 @@ export async function hasGrant(admin: Admin, customerId: string, source: GrantSo
   return (count ?? 0) > 0;
 }
 
-/** Count this customer's completed bookings. */
+/** Count this customer's completed bookings (used to gate the referral bonus). */
 export async function completedBookingCount(admin: Admin, customerId: string): Promise<number> {
   const { count } = await admin
     .from("bookings")
@@ -96,9 +96,4 @@ export async function completedBookingCount(admin: Admin, customerId: string): P
     .eq("customer_id", customerId)
     .eq("status", "completed");
   return count ?? 0;
-}
-
-/** Trusted Customer = TRUSTED_THRESHOLD+ completed bookings (skip pre-auth). */
-export function isTrusted(completedCount: number): boolean {
-  return completedCount >= TRUSTED_THRESHOLD;
 }

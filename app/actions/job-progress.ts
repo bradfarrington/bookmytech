@@ -155,8 +155,8 @@ export async function completeAndCharge(bookingId: string): Promise<JobProgressR
     .select(
       `id, status, mechanic_id, customer_id, customer_email, customer_name, total_pence,
        mechanic_payout_pence, credit_applied_pence, payment_mode,
-       stripe_payment_intent_id, stripe_payment_method_id, stripe_customer_id,
-       service:services(name), mechanic:mechanics(stripe_account_id)`,
+       stripe_payment_intent_id, service:services(name),
+       mechanic:mechanics(stripe_account_id)`,
     )
     .eq("id", bookingId)
     .single();
@@ -192,41 +192,11 @@ export async function completeAndCharge(bookingId: string): Promise<JobProgressR
     stripe = null;
   }
   // What the customer actually owes = total minus any account credit applied.
+  // The pre-auth was held for exactly this amount at booking, so a full capture
+  // takes the right figure.
   const chargePence = Math.max(0, (booking.total_pence ?? 0) - (booking.credit_applied_pence ?? 0));
 
-  if (stripe && booking.payment_mode === "deferred") {
-    // Trusted-Customer deferred flow: no hold was placed — charge the saved card
-    // now (off-session). chargePence can be 0 if credit covered the rest.
-    if (booking.stripe_payment_method_id && chargePence > 0) {
-      try {
-        const intent = await stripe.paymentIntents.create({
-          amount: chargePence,
-          currency: "gbp",
-          customer: booking.stripe_customer_id ?? undefined,
-          payment_method: booking.stripe_payment_method_id,
-          off_session: true,
-          confirm: true,
-          description: "Book My Tech — service charge",
-          metadata: { booking_id: bookingId },
-        });
-        if (intent.status !== "succeeded") {
-          return {
-            ok: false,
-            error: "Couldn't charge the saved card. The job stays open — try again.",
-          };
-        }
-        captured = true;
-        chargeId =
-          typeof intent.latest_charge === "string"
-            ? intent.latest_charge
-            : (intent.latest_charge?.id ?? null);
-      } catch (err) {
-        const message = err instanceof Error ? err.message : "Stripe charge failed";
-        return { ok: false, error: `Couldn't take payment: ${message}. The job stays open — try again.` };
-      }
-    }
-  } else if (booking.stripe_payment_intent_id && stripe) {
-    // Pre-auth flow: capture the manual hold (its amount is already total − credit).
+  if (booking.stripe_payment_intent_id && stripe) {
     try {
       const intent = await stripe.paymentIntents.capture(booking.stripe_payment_intent_id);
       captured = true;
@@ -239,7 +209,7 @@ export async function completeAndCharge(bookingId: string): Promise<JobProgressR
       return { ok: false, error: `Couldn't take payment: ${message}. The job stays open — try again.` };
     }
   }
-  // 'free' bookings (credit covered the whole total) capture nothing.
+  // 'free' bookings (credit covered the whole total) have no hold to capture.
 
   // --- Flip to completed (only after a successful / skipped capture) --------
   const { error } = await admin
