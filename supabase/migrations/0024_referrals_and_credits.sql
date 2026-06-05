@@ -1,6 +1,5 @@
 -- 0024_referrals_and_credits.sql
--- Task 11 Stage 3 — customer referrals, account credits, and the Trusted
--- Customer skip-pre-auth flow.
+-- Task 11 Stage 3 — customer referrals + account credits.
 --
 -- Adds:
 --   1. profiles.referral_code / referred_by — every customer gets a unique
