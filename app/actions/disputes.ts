@@ -15,6 +15,7 @@ import {
 } from "@/lib/disputes/constants";
 import { grantCredit } from "@/lib/credits/credits";
 import { refundPayment } from "@/lib/stripe/refund";
+import { applySuspension } from "@/lib/mechanics/suspend";
 
 export type DisputeResult = { ok: true; disputeId: string } | { ok: false; error: string };
 export type SimpleResult = { ok: true } | { ok: false; error: string };
@@ -592,6 +593,24 @@ export async function resolveDispute(
       related_dispute_id: disputeId,
       notes: `Dispute resolved: ${RESOLUTION_LABELS[input.resolution]}.`,
     });
+
+    // 3+ dispute losses in 30 days → auto-suspend pending review.
+    const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    const { count } = await admin
+      .from("mechanic_flags")
+      .select("id", { count: "exact", head: true })
+      .eq("mechanic_id", booking.mechanic_id)
+      .eq("flag_type", "dispute_loss")
+      .gte("created_at", since);
+    if ((count ?? 0) >= 3) {
+      await applySuspension(
+        admin,
+        booking.mechanic_id,
+        "3 or more disputes lost in 30 days — suspended pending review.",
+        null,
+        userId,
+      );
+    }
   }
 
   // 5) Close the dispute + restore the booking.

@@ -23,6 +23,8 @@ interface MechanicRow {
   base_postcode: string | null;
   service_radius_miles: number | null;
   specialisms: string[] | null;
+  is_suspended: boolean | null;
+  suspended_until: string | null;
 }
 
 export interface DispatchResult {
@@ -55,11 +57,13 @@ export async function dispatchBooking(bookingId: string): Promise<DispatchResult
 
   const { data: mechanics } = await admin
     .from("mechanics")
-    .select("id, base_postcode, service_radius_miles, specialisms")
+    .select("id, base_postcode, service_radius_miles, specialisms, is_suspended, suspended_until")
     .eq("status", "online")
     .not("approved_at", "is", null);
 
   if (!mechanics?.length) return { offered: 0, usedFallback: false };
+
+  const now = Date.now();
 
   const jobCoords = await geocodePostcode(booking.postcode);
   const jobArea = booking.area ?? outwardCode(booking.postcode ?? "");
@@ -67,6 +71,11 @@ export async function dispatchBooking(bookingId: string): Promise<DispatchResult
 
   const eligible: string[] = [];
   for (const m of mechanics as MechanicRow[]) {
+    // Suspended mechanics never get offers. An expired time-boxed suspension
+    // auto-lifts (the daily cron clears the flag; here we just stop excluding).
+    if (m.is_suspended && (!m.suspended_until || new Date(m.suspended_until).getTime() > now)) {
+      continue;
+    }
     // Specialism filter — skip only when they have declared specialisms that
     // don't include this service.
     if (

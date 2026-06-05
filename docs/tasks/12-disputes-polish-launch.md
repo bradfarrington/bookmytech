@@ -1,6 +1,6 @@
 # Task 12 — Disputes, refunds, polish, launch prep
 
-**Status:** ⏳ Queued
+**Status:** 🟡 In progress — **Stage 1 (disputes) ✅ complete (2026-06-05)**, migration `0025`. Stages 2–4 (polish / operational readiness / launch checklist) not started — much of 3–4 is third-party accounts + founder ops rather than code (owner chose to do Stage 1 only for now). ⚠️ Apply migration `0025`; the Stripe refund / payout-reversal paths weren't live-fired (see Stage 1 notes).
 
 The final task before public launch. Build dispute resolution end-to-end, polish the rough edges across the platform, and complete launch-readiness items.
 
@@ -129,22 +129,29 @@ Mentioned in the live monitor's "needs attention" panel (task 04). Wire it up pr
 
 **Acceptance criteria:**
 
-- [ ] Customer can open dispute from "Raise dispute" button on past jobs list within 48 h of completion
-- [ ] Mechanic can open dispute from job detail
-- [ ] In-app message thread per dispute — admin sees all correspondence
-- [ ] Notification sent to admin and assigned mechanic when dispute is opened
-- [ ] Stripe payment hold on opened dispute (don't transfer to mechanic)
-- [ ] 48 h auto-escalation to admin
-- [ ] Admin arbitration UI with case file + decision flow
-- [ ] Refund via Stripe API on resolution
-- [ ] Customer credits on partial refunds
-- [ ] Mechanic flags created on lost disputes
-- [ ] Admin can suspend mechanic from `/admin/mechanics/[id]` or dispute UI, with reason + optional end date
-- [ ] Suspended mechanic immediately excluded from dispatch; `mechanics.is_suspended = true` and `suspended_until` checked in dispatch function
-- [ ] Suspension email sent to mechanic; auto-lift when `suspended_until` passes (cron or check on dispatch)
-- [ ] Suspension history visible on mechanic profile in admin
-- [ ] Email notifications at every status change
-- [ ] Counters in admin "needs attention" panel and overview KPIs
+- [x] Customer can open dispute from "Raise dispute" button on past jobs list within 48 h of completion — replaces the mailto stub; `/dashboard/disputes/new/[bookingId]` → `openDispute`.
+- [x] Mechanic can open dispute from job detail — "Raise an issue" on the mechanic job detail → `/mechanic/disputes/new/[bookingId]`.
+- [x] In-app message thread per dispute — admin sees all correspondence — `dispute_messages` (3-party: customer / mechanic / admin mediator), shared `DisputeThread` (polling, RLS read).
+- [x] Notification sent to admin and assigned mechanic when dispute is opened — emails to `ADMIN_NOTIFY_EMAIL` + the other party.
+- [x] Stripe payment hold on opened dispute — `openDispute` reverses the mechanic's transfer (if already paid at completion) and sets `disputes.payout_held`.
+- [x] 48 h auto-escalation to admin — `/api/cron/escalate-disputes` (hourly): opened >48h or responded >48h → escalated. Parties can also escalate manually.
+- [x] Admin arbitration UI with case file + decision flow — `/admin/disputes` queue + `/admin/disputes/[id]` (booking/customer/mechanic facts, payment status, suggested-resolution rule, thread, decision panel).
+- [x] Refund via Stripe API on resolution — `lib/stripe/refund.ts`; `resolveDispute` refunds the card.
+- [x] Customer credits on partial refunds — compensation credit via `grantCredit` (source `compensation`).
+- [x] Mechanic flags created on lost disputes — `mechanic_flags` (`dispute_loss`); 3+ losses in 30 days auto-suspends.
+- [x] Admin can suspend mechanic from `/admin/mechanics/[id]` or dispute UI — `SuspensionControls` on the mechanic detail (reachable from arbitration via the mechanic link); `suspendMechanic` with reason + optional end date.
+- [x] Suspended mechanic immediately excluded from dispatch — `dispatchBooking` skips active suspensions (`is_suspended` + `suspended_until` check); suspend also sets `status='offline'`.
+- [x] Suspension email + auto-lift — email on suspend/lift; `/api/cron/lift-suspensions` (daily) clears expired ones, and dispatch already treats an expired suspension as inactive.
+- [x] Suspension history visible on mechanic profile — `mechanic_suspensions` listed on the admin mechanic detail.
+- [x] Email notifications at every status change — open / responded / escalated / resolved / withdrawn / suspend / lift all email the relevant parties.
+- [x] Counters in admin "needs attention" panel — open-disputes counter already wired in the overview's needs-attention panel; disputed bookings feed it. (KPI strip not expanded — the panel is the surface.)
+
+**Implementation notes / deviations:**
+- **Party self-resolution = the opener withdraws** (satisfied / sorted). Anything money-bearing (refund / partial / credit) is **admin-executed** in arbitration — a mechanic can't move money, so binding outcomes are admin-gated. Full propose/counter/accept between parties was not built (deliberate simplification).
+- **Refund accounting:** refunds come out of the **mechanic's payout first**, then the platform fee. On open we reverse the payout transfer; on resolve we re-transfer `max(0, payout − refund)`.
+- **Crons are Next API routes** (`escalate-disputes` hourly, `lift-suspensions` daily) + `vercel.json`, not Supabase edge functions (project convention).
+- **rating<4.0 / acceptance<70% auto-flags** (from the prose) are **deferred** to a future nightly metrics job — only the explicit "flag on lost disputes" + the 3-losses auto-suspend are built. The overview perf-flags panel already surfaces rating<4 live.
+- ⚠️ Migration `0025`. The **Stripe refund + transfer-reversal + re-transfer paths were not live-fired** (no running app/keys) — build + 39 unit tests pass; exercise a real dispute resolution before relying on the money movements.
 
 **Files touched:**
 - `app/(customer)/dashboard/disputes/new/[booking-id]/page.tsx`
