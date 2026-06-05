@@ -19,6 +19,8 @@ import {
   ListChecks,
   Settings2,
   Receipt,
+  Scale,
+  Flag,
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -69,6 +71,8 @@ export interface JobDetailProps {
   photos: JobPhoto[];
   signatureUrl: string | null;
   hasSignature: boolean;
+  // Dispute (Task 12): id of an existing dispute on this job, if any.
+  disputeId: string | null;
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -107,6 +111,7 @@ export function JobDetail(props: JobDetailProps) {
     photos,
     signatureUrl,
     hasSignature,
+    disputeId,
   } = props;
 
   const canEditPhotos = ["confirmed", "en_route", "in_progress"].includes(status);
@@ -202,6 +207,22 @@ export function JobDetail(props: JobDetailProps) {
                   Message customer
                 </Button>
               </Link>
+            )}
+            {/* Dispute: view an open case, or raise an issue on an active/completed job. */}
+            {disputeId ? (
+              <Link href={`/mechanic/disputes/${disputeId}`}>
+                <Button variant="secondary" size="sm" iconLeft={Scale} fullWidth>
+                  View dispute
+                </Button>
+              </Link>
+            ) : (
+              ["en_route", "in_progress", "completed"].includes(status) && (
+                <Link href={`/mechanic/disputes/new/${bookingId}`}>
+                  <Button variant="ghost" size="sm" iconLeft={Flag} fullWidth>
+                    Raise an issue
+                  </Button>
+                </Link>
+              )
             )}
           </Card>
 

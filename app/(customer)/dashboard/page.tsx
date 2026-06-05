@@ -107,6 +107,17 @@ export default async function DashboardPage() {
     for (const r of reviews ?? []) ratedByBooking.set(r.booking_id, r.rating);
   }
 
+  // Disputes raised on any of these bookings (so a disputed job stays visible
+  // and links to its case instead of vanishing from the list).
+  const disputesByBooking: Record<string, { id: string; status: string }> = {};
+  if (bookings.length) {
+    const { data: disputeRows } = await admin
+      .from("disputes")
+      .select("id, booking_id, status")
+      .in("booking_id", bookings.map((b) => b.id));
+    for (const d of disputeRows ?? []) disputesByBooking[d.booking_id] = { id: d.id, status: d.status };
+  }
+
   // Active card: the single most "live" booking — anything en_route/in_progress
   // first, otherwise the soonest still-open (sourcing/confirmed) job.
   const liveOnes = bookings.filter((b) => LIVE.includes(b.status));
@@ -120,9 +131,10 @@ export default async function DashboardPage() {
     (b) => OPEN.includes(b.status) && b.id !== active?.id,
   );
 
-  // Past: completed or cancelled, newest first.
+  // Past: completed, cancelled or disputed, newest first. Disputed jobs stay
+  // here (they were completed) with a link to the open case.
   const past = bookings
-    .filter((b) => b.status === "completed" || b.status === "cancelled")
+    .filter((b) => ["completed", "cancelled", "disputed"].includes(b.status))
     .sort((a, b) =>
       (b.completedAt ?? b.scheduledAt ?? "").localeCompare(a.completedAt ?? a.scheduledAt ?? ""),
     );
@@ -198,6 +210,7 @@ export default async function DashboardPage() {
           jobs={past}
           mechanics={serialiseMechanics(mechanics)}
           ratedByBooking={Object.fromEntries(ratedByBooking)}
+          disputes={disputesByBooking}
         />
       </main>
     </div>

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Star, ShieldAlert } from "lucide-react";
+import { Star, ShieldAlert, Scale } from "lucide-react";
 import { formatPrice } from "@/lib/utils";
 import { RebookControl } from "./rebook-control";
 import { STATUS_LABELS, type DashboardBooking, type MechanicLite } from "./types";
@@ -8,14 +8,16 @@ interface PastJobsProps {
   jobs: DashboardBooking[];
   mechanics: Record<string, MechanicLite>;
   ratedByBooking: Record<string, number>;
+  /** booking id → its dispute (if one exists). */
+  disputes: Record<string, { id: string; status: string }>;
 }
 
 const DISPUTE_WINDOW_MS = 48 * 60 * 60 * 1000;
 
-// Completed + cancelled history. Each completed job can be rebooked one-tap and
-// — for 48 hours after completion — disputed. The dispute flow proper lands in
-// Task 12; until then the button opens a pre-filled support email.
-export function PastJobs({ jobs, mechanics, ratedByBooking }: PastJobsProps) {
+// Completed / cancelled / disputed history. Each non-cancelled job can be
+// rebooked one-tap; completed jobs can be disputed for 48h, and a job with an
+// open dispute links straight to its case.
+export function PastJobs({ jobs, mechanics, ratedByBooking, disputes }: PastJobsProps) {
   if (jobs.length === 0) return null;
 
   return (
@@ -35,14 +37,11 @@ export function PastJobs({ jobs, mechanics, ratedByBooking }: PastJobsProps) {
               })
             : "—";
           const cancelled = job.status === "cancelled";
+          const dispute = disputes[job.id];
           const inDisputeWindow =
             job.status === "completed" &&
             job.completedAt != null &&
             Date.now() - new Date(job.completedAt).getTime() < DISPUTE_WINDOW_MS;
-
-          const disputeHref = `mailto:help@bookmytech.co.uk?subject=${encodeURIComponent(
-            `Dispute — booking ${job.id.slice(0, 8).toUpperCase()}`,
-          )}`;
 
           return (
             <div key={job.id} className="rounded-2xl border border-border bg-surface-card p-4">
@@ -84,14 +83,24 @@ export function PastJobs({ jobs, mechanics, ratedByBooking }: PastJobsProps) {
                     mechanicName={mechanic?.name ?? null}
                   />
                 )}
-                {inDisputeWindow && (
-                  <a
-                    href={disputeHref}
+                {dispute ? (
+                  <Link
+                    href={`/dashboard/disputes/${dispute.id}`}
                     className="inline-flex h-9 items-center gap-1.5 rounded-button border border-border px-3 text-sm font-medium text-text-secondary transition-colors hover:bg-surface"
                   >
-                    <ShieldAlert size={15} />
-                    Raise dispute
-                  </a>
+                    <Scale size={15} />
+                    View dispute
+                  </Link>
+                ) : (
+                  inDisputeWindow && (
+                    <Link
+                      href={`/dashboard/disputes/new/${job.id}`}
+                      className="inline-flex h-9 items-center gap-1.5 rounded-button border border-border px-3 text-sm font-medium text-text-secondary transition-colors hover:bg-surface"
+                    >
+                      <ShieldAlert size={15} />
+                      Raise dispute
+                    </Link>
+                  )
                 )}
               </div>
             </div>

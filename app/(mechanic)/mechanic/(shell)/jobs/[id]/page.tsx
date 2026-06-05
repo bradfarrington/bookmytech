@@ -151,6 +151,13 @@ export default async function MechanicJobDetailPage({ params }: PageProps) {
       : { label: "Building your rating", detail: "New mechanics are matched on proximity + availability" },
   );
 
+  // --- Dispute on this job (if any) — mechanic reads via RLS ---------------
+  const { data: disputeRow } = await supabase
+    .from("disputes")
+    .select("id")
+    .eq("booking_id", id)
+    .maybeSingle();
+
   const whenLabel = booking.scheduled_at
     ? new Date(booking.scheduled_at).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" })
     : "To be confirmed";
@@ -191,6 +198,7 @@ export default async function MechanicJobDetailPage({ params }: PageProps) {
     photos,
     signatureUrl,
     hasSignature: signatureUrl != null,
+    disputeId: disputeRow?.id ?? null,
   };
 
   return <JobDetail {...detail} />;
