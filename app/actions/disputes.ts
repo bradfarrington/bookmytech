@@ -4,13 +4,17 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendEmail } from "@/lib/email/send";
-import { siteUrl } from "@/lib/utils";
+import { siteUrl, formatPrice } from "@/lib/utils";
 import {
   isValidReason,
   MIN_DESCRIPTION_CHARS,
   MAX_DISPUTE_PHOTOS,
   REASON_LABELS,
+  RESOLUTION_LABELS,
+  type ResolutionKind,
 } from "@/lib/disputes/constants";
+import { grantCredit } from "@/lib/credits/credits";
+import { refundPayment } from "@/lib/stripe/refund";
 
 export type DisputeResult = { ok: true; disputeId: string } | { ok: false; error: string };
 export type SimpleResult = { ok: true } | { ok: false; error: string };
@@ -506,7 +510,159 @@ export async function escalateDispute(disputeId: string): Promise<SimpleResult> 
 // favour). We reversed the original transfer on open, so create a fresh one.
 // ---------------------------------------------------------------------------
 
-export async function releaseMechanicPayout(admin: Admin, booking: DisputeBooking): Promise<boolean> {
+// ---------------------------------------------------------------------------
+// Admin arbitration — the binding decision (Step 4).
+// ---------------------------------------------------------------------------
+
+export interface ResolveDisputeInput {
+  resolution: ResolutionKind;
+  /** Partial-refund amount (ignored for full/no refund). */
+  refundPence?: number;
+  /** Compensation credit to the customer (any resolution). */
+  creditPence?: number;
+  /** Customer-facing explanation (required). */
+  note: string;
+  /** Flag the mechanic's account (a dispute_loss performance flag). */
+  flagMechanic?: boolean;
+}
+
+export async function resolveDispute(
+  disputeId: string,
+  input: ResolveDisputeInput,
+): Promise<SimpleResult> {
+  const party = await partyForDispute(disputeId);
+  if (!party.ok) return party;
+  const { admin, dispute, booking, userId, role } = party;
+  if (role !== "admin") return { ok: false, error: "Only an admin can arbitrate a dispute." };
+  if (["resolved", "withdrawn"].includes(dispute.status))
+    return { ok: false, error: "This dispute is already closed." };
+  const note = input.note.trim();
+  if (!note) return { ok: false, error: "Add a customer-facing explanation for the decision." };
+
+  // Money facts for this booking.
+  const { data: money } = await admin
+    .from("bookings")
+    .select("total_pence, credit_applied_pence, mechanic_payout_pence, stripe_payment_intent_id, customer_id")
+    .eq("id", dispute.booking_id)
+    .single();
+  const chargedPence = Math.max(0, (money?.total_pence ?? 0) - (money?.credit_applied_pence ?? 0));
+  const payoutPence = money?.mechanic_payout_pence ?? 0;
+
+  // Resolve the amounts from the chosen outcome.
+  let refundPence = 0;
+  if (input.resolution === "full_refund") refundPence = chargedPence;
+  else if (input.resolution === "partial_refund")
+    refundPence = Math.min(Math.max(0, Math.round(input.refundPence ?? 0)), chargedPence);
+  const creditPence = Math.max(0, Math.round(input.creditPence ?? 0));
+
+  // 1) Refund the customer's card (if there's a captured charge).
+  if (refundPence > 0 && money?.stripe_payment_intent_id) {
+    const r = await refundPayment(money.stripe_payment_intent_id, refundPence);
+    if (!r.ok) return { ok: false, error: `Refund failed: ${r.error}. Nothing was changed — try again.` };
+    await admin.from("booking_events").insert({
+      booking_id: dispute.booking_id,
+      event_type: "payment_refunded",
+      actor_id: userId,
+      actor_role: "admin",
+      payload: { amount_pence: refundPence, refund_id: r.refundId, dispute_id: disputeId },
+    });
+  }
+
+  // 2) Compensation credit.
+  if (creditPence > 0 && money?.customer_id) {
+    await grantCredit(admin, money.customer_id, creditPence, "compensation", `Dispute resolution — booking ${booking.id.slice(0, 8).toUpperCase()}`);
+  }
+
+  // 3) Mechanic payout: refunds come out of the mechanic's share first. If the
+  //    payout was held on open, re-transfer what remains; if it was never held
+  //    (e.g. uncaptured job) there's nothing to move.
+  if (dispute.payout_held) {
+    const reTransfer = Math.max(0, payoutPence - refundPence);
+    if (reTransfer > 0) await releaseMechanicPayout(admin, booking, reTransfer);
+    else await admin.from("disputes").update({ payout_held: false }).eq("id", disputeId);
+  }
+
+  // 4) Flag the mechanic on a loss.
+  const lostByMechanic = input.flagMechanic || refundPence > 0;
+  if (lostByMechanic && booking.mechanic_id) {
+    await admin.from("mechanic_flags").insert({
+      mechanic_id: booking.mechanic_id,
+      flag_type: "dispute_loss",
+      severity: input.resolution === "full_refund" ? "high" : "medium",
+      related_dispute_id: disputeId,
+      notes: `Dispute resolved: ${RESOLUTION_LABELS[input.resolution]}.`,
+    });
+  }
+
+  // 5) Close the dispute + restore the booking.
+  await admin
+    .from("disputes")
+    .update({
+      status: "resolved",
+      resolution: input.resolution,
+      resolution_refund_pence: refundPence,
+      resolution_credit_pence: creditPence,
+      resolution_note: note,
+      resolved_at: new Date().toISOString(),
+      resolved_by: userId,
+      resolved_by_role: "admin",
+    })
+    .eq("id", disputeId);
+  await admin.from("bookings").update({ status: "completed" }).eq("id", dispute.booking_id);
+  await admin.from("booking_events").insert({
+    booking_id: dispute.booking_id,
+    event_type: "dispute_resolved",
+    actor_id: userId,
+    actor_role: "admin",
+    reason: RESOLUTION_LABELS[input.resolution],
+    payload: { dispute_id: disputeId, resolution: input.resolution, refund_pence: refundPence, credit_pence: creditPence },
+  });
+
+  // 6) Tell both parties.
+  const ref = booking.id.slice(0, 8).toUpperCase();
+  const moneyLine =
+    refundPence > 0
+      ? `<p>A refund of <strong>${formatPrice(refundPence)}</strong> has been issued to your card.</p>`
+      : "";
+  const creditLine =
+    creditPence > 0 ? `<p>We've added <strong>${formatPrice(creditPence)}</strong> credit to your account.</p>` : "";
+  if (booking.customer_email)
+    sendEmail({
+      to: booking.customer_email,
+      subject: `Your dispute has been resolved — booking ${ref}`,
+      html: `
+        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+          <h1 style="color:#1e3a8a;">Dispute resolved</h1>
+          <p>${escapeForEmail(note)}</p>
+          ${moneyLine}${creditLine}
+        </div>`,
+    }).catch(() => {});
+  const mechTo = await mechanicEmail(admin, booking.mechanic_id);
+  if (mechTo)
+    sendEmail({
+      to: mechTo,
+      subject: `A dispute has been resolved — booking ${ref}`,
+      html: `
+        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+          <h1 style="color:#1e3a8a;">Dispute resolved</h1>
+          <p>Book My Tech has reviewed the dispute on ${serviceName(booking)} and reached a decision: <strong>${RESOLUTION_LABELS[input.resolution]}</strong>.</p>
+          ${refundPence > 0 ? `<p>A refund was issued to the customer; your payout for this job was adjusted accordingly.</p>` : `<p>Your payout for this job has been released.</p>`}
+        </div>`,
+    }).catch(() => {});
+
+  revalidateDispute(disputeId, dispute.booking_id);
+  return { ok: true };
+}
+
+function escapeForEmail(s: string): string {
+  return s.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+export async function releaseMechanicPayout(
+  admin: Admin,
+  booking: DisputeBooking,
+  amountOverride?: number,
+): Promise<boolean> {
   const { data: mech } = await admin
     .from("mechanics")
     .select("stripe_account_id")
@@ -517,8 +673,10 @@ export async function releaseMechanicPayout(admin: Admin, booking: DisputeBookin
     .select("mechanic_payout_pence")
     .eq("id", booking.id)
     .single();
-  const payoutPence = full?.mechanic_payout_pence ?? 0;
-  if (!mech?.stripe_account_id || payoutPence <= 0) return false;
+  // Default to the full snapshotted payout; the arbitration path passes a reduced
+  // amount when a partial refund has eaten into the mechanic's share.
+  const amount = amountOverride ?? full?.mechanic_payout_pence ?? 0;
+  if (!mech?.stripe_account_id || amount <= 0) return false;
 
   let stripe: typeof import("@/lib/stripe/server").stripe | null = null;
   try {
@@ -528,7 +686,7 @@ export async function releaseMechanicPayout(admin: Admin, booking: DisputeBookin
   }
   try {
     const transfer = await stripe.transfers.create({
-      amount: payoutPence,
+      amount,
       currency: "gbp",
       destination: mech.stripe_account_id,
       transfer_group: booking.id,
@@ -539,7 +697,7 @@ export async function releaseMechanicPayout(admin: Admin, booking: DisputeBookin
       event_type: "payout_transferred",
       actor_role: "system",
       reason: "Payout released after dispute resolution.",
-      payload: { amount_pence: payoutPence, transfer_id: transfer.id },
+      payload: { amount_pence: amount, transfer_id: transfer.id },
     });
     await admin.from("disputes").update({ payout_held: false }).eq("booking_id", booking.id);
     return true;
