@@ -14,8 +14,8 @@ import { Button } from "@/components/ui/button";
 import { Pill } from "@/components/ui/pill";
 import { Select } from "@/components/ui/select";
 import { cn, formatPrice } from "@/lib/utils";
-import { createPaymentIntentAction, createBookingAction } from "@/app/actions/create-booking";
-import type { CreateBookingInput } from "@/app/actions/create-booking";
+import { prepareCheckout, createBookingAction } from "@/app/actions/create-booking";
+import type { CreateBookingInput, PrepareCheckoutResult } from "@/app/actions/create-booking";
 import { track, FUNNEL_EVENTS } from "@/lib/analytics/track";
 
 type ParkingType = "driveway" | "street" | "car_park" | "other";
@@ -43,6 +43,9 @@ function dayName(date: Date) {
   return format(date, "EEE");
 }
 
+// Narrow the prepareCheckout result to its success shapes once we've handled !ok.
+type ReadyCheckout = Extract<PrepareCheckoutResult, { ok: true }>;
+
 interface SlotPickerProps {
   reg: string;
   make: string;
@@ -52,6 +55,8 @@ interface SlotPickerProps {
   serviceId: string;
   pricePence: number;
   preferredMechanicId?: string;
+  /** Signed-in customer's spendable account credit (0 for guests). */
+  availableCreditPence?: number;
 }
 
 export function SlotPicker({
@@ -63,6 +68,7 @@ export function SlotPicker({
   serviceId,
   pricePence,
   preferredMechanicId,
+  availableCreditPence = 0,
 }: SlotPickerProps) {
   const days = Array.from({ length: 7 }, (_, i) => addDays(new Date(), i));
   const [selectedDay, setSelectedDay] = useState(days[0]);
@@ -71,11 +77,10 @@ export function SlotPicker({
   const [postcode, setPostcode] = useState(defaultPostcode);
   const [parkingType, setParkingType] = useState<ParkingType>("driveway");
   const [instructions, setInstructions] = useState("");
-  const [clientSecret, setClientSecret] = useState<string | null>(null);
-  // The server prices the booking from (service, entered postcode) when the
-  // PaymentIntent is created — that figure (not the URL estimate) is the amount
-  // actually pre-authorised and charged.
-  const [quotedPence, setQuotedPence] = useState(pricePence);
+  // The server prices + decides the payment mode (pre-auth / deferred / free)
+  // and the credit applied when the customer confirms — that, not the URL
+  // estimate, is authoritative.
+  const [checkout, setCheckout] = useState<ReadyCheckout | null>(null);
   const [stripeError, setStripeError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -89,37 +94,41 @@ export function SlotPicker({
     track(FUNNEL_EVENTS.slotPicked, { serviceId, slot: selectedSlot });
     setStripeError(null);
     startTransition(async () => {
-      const result = await createPaymentIntentAction({ serviceId, postcode });
+      const result = await prepareCheckout({ serviceId, postcode });
       if (!result.ok) {
         setStripeError(result.error);
         return;
       }
-      setQuotedPence(result.totalPence);
-      setClientSecret(result.clientSecret);
+      setCheckout(result);
     });
   }
 
-  if (clientSecret && selectedSlot) {
+  const common = {
+    selectedSlot: selectedSlot ?? "",
+    addressLine1,
+    postcode,
+    parkingType,
+    instructions,
+    reg,
+    make,
+    model,
+    serviceName,
+    serviceId,
+    preferredMechanicId,
+  };
+
+  if (checkout && selectedSlot) {
+    // Fully credit-covered — no card needed.
+    if (checkout.mode === "free") {
+      return <FreeCheckoutForm {...common} checkout={checkout} />;
+    }
+    // pre-auth or deferred (Trusted Customer saved-card) — both use Stripe Elements.
     return (
       <Elements
         stripe={stripePromise}
-        options={{ clientSecret, appearance: { theme: "stripe" } }}
+        options={{ clientSecret: checkout.clientSecret, appearance: { theme: "stripe" } }}
       >
-        <CheckoutForm
-          clientSecret={clientSecret}
-          selectedSlot={selectedSlot}
-          addressLine1={addressLine1}
-          postcode={postcode}
-          parkingType={parkingType}
-          instructions={instructions}
-          reg={reg}
-          make={make}
-          model={model}
-          serviceName={serviceName}
-          serviceId={serviceId}
-          pricePence={quotedPence}
-          preferredMechanicId={preferredMechanicId}
-        />
+        <CheckoutForm {...common} checkout={checkout} />
       </Elements>
     );
   }
@@ -244,6 +253,12 @@ export function SlotPicker({
         </div>
       </div>
 
+      {availableCreditPence > 0 && (
+        <p className="rounded-lg bg-green-50 px-4 py-3 text-sm font-medium text-success">
+          You have {formatPrice(availableCreditPence)} in credit — it&apos;ll be applied at the next step.
+        </p>
+      )}
+
       {stripeError && (
         <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-danger">{stripeError}</p>
       )}
@@ -251,7 +266,7 @@ export function SlotPicker({
       {/* Sticky CTA */}
       <div className="sticky bottom-4 rounded-2xl border border-border bg-surface-card p-4 shadow-hero">
         <div className="mb-3 flex items-center justify-between">
-          <span className="text-sm text-text-secondary">Amount to pre-authorise</span>
+          <span className="text-sm text-text-secondary">Estimated total</span>
           <span className="text-xl font-bold text-text-primary">{formatPrice(pricePence)}</span>
         </div>
         <Button
@@ -262,7 +277,7 @@ export function SlotPicker({
           onClick={handleProceedToPayment}
           iconLeft={pending ? Loader2 : Lock}
         >
-          {pending ? "Setting up payment…" : "Confirm booking"}
+          {pending ? "Setting up…" : "Confirm booking"}
         </Button>
         <p className="mt-2 text-center text-[11px] text-text-muted">
           No money taken until your job is complete
@@ -272,10 +287,9 @@ export function SlotPicker({
   );
 }
 
-// --- Stripe checkout form shown after PaymentIntent is created ---
+// --- Shared confirm-step props ---------------------------------------------
 
-interface CheckoutFormProps {
-  clientSecret: string;
+interface ConfirmCommon {
   selectedSlot: string;
   addressLine1: string;
   postcode: string;
@@ -286,31 +300,79 @@ interface CheckoutFormProps {
   model?: string;
   serviceName: string;
   serviceId: string;
-  pricePence: number;
   preferredMechanicId?: string;
 }
 
+function bookingInputFrom(
+  c: ConfirmCommon,
+  name: string,
+  email: string,
+  extra: Partial<CreateBookingInput>,
+): CreateBookingInput {
+  return {
+    vehicleReg: c.reg,
+    vehicleMake: c.make,
+    vehicleModel: c.model,
+    serviceName: c.serviceName,
+    serviceId: c.serviceId,
+    scheduledAt: c.selectedSlot,
+    customerEmail: email.trim(),
+    customerName: name.trim(),
+    addressLine1: c.addressLine1,
+    postcode: c.postcode.trim().toUpperCase(),
+    parkingType: c.parkingType,
+    specialInstructions: c.instructions || undefined,
+    preferredMechanicId: c.preferredMechanicId || undefined,
+    ...extra,
+  };
+}
+
+// Price breakdown shown on every confirm step.
+function PriceSummary({
+  totalPence,
+  creditAppliedPence,
+  chargePence,
+  deferred,
+}: {
+  totalPence: number;
+  creditAppliedPence: number;
+  chargePence: number;
+  deferred?: boolean;
+}) {
+  return (
+    <div className="rounded-xl border border-border bg-surface p-4 text-sm">
+      <div className="flex items-center justify-between text-text-secondary">
+        <span>Service total</span>
+        <span>{formatPrice(totalPence)}</span>
+      </div>
+      {creditAppliedPence > 0 && (
+        <div className="mt-1 flex items-center justify-between font-medium text-success">
+          <span>Account credit</span>
+          <span>−{formatPrice(creditAppliedPence)}</span>
+        </div>
+      )}
+      <div className="mt-2 flex items-center justify-between border-t border-border pt-2 text-base font-bold text-text-primary">
+        <span>{deferred ? "Due on completion" : "To pay"}</span>
+        <span>{formatPrice(chargePence)}</span>
+      </div>
+    </div>
+  );
+}
+
+// --- Stripe checkout form: pre-auth (hold now) OR deferred (save card) ------
+
 function CheckoutForm({
-  clientSecret,
-  selectedSlot,
-  addressLine1,
-  postcode,
-  parkingType,
-  instructions,
-  reg,
-  make,
-  model,
-  serviceName,
-  serviceId,
-  pricePence,
-  preferredMechanicId,
-}: CheckoutFormProps) {
+  checkout,
+  ...c
+}: ConfirmCommon & { checkout: Extract<ReadyCheckout, { mode: "preauth" | "deferred" }> }) {
   const stripe = useStripe();
   const elements = useElements();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  const deferred = checkout.mode === "deferred";
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -322,62 +384,83 @@ function CheckoutForm({
     setSubmitting(true);
     setError(null);
 
-    const { error: confirmError, paymentIntent } = await stripe.confirmPayment({
-      elements,
-      confirmParams: { payment_method_data: { billing_details: { name, email } } },
-      redirect: "if_required",
-    });
+    let extra: Partial<CreateBookingInput>;
 
-    if (confirmError) {
-      setError(confirmError.message ?? "Payment failed. Please try again.");
-      setSubmitting(false);
-      return;
+    if (deferred) {
+      // Trusted Customer: save the card (no hold). We charge on completion.
+      const { error: setupError, setupIntent } = await stripe.confirmSetup({
+        elements,
+        confirmParams: { payment_method_data: { billing_details: { name, email } } },
+        redirect: "if_required",
+      });
+      if (setupError) {
+        setError(setupError.message ?? "Couldn't save your card. Please try again.");
+        setSubmitting(false);
+        return;
+      }
+      if (!setupIntent) {
+        setError("Something went wrong. Please try again.");
+        setSubmitting(false);
+        return;
+      }
+      const pmId =
+        typeof setupIntent.payment_method === "string"
+          ? setupIntent.payment_method
+          : (setupIntent.payment_method?.id ?? null);
+      extra = {
+        paymentMode: "deferred",
+        creditAppliedPence: checkout.creditAppliedPence,
+        stripeSetupIntentId: setupIntent.id,
+        stripePaymentMethodId: pmId ?? undefined,
+        stripeCustomerId: checkout.stripeCustomerId,
+      };
+    } else {
+      // Pre-auth: place the manual-capture hold now.
+      const { error: confirmError, paymentIntent } = await stripe.confirmPayment({
+        elements,
+        confirmParams: { payment_method_data: { billing_details: { name, email } } },
+        redirect: "if_required",
+      });
+      if (confirmError) {
+        setError(confirmError.message ?? "Payment failed. Please try again.");
+        setSubmitting(false);
+        return;
+      }
+      if (!paymentIntent) {
+        setError("Something went wrong. Please try again.");
+        setSubmitting(false);
+        return;
+      }
+      const piId = checkout.clientSecret.split("_secret_")[0];
+      extra = {
+        paymentMode: "preauth",
+        creditAppliedPence: checkout.creditAppliedPence,
+        stripePaymentIntentId: piId,
+      };
     }
 
-    if (!paymentIntent) {
-      setError("Something went wrong. Please try again.");
-      setSubmitting(false);
-      return;
-    }
-
-    // Extract PI id from clientSecret (format: pi_xxx_secret_yyy)
-    const piId = clientSecret.split("_secret_")[0];
-
-    const input: CreateBookingInput = {
-      vehicleReg: reg,
-      vehicleMake: make,
-      vehicleModel: model,
-      serviceName,
-      serviceId,
-      scheduledAt: selectedSlot,
-      customerEmail: email.trim(),
-      customerName: name.trim(),
-      addressLine1: addressLine1,
-      postcode: postcode.trim().toUpperCase(),
-      parkingType,
-      specialInstructions: instructions || undefined,
-      stripePaymentIntentId: piId,
-      preferredMechanicId: preferredMechanicId || undefined,
-    };
-
-    const result = await createBookingAction(input);
-
+    const result = await createBookingAction(bookingInputFrom(c, name, email, extra));
     if (!result.ok) {
       setError(result.error);
       setSubmitting(false);
       return;
     }
-
     window.location.href = `/book/confirmed/${result.bookingId}`;
   }
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-6">
       <div className="rounded-xl border border-border bg-surface p-4 text-sm">
-        <p className="font-semibold text-text-primary">{serviceName}</p>
-        <p className="text-text-secondary">{reg} · {format(new Date(selectedSlot), "EEE d MMM, h:mm a")}</p>
-        <p className="mt-1 text-lg font-bold text-text-primary">{formatPrice(pricePence)}</p>
+        <p className="font-semibold text-text-primary">{c.serviceName}</p>
+        <p className="text-text-secondary">{c.reg} · {format(new Date(c.selectedSlot), "EEE d MMM, h:mm a")}</p>
       </div>
+
+      <PriceSummary
+        totalPence={checkout.totalPence}
+        creditAppliedPence={checkout.creditAppliedPence}
+        chargePence={checkout.chargePence}
+        deferred={deferred}
+      />
 
       <div className="flex flex-col gap-3">
         <p className="text-sm font-semibold text-text-primary">Your details</p>
@@ -400,7 +483,9 @@ function CheckoutForm({
       </div>
 
       <div>
-        <p className="mb-3 text-sm font-semibold text-text-primary">Payment details</p>
+        <p className="mb-3 text-sm font-semibold text-text-primary">
+          {deferred ? "Card details (saved, not charged)" : "Payment details"}
+        </p>
         <div className="rounded-xl border border-border p-4">
           <PaymentElement />
         </div>
@@ -418,11 +503,98 @@ function CheckoutForm({
         disabled={!stripe || submitting}
         iconLeft={submitting ? Loader2 : Lock}
       >
-        {submitting ? "Processing…" : `Pre-authorise ${formatPrice(pricePence)}`}
+        {submitting
+          ? "Processing…"
+          : deferred
+            ? "Save card & confirm booking"
+            : `Pre-authorise ${formatPrice(checkout.chargePence)}`}
       </Button>
       <p className="text-center text-[11px] text-text-muted">
-        No money is taken now. Your card is pre-authorised only — charged when the job is complete.
+        {deferred
+          ? "As a Trusted Customer, nothing is held now — your card is charged only when the job is complete."
+          : "No money is taken now. Your card is pre-authorised only — charged when the job is complete."}
       </p>
+    </form>
+  );
+}
+
+// --- Free checkout (account credit covers the whole total) ------------------
+
+function FreeCheckoutForm({
+  checkout,
+  ...c
+}: ConfirmCommon & { checkout: Extract<ReadyCheckout, { mode: "free" }> }) {
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!name.trim() || !email.trim()) {
+      setError("Please enter your name and email.");
+      return;
+    }
+    setSubmitting(true);
+    setError(null);
+    const result = await createBookingAction(
+      bookingInputFrom(c, name, email, {
+        paymentMode: "free",
+        creditAppliedPence: checkout.creditAppliedPence,
+      }),
+    );
+    if (!result.ok) {
+      setError(result.error);
+      setSubmitting(false);
+      return;
+    }
+    window.location.href = `/book/confirmed/${result.bookingId}`;
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="flex flex-col gap-6">
+      <div className="rounded-xl border border-border bg-surface p-4 text-sm">
+        <p className="font-semibold text-text-primary">{c.serviceName}</p>
+        <p className="text-text-secondary">{c.reg} · {format(new Date(c.selectedSlot), "EEE d MMM, h:mm a")}</p>
+      </div>
+
+      <PriceSummary
+        totalPence={checkout.totalPence}
+        creditAppliedPence={checkout.creditAppliedPence}
+        chargePence={0}
+      />
+
+      <p className="rounded-lg bg-green-50 px-4 py-3 text-sm font-medium text-success">
+        Your account credit covers this booking in full — there&apos;s nothing to pay.
+      </p>
+
+      <div className="flex flex-col gap-3">
+        <p className="text-sm font-semibold text-text-primary">Your details</p>
+        <input
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Full name"
+          required
+          className="h-12 rounded-lg border border-border bg-surface-card px-3 text-sm text-text-primary outline-none transition-colors placeholder:text-text-muted focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/25"
+        />
+        <input
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="Email address"
+          required
+          className="h-12 rounded-lg border border-border bg-surface-card px-3 text-sm text-text-primary outline-none transition-colors placeholder:text-text-muted focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/25"
+        />
+      </div>
+
+      {error && (
+        <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-danger">{error}</p>
+      )}
+
+      <Button type="submit" variant="primary" size="lg" fullWidth disabled={submitting} iconLeft={submitting ? Loader2 : Lock}>
+        {submitting ? "Processing…" : "Confirm booking"}
+      </Button>
     </form>
   );
 }

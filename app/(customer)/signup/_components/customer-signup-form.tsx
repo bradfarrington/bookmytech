@@ -10,14 +10,17 @@ const initialState: SignUpState = null;
 export function CustomerSignupForm({
   defaultName,
   defaultEmail,
+  referralCode,
 }: {
   defaultName?: string;
   defaultEmail?: string;
+  referralCode?: string;
 }) {
   const [state, formAction, pending] = useActionState(signUp, initialState);
 
   return (
     <form action={formAction} className="flex flex-col gap-4">
+      {referralCode && <input type="hidden" name="referral_code" value={referralCode} />}
       <label className="flex flex-col gap-1.5">
         <span className="text-sm font-semibold text-text-primary">Full name</span>
         <input

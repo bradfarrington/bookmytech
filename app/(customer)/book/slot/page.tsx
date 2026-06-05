@@ -37,8 +37,20 @@ export default async function SlotPage({ searchParams }: SlotPageProps) {
   if (!service) notFound();
 
   // Initial estimate from the URL postcode; the picker re-prices for real when
-  // the customer confirms their postcode and the PaymentIntent is created.
+  // the customer confirms their postcode and checkout is prepared.
   const price = await calculatePrice(service.id, params.postcode ?? "");
+
+  // Surface any account credit a signed-in customer has, so the picker can hint
+  // it before checkout (the actual amount applied is decided server-side).
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  let availableCreditPence = 0;
+  if (user) {
+    const { availableCreditPence: getCredit } = await import("@/lib/credits/credits");
+    const { createAdminClient } = await import("@/lib/supabase/admin");
+    availableCreditPence = await getCredit(createAdminClient(), user.id);
+  }
 
   const vehicleParams = [
     params.make ? `make=${encodeURIComponent(params.make)}` : null,
@@ -77,6 +89,7 @@ export default async function SlotPage({ searchParams }: SlotPageProps) {
         serviceId={service.id}
         pricePence={price.totalPence}
         preferredMechanicId={params.pref}
+        availableCreditPence={availableCreditPence}
       />
     </div>
   );

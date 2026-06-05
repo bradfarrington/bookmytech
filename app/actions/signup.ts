@@ -4,6 +4,9 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { linkGuestBookings } from "@/app/actions/link-guest-bookings";
+import { generateReferralCode, normaliseReferralCode } from "@/lib/credits/referral-code";
+import { grantCredit } from "@/lib/credits/credits";
+import { REFERRAL_WELCOME_PENCE } from "@/lib/credits/constants";
 
 export type SignUpState = { error: string } | null;
 
@@ -23,6 +26,7 @@ export async function signUp(
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
   const fullName = String(formData.get("full_name") ?? "").trim();
+  const referrerCode = normaliseReferralCode(String(formData.get("referral_code") ?? ""));
 
   if (!fullName) return { error: "Enter your name." };
   if (!email || !EMAIL_RE.test(email))
@@ -50,8 +54,47 @@ export async function signUp(
 
   const userId = created.user.id;
 
-  // Write the name onto the profile (trigger only seeds role + id reliably).
-  await admin.from("profiles").update({ full_name: fullName }).eq("id", userId);
+  // Resolve the referrer (if a code was supplied) before we touch the profile,
+  // so a self-referral or bad code just no-ops.
+  let referredBy: string | null = null;
+  if (referrerCode) {
+    const { data: referrer } = await admin
+      .from("profiles")
+      .select("id")
+      .eq("referral_code", referrerCode)
+      .maybeSingle();
+    if (referrer && referrer.id !== userId) referredBy = referrer.id;
+  }
+
+  // Write the name + a unique referral code onto the profile (the trigger only
+  // seeds role + id reliably). Retry on the off chance of a code collision.
+  let ownCode = generateReferralCode();
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const { error } = await admin
+      .from("profiles")
+      .update({ full_name: fullName, referral_code: ownCode, referred_by: referredBy })
+      .eq("id", userId);
+    if (!error) break;
+    // 23505 = unique_violation on referral_code — regenerate and retry.
+    if (error.code === "23505") {
+      ownCode = generateReferralCode();
+      continue;
+    }
+    // Any other error: still set the name so the account is usable.
+    await admin.from("profiles").update({ full_name: fullName }).eq("id", userId);
+    break;
+  }
+
+  // Referee welcome credit — £10 off their first booking. Granted once.
+  if (referredBy) {
+    await grantCredit(
+      admin,
+      userId,
+      REFERRAL_WELCOME_PENCE,
+      "referral_welcome",
+      "Welcome credit for joining via a referral",
+    );
+  }
 
   // Pull any guest bookings made with this email under the new account.
   await linkGuestBookings(userId, email);

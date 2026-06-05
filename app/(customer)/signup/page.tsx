@@ -7,18 +7,23 @@ export const metadata: Metadata = {
 };
 
 interface SignupPageProps {
-  // Pre-filled from the booking confirmation CTA (?name=&email=).
-  searchParams: Promise<{ name?: string; email?: string }>;
+  // Pre-filled from the booking confirmation CTA (?name=&email=). ?ref= carries
+  // a referral code when arriving from a share link.
+  searchParams: Promise<{ name?: string; email?: string; ref?: string }>;
 }
 
 export default async function SignupPage({ searchParams }: SignupPageProps) {
-  const { name, email } = await searchParams;
+  const { name, email, ref } = await searchParams;
   return (
     <AuthShell
       title="Create your account"
-      subtitle="Track your booking live, message your mechanic, and rebook in a tap."
+      subtitle={
+        ref
+          ? "You've been referred — get £10 off your first booking when you sign up."
+          : "Track your booking live, message your mechanic, and rebook in a tap."
+      }
     >
-      <CustomerSignupForm defaultName={name} defaultEmail={email} />
+      <CustomerSignupForm defaultName={name} defaultEmail={email} referralCode={ref} />
     </AuthShell>
   );
 }

@@ -5,6 +5,8 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendEmail } from "@/lib/email/send";
 import { formatPrice, siteUrl } from "@/lib/utils";
+import { completedBookingCount, grantCredit } from "@/lib/credits/credits";
+import { REFERRAL_BONUS_PENCE } from "@/lib/credits/constants";
 
 export type JobProgressResult = { ok: true } | { ok: false; error: string };
 
@@ -151,9 +153,10 @@ export async function completeAndCharge(bookingId: string): Promise<JobProgressR
   const { data: booking } = await admin
     .from("bookings")
     .select(
-      `id, status, mechanic_id, customer_email, customer_name, total_pence,
-       mechanic_payout_pence, stripe_payment_intent_id, service:services(name),
-       mechanic:mechanics(stripe_account_id)`,
+      `id, status, mechanic_id, customer_id, customer_email, customer_name, total_pence,
+       mechanic_payout_pence, credit_applied_pence, payment_mode,
+       stripe_payment_intent_id, stripe_payment_method_id, stripe_customer_id,
+       service:services(name), mechanic:mechanics(stripe_account_id)`,
     )
     .eq("id", bookingId)
     .single();
@@ -188,7 +191,42 @@ export async function completeAndCharge(bookingId: string): Promise<JobProgressR
     // No STRIPE_SECRET_KEY (dev) — proceed without capturing or transferring.
     stripe = null;
   }
-  if (booking.stripe_payment_intent_id && stripe) {
+  // What the customer actually owes = total minus any account credit applied.
+  const chargePence = Math.max(0, (booking.total_pence ?? 0) - (booking.credit_applied_pence ?? 0));
+
+  if (stripe && booking.payment_mode === "deferred") {
+    // Trusted-Customer deferred flow: no hold was placed — charge the saved card
+    // now (off-session). chargePence can be 0 if credit covered the rest.
+    if (booking.stripe_payment_method_id && chargePence > 0) {
+      try {
+        const intent = await stripe.paymentIntents.create({
+          amount: chargePence,
+          currency: "gbp",
+          customer: booking.stripe_customer_id ?? undefined,
+          payment_method: booking.stripe_payment_method_id,
+          off_session: true,
+          confirm: true,
+          description: "Book My Tech — service charge",
+          metadata: { booking_id: bookingId },
+        });
+        if (intent.status !== "succeeded") {
+          return {
+            ok: false,
+            error: "Couldn't charge the saved card. The job stays open — try again.",
+          };
+        }
+        captured = true;
+        chargeId =
+          typeof intent.latest_charge === "string"
+            ? intent.latest_charge
+            : (intent.latest_charge?.id ?? null);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Stripe charge failed";
+        return { ok: false, error: `Couldn't take payment: ${message}. The job stays open — try again.` };
+      }
+    }
+  } else if (booking.stripe_payment_intent_id && stripe) {
+    // Pre-auth flow: capture the manual hold (its amount is already total − credit).
     try {
       const intent = await stripe.paymentIntents.capture(booking.stripe_payment_intent_id);
       captured = true;
@@ -201,6 +239,7 @@ export async function completeAndCharge(bookingId: string): Promise<JobProgressR
       return { ok: false, error: `Couldn't take payment: ${message}. The job stays open — try again.` };
     }
   }
+  // 'free' bookings (credit covered the whole total) capture nothing.
 
   // --- Flip to completed (only after a successful / skipped capture) --------
   const { error } = await admin
@@ -224,8 +263,37 @@ export async function completeAndCharge(bookingId: string): Promise<JobProgressR
       event_type: "payment_captured",
       actor_id: guard.mechanicId,
       actor_role: "mechanic",
-      payload: { amount_pence: booking.total_pence },
+      payload: { amount_pence: chargePence, credit_applied_pence: booking.credit_applied_pence ?? 0 },
     });
+  }
+
+  // --- Referral bonus -------------------------------------------------------
+  // If this is the customer's first completed booking and they joined via a
+  // referral, reward the referrer with credit. Gated on first-completion so it
+  // fires exactly once per referee (completeAndCharge can't re-run once the job
+  // is 'completed').
+  if (booking.customer_id) {
+    try {
+      const completed = await completedBookingCount(admin, booking.customer_id);
+      if (completed === 1) {
+        const { data: prof } = await admin
+          .from("profiles")
+          .select("referred_by")
+          .eq("id", booking.customer_id)
+          .single();
+        if (prof?.referred_by) {
+          await grantCredit(
+            admin,
+            prof.referred_by,
+            REFERRAL_BONUS_PENCE,
+            "referral_bonus",
+            "Your friend completed their first booking",
+          );
+        }
+      }
+    } catch (err) {
+      console.error("Referral bonus failed for booking", bookingId, err);
+    }
   }
 
   // --- Pay the mechanic (Stripe Connect transfer) --------------------------
@@ -239,7 +307,11 @@ export async function completeAndCharge(bookingId: string): Promise<JobProgressR
     Array.isArray(booking.mechanic) ? booking.mechanic[0] : booking.mechanic
   ) as { stripe_account_id: string | null } | null;
   const payoutPence = booking.mechanic_payout_pence ?? 0;
-  if (captured && stripe && mechanicAccount?.stripe_account_id && payoutPence > 0) {
+  // Pay the mechanic when we captured money, or when credit covered the whole
+  // total ('free') — in the free case there's no source_transaction, so the
+  // payout draws from the platform balance (which funded the credit).
+  const shouldPay = payoutPence > 0 && (captured || booking.payment_mode === "free");
+  if (shouldPay && stripe && mechanicAccount?.stripe_account_id) {
     try {
       const transfer = await stripe.transfers.create({
         amount: payoutPence,
@@ -293,13 +365,20 @@ export async function completeAndCharge(bookingId: string): Promise<JobProgressR
           <h1 style="color: #1e3a8a;">All done — thanks for using Book My Tech</h1>
           <p>Hi ${booking.customer_name ?? "there"},</p>
           <p>Your mechanic has marked <strong>${serviceName}</strong> complete.</p>
+          ${
+            (booking.credit_applied_pence ?? 0) > 0
+              ? `<p style="color: #64748b; font-size: 14px; margin: 0;">Service total ${formatPrice(booking.total_pence ?? 0)} · account credit −${formatPrice(booking.credit_applied_pence ?? 0)}</p>`
+              : ""
+          }
           <p style="font-size: 18px; font-weight: 600; color: #1e3a8a;">
-            Total charged: ${formatPrice(booking.total_pence ?? 0)}
+            ${chargePence > 0 ? `Total charged: ${formatPrice(chargePence)}` : "Paid in full with your account credit — nothing to pay"}
           </p>
           <p style="color: #64748b; font-size: 14px;">${
-            captured
-              ? "Your card has now been charged — your pre-authorisation has been taken."
-              : "Payment will be settled shortly."
+            chargePence === 0
+              ? "Your account credit covered this booking."
+              : captured
+                ? "Your card has now been charged."
+                : "Payment will be settled shortly."
           }</p>
           <div style="margin: 24px 0; padding: 20px; background: #f8fafc; border-radius: 12px; text-align: center;">
             <p style="margin: 0 0 8px; font-weight: 600; color: #0f172a;">How did your mechanic do?</p>

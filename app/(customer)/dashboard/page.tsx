@@ -1,13 +1,16 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Plus } from "lucide-react";
+import { Plus, BadgeCheck } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { siteUrl } from "@/lib/utils";
+import { availableCreditPence, isTrusted } from "@/lib/credits/credits";
 import { DashboardHeader } from "./_components/dashboard-header";
 import { ActiveBookingCard } from "./_components/active-booking-card";
 import { UpcomingBookings } from "./_components/upcoming-bookings";
 import { PastJobs } from "./_components/past-jobs";
 import { SavedVehicles } from "./_components/saved-vehicles";
+import { ReferralCard } from "./_components/referral-card";
 import type { DashboardBooking, MechanicLite } from "./_components/types";
 
 // The customer's post-booking home. Middleware guarantees a signed-in customer
@@ -30,9 +33,11 @@ export default async function DashboardPage() {
 
   const { data: profile } = await admin
     .from("profiles")
-    .select("full_name, avatar_url")
+    .select("full_name, avatar_url, referral_code")
     .eq("id", user.id)
     .single();
+
+  const creditPence = await availableCreditPence(admin, user.id);
 
   // All of this customer's bookings — linked (customer_id) or guest-by-email.
   const email = user.email ?? "";
@@ -137,6 +142,8 @@ export default async function DashboardPage() {
   const vehicles = [...vehicleMap.values()];
 
   const firstName = (profile?.full_name ?? email).split(/[ @]/)[0];
+  const completedCount = bookings.filter((b) => b.status === "completed").length;
+  const trusted = isTrusted(completedCount);
 
   return (
     <div className="min-h-dvh bg-surface">
@@ -156,6 +163,24 @@ export default async function DashboardPage() {
             New booking
           </Link>
         </div>
+
+        {trusted && (
+          <div className="flex items-center gap-2.5 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-900">
+            <BadgeCheck size={18} className="shrink-0 text-success" />
+            <span>
+              <strong>Trusted Customer</strong> — you skip the pre-authorisation
+              hold and only pay once the job&apos;s complete.
+            </span>
+          </div>
+        )}
+
+        {profile?.referral_code && (
+          <ReferralCard
+            code={profile.referral_code}
+            shareUrl={`${siteUrl()}/signup?ref=${profile.referral_code}`}
+            creditPence={creditPence}
+          />
+        )}
 
         {active ? (
           <ActiveBookingCard

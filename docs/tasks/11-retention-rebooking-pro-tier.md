@@ -1,6 +1,6 @@
 # Task 11 — Retention: rebooking, reminders, loyalty
 
-**Status:** 🟡 In progress — Stage 1 (rebooking + reminders) and Stage 3 (referrals + loyalty) only. **Stage 2 (Mechanic Pro tier) was moved to [Task 13 — Final integrations](13-final-integrations.md)** (owner decision 2026-06-05): the Pro tier depends on the dispatch layer + mature ratings/disputes data and is cleaner to switch on last, alongside the SMS infrastructure. The stage headings below keep their original **Stage 1 / Stage 3** numbers so cross-references elsewhere still resolve; there is intentionally no Stage 2 here.
+**Status:** ✅ Complete (2026-06-05) — Stage 1 (rebooking + reminders, `0023`) · Stage 3 (referrals + credits + Trusted Customer skip-pre-auth, `0024`). **Stage 2 (Mechanic Pro tier) was moved to [Task 13 — Final integrations](13-final-integrations.md)** (owner decision 2026-06-05): the Pro tier depends on the dispatch layer + mature ratings/disputes data and is cleaner to switch on last, alongside the SMS infrastructure. The stage headings below keep their original **Stage 1 / Stage 3** numbers so cross-references elsewhere still resolve; there is intentionally no Stage 2 here. ⚠️ Apply migrations `0023`–`0024`; the deferred/free Stripe paths weren't live-fired (see Stage 3 notes).
 
 Brief phase 4. The features that drive customers back for repeat bookings and reward mechanics for sticking with the platform. Repeat-customer rate target is ≥ 42% within 90 days of launch.
 
@@ -129,13 +129,20 @@ create table customer_credits (
 
 **Acceptance criteria:**
 
-- [ ] Referral code generated for each customer on signup (existing customers get codes via a one-off migration)
-- [ ] Referral share UI on customer dashboard
-- [ ] Referee gets credit applied on signup with referral code
-- [ ] Referrer credit issued on first completed booking by referee
-- [ ] Credits applied automatically at booking checkout
-- [ ] Trusted Customer status logic
-- [ ] Skip pre-auth flow for trusted customers (capture only on completion)
+- [x] Referral code generated for each customer on signup — `signUp` mints a unique `BMT######` code (`lib/credits/referral-code.ts`, retry-on-collision); existing customers back-filled in migration `0024`.
+- [x] Referral share UI on customer dashboard — `ReferralCard` (give-£10-get-£10, copy link + Web Share, shows current credit balance).
+- [x] Referee gets credit applied on signup with referral code — `?ref=<code>` flows through the signup page → form hidden field → `signUp`, which sets `referred_by` and grants the referee a £10 `referral_welcome` credit (self-referral / bad code no-op).
+- [x] Referrer credit issued on first completed booking by referee — `completeAndCharge` grants the referrer £10 `referral_bonus` when the referee hits their **first** completed booking (gated on first-completion so it fires once per referee).
+- [x] Credits applied automatically at booking checkout — `prepareCheckout` computes `applied = min(balance, total)` server-side; the charge/PI is reduced by it; `createBookingAction` redeems it via a ledger row and snapshots `credit_applied_pence`. Mechanic payout + platform fee stay computed on the full total (credit is platform-funded).
+- [x] Trusted Customer status logic — `isTrusted` = 3+ completed bookings; surfaced as a dashboard badge.
+- [x] Skip pre-auth flow for trusted customers (capture only on completion) — Trusted Customers get the **`deferred`** payment mode: no hold is placed; the card is saved via a Stripe **SetupIntent** at booking and charged off-session in `completeAndCharge`. (A third `free` mode handles credit covering the whole total — no card taken.)
+
+**Implementation notes / deviations:**
+- **Three payment modes** on `bookings.payment_mode`: `preauth` (default — guests + non-trusted, manual-capture hold; unchanged path), `deferred` (Trusted Customer — saved card, charge on completion), `free` (account credit ≥ total — no card). Credit reduces the **charge**, never the mechanic payout/platform fee.
+- **Credits are a ledger** (`customer_credits`): positive grants, negative redemptions; balance = sum of unexpired rows. Grants expire after 365 days; redemptions don't.
+- Pure `referralCodeFromBytes` / `normaliseReferralCode` unit-tested (`lib/credits/referral-code.test.ts`, 3 cases; `npm test` now 39).
+- ⚠️ Migration `0024` adds `profiles.referral_code/referred_by` (+ backfill), `customer_credits`, and the `bookings` credit/deferred columns. **Apply `0024`.** ⚠️ The **deferred (SetupIntent off-session) + free flows were not live-fired against Stripe** this session (no running app/keys) — build + 39 unit tests pass; the guest pre-auth path is byte-for-byte unchanged. Exercise a trusted-customer booking + a credited booking before relying on them.
+- **Partial-deposit interaction:** the Trusted skip-pre-auth means some bookings now take **no hold** at booking, only charge on completion — the first place the app departs from "full price pre-authorised". Booking copy was kept truthful per-mode (see [booking-pre-auth-not-deposit](../../memory)).
 
 **Files touched:**
 - `app/(customer)/dashboard/refer/page.tsx`
