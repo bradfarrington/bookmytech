@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendEmail } from "@/lib/email/send";
+import { sendSms } from "@/lib/sms/send-sms";
 import { formatPrice } from "@/lib/utils";
 
 export type CustomerBookingResult = { ok: true } | { ok: false; error: string };
@@ -144,7 +145,7 @@ async function requireBookingCustomer(bookingId: string) {
   const { data: booking } = await admin
     .from("bookings")
     .select(
-      `id, status, scheduled_at, customer_id, customer_email, customer_name,
+      `id, status, scheduled_at, customer_id, customer_email, customer_name, customer_phone,
        mechanic_id, total_pence, stripe_payment_intent_id`,
     )
     .eq("id", bookingId)
@@ -346,6 +347,16 @@ export async function cancelBooking(
         </div>
       `,
     }).catch(console.error);
+  }
+
+  if (booking.customer_phone) {
+    sendSms({
+      to: booking.customer_phone,
+      body:
+        charged > 0
+          ? `Your Book My Tech booking is cancelled. A ${formatPrice(charged)} cancellation fee was charged; the rest of your hold is released.`
+          : `Your Book My Tech booking is cancelled. Your full pre-authorisation has been released.`,
+    }).catch(() => {});
   }
 
   revalidatePath("/dashboard");

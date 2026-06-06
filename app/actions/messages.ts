@@ -59,22 +59,33 @@ export async function sendMessage(
 
   const { admin, booking, userId, role } = party;
 
-  const { error } = await admin.from("messages").insert({
-    booking_id: bookingId,
-    sender_id: userId,
-    sender_role: role,
-    body: trimmed,
-  });
+  const { data: inserted, error } = await admin
+    .from("messages")
+    .insert({
+      booking_id: bookingId,
+      sender_id: userId,
+      sender_role: role,
+      body: trimmed,
+    })
+    .select("id")
+    .single();
   if (error) return { ok: false, error: error.message };
 
-  // SMS fallback (stubbed until the SMS sender is built). When wired, this is
-  // gated on the recipient not having opened the thread in ~5 min; for now we
-  // only attempt it for a mechanic→customer message where we hold a number.
+  // SMS fallback. We immediately nudge a mechanic→customer message when we hold
+  // a number; the unread-message sweep (cron) catches everything else after
+  // ~5 min. Stamp sms_notified_at on a successful send so the sweep never
+  // double-texts the same message.
   if (role === "mechanic" && booking.customer_phone) {
-    await sendSms({
+    const sent = await sendSms({
       to: booking.customer_phone,
       body: `Your Book My Tech mechanic sent you a message: "${trimmed.slice(0, 120)}". Reply in your dashboard.`,
-    }).catch(() => {});
+    }).catch(() => false);
+    if (sent && inserted?.id) {
+      await admin
+        .from("messages")
+        .update({ sms_notified_at: new Date().toISOString() })
+        .eq("id", inserted.id);
+    }
   }
 
   // Both surfaces show the thread; realtime delivers the new row, these just

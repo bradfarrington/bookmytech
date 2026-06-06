@@ -13,6 +13,7 @@ import {
   LogOut,
   type LucideIcon,
   Map,
+  MessageSquare,
   Package,
   PoundSterling,
   Shield,
@@ -61,6 +62,7 @@ const NAV_GROUPS: readonly NavGroup[] = [
       { label: "Analytics", href: "/admin/analytics", icon: BarChart3 },
       { label: "Services", href: "/admin/services", icon: Wrench },
       { label: "Parts", href: "/admin/parts", icon: Package },
+      { label: "SMS", href: "/admin/sms", icon: MessageSquare },
     ],
   },
 ];

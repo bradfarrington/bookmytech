@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendEmail } from "@/lib/email/send";
+import { sendSms } from "@/lib/sms/send-sms";
 import { formatPrice } from "@/lib/utils";
 import { dispatchBooking } from "@/lib/dispatch/dispatch";
 import { calculatePrice } from "@/lib/pricing/calculate";
@@ -46,6 +47,20 @@ export async function createBookingAction(
   const { data: session } = await supabase.auth.getSession();
   const customerId = session?.session?.user?.id ?? null;
 
+  // The booking form doesn't collect a phone, but signed-in customers have one
+  // on their profile — snapshot it onto the booking so SMS touchpoints (on the
+  // way, complete, cancel, message nudges) can reach them. Guest bookings have
+  // no phone and stay email-only until the funnel collects one.
+  let customerPhone: string | null = null;
+  if (customerId) {
+    const { data: prof } = await supabase
+      .from("profiles")
+      .select("phone")
+      .eq("id", customerId)
+      .single();
+    customerPhone = prof?.phone ?? null;
+  }
+
   // Account credit (and the 'free' mode it can unlock) only applies to signed-in
   // customers. Defensively collapse anything else to the plain pre-auth path a
   // guest takes.
@@ -85,6 +100,7 @@ export async function createBookingAction(
       stripe_payment_intent_id: input.stripePaymentIntentId ?? null,
       customer_email: input.customerEmail,
       customer_name: input.customerName,
+      customer_phone: customerPhone,
       address_line_1: input.addressLine1,
       address_line_2: input.addressLine2 ?? null,
       parking_type: input.parkingType,
@@ -177,6 +193,13 @@ export async function createBookingAction(
       </div>
     `,
   }).catch(console.error);
+
+  if (customerPhone) {
+    sendSms({
+      to: customerPhone,
+      body: `Booking received with Book My Tech (ref ${data.id.slice(0, 8).toUpperCase()}). We're finding your mechanic — you'll hear from us shortly.`,
+    }).catch(() => {});
+  }
 
   return { ok: true, bookingId: data.id };
 }

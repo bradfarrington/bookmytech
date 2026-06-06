@@ -1,6 +1,28 @@
 # Task 13 — Final integrations (Pro tier + SMS)
 
-**Status:** ⏳ Queued
+**Status:** 🟡 Stage B (SMS) complete (2026-06-06) — Stage A (Pro tier) still queued.
+
+Stage B notes:
+- Ported the sms-credits skill to BMT's stack: **Next.js route handlers + server
+  actions, not Supabase edge functions** (project convention). SMS state lives in
+  a dedicated `sms_settings` singleton (migration `0026_sms_credits.sql`), not a
+  `business_profile` table — gives a typed integer balance decremented atomically
+  via `reserve_sms_credit()` / `refund_sms_credit()` (reserve-before-Twilio,
+  refund-on-failure) so concurrent senders never oversend or charge for a failure.
+- `lib/sms/send-sms.ts` is now a real Twilio sender (signature unchanged). Admin
+  panel at `/admin/sms` (balance, enable toggle, sender ID, low-credit alert
+  email, 10p/credit packages, test send, purchase history). Buy-credits uses
+  **GoCardless** Instant Bank Pay (the agency reselling credits to the BMT owner;
+  Stripe is untouched). Webhook `app/api/webhooks/gocardless-sms` verifies the
+  HMAC over the raw body, tops up idempotently, and raises a paid **Xero** invoice
+  (env-gated `XERO_*`).
+- Touchpoint decisions (#4–#8): wired **#4 mechanic on the way** and **#5 booking
+  confirmed/complete/cancelled** (customer SMS). #6 (Pro gained/lost) belongs to
+  Stage A. #7 (dispatch-stall) and #8 (referral credit) left **email-only**.
+- **Gap flagged:** the booking funnel never collected a customer phone, so
+  `bookings.customer_phone` was always null. Now backfilled from the signed-in
+  customer's `profiles.phone` at creation. **Guest bookings still have no phone**
+  → their lifecycle SMS stay dormant until the funnel collects one (follow-up).
 
 The "wire it all up at the end" task. Two things were deliberately carried to the
 final slot of the roadmap so they land once everything they touch already
@@ -168,13 +190,22 @@ per-event in this task; not all need SMS):
 
 **Acceptance criteria:**
 
-- [ ] `sms-credits` infra installed (Twilio send-with-credit-deduction endpoint,
+- [x] `sms-credits` infra installed (Twilio send-with-credit-deduction endpoint,
       GoCardless top-up, webhook reconciliation, settings panel)
-- [ ] `lib/sms/send-sms.ts` sends for real and deducts a credit (signature unchanged)
-- [ ] Touchpoints #1–#3 above verified end-to-end on a real number
-- [ ] Decide + wire which of #4–#8 get an SMS (document the choices)
-- [ ] Unread-message sweep cron built + scheduled
-- [ ] Low-credit-balance alerting (so transactional SMS never silently fails)
+- [x] `lib/sms/send-sms.ts` sends for real and deducts a credit (signature unchanged)
+- [ ] Touchpoints #1–#3 above verified end-to-end on a real number — **wiring
+      complete; live verification pending the user supplying Twilio + GoCardless
+      credentials** (see env list below). Code paths exercised; no live creds in dev.
+- [x] Decide + wire which of #4–#8 get an SMS (#4 + #5 wired; #7/#8 email-only — see Status note)
+- [x] Unread-message sweep cron built + scheduled (`/api/cron/message-sms-sweep`, `*/5`)
+- [x] Low-credit-balance alerting (so transactional SMS never silently fails)
+
+**Env to set (`.env.local` + Vercel) before live verification:**
+`TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM`; `GOCARDLESS_ACCESS_TOKEN`,
+`GOCARDLESS_ENVIRONMENT`, `GOCARDLESS_WEBHOOK_SECRET` (+ optional
+`GOCARDLESS_API_VERSION`); `XERO_CLIENT_ID`, `XERO_CLIENT_SECRET`,
+`XERO_CONTACT_NAME`, `XERO_CONTACT_EMAIL`, `XERO_SALES_ACCOUNT_CODE`. Register the
+GoCardless webhook endpoint at `/api/webhooks/gocardless-sms`.
 
 **Files (indicative):**
 - `lib/sms/send-sms.ts` (real implementation)

@@ -23,6 +23,10 @@
     {
       "path": "/api/cron/lift-suspensions",
       "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/cron/message-sms-sweep",
+      "schedule": "*/5 * * * *"
     }
   ]
 }

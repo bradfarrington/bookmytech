@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendEmail } from "@/lib/email/send";
+import { sendSms } from "@/lib/sms/send-sms";
 import { formatPrice, siteUrl } from "@/lib/utils";
 import { completedBookingCount, grantCredit } from "@/lib/credits/credits";
 import { REFERRAL_BONUS_PENCE } from "@/lib/credits/constants";
@@ -56,7 +57,7 @@ async function transition(
   const admin = createAdminClient();
   const { data: booking } = await admin
     .from("bookings")
-    .select("id, status, mechanic_id, customer_email, customer_name")
+    .select("id, status, mechanic_id, customer_email, customer_name, customer_phone")
     .eq("id", bookingId)
     .single();
 
@@ -122,6 +123,14 @@ export async function startJourney(bookingId: string): Promise<JobProgressResult
     }).catch(console.error);
   }
 
+  // High-value SMS touchpoint — the customer wants to know the mechanic's coming.
+  if (booking.customer_phone) {
+    sendSms({
+      to: booking.customer_phone,
+      body: `Your Book My Tech mechanic is on the way. Please make sure your vehicle is accessible.`,
+    }).catch(() => {});
+  }
+
   revalidate(bookingId);
   return { ok: true };
 }
@@ -153,7 +162,7 @@ export async function completeAndCharge(bookingId: string): Promise<JobProgressR
   const { data: booking } = await admin
     .from("bookings")
     .select(
-      `id, status, mechanic_id, customer_id, customer_email, customer_name, total_pence,
+      `id, status, mechanic_id, customer_id, customer_email, customer_name, customer_phone, total_pence,
        mechanic_payout_pence, credit_applied_pence, payment_mode,
        stripe_payment_intent_id, service:services(name),
        mechanic:mechanics(stripe_account_id)`,
@@ -358,6 +367,16 @@ export async function completeAndCharge(bookingId: string): Promise<JobProgressR
         </div>
       `,
     }).catch(console.error);
+  }
+
+  if (booking.customer_phone) {
+    sendSms({
+      to: booking.customer_phone,
+      body:
+        chargePence > 0
+          ? `Your Book My Tech job is complete. Total charged: ${formatPrice(chargePence)}. Thanks!`
+          : `Your Book My Tech job is complete — paid in full with your account credit. Thanks!`,
+    }).catch(() => {});
   }
 
   // --- Proactive service reminders ------------------------------------------
