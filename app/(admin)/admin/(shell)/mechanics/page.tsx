@@ -67,9 +67,8 @@ export default async function AdminMechanicsListPage() {
             Mechanics
           </h1>
           <p className="mt-1.5 max-w-2xl text-sm text-text-muted">
-            The mechanic roster. Manual creation here is a placeholder until
-            proper onboarding lands in task 07. Invited mechanics receive an
-            MJML magic-link email.
+            The mechanic roster. Add a mechanic manually and they receive an
+            email invite with a magic-link sign-in.
           </p>
         </div>
         <Link href="/admin/mechanics/new">

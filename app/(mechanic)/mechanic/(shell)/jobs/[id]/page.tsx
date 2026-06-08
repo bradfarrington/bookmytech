@@ -168,7 +168,7 @@ export default async function MechanicJobDetailPage({ params }: PageProps) {
   const detail: JobDetailProps = {
     bookingId: booking.id,
     status: booking.status,
-    ref: booking.id.slice(0, 8).toUpperCase(),
+    shortRef: booking.id.slice(0, 8).toUpperCase(),
     createdAt: booking.created_at,
     serviceName: service?.name ?? "Service",
     vehicle: [booking.vehicle_make, booking.vehicle_model].filter(Boolean).join(" ") || "Vehicle",

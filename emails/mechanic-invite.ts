@@ -5,7 +5,7 @@ import { renderEmail, escapeHtml } from "./render";
 export interface MechanicInviteInput {
   /** Display name shown in the greeting. */
   name: string;
-  /** Magic-link URL from `supabase.auth.admin.generateLink({ type: 'magiclink' })`. */
+  /** Recovery link from `generateLink({ type: 'recovery' })` → /mechanic/set-password. */
   actionLink: string;
 }
 
@@ -31,15 +31,15 @@ export async function renderMechanicInviteEmail({
           </mj-text>
           <mj-text>
             An admin has invited you to join Book My Tech as a vetted professional.
-            Click the button below to sign in &mdash; the link will let you set up
-            your password and complete your profile.
+            Click the button below to set your password &mdash; then you'll sign
+            in with your email and password to complete your profile.
           </mj-text>
           <mj-button href="${safeLink}" align="left" padding="20px 0 8px">
-            Sign in to Book My Tech
+            Set your password
           </mj-button>
           <mj-text color="#64748B" font-size="12px" padding-top="16px">
-            This link expires in 24 hours. If you didn't expect this invite, you
-            can ignore this email.
+            For your security this link expires soon. If you didn't expect this
+            invite, you can ignore this email.
           </mj-text>
         </mj-column>
       </mj-section>

@@ -63,16 +63,16 @@ export async function sendSms({
     return false;
   }
 
-  // Sender: a real Twilio number wins (trial accounts require it); else the
-  // alphanumeric sender id, else a default.
+  // Sender: the platform's real Twilio number (backend-only, required on trial
+  // accounts) always wins; else the admin-set alphanumeric sender id; else a
+  // default. The number is never tenant-configurable — SMS is resold centrally.
   const { data: settings } = await admin
     .from("sms_settings")
-    .select("sms_from_number, sms_sender_name")
+    .select("sms_sender_name")
     .eq("id", 1)
     .single();
   const from =
     process.env.TWILIO_FROM ||
-    settings?.sms_from_number ||
     settings?.sms_sender_name ||
     DEFAULT_SENDER;
 

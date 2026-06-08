@@ -49,7 +49,7 @@ export async function generateMetadata({
 }
 
 const BENEFITS = [
-  { icon: PoundSterling, title: "Keep more of every job", detail: "Transparent fixed pricing, fast payouts via Stripe — no chasing invoices." },
+  { icon: PoundSterling, title: "Keep more of every job", detail: "Transparent fixed pricing, fast payouts — no chasing invoices." },
   { icon: CalendarClock, title: "Work on your terms", detail: "Set your hours, your radius and your specialisms. Accept the jobs that suit you." },
   { icon: MapPin, title: "Jobs near you", detail: "We match you to bookings in your area and bring the customers to you." },
 ];

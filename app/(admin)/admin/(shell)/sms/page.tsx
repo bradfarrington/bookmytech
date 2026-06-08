@@ -17,7 +17,7 @@ export default async function AdminSmsPage() {
     admin
       .from("sms_settings")
       .select(
-        "sms_enabled, sms_credits_balance, sms_sender_name, sms_from_number, low_credit_alert_email",
+        "sms_enabled, sms_credits_balance, sms_sender_name, low_credit_alert_email",
       )
       .eq("id", 1)
       .single(),
@@ -33,7 +33,6 @@ export default async function AdminSmsPage() {
     smsEnabled: settings?.sms_enabled ?? false,
     balance: settings?.sms_credits_balance ?? 0,
     senderName: settings?.sms_sender_name ?? "",
-    fromNumber: settings?.sms_from_number ?? "",
     // Pre-populate the alert recipient with the signed-in admin's email so a
     // first save captures the right address.
     lowCreditEmail: settings?.low_credit_alert_email ?? user?.email ?? "",

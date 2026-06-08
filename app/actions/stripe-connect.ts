@@ -65,7 +65,7 @@ export async function startStripeOnboarding(): Promise<StripeConnectResult> {
     const url = await connect.createOnboardingLink(accountId);
     return { ok: true, url };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Stripe error";
+    const message = err instanceof Error ? err.message : "Couldn't set up payouts. Please try again.";
     return { ok: false, error: message };
   }
 }
@@ -86,29 +86,51 @@ export async function refreshStripeStatus(): Promise<
   const admin = createAdminClient();
   const { data: mechanic } = await admin
     .from("mechanics")
-    .select("stripe_account_id")
+    .select("stripe_account_id, stripe_payouts_enabled, status")
     .eq("id", guard.userId)
     .single();
   if (!mechanic?.stripe_account_id)
-    return { ok: false, error: "No Stripe account yet — start onboarding first." };
+    return { ok: false, error: "No payout account yet — start onboarding first." };
 
   try {
     const account = await connect.retrieveAccount(mechanic.stripe_account_id);
     const flags = connect.accountFlags(account);
-    await admin
-      .from("mechanics")
-      .update({
-        stripe_charges_enabled: flags.chargesEnabled,
-        stripe_payouts_enabled: flags.payoutsEnabled,
-        stripe_onboarding_complete: flags.onboardingComplete,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", guard.userId);
+
+    // Auto-go-online the moment payouts first become enabled, so a freshly
+    // approved mechanic is available for jobs straight after connecting their
+    // bank — no separate "go online" step. We only do this on the
+    // disabled→enabled transition, so re-checking status later won't force a
+    // mechanic who has deliberately gone offline back online.
+    const justEnabled = flags.payoutsEnabled && !mechanic.stripe_payouts_enabled;
+    const now = new Date().toISOString();
+    const patch: Record<string, unknown> = {
+      stripe_charges_enabled: flags.chargesEnabled,
+      stripe_payouts_enabled: flags.payoutsEnabled,
+      stripe_onboarding_complete: flags.onboardingComplete,
+      updated_at: now,
+    };
+    if (justEnabled && mechanic.status !== "online") {
+      patch.status = "online";
+      patch.online_at = now;
+      patch.last_seen_at = now;
+    }
+
+    await admin.from("mechanics").update(patch).eq("id", guard.userId);
+
+    // Now that they're online, pull in any job that was waiting for a mechanic.
+    if (justEnabled) {
+      try {
+        await (await import("@/lib/dispatch/dispatch")).redispatchPending();
+      } catch (err) {
+        console.error("redispatch after auto-online failed", err);
+      }
+    }
+
     revalidatePath("/mechanic/onboarding/stripe");
     revalidatePath("/mechanic/jobs");
     return { ok: true, payoutsEnabled: flags.payoutsEnabled };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Stripe error";
+    const message = err instanceof Error ? err.message : "Couldn't refresh payout status. Please try again.";
     return { ok: false, error: message };
   }
 }

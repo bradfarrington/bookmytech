@@ -32,9 +32,9 @@ export default async function AdminShellLayout({
   const displayRole = profile?.role ?? "admin";
 
   return (
-    <div className="flex min-h-dvh bg-surface text-text-primary">
+    <div className="flex h-dvh overflow-hidden bg-surface text-text-primary">
       <AdminSidebar userName={displayName} userRole={displayRole} />
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <AdminTopBar />
         <main className="flex-1 overflow-auto p-7">{children}</main>
       </div>

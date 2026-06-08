@@ -165,7 +165,7 @@ export default async function MechanicEarningsPage() {
 
       <EarningsChart series={series} />
 
-      <PayoutsTable rows={payouts} />
+      <PayoutsTable rows={payouts} live={stripePayouts !== null} />
     </div>
   );
 }
@@ -251,7 +251,7 @@ async function fetchStripePayouts(accountId: string | null): Promise<PayoutRow[]
         amountPence: t.amount,
         status: "paid" as const,
         periodLabel: when.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }),
-        accountMask: "Stripe",
+        accountMask: "Bank account",
       };
     });
   } catch (err) {

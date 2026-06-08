@@ -5,14 +5,15 @@ import type { RenderedEmail } from "./mechanic-invite";
 
 export interface ApplicationApprovedInput {
   name: string;
-  /** token_hash magic-link into /auth/callback (same flow as the invite). */
+  /** token_hash recovery link into /auth/callback → /mechanic/set-password. */
   actionLink: string;
   /** If approved with grace, the deadline + outstanding items copy. */
   grace?: { endsOn: string; outstanding: string[] } | null;
 }
 
-// Sent when an application is approved. Reuses the proven magic-link sign-in
-// flow rather than a temp password (no reset screen needed).
+// Sent when an application is approved. The link is a recovery link that drops
+// the mechanic on /mechanic/set-password to choose a password; afterwards they
+// sign in with email + password.
 export async function renderApplicationApprovedEmail({
   name,
   actionLink,
@@ -42,15 +43,17 @@ export async function renderApplicationApprovedEmail({
             You're in, ${safeName}. Welcome aboard.
           </mj-text>
           <mj-text>
-            Your application has been approved. Click below to sign in, set your
-            password and start receiving jobs near you.
+            Your application has been approved. Click below to set your password
+            — then you'll sign in with your email and password to start
+            receiving jobs near you.
           </mj-text>
           <mj-button href="${safeLink}" align="left" padding="20px 0 8px">
-            Sign in to your dashboard
+            Set your password
           </mj-button>
           ${graceBlock}
           <mj-text color="#64748B" font-size="12px" padding-top="16px">
-            This link expires in 24 hours.
+            For your security this link expires soon. If it stops working, ask
+            us to send a fresh one.
           </mj-text>
         </mj-column>
       </mj-section>

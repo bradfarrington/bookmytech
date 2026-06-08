@@ -3,9 +3,9 @@ import { Pill } from "@/components/ui/pill";
 import { Landmark } from "lucide-react";
 import { formatPrice } from "@/lib/utils";
 
-// Payouts are part of Stripe Connect — real payout history lands in Task 08.
-// For now this renders seed rows with masked bank details so the page reads
-// like the finished article. Marked clearly as a preview.
+// Renders payout history. When `live` is true the rows are real Stripe Connect
+// transfers to the mechanic's connected account; otherwise they're a weekly-
+// accrual preview (the mechanic hasn't connected Stripe yet), clearly marked.
 
 export interface PayoutRow {
   id: string;
@@ -19,7 +19,7 @@ export interface PayoutRow {
   accountMask: string;
 }
 
-export function PayoutsTable({ rows }: { rows: PayoutRow[] }) {
+export function PayoutsTable({ rows, live = false }: { rows: PayoutRow[]; live?: boolean }) {
   return (
     <Card padded={false}>
       <div className="flex items-center justify-between gap-2.5 border-b border-border px-5 py-4">
@@ -27,15 +27,21 @@ export function PayoutsTable({ rows }: { rows: PayoutRow[] }) {
           <Landmark size={16} className="text-brand-blue" />
           <h2 className="text-[15px] font-bold text-text-primary">Recent payouts</h2>
         </div>
-        <span className="text-[11px] font-medium text-text-muted">
-          Preview — live payouts arrive with Stripe Connect
-        </span>
+        {live ? (
+          <Pill tone="success" dot>
+            Live · paid via Stripe
+          </Pill>
+        ) : (
+          <span className="text-[11px] font-medium text-text-muted">
+            Preview — connect Stripe to see real payouts
+          </span>
+        )}
       </div>
 
       {rows.length === 0 ? (
         <p className="px-5 py-10 text-center text-sm text-text-muted">
           No payouts yet. They&apos;ll appear here once you&apos;ve completed jobs and
-          Stripe payouts are switched on.
+          your payouts are switched on.
         </p>
       ) : (
         <div className="overflow-x-auto">

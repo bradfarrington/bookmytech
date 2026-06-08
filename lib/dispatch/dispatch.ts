@@ -139,3 +139,29 @@ export async function dispatchBooking(bookingId: string): Promise<DispatchResult
 
   return { offered: recipients.length, usedFallback };
 }
+
+/**
+ * Re-broadcast every still-unassigned booking. Called when a mechanic comes
+ * online (manual toggle or auto-online after connecting their bank) so a job
+ * booked while nobody was available isn't stranded — dispatchBooking is
+ * idempotent (offer rows upsert on the unique booking/mechanic pair), so
+ * re-offering to mechanics who already have the offer is a no-op. Returns the
+ * number of bookings that reached at least one mechanic.
+ */
+export async function redispatchPending(): Promise<number> {
+  const admin = createAdminClient();
+  const { data: pending } = await admin
+    .from("bookings")
+    .select("id")
+    .eq("status", "sourcing_mechanic")
+    .is("mechanic_id", null);
+
+  if (!pending?.length) return 0;
+
+  let reached = 0;
+  for (const b of pending) {
+    const { offered } = await dispatchBooking(b.id);
+    if (offered > 0) reached += 1;
+  }
+  return reached;
+}

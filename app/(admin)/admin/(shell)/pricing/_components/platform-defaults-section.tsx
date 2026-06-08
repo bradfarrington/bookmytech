@@ -54,7 +54,7 @@ export function PlatformDefaultsSection({ settings }: { settings: PlatformSettin
               onSave={(v) => updatePlatformSetting("take_rate_base", v ?? 0)}
             />
           </Row>
-          <Row label="Pro take rate" hint="Pro-tier mechanics (Task 11)">
+          <Row label="Pro take rate" hint="Applied to Pro-tier mechanics">
             <InlineNumber
               value={settings.take_rate_pro}
               {...percent}

@@ -126,7 +126,7 @@ export function BookingActions({
         </button>
         <p className="mt-1.5 text-xs text-text-muted">
           Releases the Stripe pre-authorisation (auto-releases within 7 days).
-          No cancellation fee is taken — that lands in a later task.
+          An admin cancellation takes no fee from the customer.
         </p>
       </div>
     </div>

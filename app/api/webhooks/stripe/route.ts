@@ -49,14 +49,45 @@ export async function POST(req: NextRequest) {
 async function syncAccount(account: Stripe.Account) {
   const flags = accountFlags(account);
   const admin = createAdminClient();
+
+  // Read the current state so we can detect the disabled→enabled transition and
+  // auto-go-online the mechanic the first time payouts are enabled (matches the
+  // local refreshStripeStatus path).
+  const { data: existing } = await admin
+    .from("mechanics")
+    .select("id, stripe_payouts_enabled, status")
+    .eq("stripe_account_id", account.id)
+    .single();
+
+  const justEnabled = flags.payoutsEnabled && !existing?.stripe_payouts_enabled;
+  const now = new Date().toISOString();
+  const patch: Record<string, unknown> = {
+    stripe_charges_enabled: flags.chargesEnabled,
+    stripe_payouts_enabled: flags.payoutsEnabled,
+    stripe_onboarding_complete: flags.onboardingComplete,
+    updated_at: now,
+  };
+  if (justEnabled && existing?.status !== "online") {
+    patch.status = "online";
+    patch.online_at = now;
+    patch.last_seen_at = now;
+  }
+
   const { error } = await admin
     .from("mechanics")
-    .update({
-      stripe_charges_enabled: flags.chargesEnabled,
-      stripe_payouts_enabled: flags.payoutsEnabled,
-      stripe_onboarding_complete: flags.onboardingComplete,
-      updated_at: new Date().toISOString(),
-    })
+    .update(patch)
     .eq("stripe_account_id", account.id);
-  if (error) console.error("Failed to sync mechanic from account.updated", error);
+  if (error) {
+    console.error("Failed to sync mechanic from account.updated", error);
+    return;
+  }
+
+  // Once they're online, re-offer any job that was waiting for a mechanic.
+  if (justEnabled) {
+    try {
+      await (await import("@/lib/dispatch/dispatch")).redispatchPending();
+    } catch (err) {
+      console.error("redispatch after webhook auto-online failed", err);
+    }
+  }
 }

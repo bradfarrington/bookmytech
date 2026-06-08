@@ -90,16 +90,16 @@ export function StripeOnboardingPanel({
     <div className="rounded-2xl border border-border bg-surface-card p-6">
       {syncing ? (
         <p className="flex items-center gap-2 text-sm text-text-muted">
-          <Loader2 className="animate-spin" size={16} /> Checking your Stripe status…
+          <Loader2 className="animate-spin" size={16} /> Checking your payout status…
         </p>
       ) : (
         <>
           <p className="text-sm text-text-secondary">
             {hasAccount && onboardingComplete
-              ? "Stripe has your details but hasn't enabled payouts yet — this can take a few minutes. Re-check below."
+              ? "We have your details but payouts aren't enabled yet — this can take a few minutes. Re-check below."
               : hasAccount
                 ? "You started onboarding but haven't finished. Pick up where you left off."
-                : "Stripe collects your bank details and verifies your identity on a secure, Stripe-hosted page. It takes a couple of minutes."}
+                : "We securely collect your bank details and verify your identity on a secure hosted page. It takes a couple of minutes."}
           </p>
 
           <div className="mt-5 flex flex-wrap gap-3">
@@ -110,7 +110,7 @@ export function StripeOnboardingPanel({
               disabled={pending}
             >
               {pending
-                ? "Opening Stripe…"
+                ? "Opening…"
                 : hasAccount
                   ? "Continue onboarding"
                   : "Connect bank account"}

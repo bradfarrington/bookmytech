@@ -266,7 +266,7 @@ export async function cancelBooking(
           await stripe.paymentIntents.cancel(booking.stripe_payment_intent_id);
         }
       } catch (err) {
-        const message = err instanceof Error ? err.message : "Stripe error";
+        const message = err instanceof Error ? err.message : "Payment error";
         return {
           ok: false,
           error: `Couldn't settle your payment hold: ${message}. Nothing was changed — try again.`,

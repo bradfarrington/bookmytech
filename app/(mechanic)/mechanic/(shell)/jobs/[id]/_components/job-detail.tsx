@@ -37,7 +37,7 @@ import { PartsOrder, type JobPart } from "./parts-order";
 export interface JobDetailProps {
   bookingId: string;
   status: string;
-  ref: string; // short id
+  shortRef: string; // short id ("ref" is reserved by React — can't be a prop name)
   createdAt: string | null;
   serviceName: string;
   vehicle: string; // "VW Golf"
@@ -263,12 +263,12 @@ export function JobDetail(props: JobDetailProps) {
             </Card>
           )}
 
-          {/* Parts — placeholder until the parts system (Task 10) */}
+          {/* Parts allocated to this job (the side column lists them in full
+              once any are added). */}
           <Card className="space-y-3 p-6">
             <CardTitle icon={Package}>Parts allocated</CardTitle>
             <p className="text-sm text-text-muted">
-              No parts allocated yet. Parts sourcing &amp; supplier costs land with
-              the parts system in a later task.
+              No parts have been allocated to this job.
             </p>
           </Card>
 

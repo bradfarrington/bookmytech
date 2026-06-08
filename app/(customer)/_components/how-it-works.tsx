@@ -16,7 +16,7 @@ const STEPS: Step[] = [
     icon: Car,
     title: "Tell us your car",
     description:
-      "Drop in your reg — we'll pull the make, model and engine straight from the DVLA.",
+      "Drop in your reg — we'll pull the make, model and engine automatically.",
   },
   {
     number: "02",

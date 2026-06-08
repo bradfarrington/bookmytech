@@ -52,7 +52,7 @@ export default async function AdminOverviewPage() {
   const { data: bookingsRaw } = await supabase
     .from("bookings")
     .select(
-      "id, status, area, total_pence, customer_name, mechanic_id, service_id, created_at",
+      "id, status, area, total_pence, platform_fee_pence, commission_rate, customer_name, mechanic_id, service_id, created_at",
     )
     .order("created_at", { ascending: false })
     .limit(1000);
@@ -64,7 +64,7 @@ export default async function AdminOverviewPage() {
   const serviceIds = [...new Set(bookings.map((b) => b.service_id).filter(Boolean))];
   const mechanicIds = [...new Set(bookings.map((b) => b.mechanic_id).filter(Boolean))];
 
-  const [{ data: services }, { data: mechProfiles }, { data: mechanics }] =
+  const [{ data: services }, { data: mechProfiles }, { data: mechanics }, { data: acceptedOffers }] =
     await Promise.all([
       serviceIds.length
         ? supabase.from("services").select("id, name").in("id", serviceIds)
@@ -73,6 +73,13 @@ export default async function AdminOverviewPage() {
         ? supabase.from("profiles").select("id, full_name").in("id", mechanicIds)
         : Promise.resolve({ data: [] as { id: string; full_name: string | null }[] }),
       supabase.from("mechanics").select("id, status, base_postcode, rating, job_count"),
+      supabase
+        .from("job_offers")
+        .select("offered_at, responded_at")
+        .eq("response", "accepted")
+        .not("responded_at", "is", null)
+        .order("responded_at", { ascending: false })
+        .limit(200),
     ]);
 
   const serviceName = new Map((services ?? []).map((s) => [s.id, s.name]));
@@ -93,6 +100,41 @@ export default async function AdminOverviewPage() {
     .filter((b) => new Date(b.created_at).getTime() >= startOfToday)
     .reduce((sum, b) => sum + (b.total_pence ?? 0), 0);
   const mechanicsOnline = (mechanics ?? []).filter((m) => m.status === "online").length;
+
+  // Take-rate = platform fees as a share of GMV (snapshotted per booking by the
+  // pricing engine). Falls back to the mean commission rate when no fee figures
+  // exist yet, then null so the card shows "—" rather than a fake number.
+  let feeSum = 0;
+  let gmvSum = 0;
+  for (const b of bookings) {
+    if (b.total_pence && b.platform_fee_pence != null) {
+      feeSum += b.platform_fee_pence;
+      gmvSum += b.total_pence;
+    }
+  }
+  let takeRatePct: number | null = null;
+  if (gmvSum > 0) {
+    takeRatePct = (feeSum / gmvSum) * 100;
+  } else {
+    const rates = bookings.map((b) => b.commission_rate).filter((r) => r != null);
+    if (rates.length) {
+      takeRatePct = (rates.reduce((a, c) => a + Number(c), 0) / rates.length) * 100;
+    }
+  }
+
+  // Avg time-to-accept = mean(offered_at → responded_at) over recent accepted
+  // offers. Guards against clock skew / stale offers (negative or >24h dropped).
+  const acceptDiffs = (acceptedOffers ?? [])
+    .map((o) =>
+      o.responded_at && o.offered_at
+        ? (new Date(o.responded_at).getTime() - new Date(o.offered_at).getTime()) / 1000
+        : NaN,
+    )
+    .filter((d) => Number.isFinite(d) && d >= 0 && d < 86_400);
+  const avgAcceptSecs =
+    acceptDiffs.length > 0
+      ? acceptDiffs.reduce((a, c) => a + c, 0) / acceptDiffs.length
+      : null;
 
   // --- Monitor rows ---------------------------------------------------------
   const monitorRows: MonitorRow[] = bookings.map((b) => ({
@@ -171,7 +213,7 @@ export default async function AdminOverviewPage() {
       </header>
 
       <KpiCards
-        kpis={{ liveBookings, gmvTodayPence, mechanicsOnline }}
+        kpis={{ liveBookings, gmvTodayPence, mechanicsOnline, takeRatePct, avgAcceptSecs }}
       />
 
       <div className="grid gap-6 lg:grid-cols-3">

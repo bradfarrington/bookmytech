@@ -2,6 +2,15 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   devIndicators: false,
+  experimental: {
+    serverActions: {
+      // Uploads (onboarding docs, job photos, avatars) go through Server Actions.
+      // Next.js caps Server Action request bodies at 1MB by default, which rejects
+      // a normal photo/PDF before our own 10MB per-file validation can run. Lift it
+      // above the largest per-file limit (10MB docs/photos) plus multipart overhead.
+      bodySizeLimit: "15mb",
+    },
+  },
   async headers() {
     return [
       // Baseline security headers, applied everywhere.

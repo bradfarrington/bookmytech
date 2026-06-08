@@ -18,7 +18,6 @@ export interface SmsSettings {
   smsEnabled: boolean;
   balance: number;
   senderName: string;
-  fromNumber: string;
   lowCreditEmail: string;
 }
 
@@ -71,7 +70,7 @@ export function SmsPanel({
       <BalanceAndToggle balance={settings.balance} smsEnabled={settings.smsEnabled} />
 
       <section className="space-y-3">
-        <SectionHeading title="Buy credits" subtitle="Top up via bank payment (GoCardless). 10p per credit." />
+        <SectionHeading title="Buy credits" subtitle="Top up via secure bank payment. 10p per credit." />
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {packages.map((p) => (
             <PackageCard key={p.credits} pkg={p} />
@@ -80,7 +79,7 @@ export function SmsPanel({
       </section>
 
       <div className="grid gap-8 lg:grid-cols-2">
-        <SenderSection senderName={settings.senderName} fromNumber={settings.fromNumber} />
+        <SenderSection senderName={settings.senderName} />
         <AlertEmailSection email={settings.lowCreditEmail} />
       </div>
 
@@ -221,14 +220,13 @@ function PackageCard({ pkg }: { pkg: PackageRow }) {
   );
 }
 
-function SenderSection({ senderName, fromNumber }: { senderName: string; fromNumber: string }) {
+function SenderSection({ senderName }: { senderName: string }) {
   const [name, setName] = useState(senderName);
-  const [number, setNumber] = useState(fromNumber);
   const [pending, start] = useTransition();
 
   function save() {
     start(async () => {
-      const res = await saveSmsSender({ senderName: name, fromNumber: number });
+      const res = await saveSmsSender({ senderName: name });
       if (res.ok) toast.success("Sender saved.");
       else toast.error(res.error);
     });
@@ -247,21 +245,13 @@ function SenderSection({ senderName, fromNumber }: { senderName: string; fromNum
           onChange={(e) => setName(e.target.value)}
         />
         <span className="text-xs font-normal text-text-muted">
-          1–11 letters/numbers, no spaces. Not supported on Twilio trial accounts.
+          1–11 letters/numbers, no spaces.
         </span>
       </label>
-      <label className={FIELD_LABEL}>
-        From number
-        <input
-          className={FIELD_INPUT}
-          value={number}
-          placeholder="+447700900000"
-          onChange={(e) => setNumber(e.target.value)}
-        />
-        <span className="text-xs font-normal text-text-muted">
-          A real Twilio number (required on trial accounts). Wins over the sender name.
-        </span>
-      </label>
+      <p className="rounded-button bg-surface px-3 py-2 text-xs text-text-muted">
+        The sending phone number is managed centrally by Book My Tech and
+        can&apos;t be changed here.
+      </p>
       <SaveButton pending={pending} onClick={save} />
     </section>
   );

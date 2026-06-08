@@ -92,7 +92,7 @@ export function VehicleLookupModal({
             className="animate-spin text-brand-blue"
           />
           <p className="text-sm text-text-secondary">
-            Checking DVLA for your vehicle…
+            Looking up your vehicle…
           </p>
         </div>
       )}

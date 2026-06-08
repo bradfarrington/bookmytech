@@ -33,8 +33,8 @@ export default async function NewMechanicPage() {
         </h1>
         <p className="mt-1.5 text-sm text-text-muted">
           Manually create a mechanic profile. They&apos;ll receive an email
-          invite with a magic-link sign-in. Proper application + document
-          review flow lands in task 07.
+          invite with a magic-link sign-in. For self-serve sign-ups, mechanics
+          can also apply and upload documents via the public application.
         </p>
       </header>
 

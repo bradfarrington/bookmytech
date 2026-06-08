@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { redispatchPending } from "@/lib/dispatch/dispatch";
 
 export type MechanicStatusResult =
   | { ok: true; status: "online" | "offline" }
@@ -51,6 +52,16 @@ export async function setOwnAvailability(
     .eq("id", user.id);
 
   if (error) return { ok: false, error: error.message };
+
+  // Coming online rescues any job booked while nobody was available — re-offer
+  // every still-unassigned booking so it reaches this mechanic if in range.
+  if (status === "online") {
+    try {
+      await redispatchPending();
+    } catch (err) {
+      console.error("redispatch on go-online failed", err);
+    }
+  }
 
   revalidatePath("/mechanic/jobs");
   return { ok: true, status };

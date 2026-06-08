@@ -59,16 +59,6 @@ export default async function SettingsPage() {
           </div>
           <ChevronRight size={18} className="shrink-0 text-text-muted" />
         </Link>
-
-        {/* Saved cards + addresses still land with the partial-deposit/saved-cards
-            work; surface them as a clear placeholder rather than a dead link. */}
-        <div className="rounded-2xl border border-dashed border-border bg-surface-card p-6">
-          <h2 className="text-sm font-bold uppercase tracking-wide text-text-muted">Payment &amp; addresses</h2>
-          <p className="mt-2 text-sm text-text-secondary">
-            Saved cards and addresses are coming soon. For now your card is
-            entered securely at booking time.
-          </p>
-        </div>
       </main>
     </div>
   );

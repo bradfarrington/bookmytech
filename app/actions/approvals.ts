@@ -192,21 +192,23 @@ async function provisionMechanic(
     console.error("approve: failed to seed mechanic_documents", err);
   }
 
-  // Magic-link sign-in (token_hash → server callback), same as the invite flow.
+  // Set-password invite: a recovery link redeemed in /auth/callback leaves the
+  // mechanic with a session on /mechanic/set-password, where they choose a
+  // password. They sign in with email + password from then on.
   const base = siteUrl();
   const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({
-    type: "magiclink",
+    type: "recovery",
     email,
-    options: { redirectTo: `${base}/auth/callback?next=/mechanic` },
+    options: { redirectTo: `${base}/auth/callback?next=/mechanic/set-password` },
   });
 
-  let actionLink = `${base}/mechanic`;
+  let actionLink = `${base}/mechanic/login`;
   if (!linkErr && linkData?.properties?.hashed_token) {
     actionLink = `${base}/auth/callback?token_hash=${encodeURIComponent(
       linkData.properties.hashed_token,
-    )}&type=magiclink&next=/mechanic`;
+    )}&type=recovery&next=/mechanic/set-password`;
   } else {
-    console.error("approve: failed to generate magic link", linkErr);
+    console.error("approve: failed to generate set-password link", linkErr);
   }
 
   try {

@@ -135,13 +135,15 @@ export async function createMechanicAction(
     return { error: `Couldn't create mechanic profile: ${mechErr.message}` };
   }
 
-  // Step 4 — generate a magic link and email it. We never enable Supabase's
-  // built-in mailer; the link goes through our MJML template + Resend wrapper.
+  // Step 4 — generate a set-password (recovery) link and email it. We never
+  // enable Supabase's built-in mailer; the link goes through our MJML template
+  // + Resend wrapper. Redeemed in /auth/callback, it lands the mechanic on
+  // /mechanic/set-password to choose a password (then email + password login).
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ?? "http://localhost:3000";
-  const redirectTo = `${siteUrl}/auth/callback?next=/mechanic`;
+  const redirectTo = `${siteUrl}/auth/callback?next=/mechanic/set-password`;
 
   const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({
-    type: "magiclink",
+    type: "recovery",
     email: parsed.data.email,
     options: { redirectTo },
   });
@@ -150,7 +152,7 @@ export async function createMechanicAction(
     // The mechanic exists — they just won't get the invite email. Admin can
     // re-send via a future "Resend invite" button. Don't roll back the whole
     // create — that would be worse.
-    console.error("Failed to generate magic link", linkErr);
+    console.error("Failed to generate set-password link", linkErr);
     revalidatePath("/admin/mechanics");
     redirect(`/admin/mechanics?flash=mechanic-created&email_warning=1`);
   }
@@ -162,7 +164,7 @@ export async function createMechanicAction(
   // the session server-side via verifyOtp and set the SSR cookies.
   const actionLink = `${siteUrl}/auth/callback?token_hash=${encodeURIComponent(
     linkData.properties.hashed_token,
-  )}&type=magiclink&next=/mechanic`;
+  )}&type=recovery&next=/mechanic/set-password`;
 
   const { subject, html } = await renderMechanicInviteEmail({
     name: parsed.data.fullName,

@@ -169,25 +169,24 @@ export async function setSmsEnabled(enabled: boolean): Promise<SmsResult> {
 
 export async function saveSmsSender(input: {
   senderName: string;
-  fromNumber: string;
 }): Promise<SmsResult> {
   const guard = await requireAdmin();
   if (!guard.ok) return guard;
 
   const senderName = input.senderName.trim();
   // Twilio alphanumeric sender id: 1-11 chars, letters/numbers (and spaces are
-  // not allowed). Empty is allowed (falls back to the number / default).
+  // not allowed). Empty is allowed (falls back to the platform number / default).
+  // The actual sending phone number is backend-only (TWILIO_FROM env) — SMS is
+  // resold centrally, so it's never tenant-configurable.
   if (senderName && !/^[A-Za-z0-9]{1,11}$/.test(senderName)) {
     return { ok: false, error: "Sender name must be 1-11 letters/numbers, no spaces." };
   }
-  const fromNumber = input.fromNumber.trim();
 
   const admin = createAdminClient();
   const { error } = await admin
     .from("sms_settings")
     .update({
       sms_sender_name: senderName || null,
-      sms_from_number: fromNumber || null,
       updated_at: new Date().toISOString(),
     })
     .eq("id", 1);

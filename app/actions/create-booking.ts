@@ -264,7 +264,7 @@ export async function prepareCheckout(input: {
   try {
     stripe = (await import("@/lib/stripe/server")).stripe;
   } catch {
-    return { ok: false, error: "Stripe is not configured. Add STRIPE_SECRET_KEY to .env.local." };
+    return { ok: false, error: "Payments aren't configured. Please try again shortly." };
   }
 
   try {
@@ -274,7 +274,7 @@ export async function prepareCheckout(input: {
       capture_method: "manual",
       description: "Book My Tech — service pre-authorisation",
     });
-    if (!intent.client_secret) return { ok: false, error: "No client secret from Stripe." };
+    if (!intent.client_secret) return { ok: false, error: "Couldn't start the payment. Please try again." };
     return {
       ok: true,
       mode: "preauth",
@@ -284,6 +284,6 @@ export async function prepareCheckout(input: {
       chargePence,
     };
   } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : "Stripe error" };
+    return { ok: false, error: err instanceof Error ? err.message : "Payment error" };
   }
 }

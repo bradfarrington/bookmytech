@@ -164,8 +164,7 @@ export async function completeAndCharge(bookingId: string): Promise<JobProgressR
     .select(
       `id, status, mechanic_id, customer_id, customer_email, customer_name, customer_phone, total_pence,
        mechanic_payout_pence, credit_applied_pence, payment_mode,
-       stripe_payment_intent_id, service:services(name),
-       mechanic:mechanics(stripe_account_id)`,
+       stripe_payment_intent_id, service:services(name)`,
     )
     .eq("id", bookingId)
     .single();
@@ -214,7 +213,7 @@ export async function completeAndCharge(bookingId: string): Promise<JobProgressR
           ? intent.latest_charge
           : (intent.latest_charge?.id ?? null);
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Stripe capture failed";
+      const message = err instanceof Error ? err.message : "Payment capture failed";
       return { ok: false, error: `Couldn't take payment: ${message}. The job stays open — try again.` };
     }
   }
@@ -282,9 +281,16 @@ export async function completeAndCharge(bookingId: string): Promise<JobProgressR
   // replacement mechanic is paid correctly. A failed transfer is NON-fatal —
   // the money is already captured and the job is complete — so we log it for
   // reconciliation/retry rather than blocking sign-off.
-  const mechanicAccount = (
-    Array.isArray(booking.mechanic) ? booking.mechanic[0] : booking.mechanic
-  ) as { stripe_account_id: string | null } | null;
+  // The mechanic's connected-account id lives on the `mechanics` table. There's
+  // no PostgREST-resolvable FK from bookings → mechanics, so fetch it directly
+  // rather than as an embedded join — embedding it errors the whole booking
+  // query (and made completion fail with "That job no longer exists").
+  const { data: mechanicRow } = await admin
+    .from("mechanics")
+    .select("stripe_account_id")
+    .eq("id", booking.mechanic_id)
+    .maybeSingle();
+  const mechanicAccount = mechanicRow as { stripe_account_id: string | null } | null;
   const payoutPence = booking.mechanic_payout_pence ?? 0;
   // Pay the mechanic when we captured money, or when credit covered the whole
   // total ('free') — in the free case there's no source_transaction, so the

@@ -408,6 +408,18 @@ export async function sendDisputeMessage(disputeId: string, body: string): Promi
     }).catch(() => {});
   }
 
+  // Nudge the mechanic on every new reply from another party so they don't have
+  // to be watching the thread (the admin gets the 'responded' email above).
+  if (role !== "mechanic") {
+    const mechTo = await mechanicEmail(admin, booking.mechanic_id);
+    if (mechTo)
+      sendEmail({
+        to: mechTo,
+        subject: `New message on a dispute — booking ${booking.id.slice(0, 8).toUpperCase()}`,
+        html: `<p>The ${role} posted a new message on the dispute for ${serviceName(booking)}. <a href="${siteUrl()}/mechanic/disputes/${disputeId}">Open the thread →</a></p>`,
+      }).catch(() => {});
+  }
+
   revalidateDispute(disputeId, dispute.booking_id);
   return { ok: true };
 }
@@ -501,6 +513,17 @@ export async function escalateDispute(disputeId: string): Promise<SimpleResult> 
     subject: `Dispute escalated — booking ${booking.id.slice(0, 8).toUpperCase()}`,
     html: `<p>A dispute on ${serviceName(booking)} was escalated by the ${role} and needs arbitration. <a href="${siteUrl()}/admin/disputes/${disputeId}">Arbitrate →</a></p>`,
   }).catch(() => {});
+
+  // Let the mechanic know when the other party escalates (admins can't escalate).
+  if (role !== "mechanic") {
+    const mechTo = await mechanicEmail(admin, booking.mechanic_id);
+    if (mechTo)
+      sendEmail({
+        to: mechTo,
+        subject: `A dispute was escalated — booking ${booking.id.slice(0, 8).toUpperCase()}`,
+        html: `<p>The ${role} escalated the dispute on ${serviceName(booking)} to Book My Tech for arbitration. We'll review and let you know the outcome. <a href="${siteUrl()}/mechanic/disputes/${disputeId}">View →</a></p>`,
+      }).catch(() => {});
+  }
 
   revalidateDispute(disputeId, dispute.booking_id);
   return { ok: true };
