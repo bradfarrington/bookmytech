@@ -16,9 +16,43 @@ Work top to bottom. Tick each box as you go. If something doesn't match the
 
 ---
 
+## Automated coverage (Playwright)
+
+Some of this guide is now an automated end-to-end suite — see
+[`tests/e2e/`](../tests/e2e/README.md). Run it with `npm run test:e2e`.
+
+| Guide section | Automated? |
+|---|---|
+| §1.1 Make a booking (core flow) | ✅ Partial — see the note under §1.1 |
+| Everything else (§1.2 onward) | ⬜ Not yet — manual only (mapped as TODOs in the e2e README) |
+
+Two caveats apply wherever automation touches money or messages:
+- **Stripe**: the suite uses Stripe **test mode** and asserts against the Stripe
+  **API**, not the dashboard. The in-browser card-entry + confirm step can't be
+  automated (Stripe's hCaptcha bot-check never resolves under a robot), so that
+  exact click is still **manual-only**.
+- **Email/SMS**: the suite asserts the message was **dispatched** (captured to a
+  test outbox), not that it arrived in a real inbox. Reading actual delivered
+  mail stays **manual**.
+
+---
+
 ## 1. Customer — booking a job
 
 ### 1.1 Make a booking (the core flow)
+
+> **✅ Automated** by `tests/e2e/customer-booking.spec.ts` (two flows):
+> - **Guest card pre-auth** — drives the funnel (service → price → slot →
+>   checkout) and verifies a **manual-capture hold for the full price** that,
+>   once confirmed, sits **uncaptured** (`requires_capture`). Checked via the
+>   Stripe API, not the dashboard.
+> - **Credit-covered booking** — a signed-in customer with account credit books
+>   with no card step, verifying the **confirmation screen + booking reference**,
+>   the booking row, and the **"we're finding your mechanic" email**.
+>
+> **Still manual** (not automated): the DVLA **reg lookup** (the suite passes the
+> vehicle in directly), **typing the test card into the Stripe form and
+> confirming**, and eyeballing the **real inbox** / **Stripe dashboard**.
 - [ ] Go to the home page → start a booking → **enter a car reg** → **Expect:** the car's make/model is looked up and shown (if the reg isn't found, you can enter details manually).
 - [ ] **Pick a service** (e.g. brake pads) → **Expect:** a price is shown.
 - [ ] **Pick a date & time slot** → **Expect:** you're taken to a payment step.

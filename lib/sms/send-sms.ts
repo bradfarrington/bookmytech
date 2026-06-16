@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { sendEmail } from "@/lib/email/send";
 import { renderLowCreditEmail } from "@/emails/low-sms-credits";
 import { siteUrl } from "@/lib/utils";
+import { recordTestOutbox } from "@/lib/test-outbox";
 
 // SMS sender — real Twilio implementation (Task 13 Stage B, sms-credits skill).
 //
@@ -39,6 +40,9 @@ export async function sendSms({
   body: string;
 }): Promise<boolean> {
   if (!to) return false;
+
+  // Test mode: capture the SMS and skip Twilio + credit logic (lib/test-outbox.ts).
+  if (recordTestOutbox("sms", { to, body })) return true;
 
   const accountSid = process.env.TWILIO_ACCOUNT_SID;
   const authToken = process.env.TWILIO_AUTH_TOKEN;
