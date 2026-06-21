@@ -1,3 +1,4 @@
+import Link from "next/link";
 import {
   Wrench,
   Search,
@@ -5,6 +6,7 @@ import {
   BatteryCharging,
   Settings,
   ShieldCheck,
+  ArrowRight,
   type LucideIcon,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -90,13 +92,14 @@ export async function ServicesPreview() {
           {services.map((s) => {
             const meta = SERVICE_META[s.slug] ?? { icon: FALLBACK_ICON };
             return (
-              <li key={s.id}>
-                <Card
-                  className={cn(
-                    "flex h-full items-start gap-3.5",
-                    meta.featured && "border-brand-blue bg-blue-50",
-                  )}
-                >
+              <li key={s.id} className="h-full">
+                <Link href="/book" className="block h-full" aria-label={`Book ${s.name}`}>
+                  <Card
+                    className={cn(
+                      "flex h-full items-start gap-3.5 transition-all hover:-translate-y-0.5 hover:border-brand-blue/50",
+                      meta.featured && "border-brand-blue bg-blue-50",
+                    )}
+                  >
                   <div
                     className={cn(
                       "flex size-11 shrink-0 items-center justify-center rounded-xl",
@@ -125,11 +128,22 @@ export async function ServicesPreview() {
                       </span>
                     </p>
                   </div>
-                </Card>
+                  </Card>
+                </Link>
               </li>
             );
           })}
         </ul>
+
+        <div className="mt-9 flex justify-center">
+          <Link
+            href="/services"
+            className="inline-flex items-center gap-1.5 text-sm font-semibold text-brand-blue transition-colors hover:text-brand-blue-dark"
+          >
+            View all services
+            <Icon icon={ArrowRight} size={16} />
+          </Link>
+        </div>
       </div>
     </section>
   );

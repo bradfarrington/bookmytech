@@ -8,13 +8,11 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 
-// Navigation labels shown across customer surfaces. Paths point at routes
-// planned by the brief — most don't exist yet, but the labels and ordering
-// match the proposal so links can be wired in as routes land.
+// Navigation labels shown across customer surfaces.
 const NAV_ITEMS = [
-  { label: "Book", href: "/" },
+  { label: "Book", href: "/book" },
   { label: "How it works", href: "/#how-it-works" },
-  { label: "Services", href: "/#services" },
+  { label: "Services", href: "/services" },
   { label: "For mechanics", href: "/mechanics" },
   { label: "Help", href: "/help" },
 ] as const;
@@ -100,16 +98,18 @@ export function CustomerNav({ active = "Book", dark = false }: CustomerNavProps)
         >
           Sign in
         </Link>
-        <Button
-          variant={dark ? "secondary" : "primary"}
-          size="sm"
-          className={cn(
-            "whitespace-nowrap",
-            dark && "border-transparent bg-white text-brand-blue hover:bg-white/90",
-          )}
-        >
-          Book a mechanic
-        </Button>
+        <Link href="/book">
+          <Button
+            variant={dark ? "secondary" : "primary"}
+            size="sm"
+            className={cn(
+              "whitespace-nowrap",
+              dark && "border-transparent bg-white text-brand-blue hover:bg-white/90",
+            )}
+          >
+            Book a mechanic
+          </Button>
+        </Link>
       </div>
 
       <button
@@ -216,14 +216,11 @@ function NavDrawer({ open, onClose, active }: NavDrawerProps) {
           >
             Sign in
           </Link>
-          <Button
-            variant="primary"
-            size="md"
-            fullWidth
-            onClick={onClose}
-          >
-            Book a mechanic
-          </Button>
+          <Link href="/book" onClick={onClose} className="block">
+            <Button variant="primary" size="md" fullWidth>
+              Book a mechanic
+            </Button>
+          </Link>
         </div>
       </aside>
     </div>

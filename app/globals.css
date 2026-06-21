@@ -54,3 +54,18 @@ body {
   background-color: var(--color-surface);
   color: var(--color-text-primary);
 }
+
+/* Tailwind v4's Preflight no longer sets `cursor: pointer` on buttons, so
+   clickable controls show the default arrow. Restore the hand cursor on
+   interactive elements site-wide. Disabled controls keep the not-allowed
+   cursor set by their own styles. */
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  a[href],
+  label[for],
+  summary,
+  select:not(:disabled) {
+    cursor: pointer;
+  }
+}

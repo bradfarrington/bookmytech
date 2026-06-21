@@ -38,29 +38,29 @@ const COLUMNS: FooterColumn[] = [
   {
     heading: "For Customers",
     links: [
-      { label: "Book a service", href: "#" },
-      { label: "How it works", href: "#how-it-works" },
-      { label: "Services", href: "#services" },
-      { label: "Reviews", href: "#reviews" },
-      { label: "Pricing", href: "#" },
+      { label: "Book a service", href: "/book" },
+      { label: "How it works", href: "/#how-it-works" },
+      { label: "Services", href: "/services" },
+      { label: "Reviews", href: "/#reviews" },
+      { label: "Pricing", href: "/services" },
     ],
   },
   {
     heading: "For Mechanics",
     links: [
-      { label: "Become a mechanic", href: "/mechanics/apply" },
-      { label: "Pro tier", href: "#" },
-      { label: "Help centre", href: "#" },
+      { label: "Become a mechanic", href: "/mechanics" },
+      { label: "Apply now", href: "/mechanics/apply" },
+      { label: "Help centre", href: "/help" },
       { label: "Mechanic login", href: "/mechanic/login" },
     ],
   },
   {
     heading: "Company",
     links: [
-      { label: "About", href: "#" },
-      { label: "Careers", href: "#" },
-      { label: "Contact", href: "#" },
-      { label: "Press", href: "#" },
+      { label: "Services", href: "/services" },
+      { label: "Help & FAQ", href: "/help" },
+      { label: "For mechanics", href: "/mechanics" },
+      { label: "Contact", href: "/help" },
     ],
   },
 ];
