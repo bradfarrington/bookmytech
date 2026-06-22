@@ -18,6 +18,7 @@ import { Card } from "@/components/ui/card";
 import { Icon } from "@/components/ui/icon";
 import { Overline } from "@/components/ui/overline";
 import { Button } from "@/components/ui/button";
+import { Reveal } from "@/components/ui/reveal";
 import { createClient } from "@/lib/supabase/server";
 import { formatPrice } from "@/lib/utils";
 import { Footer } from "../_components/footer";
@@ -108,7 +109,7 @@ export default async function ServicesPage() {
     <>
       <section className="bg-brand-gradient text-white">
         <CustomerNav active="Services" dark />
-        <div className="mx-auto max-w-content px-4 pb-16 pt-10 text-center sm:px-8 lg:pb-20 lg:pt-14">
+        <Reveal stagger trigger="mount" y={18} className="mx-auto max-w-content px-4 pb-16 pt-10 text-center sm:px-8 lg:pb-20 lg:pt-14">
           <Overline className="mb-3 text-white/70">Services &amp; pricing</Overline>
           <h1 className="mx-auto mb-4 max-w-3xl text-[34px] font-extrabold leading-[1.05] tracking-[-0.025em] sm:text-[44px] lg:text-[52px]">
             Fixed prices on every job. Parts and labour included.
@@ -138,7 +139,7 @@ export default async function ServicesPage() {
               </li>
             ))}
           </ul>
-        </div>
+        </Reveal>
       </section>
 
       <main className="bg-surface">
@@ -169,7 +170,7 @@ export default async function ServicesPage() {
                       </h2>
                     </div>
 
-                    <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    <Reveal as="ul" stagger className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                       {group.services.map((s) => (
                         <li key={s.id} className="h-full">
                           <Link
@@ -202,7 +203,7 @@ export default async function ServicesPage() {
                           </Link>
                         </li>
                       ))}
-                    </ul>
+                    </Reveal>
                   </section>
                 );
               })}

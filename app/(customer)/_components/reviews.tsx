@@ -1,6 +1,7 @@
 import { Avatar } from "@/components/ui/avatar";
 import { Card } from "@/components/ui/card";
 import { Stars } from "@/components/ui/stars";
+import { Reveal } from "@/components/ui/reveal";
 
 type Review = {
   name: string;
@@ -37,7 +38,7 @@ const REVIEWS: Review[] = [
 export function Reviews() {
   return (
     <section id="reviews" className="mx-auto max-w-content px-4 pb-14 sm:px-8 lg:pb-[56px]">
-      <ul className="grid gap-4 lg:grid-cols-3">
+      <Reveal as="ul" stagger className="grid gap-4 lg:grid-cols-3">
         {REVIEWS.map((r, i) => (
           <li key={r.name}>
             <Card className="flex h-full flex-col">
@@ -58,7 +59,7 @@ export function Reviews() {
             </Card>
           </li>
         ))}
-      </ul>
+      </Reveal>
     </section>
   );
 }

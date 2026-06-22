@@ -6,6 +6,7 @@ import {
   RosetteIcon,
 } from "@/components/ui/brand-icons";
 import { Overline } from "@/components/ui/overline";
+import { Reveal } from "@/components/ui/reveal";
 
 type Pillar = {
   Icon: (p: BrandIconProps) => React.ReactElement;
@@ -40,14 +41,14 @@ export function WhyBmt() {
   return (
     <section className="bg-surface-card border-y border-border">
       <div className="mx-auto max-w-content px-4 py-14 sm:px-8 lg:py-[56px]">
-        <div className="mx-auto mb-10 max-w-[640px] text-center">
+        <Reveal className="mx-auto mb-10 max-w-[640px] text-center">
           <Overline className="mb-2 text-brand-blue">Why Book My Tech</Overline>
           <h2 className="text-[32px] font-extrabold leading-tight tracking-[-0.025em] text-text-primary sm:text-[40px]">
             Built for drivers who&apos;d rather be anywhere else.
           </h2>
-        </div>
+        </Reveal>
 
-        <ul className="grid gap-x-10 gap-y-8 md:grid-cols-2 md:gap-x-16">
+        <Reveal as="ul" stagger className="grid gap-x-10 gap-y-8 md:grid-cols-2 md:gap-x-16">
           {PILLARS.map((p) => (
             <li key={p.title} className="flex items-start gap-4">
               <div className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-blue-50 ring-1 ring-inset ring-brand-blue/10">
@@ -63,7 +64,7 @@ export function WhyBmt() {
               </div>
             </li>
           ))}
-        </ul>
+        </Reveal>
       </div>
     </section>
   );

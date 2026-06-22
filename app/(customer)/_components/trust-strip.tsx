@@ -5,6 +5,7 @@ import {
   CalendarBoltIcon,
   RosetteIcon,
 } from "@/components/ui/brand-icons";
+import { Reveal } from "@/components/ui/reveal";
 
 type Badge = {
   Icon: (p: BrandIconProps) => React.ReactElement;
@@ -22,7 +23,7 @@ const BADGES: Badge[] = [
 export function TrustStrip() {
   return (
     <section className="border-b border-border bg-surface-card">
-      <div className="mx-auto grid max-w-content gap-3 px-4 py-6 sm:grid-cols-2 sm:px-8 sm:py-7 lg:grid-cols-4">
+      <Reveal as="div" stagger y={16} className="mx-auto grid max-w-content gap-3 px-4 py-6 sm:grid-cols-2 sm:px-8 sm:py-7 lg:grid-cols-4">
         {BADGES.map(({ Icon, value, label }) => (
           <div
             key={value}
@@ -41,7 +42,7 @@ export function TrustStrip() {
             </div>
           </div>
         ))}
-      </div>
+      </Reveal>
     </section>
   );
 }

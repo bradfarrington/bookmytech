@@ -2,7 +2,8 @@ import { Check } from "lucide-react";
 import { CustomerNav } from "@/components/ui/customer-nav";
 import { Icon } from "@/components/ui/icon";
 import { Pill } from "@/components/ui/pill";
-import { MechanicPreviewCard } from "./mechanic-preview-card";
+import { Reveal } from "@/components/ui/reveal";
+import { LiveDispatchCard } from "./live-dispatch-card";
 import { RegLookupForm } from "./reg-lookup-form";
 
 const REASSURANCES = [
@@ -17,7 +18,7 @@ export function Hero() {
       <CustomerNav active="Book" dark />
 
       <div className="mx-auto grid max-w-content gap-10 px-4 pb-14 pt-8 sm:px-8 lg:grid-cols-[1.1fr_1fr] lg:gap-14 lg:pb-14 lg:pt-14">
-        <div>
+        <Reveal stagger trigger="mount" y={18}>
           <Pill
             tone="dark"
             dot
@@ -46,10 +47,10 @@ export function Hero() {
               </li>
             ))}
           </ul>
-        </div>
+        </Reveal>
 
         <div className="relative mx-auto w-full max-w-[420px] lg:ml-auto lg:mr-0">
-          <MechanicPreviewCard />
+          <LiveDispatchCard />
         </div>
       </div>
     </section>

@@ -7,6 +7,7 @@ import { Icon } from "@/components/ui/icon";
 import { Overline } from "@/components/ui/overline";
 import { Button } from "@/components/ui/button";
 import { Accordion, type AccordionItem } from "@/components/ui/accordion";
+import { Reveal } from "@/components/ui/reveal";
 import type { BrandIconProps } from "@/components/ui/brand-icons";
 import {
   PoundCoinIcon,
@@ -142,7 +143,7 @@ export default function MechanicsLandingPage() {
       <section className="bg-brand-gradient text-white">
         <CustomerNav active="For mechanics" dark />
         <div className="mx-auto grid max-w-content gap-10 px-4 pb-16 pt-10 sm:px-8 lg:grid-cols-[1.15fr_1fr] lg:items-center lg:gap-14 lg:pb-20 lg:pt-14">
-          <div>
+          <Reveal stagger trigger="mount" y={18}>
             <Overline className="mb-3 text-white/70">For mechanics</Overline>
             <h1 className="mb-4 text-[34px] font-extrabold leading-[1.05] tracking-[-0.025em] sm:text-[44px] lg:text-[54px]">
               Be your own boss. We&apos;ll bring the work.
@@ -176,10 +177,10 @@ export default function MechanicsLandingPage() {
             <p className="mt-4 text-sm text-white/70">
               Takes about 10 minutes · free to apply · vetted in days
             </p>
-          </div>
+          </Reveal>
 
           <Card className="bg-white/10 backdrop-blur lg:ml-auto" padded>
-            <ul className="grid grid-cols-2 gap-x-6 gap-y-7">
+            <Reveal as="ul" stagger y={16} className="grid grid-cols-2 gap-x-6 gap-y-7">
               {STATS.map((s) => (
                 <li key={s.label}>
                   <p className="text-3xl font-extrabold tracking-tight text-white">
@@ -188,7 +189,7 @@ export default function MechanicsLandingPage() {
                   <p className="mt-1 text-sm text-white/75">{s.label}</p>
                 </li>
               ))}
-            </ul>
+            </Reveal>
           </Card>
         </div>
       </section>
@@ -202,7 +203,7 @@ export default function MechanicsLandingPage() {
               Built around mechanics, not middlemen.
             </h2>
           </div>
-          <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <Reveal as="ul" stagger className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {BENEFITS.map((b) => (
               <li key={b.title}>
                 <Card className="h-full">
@@ -216,7 +217,7 @@ export default function MechanicsLandingPage() {
                 </Card>
               </li>
             ))}
-          </ul>
+          </Reveal>
         </div>
       </section>
 
@@ -229,7 +230,7 @@ export default function MechanicsLandingPage() {
               From application to earning in three steps.
             </h2>
           </div>
-          <ol className="grid gap-4 md:grid-cols-3">
+          <Reveal as="ol" stagger className="grid gap-4 md:grid-cols-3">
             {STEPS.map((s) => (
               <li key={s.number}>
                 <Card className="h-full">
@@ -248,7 +249,7 @@ export default function MechanicsLandingPage() {
                 </Card>
               </li>
             ))}
-          </ol>
+          </Reveal>
         </div>
       </section>
 

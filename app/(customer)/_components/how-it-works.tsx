@@ -7,6 +7,7 @@ import {
 } from "@/components/ui/brand-icons";
 import { Card } from "@/components/ui/card";
 import { Overline } from "@/components/ui/overline";
+import { Reveal } from "@/components/ui/reveal";
 
 type Step = {
   number: string;
@@ -49,7 +50,7 @@ const STEPS: Step[] = [
 export function HowItWorks() {
   return (
     <section id="how-it-works" className="mx-auto max-w-content px-4 py-14 sm:px-8 lg:py-[56px]">
-      <div className="mx-auto mb-9 max-w-[600px] text-center">
+      <Reveal className="mx-auto mb-9 max-w-[600px] text-center">
         <Overline className="mb-2 text-brand-blue">How it works</Overline>
         <h2 className="mb-2 text-[32px] font-extrabold leading-tight tracking-[-0.025em] text-text-primary sm:text-[40px]">
           From breakdown to fixed in four taps.
@@ -58,9 +59,9 @@ export function HowItWorks() {
           No phone calls. No quotes. No waiting around for the AA. Just a fast,
           transparent booking.
         </p>
-      </div>
+      </Reveal>
 
-      <ol className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <Reveal as="ol" stagger className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {STEPS.map((s) => (
           <li key={s.number}>
             <Card className="h-full p-[22px]">
@@ -81,7 +82,7 @@ export function HowItWorks() {
             </Card>
           </li>
         ))}
-      </ol>
+      </Reveal>
     </section>
   );
 }

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { Icon } from "@/components/ui/icon";
 import { Overline } from "@/components/ui/overline";
+import { Reveal } from "@/components/ui/reveal";
 import { cn } from "@/lib/utils";
 
 type FaqItem = { question: string; answer: string };
@@ -47,12 +48,12 @@ export function Faq() {
   return (
     <section className="bg-surface">
       <div className="mx-auto max-w-[820px] px-4 py-14 sm:px-8 lg:py-[56px]">
-        <div className="mb-9 text-center">
+        <Reveal className="mb-9 text-center">
           <Overline className="mb-2 text-brand-blue">FAQ</Overline>
           <h2 className="text-[32px] font-extrabold leading-tight tracking-[-0.025em] text-text-primary sm:text-[40px]">
             Questions, answered.
           </h2>
-        </div>
+        </Reveal>
 
         <ul className="flex flex-col gap-2">
           {FAQS.map((item, i) => {

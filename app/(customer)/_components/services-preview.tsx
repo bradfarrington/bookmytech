@@ -13,6 +13,7 @@ import { Card } from "@/components/ui/card";
 import { Icon } from "@/components/ui/icon";
 import { Overline } from "@/components/ui/overline";
 import { Pill } from "@/components/ui/pill";
+import { Reveal } from "@/components/ui/reveal";
 import { createClient } from "@/lib/supabase/server";
 import { cn, formatPrice } from "@/lib/utils";
 
@@ -77,7 +78,7 @@ export async function ServicesPreview() {
   return (
     <section id="services" className="bg-surface">
       <div className="mx-auto max-w-content px-4 py-14 sm:px-8 lg:py-[56px]">
-        <div className="mx-auto mb-9 max-w-[600px] text-center">
+        <Reveal className="mx-auto mb-9 max-w-[600px] text-center">
           <Overline className="mb-2 text-brand-blue">Services</Overline>
           <h2 className="mb-2 text-[32px] font-extrabold leading-tight tracking-[-0.025em] text-text-primary sm:text-[40px]">
             Fixed prices on the things that matter.
@@ -86,9 +87,9 @@ export async function ServicesPreview() {
             Every job priced up front, parts and labour included. Pick what you
             need, see the price, book a mechanic.
           </p>
-        </div>
+        </Reveal>
 
-        <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <Reveal as="ul" stagger className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {services.map((s) => {
             const meta = SERVICE_META[s.slug] ?? { icon: FALLBACK_ICON };
             return (
@@ -133,7 +134,7 @@ export async function ServicesPreview() {
               </li>
             );
           })}
-        </ul>
+        </Reveal>
 
         <div className="mt-9 flex justify-center">
           <Link
