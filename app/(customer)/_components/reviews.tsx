@@ -1,5 +1,6 @@
 import { Avatar } from "@/components/ui/avatar";
 import { Card } from "@/components/ui/card";
+import { Overline } from "@/components/ui/overline";
 import { Stars } from "@/components/ui/stars";
 import { Reveal } from "@/components/ui/reveal";
 
@@ -38,6 +39,17 @@ const REVIEWS: Review[] = [
 export function Reviews() {
   return (
     <section id="reviews" className="mx-auto max-w-content px-4 pb-14 sm:px-8 lg:pb-[56px]">
+      <Reveal className="mx-auto mb-9 max-w-[600px] text-center">
+        <Overline className="mb-2 text-brand-blue">Reviews</Overline>
+        <h2 className="mb-2 text-[32px] font-extrabold leading-tight tracking-[-0.025em] text-text-primary sm:text-[40px]">
+          Drivers across the UK rate us 4.9 out of 5.
+        </h2>
+        <p className="text-base text-text-secondary">
+          Real bookings, real mechanics, real results — here&apos;s what people
+          say after we&apos;ve been to their door.
+        </p>
+      </Reveal>
+
       <Reveal as="ul" stagger className="grid gap-4 lg:grid-cols-3">
         {REVIEWS.map((r, i) => (
           <li key={r.name}>

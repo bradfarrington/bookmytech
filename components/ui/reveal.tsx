@@ -47,19 +47,36 @@ export function Reveal({
       if (!root) return;
       if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
 
-      const targets = stagger ? Array.from(root.children) : root;
+      const targets = stagger ? Array.from(root.children) : [root];
 
-      gsap.from(targets, {
-        opacity: 0,
-        y,
-        duration: 0.7,
-        ease: "power3.out",
-        delay,
-        stagger: stagger ? 0.09 : 0,
-        ...(trigger === "scroll"
-          ? { scrollTrigger: { trigger: root, start: "top 85%", once: true } }
-          : {}),
-      });
+      // Set the hidden state up front, then play a self-contained tween to
+      // completion. Crucially the tween is NOT attached to the ScrollTrigger:
+      // ScrollTrigger only fires `onEnter` once, and the `gsap.to` runs on its
+      // own timeline. Attaching `gsap.from` directly to the trigger could pin
+      // the playhead to the scroll position and freeze the reveal partway
+      // through (leaving content stuck invisible).
+      gsap.set(targets, { opacity: 0, y });
+
+      const play = () =>
+        gsap.to(targets, {
+          opacity: 1,
+          y: 0,
+          duration: 0.7,
+          ease: "power3.out",
+          delay,
+          stagger: stagger ? 0.09 : 0,
+        });
+
+      if (trigger === "scroll") {
+        ScrollTrigger.create({
+          trigger: root,
+          start: "top 85%",
+          once: true,
+          onEnter: play,
+        });
+      } else {
+        play();
+      }
     },
     { scope: ref },
   );

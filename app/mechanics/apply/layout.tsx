@@ -17,8 +17,8 @@ export default function ApplyLayout({ children }: { children: React.ReactNode })
     <div className="min-h-screen bg-surface">
       <header className="border-b border-border bg-surface-card">
         <div className="mx-auto flex max-w-content items-center justify-between px-4 py-3">
-          <Link href="/" aria-label="Book My Tech — home">
-            <Image src="/logo-no-bg.png" alt="Book My Tech" width={120} height={32} className="h-8 w-auto" />
+          <Link href="/" aria-label="Book My Tech — home" className="flex items-center">
+            <Image src="/logo-cropped.png" alt="Book My Tech" width={1463} height={368} priority className="h-9 w-auto sm:h-10" />
           </Link>
           <a
             href="tel:+441234567890"
