@@ -13,7 +13,7 @@ interface LoginPageProps {
 export default async function LoginPage({ searchParams }: LoginPageProps) {
   const { created } = await searchParams;
   return (
-    <AuthShell title="Welcome back" subtitle="Sign in to track your bookings and rebook in a tap.">
+    <AuthShell title="Welcome back" subtitle="Sign in to your account — we'll take you to the right place.">
       <CustomerLoginForm justCreated={created === "1"} />
     </AuthShell>
   );

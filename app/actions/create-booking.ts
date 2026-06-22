@@ -79,7 +79,15 @@ export async function createBookingAction(
     return { ok: false, error: message };
   }
 
-  const { data, error } = await supabase
+  // Write the booking through the service-role client (the codebase convention —
+  // see 0023: "all writes go through the service-role client in the server").
+  // Safe here: the price is recomputed server-side above and customer_id is taken
+  // from the authenticated session, never from the request — nothing is client-
+  // trusted. This also makes the insert independent of any RLS-policy drift on
+  // the live `bookings` table (the anon client was throwing "new row violates
+  // row-level security policy").
+  const db = createAdminClient();
+  const { data, error } = await db
     .from("bookings")
     .insert({
       customer_id: customerId,

@@ -5,120 +5,89 @@ import { createClient } from "@/lib/supabase/server";
 
 export type SignInState = { error: string } | null;
 
+type AuthedClient = Awaited<ReturnType<typeof createClient>>;
+
+type AuthResult =
+  | { error: string }
+  | { supabase: AuthedClient; role: string };
+
+// Where each role lands after a successful sign-in.
+const DEST_FOR_ROLE: Record<string, string> = {
+  admin: "/admin",
+  mechanic: "/mechanic/jobs",
+  customer: "/dashboard",
+};
+
+// Validate credentials and resolve the account's role. Returns a form-ready
+// error string on failure, or the authenticated client + role on success.
+// Never calls redirect() — callers decide where each role lands so this can
+// back both the unified door and the role-specific login pages.
+async function authenticate(formData: FormData): Promise<AuthResult> {
+  const email = String(formData.get("email") ?? "").trim();
+  const password = String(formData.get("password") ?? "");
+
+  if (!email || !password) {
+    return { error: "Enter your email and password." };
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  });
+
+  if (error || !data.user) {
+    return { error: "That email and password didn't match." };
+  }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", data.user.id)
+    .single();
+
+  return { supabase, role: profile?.role ?? "customer" };
+}
+
+// Unified sign-in for the public /login door — works for every role. The role
+// is read from profiles, so there's no need to ask people which kind of account
+// they have; we just route them to the area they belong to. Middleware re-checks
+// the role on every protected request.
+export async function signInUnified(
+  _prevState: SignInState,
+  formData: FormData,
+): Promise<SignInState> {
+  const result = await authenticate(formData);
+  if ("error" in result) return result;
+  redirect(DEST_FOR_ROLE[result.role] ?? "/dashboard");
+}
+
+// Admin-only sign-in for the dedicated /admin/login page. Rejects non-admins at
+// submission with a friendlier message; middleware re-checks on every /admin/*.
 export async function signIn(
   _prevState: SignInState,
   formData: FormData,
 ): Promise<SignInState> {
-  const email = String(formData.get("email") ?? "").trim();
-  const password = String(formData.get("password") ?? "");
-
-  if (!email || !password) {
-    return { error: "Enter your email and password." };
-  }
-
-  const supabase = await createClient();
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  });
-
-  if (error || !data.user) {
-    return { error: "That email and password didn't match." };
-  }
-
-  // Block non-admin accounts from completing admin sign-in. We re-check this
-  // in middleware on every /admin/* request — this is just a friendlier
-  // error at the point of submission.
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", data.user.id)
-    .single();
-
-  if (profile?.role !== "admin") {
-    await supabase.auth.signOut();
+  const result = await authenticate(formData);
+  if ("error" in result) return result;
+  if (result.role !== "admin") {
+    await result.supabase.auth.signOut();
     return { error: "This account doesn't have admin access." };
   }
-
   redirect("/admin");
 }
 
-export async function signInCustomer(
-  _prevState: SignInState,
-  formData: FormData,
-): Promise<SignInState> {
-  const email = String(formData.get("email") ?? "").trim();
-  const password = String(formData.get("password") ?? "");
-
-  if (!email || !password) {
-    return { error: "Enter your email and password." };
-  }
-
-  const supabase = await createClient();
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  });
-
-  if (error || !data.user) {
-    return { error: "That email and password didn't match." };
-  }
-
-  // Customers carry role='customer' (the handle_new_user default). Block
-  // admin/mechanic accounts from the customer dashboard so they land in the
-  // right place — middleware re-checks role on every /dashboard request.
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", data.user.id)
-    .single();
-
-  if (profile?.role === "admin") {
-    await supabase.auth.signOut();
-    return { error: "That's an admin account — sign in at /admin." };
-  }
-  if (profile?.role === "mechanic") {
-    await supabase.auth.signOut();
-    return { error: "That's a mechanic account — sign in at /mechanic/login." };
-  }
-
-  redirect("/dashboard");
-}
-
+// Mechanic-only sign-in for the dedicated /mechanic/login page. Mirrors the
+// admin guard; middleware re-checks the role on every /mechanic/* request.
 export async function signInMechanic(
   _prevState: SignInState,
   formData: FormData,
 ): Promise<SignInState> {
-  const email = String(formData.get("email") ?? "").trim();
-  const password = String(formData.get("password") ?? "");
-
-  if (!email || !password) {
-    return { error: "Enter your email and password." };
-  }
-
-  const supabase = await createClient();
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  });
-
-  if (error || !data.user) {
-    return { error: "That email and password didn't match." };
-  }
-
-  // Mirror the admin guard: block non-mechanic accounts at submission. The
-  // middleware re-checks role on every /mechanic/* request — this is the
-  // friendlier point-of-entry error.
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", data.user.id)
-    .single();
-
-  if (profile?.role !== "mechanic") {
-    await supabase.auth.signOut();
+  const result = await authenticate(formData);
+  if ("error" in result) return result;
+  if (result.role !== "mechanic") {
+    await result.supabase.auth.signOut();
     return { error: "This account isn't set up as a mechanic." };
   }
-
   redirect("/mechanic/jobs");
 }

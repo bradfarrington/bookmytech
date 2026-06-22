@@ -3,13 +3,13 @@
 import { useActionState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { signInCustomer } from "@/app/actions/sign-in";
+import { signInUnified } from "@/app/actions/sign-in";
 import type { SignInState } from "@/app/actions/sign-in";
 
 const initialState: SignInState = null;
 
 export function CustomerLoginForm({ justCreated }: { justCreated?: boolean }) {
-  const [state, formAction, pending] = useActionState(signInCustomer, initialState);
+  const [state, formAction, pending] = useActionState(signInUnified, initialState);
 
   return (
     <form action={formAction} className="flex flex-col gap-4">
