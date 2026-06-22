@@ -13,8 +13,18 @@ interface ProgressStepperProps {
 }
 
 export function ProgressStepper({ currentStep }: ProgressStepperProps) {
+  const current = STEPS[currentStep - 1];
+
   return (
     <nav aria-label="Booking progress" className="w-full">
+      {/* Caption — makes the position in the flow unmistakable. */}
+      <div className="mb-3 flex items-baseline justify-between">
+        <p className="text-xs font-bold uppercase tracking-[0.1em] text-brand-blue">
+          Step {currentStep} of {STEPS.length}
+        </p>
+        <p className="text-sm font-semibold text-text-secondary">{current.label}</p>
+      </div>
+
       <ol className="flex items-center gap-0">
         {STEPS.map((step, idx) => {
           const stepNum = (idx + 1) as 1 | 2 | 3 | 4;
@@ -27,14 +37,15 @@ export function ProgressStepper({ currentStep }: ProgressStepperProps) {
               <div className="flex flex-col items-center gap-1.5">
                 <div
                   className={cn(
-                    "flex size-8 items-center justify-center rounded-full border-2 text-xs font-bold transition-colors",
-                    done && "border-brand-blue bg-brand-blue text-white",
-                    active && "border-brand-blue bg-white text-brand-blue",
-                    !done && !active && "border-border bg-white text-text-muted",
+                    "flex size-9 items-center justify-center rounded-full text-sm font-extrabold transition-all",
+                    done && "bg-brand-blue text-white",
+                    active &&
+                      "bg-brand-gradient text-white shadow-[0_4px_12px_rgba(37,99,235,0.35)] ring-4 ring-brand-blue/15",
+                    !done && !active && "border-2 border-border bg-white text-text-muted",
                   )}
                   aria-current={active ? "step" : undefined}
                 >
-                  {done ? <Check size={14} strokeWidth={3} /> : stepNum}
+                  {done ? <Check size={16} strokeWidth={3} /> : stepNum}
                 </div>
                 <span
                   className={cn(
@@ -50,12 +61,14 @@ export function ProgressStepper({ currentStep }: ProgressStepperProps) {
 
               {/* Connector line — don't render after last step */}
               {idx < STEPS.length - 1 && (
-                <div
-                  className={cn(
-                    "mx-2 h-0.5 flex-1 transition-colors",
-                    done ? "bg-brand-blue" : "bg-border",
-                  )}
-                />
+                <div className="mx-2 h-1 flex-1 overflow-hidden rounded-full bg-border">
+                  <div
+                    className={cn(
+                      "h-full rounded-full bg-brand-blue transition-all duration-500",
+                      done ? "w-full" : "w-0",
+                    )}
+                  />
+                </div>
               )}
             </li>
           );

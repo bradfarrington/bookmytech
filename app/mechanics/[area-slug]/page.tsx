@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
 import { notFound } from "next/navigation";
-import { ArrowRight, CheckCircle2, MapPin, PoundSterling, CalendarClock } from "lucide-react";
+import { ArrowRight, CheckCircle2, MapPin } from "lucide-react";
+import { PoundCoinIcon, CalendarBoltIcon, MapPinIcon } from "@/components/ui/brand-icons";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { Button } from "@/components/ui/button";
 
@@ -49,9 +50,9 @@ export async function generateMetadata({
 }
 
 const BENEFITS = [
-  { icon: PoundSterling, title: "Keep more of every job", detail: "Transparent fixed pricing, fast payouts — no chasing invoices." },
-  { icon: CalendarClock, title: "Work on your terms", detail: "Set your hours, your radius and your specialisms. Accept the jobs that suit you." },
-  { icon: MapPin, title: "Jobs near you", detail: "We match you to bookings in your area and bring the customers to you." },
+  { Icon: PoundCoinIcon, title: "Keep more of every job", detail: "Transparent fixed pricing, fast payouts — no chasing invoices." },
+  { Icon: CalendarBoltIcon, title: "Work on your terms", detail: "Set your hours, your radius and your specialisms. Accept the jobs that suit you." },
+  { Icon: MapPinIcon, title: "Jobs near you", detail: "We match you to bookings in your area and bring the customers to you." },
 ];
 
 export default async function AreaRecruitmentPage({
@@ -108,8 +109,8 @@ export default async function AreaRecruitmentPage({
           <div className="grid gap-6 sm:grid-cols-3">
             {BENEFITS.map((b) => (
               <div key={b.title} className="rounded-2xl border border-border bg-surface-card p-6 shadow-card">
-                <div className="flex size-11 items-center justify-center rounded-xl bg-blue-50 text-brand-blue">
-                  <b.icon size={22} />
+                <div className="flex size-12 items-center justify-center rounded-2xl bg-blue-50 ring-1 ring-inset ring-brand-blue/10">
+                  <b.Icon size={24} className="text-text-primary" />
                 </div>
                 <h2 className="mt-4 text-lg font-bold text-text-primary">{b.title}</h2>
                 <p className="mt-1.5 text-sm text-text-secondary">{b.detail}</p>

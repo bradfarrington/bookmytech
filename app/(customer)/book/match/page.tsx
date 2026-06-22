@@ -2,6 +2,7 @@ import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, ChevronRight } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { vehicleLabel } from "@/lib/utils";
 import { ProgressStepper } from "@/components/customer/progress-stepper";
 import { Button } from "@/components/ui/button";
 import { calculatePrice } from "@/lib/pricing/calculate";
@@ -27,7 +28,7 @@ export default async function MatchPage({ searchParams }: MatchPageProps) {
   const reg = params.reg ?? "";
   const serviceSlug = params.service ?? "";
 
-  if (!reg.trim() || !serviceSlug.trim()) {
+  if ((!reg.trim() && !params.make) || !serviceSlug.trim()) {
     redirect("/book");
   }
 
@@ -88,7 +89,7 @@ export default async function MatchPage({ searchParams }: MatchPageProps) {
         </Link>
         <div>
           <h1 className="text-2xl font-bold text-text-primary">Your price</h1>
-          <p className="text-sm text-text-secondary">{reg}</p>
+          <p className="text-sm text-text-secondary">{vehicleLabel(reg, params.make, params.model)}</p>
         </div>
       </div>
 

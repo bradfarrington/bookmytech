@@ -19,6 +19,19 @@ export function normaliseReg(input: string): string {
   return cleaned;
 }
 
+// A vehicle is identified through the booking flow by EITHER its registration
+// (number-plate path) OR its make/model (the "use car details" path, where the
+// customer doesn't enter a reg). This returns whichever is present, so display
+// lines and confirmations read sensibly in both cases.
+export function vehicleLabel(
+  reg: string | null | undefined,
+  make?: string | null,
+  model?: string | null,
+): string {
+  if (reg && reg.trim()) return reg.trim();
+  return [make, model].filter(Boolean).join(" ").trim();
+}
+
 // £45.99 is stored as 4599 pence. Formats with a £ prefix; whole-pound
 // amounts are shown without the trailing .00 (e.g. £45 not £45.00).
 export function formatPrice(pence: number): string {

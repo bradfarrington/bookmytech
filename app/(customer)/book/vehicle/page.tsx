@@ -21,7 +21,8 @@ export default async function VehiclePage({ searchParams }: VehiclePageProps) {
   const params = await searchParams;
   const raw = params.reg ?? "";
 
-  if (!raw.trim()) {
+  // Need either a registration (plate path) or a make (car-details path).
+  if (!raw.trim() && !params.make) {
     redirect("/book");
   }
 

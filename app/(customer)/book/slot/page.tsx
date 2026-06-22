@@ -2,6 +2,7 @@ import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { vehicleLabel } from "@/lib/utils";
 import { ProgressStepper } from "@/components/customer/progress-stepper";
 import { calculatePrice } from "@/lib/pricing/calculate";
 import { SlotPicker } from "./_components/slot-picker";
@@ -22,7 +23,7 @@ export default async function SlotPage({ searchParams }: SlotPageProps) {
   const reg = params.reg ?? "";
   const serviceSlug = params.service ?? "";
 
-  if (!reg.trim() || !serviceSlug.trim()) {
+  if ((!reg.trim() && !params.make) || !serviceSlug.trim()) {
     redirect("/book");
   }
 
@@ -76,7 +77,7 @@ export default async function SlotPage({ searchParams }: SlotPageProps) {
         </Link>
         <div>
           <h1 className="text-2xl font-bold text-text-primary">Pick a time</h1>
-          <p className="text-sm text-text-secondary">{service.name} · {reg}</p>
+          <p className="text-sm text-text-secondary">{service.name} · {vehicleLabel(reg, params.make, params.model)}</p>
         </div>
       </div>
 

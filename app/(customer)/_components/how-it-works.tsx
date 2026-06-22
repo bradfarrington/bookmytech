@@ -1,11 +1,16 @@
-import { Car, Wrench, PoundSterling, Calendar, type LucideIcon } from "lucide-react";
+import type { BrandIconProps } from "@/components/ui/brand-icons";
+import {
+  CarIcon,
+  WrenchIcon,
+  PoundCoinIcon,
+  CalendarBoltIcon,
+} from "@/components/ui/brand-icons";
 import { Card } from "@/components/ui/card";
-import { Icon } from "@/components/ui/icon";
 import { Overline } from "@/components/ui/overline";
 
 type Step = {
   number: string;
-  icon: LucideIcon;
+  Icon: (p: BrandIconProps) => React.ReactElement;
   title: string;
   description: string;
 };
@@ -13,28 +18,28 @@ type Step = {
 const STEPS: Step[] = [
   {
     number: "01",
-    icon: Car,
+    Icon: CarIcon,
     title: "Tell us your car",
     description:
       "Drop in your reg — we'll pull the make, model and engine automatically.",
   },
   {
     number: "02",
-    icon: Wrench,
+    Icon: WrenchIcon,
     title: "Pick what's wrong",
     description:
       "Choose from a service or describe a fault. We'll match the right specialist for the job.",
   },
   {
     number: "03",
-    icon: PoundSterling,
+    Icon: PoundCoinIcon,
     title: "See your fixed price",
     description:
       "Transparent pricing for your area. No hidden fees. Pay only when the job is done.",
   },
   {
     number: "04",
-    icon: Calendar,
+    Icon: CalendarBoltIcon,
     title: "Pick a slot, we come to you",
     description:
       "Same-day or scheduled. We'll send a vetted mechanic to your home, work, or roadside.",
@@ -59,11 +64,11 @@ export function HowItWorks() {
         {STEPS.map((s) => (
           <li key={s.number}>
             <Card className="h-full p-[22px]">
-              <div className="mb-3.5 flex items-center justify-between">
-                <div className="flex size-10 items-center justify-center rounded-[10px] bg-blue-50">
-                  <Icon icon={s.icon} size={20} className="text-brand-blue" />
+              <div className="mb-4 flex items-center justify-between">
+                <div className="flex size-12 items-center justify-center rounded-2xl bg-blue-50 ring-1 ring-inset ring-brand-blue/10">
+                  <s.Icon size={26} className="text-text-primary" />
                 </div>
-                <span className="text-[11px] font-extrabold tracking-[0.1em] text-text-disabled">
+                <span className="flex size-7 items-center justify-center rounded-full bg-blue-50 text-xs font-extrabold text-brand-blue">
                   {s.number}
                 </span>
               </div>

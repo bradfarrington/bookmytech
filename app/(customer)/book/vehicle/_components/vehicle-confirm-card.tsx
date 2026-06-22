@@ -6,7 +6,6 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Pill } from "@/components/ui/pill";
 import { ProgressStepper } from "@/components/customer/progress-stepper";
-import { cn } from "@/lib/utils";
 import type { VehicleDetails } from "@/lib/dvla/types";
 import { ManualVehicleForm } from "./manual-vehicle-form";
 
@@ -47,8 +46,14 @@ export function VehicleConfirmCard({ details, reg, nextHref }: VehicleConfirmCar
       <div>
         <h1 className="text-2xl font-bold text-text-primary">Is this your vehicle?</h1>
         <p className="mt-1 text-text-secondary">
-          We found the following details for{" "}
-          <span className="font-bold tracking-wide text-text-primary">{reg}</span>
+          {reg ? (
+            <>
+              We found the following details for{" "}
+              <span className="font-bold tracking-wide text-text-primary">{reg}</span>
+            </>
+          ) : (
+            "Please check the details you entered."
+          )}
         </p>
       </div>
 

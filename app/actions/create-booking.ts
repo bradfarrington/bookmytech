@@ -183,7 +183,7 @@ export async function createBookingAction(
         <p>We've received your booking and are now matching you with the best available mechanic in your area. You'll hear from us as soon as one accepts — usually within minutes.</p>
         <table style="width:100%; border-collapse: collapse; margin: 24px 0;">
           <tr><td style="padding: 8px 0; color: #64748b; font-size: 14px;">Booking ref</td><td style="padding: 8px 0; font-weight: 600;">${data.id.slice(0, 8).toUpperCase()}</td></tr>
-          <tr><td style="padding: 8px 0; color: #64748b; font-size: 14px;">Vehicle</td><td style="padding: 8px 0; font-weight: 600;">${input.vehicleReg} — ${input.vehicleMake}${input.vehicleModel ? ` ${input.vehicleModel}` : ""}</td></tr>
+          <tr><td style="padding: 8px 0; color: #64748b; font-size: 14px;">Vehicle</td><td style="padding: 8px 0; font-weight: 600;">${input.vehicleReg ? `${input.vehicleReg} — ` : ""}${input.vehicleMake}${input.vehicleModel ? ` ${input.vehicleModel}` : ""}</td></tr>
           <tr><td style="padding: 8px 0; color: #64748b; font-size: 14px;">Service</td><td style="padding: 8px 0; font-weight: 600;">${input.serviceName}</td></tr>
           <tr><td style="padding: 8px 0; color: #64748b; font-size: 14px;">Date &amp; time</td><td style="padding: 8px 0; font-weight: 600;">${new Date(input.scheduledAt).toLocaleString("en-GB", { dateStyle: "full", timeStyle: "short" })}</td></tr>
         </table>

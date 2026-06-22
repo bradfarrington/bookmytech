@@ -1,25 +1,23 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import {
-  PoundSterling,
-  CalendarClock,
-  MapPin,
-  ShieldCheck,
-  Smartphone,
-  Wallet,
-  ClipboardCheck,
-  UserCheck,
-  Rocket,
-  ArrowRight,
-  Check,
-  type LucideIcon,
-} from "lucide-react";
+import { ArrowRight, Check } from "lucide-react";
 import { CustomerNav } from "@/components/ui/customer-nav";
 import { Card } from "@/components/ui/card";
 import { Icon } from "@/components/ui/icon";
 import { Overline } from "@/components/ui/overline";
 import { Button } from "@/components/ui/button";
 import { Accordion, type AccordionItem } from "@/components/ui/accordion";
+import type { BrandIconProps } from "@/components/ui/brand-icons";
+import {
+  PoundCoinIcon,
+  CalendarBoltIcon,
+  MapPinIcon,
+  ShieldCheckIcon,
+  SmartphoneIcon,
+  BanknoteIcon,
+  ClipboardCheckIcon,
+  RocketIcon,
+} from "@/components/ui/brand-icons";
 import { Footer } from "../(customer)/_components/footer";
 
 export const metadata: Metadata = {
@@ -30,59 +28,59 @@ export const metadata: Metadata = {
 
 const APPLY_HREF = "/mechanics/apply/step-1";
 
-type Benefit = { icon: LucideIcon; title: string; body: string };
+type Benefit = { Icon: (p: BrandIconProps) => React.ReactElement; title: string; body: string };
 
 const BENEFITS: Benefit[] = [
   {
-    icon: PoundSterling,
+    Icon: PoundCoinIcon,
     title: "Keep more of every job",
     body: "Transparent fixed pricing and fast payouts straight to your account. No chasing invoices, no cash handling.",
   },
   {
-    icon: CalendarClock,
+    Icon: CalendarBoltIcon,
     title: "Work on your terms",
     body: "Set your own hours, radius and specialisms. Go online when you want and accept only the jobs that suit you.",
   },
   {
-    icon: MapPin,
+    Icon: MapPinIcon,
     title: "Jobs come to you",
     body: "We match you to bookings near you and bring the customers — no marketing, no quoting, no time-wasters.",
   },
   {
-    icon: Smartphone,
+    Icon: SmartphoneIcon,
     title: "Everything in one app",
     body: "Job details, customer messaging, photos, parts and payment all handled in the mechanic app on your phone.",
   },
   {
-    icon: Wallet,
+    Icon: BanknoteIcon,
     title: "Fast, reliable payouts",
     body: "Payment is pre-authorised before you arrive and released as soon as the job's marked complete and approved.",
   },
   {
-    icon: ShieldCheck,
+    Icon: ShieldCheckIcon,
     title: "Backed and protected",
     body: "Every job is covered by our workmanship guarantee and dispute support, so you're never on your own.",
   },
 ];
 
-type Step = { number: string; icon: LucideIcon; title: string; body: string };
+type Step = { number: string; Icon: (p: BrandIconProps) => React.ReactElement; title: string; body: string };
 
 const STEPS: Step[] = [
   {
     number: "01",
-    icon: ClipboardCheck,
+    Icon: ClipboardCheckIcon,
     title: "Apply online",
     body: "Tell us about yourself, your business, your specialisms and your area. Takes about 10 minutes.",
   },
   {
     number: "02",
-    icon: UserCheck,
+    Icon: ShieldCheckIcon,
     title: "Get verified",
     body: "We check your ID, insurance and qualifications directly with the issuing bodies — usually within a few days.",
   },
   {
     number: "03",
-    icon: Rocket,
+    Icon: RocketIcon,
     title: "Go live & earn",
     body: "Download the mechanic app, set your availability and start getting matched to jobs near you.",
   },
@@ -208,8 +206,8 @@ export default function MechanicsLandingPage() {
             {BENEFITS.map((b) => (
               <li key={b.title}>
                 <Card className="h-full">
-                  <div className="mb-3.5 flex size-11 items-center justify-center rounded-xl bg-blue-50">
-                    <Icon icon={b.icon} size={20} className="text-brand-blue" />
+                  <div className="mb-3.5 flex size-12 items-center justify-center rounded-2xl bg-blue-50 ring-1 ring-inset ring-brand-blue/10">
+                    <b.Icon size={24} className="text-text-primary" />
                   </div>
                   <h3 className="mb-1.5 text-lg font-bold tracking-[-0.01em] text-text-primary">
                     {b.title}
@@ -236,10 +234,10 @@ export default function MechanicsLandingPage() {
               <li key={s.number}>
                 <Card className="h-full">
                   <div className="mb-3.5 flex items-center justify-between">
-                    <div className="flex size-11 items-center justify-center rounded-xl bg-blue-50">
-                      <Icon icon={s.icon} size={20} className="text-brand-blue" />
+                    <div className="flex size-12 items-center justify-center rounded-2xl bg-blue-50 ring-1 ring-inset ring-brand-blue/10">
+                      <s.Icon size={24} className="text-text-primary" />
                     </div>
-                    <span className="text-[11px] font-extrabold tracking-[0.1em] text-text-disabled">
+                    <span className="flex size-7 items-center justify-center rounded-full bg-blue-50 text-xs font-extrabold text-brand-blue">
                       {s.number}
                     </span>
                   </div>

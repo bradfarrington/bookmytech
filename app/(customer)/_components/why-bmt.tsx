@@ -1,31 +1,36 @@
-import { Shield, PoundSterling, MapPin, Award, type LucideIcon } from "lucide-react";
-import { Icon } from "@/components/ui/icon";
+import type { BrandIconProps } from "@/components/ui/brand-icons";
+import {
+  ShieldCheckIcon,
+  PoundCoinIcon,
+  MapPinIcon,
+  RosetteIcon,
+} from "@/components/ui/brand-icons";
 import { Overline } from "@/components/ui/overline";
 
 type Pillar = {
-  icon: LucideIcon;
+  Icon: (p: BrandIconProps) => React.ReactElement;
   title: string;
   body: string;
 };
 
 const PILLARS: Pillar[] = [
   {
-    icon: Shield,
+    Icon: ShieldCheckIcon,
     title: "Vetted mechanics",
     body: "Every mechanic is DBS-checked, insured, and holds a verified trade qualification before they take their first job.",
   },
   {
-    icon: PoundSterling,
+    Icon: PoundCoinIcon,
     title: "Transparent pricing",
     body: "See the total before you book. No call-out fees, no surprises on the invoice.",
   },
   {
-    icon: MapPin,
+    Icon: MapPinIcon,
     title: "Comes to you",
     body: "Home, office or roadside — we work wherever your car is. No waiting rooms, no taxis to a garage.",
   },
   {
-    icon: Award,
+    Icon: RosetteIcon,
     title: "12-month guarantee",
     body: "Every job covered for a full year on parts and labour. If it goes wrong, we put it right.",
   },
@@ -45,8 +50,8 @@ export function WhyBmt() {
         <ul className="grid gap-x-10 gap-y-8 md:grid-cols-2 md:gap-x-16">
           {PILLARS.map((p) => (
             <li key={p.title} className="flex items-start gap-4">
-              <div className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-blue-50">
-                <Icon icon={p.icon} size={22} className="text-brand-blue" />
+              <div className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-blue-50 ring-1 ring-inset ring-brand-blue/10">
+                <p.Icon size={24} className="text-text-primary" />
               </div>
               <div>
                 <h3 className="mb-1 text-lg font-bold tracking-[-0.01em] text-text-primary">

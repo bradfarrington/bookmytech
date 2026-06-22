@@ -130,17 +130,17 @@ export function Footer() {
           <p>© 2026 Book My Tech Ltd. All rights reserved.</p>
           <ul className="flex flex-wrap gap-x-5 gap-y-2">
             <li>
-              <Link href="#" className="hover:text-white">
+              <Link href="/terms" className="hover:text-white">
                 Terms
               </Link>
             </li>
             <li>
-              <Link href="#" className="hover:text-white">
+              <Link href="/privacy" className="hover:text-white">
                 Privacy
               </Link>
             </li>
             <li>
-              <Link href="#" className="hover:text-white">
+              <Link href="/cookies" className="hover:text-white">
                 Cookies
               </Link>
             </li>

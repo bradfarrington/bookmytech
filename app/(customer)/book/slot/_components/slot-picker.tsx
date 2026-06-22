@@ -13,7 +13,7 @@ import { Loader2, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Pill } from "@/components/ui/pill";
 import { Select } from "@/components/ui/select";
-import { cn, formatPrice } from "@/lib/utils";
+import { cn, formatPrice, vehicleLabel } from "@/lib/utils";
 import { prepareCheckout, createBookingAction } from "@/app/actions/create-booking";
 import type { CreateBookingInput, PrepareCheckoutResult } from "@/app/actions/create-booking";
 import { track, FUNNEL_EVENTS } from "@/lib/analytics/track";
@@ -418,7 +418,7 @@ function CheckoutForm({
     <form onSubmit={handleSubmit} className="flex flex-col gap-6">
       <div className="rounded-xl border border-border bg-surface p-4 text-sm">
         <p className="font-semibold text-text-primary">{c.serviceName}</p>
-        <p className="text-text-secondary">{c.reg} · {format(new Date(c.selectedSlot), "EEE d MMM, h:mm a")}</p>
+        <p className="text-text-secondary">{vehicleLabel(c.reg, c.make, c.model)} · {format(new Date(c.selectedSlot), "EEE d MMM, h:mm a")}</p>
       </div>
 
       <PriceSummary
@@ -512,7 +512,7 @@ function FreeCheckoutForm({
     <form onSubmit={handleSubmit} className="flex flex-col gap-6">
       <div className="rounded-xl border border-border bg-surface p-4 text-sm">
         <p className="font-semibold text-text-primary">{c.serviceName}</p>
-        <p className="text-text-secondary">{c.reg} · {format(new Date(c.selectedSlot), "EEE d MMM, h:mm a")}</p>
+        <p className="text-text-secondary">{vehicleLabel(c.reg, c.make, c.model)} · {format(new Date(c.selectedSlot), "EEE d MMM, h:mm a")}</p>
       </div>
 
       <PriceSummary
