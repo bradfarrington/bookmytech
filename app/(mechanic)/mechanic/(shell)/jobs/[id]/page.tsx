@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { geocodePostcode, haversineMiles, type LatLng } from "@/lib/geo/postcodes";
 import { mechanicSharePence } from "@/lib/earnings";
 import { estimatedDurationLabel } from "@/lib/jobs/estimates";
+import { formatBookingSlot } from "@/lib/slots";
 import { JobDetail, type JobDetailProps } from "./_components/job-detail";
 import type { TimelineEvent } from "@/app/(admin)/admin/(shell)/jobs/[id]/_components/timeline";
 
@@ -34,7 +35,7 @@ export default async function MechanicJobDetailPage({ params }: PageProps) {
   const { data: booking } = await supabase
     .from("bookings")
     .select(
-      `id, status, mechanic_id, scheduled_at, created_at, total_pence, commission_rate,
+      `id, status, mechanic_id, scheduled_at, slot_window, created_at, total_pence, commission_rate,
        platform_fee_pence, mechanic_payout_pence,
        vehicle_reg, vehicle_make, vehicle_model, postcode, area,
        address_line_1, address_line_2,
@@ -159,7 +160,7 @@ export default async function MechanicJobDetailPage({ params }: PageProps) {
     .maybeSingle();
 
   const whenLabel = booking.scheduled_at
-    ? new Date(booking.scheduled_at).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" })
+    ? formatBookingSlot(booking.scheduled_at, booking.slot_window, { relative: true })
     : "To be confirmed";
 
   const address =

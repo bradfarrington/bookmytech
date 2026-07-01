@@ -4,6 +4,7 @@ import { CalendarClock, ChevronRight, MapPin } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { mechanicSharePence } from "@/lib/earnings";
 import { formatPrice } from "@/lib/utils";
+import { formatBookingSlot } from "@/lib/slots";
 import { Card } from "@/components/ui/card";
 import { Pill, type PillProps } from "@/components/ui/pill";
 import { Icon } from "@/components/ui/icon";
@@ -39,6 +40,7 @@ const STATUS_META: Record<JobStatus, { label: string; tone: PillProps["tone"] }>
 interface BookingRow {
   id: string;
   scheduled_at: string | null;
+  slot_window: string | null;
   status: string;
   postcode: string | null;
   area: string | null;
@@ -64,15 +66,8 @@ function serviceName(service: unknown): string {
   return s?.name ?? "Service";
 }
 
-function whenLabel(iso: string | null): string {
-  if (!iso) return "Time to be confirmed";
-  return new Date(iso).toLocaleString("en-GB", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+function whenLabel(iso: string | null, window: string | null): string {
+  return formatBookingSlot(iso, window);
 }
 
 function JobRow({ job }: { job: JobItem }) {
@@ -121,7 +116,7 @@ export default async function MechanicSchedulePage() {
   const { data: rows } = await supabase
     .from("bookings")
     .select(
-      "id, scheduled_at, status, postcode, area, total_pence, commission_rate, vehicle_make, vehicle_model, service:services(name)",
+      "id, scheduled_at, slot_window, status, postcode, area, total_pence, commission_rate, vehicle_make, vehicle_model, service:services(name)",
     )
     .eq("mechanic_id", user.id)
     .order("scheduled_at", { ascending: true });
@@ -133,7 +128,7 @@ export default async function MechanicSchedulePage() {
     jobs.push({
       id: b.id,
       status,
-      whenLabel: whenLabel(b.scheduled_at),
+      whenLabel: whenLabel(b.scheduled_at, b.slot_window),
       sortKey: b.scheduled_at ? new Date(b.scheduled_at).getTime() : 0,
       title: `${serviceName(b.service)} · ${[b.vehicle_make, b.vehicle_model].filter(Boolean).join(" ") || "Vehicle"}`,
       where: b.area ?? b.postcode ?? "—",

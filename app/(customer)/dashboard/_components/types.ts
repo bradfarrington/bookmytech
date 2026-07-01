@@ -1,10 +1,13 @@
 // Plain, serialisable shapes shared between the dashboard server page and its
 // client components.
 
+import { formatBookingSlot } from "@/lib/slots";
+
 export interface DashboardBooking {
   id: string;
   status: string;
   scheduledAt: string | null;
+  slotWindow: string | null;
   createdAt: string | null;
   completedAt: string | null;
   totalPence: number;
@@ -50,13 +53,6 @@ export const STATUS_TONES: Record<string, string> = {
   disputed: "bg-amber-50 text-amber-800",
 };
 
-export function formatSlot(iso: string | null): string {
-  if (!iso) return "Time to be confirmed";
-  return new Date(iso).toLocaleString("en-GB", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    hour: "numeric",
-    minute: "2-digit",
-  });
+export function formatSlot(iso: string | null, window?: string | null): string {
+  return formatBookingSlot(iso, window);
 }

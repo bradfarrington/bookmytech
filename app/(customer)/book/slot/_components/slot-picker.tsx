@@ -11,11 +11,11 @@ import {
 import { addDays, format, isToday, isTomorrow } from "date-fns";
 import { Loader2, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Pill } from "@/components/ui/pill";
 import { Select } from "@/components/ui/select";
 import { cn, formatPrice, vehicleLabel } from "@/lib/utils";
 import { prepareCheckout, createBookingAction } from "@/app/actions/create-booking";
 import type { CreateBookingInput, PrepareCheckoutResult } from "@/app/actions/create-booking";
+import { TWO_HOUR_SLOTS, ALL_DAY_SLOT, slotIso, formatBookingSlot } from "@/lib/slots";
 import { track, FUNNEL_EVENTS } from "@/lib/analytics/track";
 
 type ParkingType = "driveway" | "street" | "car_park" | "other";
@@ -30,12 +30,6 @@ const PARKING_OPTIONS: ReadonlyArray<{ value: ParkingType; label: string }> = [
 const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
   ? loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
   : null;
-
-const TIME_SLOTS = [
-  { label: "Morning", range: "8:00am – 12:00pm", hour: 8, badge: null },
-  { label: "Afternoon", range: "12:00pm – 5:00pm", hour: 12, badge: "Popular" },
-  { label: "Evening", range: "5:00pm – 8:00pm", hour: 17, badge: "Last" },
-] as const;
 
 function dayName(date: Date) {
   if (isToday(date)) return "Today";
@@ -73,6 +67,10 @@ export function SlotPicker({
   const days = Array.from({ length: 7 }, (_, i) => addDays(new Date(), i));
   const [selectedDay, setSelectedDay] = useState(days[0]);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
+  // The arrival window the customer picked (persisted + shown to the mechanic).
+  // Tracked alongside selectedSlot because the "8am–10am" and all-day windows
+  // share the same start time — the ISO alone can't tell them apart.
+  const [selectedWindow, setSelectedWindow] = useState<string | null>(null);
   const [addressLine1, setAddressLine1] = useState("");
   const [postcode, setPostcode] = useState(defaultPostcode);
   const [parkingType, setParkingType] = useState<ParkingType>("driveway");
@@ -105,6 +103,7 @@ export function SlotPicker({
 
   const common = {
     selectedSlot: selectedSlot ?? "",
+    selectedWindow: selectedWindow ?? "",
     addressLine1,
     postcode,
     parkingType,
@@ -145,7 +144,7 @@ export function SlotPicker({
               <button
                 key={day.toISOString()}
                 type="button"
-                onClick={() => { setSelectedDay(day); setSelectedSlot(null); }}
+                onClick={() => { setSelectedDay(day); setSelectedSlot(null); setSelectedWindow(null); }}
                 className={cn(
                   "flex flex-col items-center gap-1 rounded-2xl border py-3 text-center transition-colors",
                   active
@@ -165,46 +164,54 @@ export function SlotPicker({
         </div>
       </div>
 
-      {/* Time slots */}
+      {/* Time slots — 2-hour arrival windows, plus an all-day option */}
       <div>
-        <p className="mb-2 text-sm font-semibold text-text-primary">Select a time</p>
+        <p className="mb-2 text-sm font-semibold text-text-primary">Select an arrival window</p>
         <div className="grid grid-cols-3 gap-3">
-          {TIME_SLOTS.map((slot) => {
-            const isoValue = (() => {
-              const d = new Date(selectedDay);
-              d.setHours(slot.hour, 0, 0, 0);
-              return d.toISOString();
-            })();
-            const active = isoValue === selectedSlot;
+          {TWO_HOUR_SLOTS.map((slot) => {
+            const isoValue = slotIso(selectedDay, slot.startHour);
+            const active = selectedSlot === isoValue && selectedWindow === slot.window;
             return (
               <button
-                key={slot.label}
+                key={slot.window}
                 type="button"
-                onClick={() => setSelectedSlot(isoValue)}
+                onClick={() => { setSelectedSlot(isoValue); setSelectedWindow(slot.window); }}
                 className={cn(
-                  "relative flex flex-col items-center gap-1 rounded-xl border px-2 py-4 text-center transition-colors",
+                  "flex items-center justify-center rounded-xl border px-2 py-4 text-center text-sm font-bold transition-colors",
                   active
                     ? "border-brand-blue bg-brand-blue text-white"
-                    : "border-border bg-surface-card hover:border-brand-blue/50",
+                    : "border-border bg-surface-card text-text-primary hover:border-brand-blue/50",
                 )}
               >
-                {slot.badge && !active && (
-                  <span className="absolute -top-2 left-1/2 -translate-x-1/2">
-                    <Pill tone={slot.badge === "Popular" ? "active" : "neutral"}>
-                      {slot.badge}
-                    </Pill>
-                  </span>
-                )}
-                <span className={cn("text-sm font-bold", active ? "text-white" : "text-text-primary")}>
-                  {slot.label}
-                </span>
-                <span className={cn("text-[11px] leading-tight", active ? "text-blue-200" : "text-text-muted")}>
-                  {slot.range}
-                </span>
+                {slot.window}
               </button>
             );
           })}
         </div>
+
+        {(() => {
+          const isoValue = slotIso(selectedDay, ALL_DAY_SLOT.startHour);
+          const active = selectedSlot === isoValue && selectedWindow === ALL_DAY_SLOT.window;
+          return (
+            <button
+              type="button"
+              onClick={() => { setSelectedSlot(isoValue); setSelectedWindow(ALL_DAY_SLOT.window); }}
+              className={cn(
+                "mt-3 flex w-full flex-col items-center gap-0.5 rounded-xl border px-2 py-3.5 text-center transition-colors",
+                active
+                  ? "border-brand-blue bg-brand-blue text-white"
+                  : "border-border bg-surface-card hover:border-brand-blue/50",
+              )}
+            >
+              <span className={cn("text-sm font-bold", active ? "text-white" : "text-text-primary")}>
+                All day
+              </span>
+              <span className={cn("text-[11px] leading-tight", active ? "text-blue-200" : "text-text-muted")}>
+                8am – 8pm
+              </span>
+            </button>
+          );
+        })()}
       </div>
 
       {/* Address */}
@@ -291,6 +298,7 @@ export function SlotPicker({
 
 interface ConfirmCommon {
   selectedSlot: string;
+  selectedWindow: string;
   addressLine1: string;
   postcode: string;
   parkingType: string;
@@ -307,6 +315,7 @@ function bookingInputFrom(
   c: ConfirmCommon,
   name: string,
   email: string,
+  phone: string,
   extra: Partial<CreateBookingInput>,
 ): CreateBookingInput {
   return {
@@ -316,8 +325,10 @@ function bookingInputFrom(
     serviceName: c.serviceName,
     serviceId: c.serviceId,
     scheduledAt: c.selectedSlot,
+    slotWindow: c.selectedWindow || undefined,
     customerEmail: email.trim(),
     customerName: name.trim(),
+    customerPhone: phone.trim() || undefined,
     addressLine1: c.addressLine1,
     postcode: c.postcode.trim().toUpperCase(),
     parkingType: c.parkingType,
@@ -367,6 +378,7 @@ function CheckoutForm({
   const elements = useElements();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -400,7 +412,7 @@ function CheckoutForm({
     const piId = checkout.clientSecret.split("_secret_")[0];
 
     const result = await createBookingAction(
-      bookingInputFrom(c, name, email, {
+      bookingInputFrom(c, name, email, phone, {
         paymentMode: "preauth",
         creditAppliedPence: checkout.creditAppliedPence,
         stripePaymentIntentId: piId,
@@ -418,7 +430,7 @@ function CheckoutForm({
     <form onSubmit={handleSubmit} className="flex flex-col gap-6">
       <div className="rounded-xl border border-border bg-surface p-4 text-sm">
         <p className="font-semibold text-text-primary">{c.serviceName}</p>
-        <p className="text-text-secondary">{vehicleLabel(c.reg, c.make, c.model)} · {format(new Date(c.selectedSlot), "EEE d MMM, h:mm a")}</p>
+        <p className="text-text-secondary">{vehicleLabel(c.reg, c.make, c.model)} · {formatBookingSlot(c.selectedSlot, c.selectedWindow)}</p>
       </div>
 
       <PriceSummary
@@ -443,6 +455,13 @@ function CheckoutForm({
           onChange={(e) => setEmail(e.target.value)}
           placeholder="Email address"
           required
+          className="h-12 rounded-lg border border-border bg-surface-card px-3 text-sm text-text-primary outline-none transition-colors placeholder:text-text-muted focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/25"
+        />
+        <input
+          type="tel"
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+          placeholder="Mobile number (optional — for text updates)"
           className="h-12 rounded-lg border border-border bg-surface-card px-3 text-sm text-text-primary outline-none transition-colors placeholder:text-text-muted focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/25"
         />
       </div>
@@ -483,6 +502,7 @@ function FreeCheckoutForm({
 }: ConfirmCommon & { checkout: Extract<ReadyCheckout, { mode: "free" }> }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -495,7 +515,7 @@ function FreeCheckoutForm({
     setSubmitting(true);
     setError(null);
     const result = await createBookingAction(
-      bookingInputFrom(c, name, email, {
+      bookingInputFrom(c, name, email, phone, {
         paymentMode: "free",
         creditAppliedPence: checkout.creditAppliedPence,
       }),
@@ -512,7 +532,7 @@ function FreeCheckoutForm({
     <form onSubmit={handleSubmit} className="flex flex-col gap-6">
       <div className="rounded-xl border border-border bg-surface p-4 text-sm">
         <p className="font-semibold text-text-primary">{c.serviceName}</p>
-        <p className="text-text-secondary">{vehicleLabel(c.reg, c.make, c.model)} · {format(new Date(c.selectedSlot), "EEE d MMM, h:mm a")}</p>
+        <p className="text-text-secondary">{vehicleLabel(c.reg, c.make, c.model)} · {formatBookingSlot(c.selectedSlot, c.selectedWindow)}</p>
       </div>
 
       <PriceSummary
@@ -541,6 +561,13 @@ function FreeCheckoutForm({
           onChange={(e) => setEmail(e.target.value)}
           placeholder="Email address"
           required
+          className="h-12 rounded-lg border border-border bg-surface-card px-3 text-sm text-text-primary outline-none transition-colors placeholder:text-text-muted focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/25"
+        />
+        <input
+          type="tel"
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+          placeholder="Mobile number (optional — for text updates)"
           className="h-12 rounded-lg border border-border bg-surface-card px-3 text-sm text-text-primary outline-none transition-colors placeholder:text-text-muted focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/25"
         />
       </div>

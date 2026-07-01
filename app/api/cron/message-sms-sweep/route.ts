@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendSms } from "@/lib/sms/send-sms";
+import { getSmsTemplateBody } from "@/lib/sms/render-template";
 
 // Unread-message SMS sweep (Task 13 Stage B).
 //
@@ -73,6 +74,7 @@ async function runSweep() {
 
   let nudged = 0;
   let stamped = 0;
+  const nudgeBody = await getSmsTemplateBody("message_nudge");
   for (const g of groups.values()) {
     const booking = bookingById.get(g.bookingId);
     const phone =
@@ -83,10 +85,7 @@ async function runSweep() {
           : null;
 
     if (phone) {
-      const sent = await sendSms({
-        to: phone,
-        body: "You have an unread message on your Book My Tech booking. Open your dashboard to reply.",
-      }).catch(() => false);
+      const sent = await sendSms({ to: phone, body: nudgeBody }).catch(() => false);
       if (sent) nudged += 1;
     }
 

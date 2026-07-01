@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendEmail } from "@/lib/email/send";
 import { sendSms } from "@/lib/sms/send-sms";
+import { renderSmsTemplate } from "@/lib/sms/render-template";
 import { formatPrice, siteUrl } from "@/lib/utils";
 import { completedBookingCount, grantCredit } from "@/lib/credits/credits";
 import { REFERRAL_BONUS_PENCE } from "@/lib/credits/constants";
@@ -125,10 +126,8 @@ export async function startJourney(bookingId: string): Promise<JobProgressResult
 
   // High-value SMS touchpoint — the customer wants to know the mechanic's coming.
   if (booking.customer_phone) {
-    sendSms({
-      to: booking.customer_phone,
-      body: `Your Book My Tech mechanic is on the way. Please make sure your vehicle is accessible.`,
-    }).catch(() => {});
+    const body = await renderSmsTemplate("mechanic_en_route");
+    sendSms({ to: booking.customer_phone, body }).catch(() => {});
   }
 
   revalidate(bookingId);
@@ -376,13 +375,11 @@ export async function completeAndCharge(bookingId: string): Promise<JobProgressR
   }
 
   if (booking.customer_phone) {
-    sendSms({
-      to: booking.customer_phone,
-      body:
-        chargePence > 0
-          ? `Your Book My Tech job is complete. Total charged: ${formatPrice(chargePence)}. Thanks!`
-          : `Your Book My Tech job is complete — paid in full with your account credit. Thanks!`,
-    }).catch(() => {});
+    const body =
+      chargePence > 0
+        ? await renderSmsTemplate("job_complete_charged", { total: formatPrice(chargePence) })
+        : await renderSmsTemplate("job_complete_credit");
+    sendSms({ to: booking.customer_phone, body }).catch(() => {});
   }
 
   // --- Proactive service reminders ------------------------------------------

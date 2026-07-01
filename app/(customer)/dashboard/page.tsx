@@ -44,7 +44,7 @@ export default async function DashboardPage() {
   const { data: rows } = await admin
     .from("bookings")
     .select(
-      `id, status, scheduled_at, created_at, completed_at, total_pence,
+      `id, status, scheduled_at, slot_window, created_at, completed_at, total_pence,
        vehicle_reg, vehicle_make, vehicle_model, address_line_1, postcode,
        mechanic_id, reschedule_status, reschedule_proposed_at, reschedule_note,
        service:services(name, slug)`,
@@ -56,6 +56,7 @@ export default async function DashboardPage() {
     id: b.id,
     status: b.status,
     scheduledAt: b.scheduled_at,
+    slotWindow: b.slot_window,
     createdAt: b.created_at,
     completedAt: b.completed_at,
     totalPence: b.total_pence ?? 0,

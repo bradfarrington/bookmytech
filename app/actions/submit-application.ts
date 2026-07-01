@@ -126,23 +126,10 @@ export async function submitApplication(
   if (!ACCOUNT_RE.test(accountNumber))
     return { ok: false, error: "Account number must be 8 digits." };
 
-  for (const [i, ref] of input.references.entries()) {
-    if (!ref?.name?.trim() || !ref?.email?.trim() || !ref?.phone?.trim())
-      return { ok: false, error: `Reference ${i + 1} needs a name, email and phone.` };
-    if (!EMAIL_RE.test(ref.email.trim()))
-      return { ok: false, error: `Reference ${i + 1} email is invalid.` };
-  }
-
-  // Required documents (VAT only when registered).
-  if (!input.docs.photo_id) return { ok: false, error: "Photo ID is required." };
-  if (!input.docs.public_liability_insurance)
-    return { ok: false, error: "Public liability insurance is required." };
-  if (!input.docs.trade_insurance)
-    return { ok: false, error: "Trade insurance is required." };
-  if (!input.docs.qualification)
-    return { ok: false, error: "A trade qualification is required." };
-  if (input.vatRegistered && !input.docs.vat)
-    return { ok: false, error: "A VAT registration document is required." };
+  // References and documents are deliberately NOT required to submit. References
+  // are optional entirely; documents can be supplied later under the 28-day
+  // grace period an admin grants at approval. We still store whatever the
+  // applicant did provide.
 
   const years = input.yearsExperience?.trim()
     ? Number.parseInt(input.yearsExperience, 10)
@@ -183,14 +170,14 @@ export async function submitApplication(
       doc_vat: input.docs.vat ?? null,
       bank_sort_code_encrypted: encrypt(sortCode),
       bank_account_number_encrypted: encrypt(accountNumber),
-      reference_1_name: input.references[0].name.trim(),
-      reference_1_relationship: input.references[0].relationship?.trim() || null,
-      reference_1_email: input.references[0].email.trim().toLowerCase(),
-      reference_1_phone: input.references[0].phone.trim(),
-      reference_2_name: input.references[1].name.trim(),
-      reference_2_relationship: input.references[1].relationship?.trim() || null,
-      reference_2_email: input.references[1].email.trim().toLowerCase(),
-      reference_2_phone: input.references[1].phone.trim(),
+      reference_1_name: input.references[0]?.name?.trim() || null,
+      reference_1_relationship: input.references[0]?.relationship?.trim() || null,
+      reference_1_email: input.references[0]?.email?.trim().toLowerCase() || null,
+      reference_1_phone: input.references[0]?.phone?.trim() || null,
+      reference_2_name: input.references[1]?.name?.trim() || null,
+      reference_2_relationship: input.references[1]?.relationship?.trim() || null,
+      reference_2_email: input.references[1]?.email?.trim().toLowerCase() || null,
+      reference_2_phone: input.references[1]?.phone?.trim() || null,
       status: "submitted",
     })
     .select("id")

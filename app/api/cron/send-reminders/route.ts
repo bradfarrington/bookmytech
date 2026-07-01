@@ -2,6 +2,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendEmail } from "@/lib/email/send";
 import { sendSms } from "@/lib/sms/send-sms";
+import { getSmsTemplateBody } from "@/lib/sms/render-template";
+import { interpolateTemplate } from "@/lib/sms/templates";
 import { siteUrl } from "@/lib/utils";
 import { renderReminderEmail } from "@/emails/reminder";
 import { REMINDER_META, type ReminderType } from "@/lib/reminders/types";
@@ -77,6 +79,10 @@ async function runSender() {
   let sent = 0;
   let skipped = 0;
 
+  // Resolve the reminder SMS template once for the whole batch (admin override
+  // or code default), then interpolate per row.
+  const reminderSmsBody = await getSmsTemplateBody("reminder");
+
   for (const r of due as ReminderRow[]) {
     const prefs: Prefs = (r.customer_id && prefsById.get(r.customer_id)) || {
       name: null,
@@ -114,11 +120,13 @@ async function runSender() {
     }
 
     if (prefs.viaSms && prefs.phone) {
-      // Stub until Task 13 — logs + returns false today.
-      const ok = await sendSms({
-        to: prefs.phone,
-        body: `${REMINDER_META[r.reminder_type].label} for ${r.vehicle_reg}: ${REMINDER_META[r.reminder_type].cta} — ${ctaUrl}`,
-      }).catch(() => false);
+      const body = interpolateTemplate(reminderSmsBody, {
+        label: REMINDER_META[r.reminder_type].label,
+        vehicle_reg: r.vehicle_reg,
+        cta: REMINDER_META[r.reminder_type].cta,
+        url: ctaUrl,
+      });
+      const ok = await sendSms({ to: prefs.phone, body }).catch(() => false);
       delivered = delivered || ok;
     }
 

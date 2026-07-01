@@ -66,7 +66,7 @@ export function ActiveBookingCard({ booking, mechanic }: ActiveBookingCardProps)
         <div className="flex flex-col gap-2 text-sm">
           <p className="flex items-center gap-2 text-text-secondary">
             <Clock size={15} className="shrink-0 text-text-muted" />
-            {formatSlot(booking.scheduledAt)}
+            {formatSlot(booking.scheduledAt, booking.slotWindow)}
           </p>
           {booking.addressLine1 && (
             <p className="flex items-center gap-2 text-text-secondary">

@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { geocodePostcode, haversineMiles, type LatLng } from "@/lib/geo/postcodes";
 import { mechanicSharePence } from "@/lib/earnings";
 import { formatPrice } from "@/lib/utils";
+import { formatBookingSlot } from "@/lib/slots";
 import { KpiCards, type MechanicKpis } from "./_components/kpi-cards";
 import { OfferFeed, type OfferView } from "./_components/offer-feed";
 import { Schedule, type ScheduleItem } from "./_components/schedule";
@@ -39,6 +40,7 @@ interface BookingJoin {
   area: string | null;
   postcode: string | null;
   scheduled_at: string | null;
+  slot_window: string | null;
   total_pence: number | null;
   commission_rate: number | null;
   service: unknown;
@@ -83,19 +85,6 @@ function serviceName(service: unknown): string {
   return s?.name ?? "Service";
 }
 
-function slotLabel(iso: string | null): string {
-  if (!iso) return "Time to be confirmed";
-  const when = new Date(iso);
-  const time = when.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
-  const today = startOfToday();
-  const whenDay = new Date(when);
-  whenDay.setHours(0, 0, 0, 0);
-  const dayDiff = Math.round((whenDay.getTime() - today.getTime()) / 86_400_000);
-  if (dayDiff === 0) return `Today ${time}`;
-  if (dayDiff === 1) return `Tomorrow ${time}`;
-  return `${when.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })} · ${time}`;
-}
-
 export default async function MechanicJobsPage() {
   const supabase = await createClient();
   const {
@@ -120,7 +109,7 @@ export default async function MechanicJobsPage() {
   const { data: offerRows } = await supabase
     .from("job_offers")
     .select(
-      "id, offered_at, booking:bookings(id, vehicle_reg, vehicle_make, vehicle_model, area, postcode, scheduled_at, total_pence, commission_rate, service:services(name))",
+      "id, offered_at, booking:bookings(id, vehicle_reg, vehicle_make, vehicle_model, area, postcode, scheduled_at, slot_window, total_pence, commission_rate, service:services(name))",
     )
     .eq("mechanic_id", user.id)
     .is("response", null)
@@ -146,7 +135,7 @@ export default async function MechanicJobsPage() {
       reg: b.vehicle_reg ?? "",
       area: b.area ?? b.postcode ?? "—",
       distanceLabel,
-      slot: slotLabel(b.scheduled_at),
+      slot: formatBookingSlot(b.scheduled_at, b.slot_window, { relative: true }),
       earningsPence: mechanicSharePence(b.total_pence ?? 0, b.commission_rate ?? 0.15),
     });
   }

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendSms } from "@/lib/sms/send-sms";
+import { renderSmsTemplate } from "@/lib/sms/render-template";
 
 export type MessageResult = { ok: true } | { ok: false; error: string };
 
@@ -76,10 +77,10 @@ export async function sendMessage(
   // ~5 min. Stamp sms_notified_at on a successful send so the sweep never
   // double-texts the same message.
   if (role === "mechanic" && booking.customer_phone) {
-    const sent = await sendSms({
-      to: booking.customer_phone,
-      body: `Your Book My Tech mechanic sent you a message: "${trimmed.slice(0, 120)}". Reply in your dashboard.`,
-    }).catch(() => false);
+    const body = await renderSmsTemplate("message_fallback", {
+      preview: trimmed.slice(0, 120),
+    });
+    const sent = await sendSms({ to: booking.customer_phone, body }).catch(() => false);
     if (sent && inserted?.id) {
       await admin
         .from("messages")

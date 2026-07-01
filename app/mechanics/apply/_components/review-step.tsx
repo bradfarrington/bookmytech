@@ -105,7 +105,7 @@ export function ReviewStep({ services }: { services: ServiceLookup[] }) {
       <div className="space-y-1">
         <h1 className="text-2xl font-extrabold text-text-primary">Review & submit</h1>
         <p className="text-sm text-text-secondary">
-          Check everything looks right, then submit. We'll review within 48 hours.
+          Check everything looks right, then submit. We&apos;ll review within 48 hours.
         </p>
       </div>
 
@@ -139,7 +139,10 @@ export function ReviewStep({ services }: { services: ServiceLookup[] }) {
       </SectionCard>
 
       <SectionCard title="Documents & references" editHref="/mechanics/apply/step-4">
-        <Row label="Documents uploaded" value={uploadedDocLabels.join(", ")} />
+        <Row
+          label="Documents uploaded"
+          value={uploadedDocLabels.length ? uploadedDocLabels.join(", ") : "None yet — 28-day grace after approval"}
+        />
         <Row label="Bank details" value={bankReady ? "Provided (encrypted)" : "Missing"} />
         <Row label="Reference 1" value={data.references[0].name} />
         <Row label="Reference 2" value={data.references[1].name} />

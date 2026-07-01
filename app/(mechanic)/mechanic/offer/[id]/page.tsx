@@ -4,6 +4,7 @@ import { CheckCircle2, ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { geocodePostcode, haversineMiles, type LatLng } from "@/lib/geo/postcodes";
 import { mechanicSharePence } from "@/lib/earnings";
+import { formatBookingSlot } from "@/lib/slots";
 import { OfferScreen } from "./_components/offer-screen";
 
 export const dynamic = "force-dynamic";
@@ -16,20 +17,6 @@ interface PageProps {
 function one<T>(value: T | T[] | null | undefined): T | null {
   if (Array.isArray(value)) return value[0] ?? null;
   return value ?? null;
-}
-
-function slotLabel(iso: string | null): string {
-  if (!iso) return "Time to be confirmed";
-  const when = new Date(iso);
-  const time = when.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const whenDay = new Date(when);
-  whenDay.setHours(0, 0, 0, 0);
-  const dayDiff = Math.round((whenDay.getTime() - today.getTime()) / 86_400_000);
-  if (dayDiff === 0) return `Today, ${time}`;
-  if (dayDiff === 1) return `Tomorrow, ${time}`;
-  return `${when.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })}, ${time}`;
 }
 
 // Minimal full-screen chrome — this route lives outside the (shell) group on
@@ -58,7 +45,7 @@ export default async function OfferPage({ params }: PageProps) {
     .select(
       `id, response, mechanic_id, offered_at,
        booking:bookings(id, vehicle_reg, vehicle_make, vehicle_model, area, postcode,
-         scheduled_at, total_pence, commission_rate, special_instructions,
+         scheduled_at, slot_window, total_pence, commission_rate, special_instructions,
          service:services(name))`,
     )
     .eq("id", id)
@@ -75,6 +62,7 @@ export default async function OfferPage({ params }: PageProps) {
         area: string | null;
         postcode: string | null;
         scheduled_at: string | null;
+        slot_window: string | null;
         total_pence: number | null;
         commission_rate: number | null;
         special_instructions: string | null;
@@ -147,7 +135,7 @@ export default async function OfferPage({ params }: PageProps) {
         serviceName={service?.name ?? "Service"}
         vehicle={[booking.vehicle_make, booking.vehicle_model].filter(Boolean).join(" ") || "Vehicle"}
         reg={booking.vehicle_reg}
-        whenLabel={slotLabel(booking.scheduled_at)}
+        whenLabel={formatBookingSlot(booking.scheduled_at, booking.slot_window, { relative: true })}
         where={booking.area ?? booking.postcode ?? "—"}
         distanceLabel={distanceLabel}
         notes={booking.special_instructions}

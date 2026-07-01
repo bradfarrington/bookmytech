@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { findPackage } from "@/lib/sms/packages";
 import { sendSms } from "@/lib/sms/send-sms";
+import { SMS_TEMPLATE_BY_KEY } from "@/lib/sms/templates";
 import { siteUrl } from "@/lib/utils";
 
 // Admin SMS controls (Task 13 Stage B). Mutations verify the caller is an admin
@@ -149,6 +150,81 @@ export async function sendTestSms(phone: string): Promise<SmsResult> {
     return { ok: false, error: "Twilio rejected the message — check the number and sender." };
 
   revalidatePath("/admin/sms");
+  return { ok: true };
+}
+
+// ── Custom (one-off) send ────────────────────────────────────────────────────
+export async function sendCustomSms(input: {
+  to: string;
+  body: string;
+}): Promise<SmsResult> {
+  const guard = await requireAdmin();
+  if (!guard.ok) return guard;
+
+  const to = input.to.trim();
+  const body = input.body.trim();
+  if (!to) return { ok: false, error: "Enter a phone number." };
+  if (!body) return { ok: false, error: "Enter a message." };
+  if (body.length > 1000) return { ok: false, error: "Message is too long." };
+
+  const admin = createAdminClient();
+  const { data: settings } = await admin
+    .from("sms_settings")
+    .select("sms_enabled, sms_credits_balance")
+    .eq("id", 1)
+    .single();
+  if (!settings?.sms_enabled)
+    return { ok: false, error: "SMS is disabled. Enable it first." };
+  if ((settings.sms_credits_balance ?? 0) < 1)
+    return { ok: false, error: "No SMS credits remaining. Buy more first." };
+
+  const sent = await sendSms({ to, body });
+  if (!sent)
+    return { ok: false, error: "Twilio rejected the message — check the number and sender." };
+
+  revalidatePath("/admin/sms");
+  return { ok: true };
+}
+
+// ── Lifecycle template overrides ─────────────────────────────────────────────
+export async function saveSmsTemplate(input: {
+  key: string;
+  body: string;
+}): Promise<SmsResult> {
+  const guard = await requireAdmin();
+  if (!guard.ok) return guard;
+
+  if (!SMS_TEMPLATE_BY_KEY[input.key])
+    return { ok: false, error: "Unknown template." };
+  const body = input.body.trim();
+  if (!body) return { ok: false, error: "Message can't be empty." };
+  if (body.length > 1000) return { ok: false, error: "Message is too long." };
+
+  const admin = createAdminClient();
+  const { error } = await admin.from("sms_templates").upsert(
+    {
+      key: input.key,
+      body,
+      updated_at: new Date().toISOString(),
+      updated_by: guard.adminId,
+    },
+    { onConflict: "key" },
+  );
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/admin/sms/templates");
+  return { ok: true };
+}
+
+/** Delete the override → the sender falls back to the code default. */
+export async function resetSmsTemplate(key: string): Promise<SmsResult> {
+  const guard = await requireAdmin();
+  if (!guard.ok) return guard;
+  if (!SMS_TEMPLATE_BY_KEY[key]) return { ok: false, error: "Unknown template." };
+
+  const admin = createAdminClient();
+  const { error } = await admin.from("sms_templates").delete().eq("key", key);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/admin/sms/templates");
   return { ok: true };
 }
 

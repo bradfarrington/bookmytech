@@ -10,6 +10,7 @@ import {
   createCheckout,
   saveLowCreditEmail,
   saveSmsSender,
+  sendCustomSms,
   sendTestSms,
   setSmsEnabled,
 } from "@/app/actions/sms";
@@ -83,7 +84,10 @@ export function SmsPanel({
         <AlertEmailSection email={settings.lowCreditEmail} />
       </div>
 
-      <TestSendSection enabled={settings.smsEnabled} balance={settings.balance} />
+      <div className="grid gap-8 lg:grid-cols-2">
+        <TestSendSection enabled={settings.smsEnabled} balance={settings.balance} />
+        <ComposeSection enabled={settings.smsEnabled} balance={settings.balance} />
+      </div>
 
       <PurchaseHistory purchases={purchases} />
     </div>
@@ -335,6 +339,69 @@ function TestSendSection({ enabled, balance }: { enabled: boolean; balance: numb
           Send test
         </button>
       </div>
+    </section>
+  );
+}
+
+function ComposeSection({ enabled, balance }: { enabled: boolean; balance: number }) {
+  const [phone, setPhone] = useState("");
+  const [message, setMessage] = useState("");
+  const [pending, start] = useTransition();
+  const blocked = !enabled || balance < 1;
+
+  function send() {
+    start(async () => {
+      const res = await sendCustomSms({ to: phone, body: message });
+      if (res.ok) {
+        toast.success("Message sent — 1 credit used.");
+        setPhone("");
+        setMessage("");
+      } else {
+        toast.error(res.error);
+      }
+    });
+  }
+
+  return (
+    <section className={cn(CARD, "space-y-4")}>
+      <SectionHeading
+        title="Send a message"
+        subtitle="One-off SMS to any number. Uses one credit."
+      />
+      {blocked && (
+        <p className="rounded-button bg-warning/10 px-3 py-2 text-xs font-medium text-warning">
+          {!enabled ? "Enable SMS above to send." : "No credits — buy some first."}
+        </p>
+      )}
+      <label className={FIELD_LABEL}>
+        Phone number
+        <input
+          className={FIELD_INPUT}
+          value={phone}
+          placeholder="07700 900000"
+          onChange={(e) => setPhone(e.target.value)}
+        />
+      </label>
+      <label className={FIELD_LABEL}>
+        Message
+        <textarea
+          className={cn(FIELD_INPUT, "h-24 resize-y py-2.5 leading-relaxed")}
+          value={message}
+          maxLength={1000}
+          placeholder="Type your message…"
+          onChange={(e) => setMessage(e.target.value)}
+        />
+        <span className="text-xs font-normal text-text-muted">{message.length}/1000</span>
+      </label>
+      <button
+        type="button"
+        onClick={send}
+        disabled={pending || blocked || !phone.trim() || !message.trim()}
+        className="inline-flex h-11 items-center gap-2 rounded-button bg-brand-blue px-4 text-sm font-semibold text-white transition hover:bg-brand-blue-dark disabled:opacity-50"
+      >
+        {pending ? <Icon icon={Loader2} size={15} className="animate-spin" /> : <Icon icon={Send} size={15} />}
+        Send message
+      </button>
     </section>
   );
 }

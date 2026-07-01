@@ -1,6 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { Overline } from "@/components/ui/overline";
 import { CREDIT_PACKAGES } from "@/lib/sms/packages";
 import { SmsPanel, type SmsSettings, type PurchaseRow } from "./_components/sms-panel";
 
@@ -39,23 +38,10 @@ export default async function AdminSmsPage() {
   };
 
   return (
-    <div className="space-y-10">
-      <header>
-        <Overline>Commercial</Overline>
-        <h1 className="mt-1 text-3xl font-bold tracking-tight text-text-primary">SMS</h1>
-        <p className="mt-1.5 max-w-2xl text-sm text-text-muted">
-          Prepaid SMS credits power booking updates, reminders and message
-          nudges. Buy credits, set your sender ID, send a test, and watch the
-          balance. Each delivered text costs one credit; email always sends
-          regardless.
-        </p>
-      </header>
-
-      <SmsPanel
-        settings={s}
-        packages={CREDIT_PACKAGES.map((p) => ({ ...p }))}
-        purchases={(purchases ?? []) as PurchaseRow[]}
-      />
-    </div>
+    <SmsPanel
+      settings={s}
+      packages={CREDIT_PACKAGES.map((p) => ({ ...p }))}
+      purchases={(purchases ?? []) as PurchaseRow[]}
+    />
   );
 }

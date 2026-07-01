@@ -2,6 +2,8 @@
 
 **Status:** ✅ Complete (2026-06-04) — all three stages shipped. Public application wizard at `/mechanics/apply`, admin approvals queue at `/admin/approvals`, and documents management at `/mechanic/documents` + `/admin/documents`. Deviations: (1) Approve emails a **magic-link** sign-in (reusing Task 04's proven flow) rather than a temp-password-with-forced-reset — no reset screen exists, so this is more robust; (2) admin/mechanic pages live under their existing `(shell)` route groups (URLs unchanged: `/admin/approvals`, `/admin/documents`, `/mechanic/documents`). ⚠️ Apply migrations `0013`–`0015`; set `APP_ENCRYPTION_KEY` (bank encryption) and ideally `ADMIN_ALERT_EMAIL` + `CRON_SECRET` in prod.
 
+**Follow-up (2026-07-01) — optional docs & references + grace enforcement.** Documents and references are no longer mandatory to *submit* an application (bank details still required): applicants can apply without paperwork to hand, and the admin's existing "Approve with 28-day grace" grants the window. Shipped the previously-missing enforcement side promised at line 127: migration `0029` links each application to its provisioned mechanic (`approved_mechanic_id`) and adds `grace_enforced_at`; a new daily cron `/api/cron/enforce-grace-periods` reminds at 14/7/1 days, clears the grace to a plain approval once all outstanding docs are on file, and (via `applySuspension`) suspends the mechanic from dispatch if the deadline passes with docs still missing — an admin lifts the suspension after verifying the late uploads. ⚠️ Also apply migration `0029`.
+
 Build the public-facing mechanic application flow ("become a BMT mechanic") and the admin approvals queue that processes those applications. Replaces the manual mechanic creation from task 04.
 
 ## Why this task

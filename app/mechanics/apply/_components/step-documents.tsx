@@ -16,7 +16,6 @@ import { FIELD_INPUT, FIELD_LABEL, FIELD_HINT } from "./field";
 
 const SORT_CODE_RE = /^\d{6}$/;
 const ACCOUNT_RE = /^\d{8}$/;
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function DocUpload({ docType, label, hint }: { docType: DocType; label: string; hint: string }) {
   const { data, update } = useApplication();
@@ -169,19 +168,13 @@ export function StepDocuments() {
   }
 
   function handleNext() {
-    for (const def of docDefs) {
-      if (!data.docs[def.type]) return setError(`Please upload: ${def.label}.`);
-    }
+    // Documents and references are optional at this stage — you can upload
+    // paperwork later under the 28-day grace period. Bank details are still
+    // required so we can pay you for jobs.
     if (!SORT_CODE_RE.test(bank.sortCode.replace(/[\s-]/g, "")))
       return setError("Sort code must be 6 digits.");
     if (!ACCOUNT_RE.test(bank.accountNumber.replace(/\s/g, "")))
       return setError("Account number must be 8 digits.");
-    for (const [i, ref] of data.references.entries()) {
-      if (!ref.name.trim() || !ref.email.trim() || !ref.phone.trim())
-        return setError(`Reference ${i + 1} needs a name, email and phone.`);
-      if (!EMAIL_RE.test(ref.email.trim()))
-        return setError(`Reference ${i + 1} email looks invalid.`);
-    }
     setError(null);
     router.push("/mechanics/apply/review");
   }
@@ -189,13 +182,19 @@ export function StepDocuments() {
   return (
     <StepShell
       title="Documents & references"
-      intro="Upload your paperwork and add two professional references. Files are stored securely and only seen by our verification team."
+      intro="Upload whatever paperwork you have to hand. Don't worry if some isn't ready — once you're approved you'll have 28 days to supply anything outstanding. Files are stored securely and only seen by our verification team."
       backHref="/mechanics/apply/step-3"
       error={error}
       onNext={handleNext}
     >
       <div className="space-y-3">
-        <p className="text-sm font-semibold text-text-primary">Documents</p>
+        <div>
+          <p className="text-sm font-semibold text-text-primary">Documents</p>
+          <p className={FIELD_HINT}>
+            Optional now — upload what you can. You&apos;ll have 28 days after
+            approval to add anything missing before it affects your jobs.
+          </p>
+        </div>
         {docDefs.map((def) => (
           <DocUpload key={def.type} docType={def.type} label={def.label} hint={def.hint} />
         ))}
@@ -238,8 +237,10 @@ export function StepDocuments() {
 
       <div className="space-y-3 border-t border-border pt-5">
         <div>
-          <p className="text-sm font-semibold text-text-primary">Professional references</p>
-          <p className={FIELD_HINT}>Two people who can vouch for your work.</p>
+          <p className="text-sm font-semibold text-text-primary">
+            Professional references <span className="font-normal text-text-muted">(optional)</span>
+          </p>
+          <p className={FIELD_HINT}>Two people who can vouch for your work. Add them if you can — it helps us verify you faster.</p>
         </div>
         {data.references.map((ref, i) => (
           <ReferenceFields

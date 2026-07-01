@@ -125,7 +125,7 @@ async function provisionMechanic(
   admin: ReturnType<typeof createAdminClient>,
   app: Record<string, unknown>,
   grace: { endsOn: string; outstanding: string[] } | null,
-): Promise<{ ok: true } | { ok: false; error: string }> {
+): Promise<{ ok: true; userId: string } | { ok: false; error: string }> {
   const email = String(app.email);
   const fullName = String(app.full_name);
 
@@ -222,7 +222,7 @@ async function provisionMechanic(
     console.error("approve: failed to send approval email", err);
   }
 
-  return { ok: true };
+  return { ok: true, userId };
 }
 
 /**
@@ -265,6 +265,9 @@ export async function approveApplication(
     .update({
       status: withGrace ? "approved_with_grace" : "approved",
       grace_period_ends_at: gracePeriodEndsAt,
+      // Link the application to its live mechanic so the grace-enforcement cron
+      // can resolve it later (profiles carry no email column to look up by).
+      approved_mechanic_id: provisioned.userId,
       reviewed_at: new Date().toISOString(),
       reviewed_by: guard.adminId,
     })

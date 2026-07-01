@@ -19,6 +19,7 @@ import {
   Package,
   PoundSterling,
   Shield,
+  Star,
   Users,
   Wrench,
 } from "lucide-react";
@@ -53,6 +54,7 @@ const NAV_GROUPS: readonly NavGroup[] = [
     title: "Network",
     items: [
       { label: "Mechanics", href: "/admin/mechanics", icon: Users },
+      { label: "Reviews", href: "/admin/reviews", icon: Star },
       { label: "Approvals", href: "/admin/approvals", icon: Shield },
       { label: "Documents", href: "/admin/documents", icon: FileText },
     ],

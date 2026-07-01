@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendEmail } from "@/lib/email/send";
 import { sendSms } from "@/lib/sms/send-sms";
+import { renderSmsTemplate } from "@/lib/sms/render-template";
 import { formatPrice } from "@/lib/utils";
 
 export type CustomerBookingResult = { ok: true } | { ok: false; error: string };
@@ -71,6 +72,9 @@ export async function respondToReschedule(
     .update({
       // On accept, move to the proposed slot; on decline keep the original.
       scheduled_at: accepted ? proposed : original,
+      // Accepting sets a specific time, so the original arrival window no longer
+      // applies — clear it and let displays fall back to the exact time.
+      ...(accepted ? { slot_window: null } : {}),
       // Proposal consumed either way — returns both sides to the normal
       // confirmed state (no lingering banners).
       reschedule_proposed_at: null,
@@ -350,13 +354,11 @@ export async function cancelBooking(
   }
 
   if (booking.customer_phone) {
-    sendSms({
-      to: booking.customer_phone,
-      body:
-        charged > 0
-          ? `Your Book My Tech booking is cancelled. A ${formatPrice(charged)} cancellation fee was charged; the rest of your hold is released.`
-          : `Your Book My Tech booking is cancelled. Your full pre-authorisation has been released.`,
-    }).catch(() => {});
+    const body =
+      charged > 0
+        ? await renderSmsTemplate("booking_cancelled_fee", { fee: formatPrice(charged) })
+        : await renderSmsTemplate("booking_cancelled_nofee");
+    sendSms({ to: booking.customer_phone, body }).catch(() => {});
   }
 
   revalidatePath("/dashboard");
@@ -397,6 +399,9 @@ export async function rescheduleBooking(
     .from("bookings")
     .update({
       scheduled_at: when.toISOString(),
+      // The customer picked a specific time, so the arrival window no longer
+      // applies — clear it so displays show the exact rescheduled time.
+      slot_window: null,
       // Supersede any pending mechanic proposal — the customer just set the time.
       reschedule_proposed_at: null,
       reschedule_note: null,

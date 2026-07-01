@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendEmail } from "@/lib/email/send";
 import { sendSms } from "@/lib/sms/send-sms";
+import { renderSmsTemplate } from "@/lib/sms/render-template";
 import { formatPrice } from "@/lib/utils";
 import { dispatchBooking } from "@/lib/dispatch/dispatch";
 import { calculatePrice } from "@/lib/pricing/calculate";
@@ -21,9 +22,13 @@ export interface CreateBookingInput {
   vehicleModel?: string;
   serviceName: string;
   serviceId: string;
-  scheduledAt: string; // ISO string
+  scheduledAt: string; // ISO string — the window start
+  /** Human arrival window the customer picked ("8am–10am" … "All day (8am–8pm)"). */
+  slotWindow?: string;
   customerEmail: string;
   customerName: string;
+  /** Optional — lets guests receive booking SMS updates (signed-in users use their profile phone). */
+  customerPhone?: string;
   addressLine1: string;
   addressLine2?: string;
   postcode: string;
@@ -47,18 +52,19 @@ export async function createBookingAction(
   const { data: session } = await supabase.auth.getSession();
   const customerId = session?.session?.user?.id ?? null;
 
-  // The booking form doesn't collect a phone, but signed-in customers have one
-  // on their profile — snapshot it onto the booking so SMS touchpoints (on the
-  // way, complete, cancel, message nudges) can reach them. Guest bookings have
-  // no phone and stay email-only until the funnel collects one.
-  let customerPhone: string | null = null;
+  // Snapshot a phone onto the booking so SMS touchpoints (on the way, complete,
+  // cancel, message nudges) can reach the customer. Signed-in customers use
+  // their profile phone; the funnel also collects an optional number (the only
+  // source for guests), used as a fallback when the profile has none.
+  const inputPhone = input.customerPhone?.trim() || null;
+  let customerPhone: string | null = inputPhone;
   if (customerId) {
     const { data: prof } = await supabase
       .from("profiles")
       .select("phone")
       .eq("id", customerId)
       .single();
-    customerPhone = prof?.phone ?? null;
+    customerPhone = prof?.phone ?? inputPhone;
   }
 
   // Account credit (and the 'free' mode it can unlock) only applies to signed-in
@@ -96,6 +102,7 @@ export async function createBookingAction(
       vehicle_make: input.vehicleMake,
       vehicle_model: input.vehicleModel ?? null,
       scheduled_at: input.scheduledAt,
+      slot_window: input.slotWindow ?? null,
       status: "sourcing_mechanic",
       total_pence: price.totalPence,
       area_id: price.areaId,
@@ -193,7 +200,7 @@ export async function createBookingAction(
           <tr><td style="padding: 8px 0; color: #64748b; font-size: 14px;">Booking ref</td><td style="padding: 8px 0; font-weight: 600;">${data.id.slice(0, 8).toUpperCase()}</td></tr>
           <tr><td style="padding: 8px 0; color: #64748b; font-size: 14px;">Vehicle</td><td style="padding: 8px 0; font-weight: 600;">${input.vehicleReg ? `${input.vehicleReg} — ` : ""}${input.vehicleMake}${input.vehicleModel ? ` ${input.vehicleModel}` : ""}</td></tr>
           <tr><td style="padding: 8px 0; color: #64748b; font-size: 14px;">Service</td><td style="padding: 8px 0; font-weight: 600;">${input.serviceName}</td></tr>
-          <tr><td style="padding: 8px 0; color: #64748b; font-size: 14px;">Date &amp; time</td><td style="padding: 8px 0; font-weight: 600;">${new Date(input.scheduledAt).toLocaleString("en-GB", { dateStyle: "full", timeStyle: "short" })}</td></tr>
+          <tr><td style="padding: 8px 0; color: #64748b; font-size: 14px;">Date &amp; time</td><td style="padding: 8px 0; font-weight: 600;">${new Date(input.scheduledAt).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })}${input.slotWindow ? ` · ${input.slotWindow}` : `, ${new Date(input.scheduledAt).toLocaleTimeString("en-GB", { hour: "numeric", minute: "2-digit" })}`}</td></tr>
         </table>
         <p style="font-weight: 600;">${payLine}</p>
         <p style="color: #64748b; font-size: 14px;">No money has left your account yet. Your payment will only be captured once the job is complete and you've signed off.</p>
@@ -203,10 +210,10 @@ export async function createBookingAction(
   }).catch(console.error);
 
   if (customerPhone) {
-    sendSms({
-      to: customerPhone,
-      body: `Booking received with Book My Tech (ref ${data.id.slice(0, 8).toUpperCase()}). We're finding your mechanic — you'll hear from us shortly.`,
-    }).catch(() => {});
+    const body = await renderSmsTemplate("booking_received", {
+      ref: data.id.slice(0, 8).toUpperCase(),
+    });
+    sendSms({ to: customerPhone, body }).catch(() => {});
   }
 
   return { ok: true, bookingId: data.id };
