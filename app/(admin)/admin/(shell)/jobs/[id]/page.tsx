@@ -95,7 +95,7 @@ export default async function BookingDetailPage({ params }: PageProps) {
     .from("bookings")
     .select(
       `id, status, area, postcode, total_pence, base_price_pence, parts_price_pence,
-       commission_rate, platform_fee_pence, mechanic_payout_pence,
+       commission_rate, platform_fee_pence, mechanic_payout_pence, credit_applied_pence,
        customer_name, customer_email,
        vehicle_reg, vehicle_make, vehicle_model, service_id, mechanic_id,
        scheduled_at, created_at, address_line_1, address_line_2, parking_type,
@@ -111,7 +111,7 @@ export default async function BookingDetailPage({ params }: PageProps) {
       supabase.from("services").select("name").eq("id", booking.service_id).single(),
       supabase
         .from("booking_events")
-        .select("id, event_type, actor_role, reason, created_at")
+        .select("id, event_type, actor_role, reason, payload, created_at")
         .eq("booking_id", id)
         .order("created_at", { ascending: true }),
       supabase
@@ -140,6 +140,22 @@ export default async function BookingDetailPage({ params }: PageProps) {
   }));
 
   const pay = paymentMeta(paymentStatus);
+
+  // Refund state. Refundable = what the customer actually paid minus anything
+  // already refunded (summed from the timeline). Refunds only apply to a captured
+  // charge; each refund is recovered from the mechanic (see refundBooking).
+  const chargedPence = Math.max(
+    0,
+    (booking.total_pence ?? 0) - (booking.credit_applied_pence ?? 0),
+  );
+  const alreadyRefundedPence = (events ?? [])
+    .filter((e) => e.event_type === "payment_refunded")
+    .reduce(
+      (sum, e) => sum + ((e.payload as { amount_pence?: number } | null)?.amount_pence ?? 0),
+      0,
+    );
+  const refundablePence = Math.max(0, chargedPence - alreadyRefundedPence);
+  const canRefund = paymentStatus === "succeeded" && refundablePence > 0;
 
   // Commission/payout split. Prefer the values snapshotted on the booking at
   // creation; fall back to recomputing for legacy rows that predate them.
@@ -265,6 +281,14 @@ export default async function BookingDetailPage({ params }: PageProps) {
                     {formatPrice(booking.total_pence ?? 0)}
                   </span>
                 </div>
+                {alreadyRefundedPence > 0 && (
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-sm text-text-secondary">Refunded</span>
+                    <span className="text-sm font-semibold text-red-600">
+                      −{formatPrice(alreadyRefundedPence)}
+                    </span>
+                  </div>
+                )}
                 <p className="break-all text-xs text-text-muted">
                   {booking.stripe_payment_intent_id}
                 </p>
@@ -319,6 +343,9 @@ export default async function BookingDetailPage({ params }: PageProps) {
               currentMechanicId={booking.mechanic_id}
               isClosed={booking.status === "cancelled"}
               mechanics={mechanics}
+              canRefund={canRefund}
+              refundablePence={refundablePence}
+              hasMechanic={booking.mechanic_id != null}
             />
           </Card>
         </div>

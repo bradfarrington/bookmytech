@@ -51,6 +51,31 @@ export function calcEarnings(
   };
 }
 
+/**
+ * Net a job's gross payout against the mechanic's prior balance to work out what
+ * to actually transfer. Mechanics are paid instantly, but a refund BMT fronted on
+ * an earlier job leaves their balance NEGATIVE (a debt); that debt is recovered
+ * off this payout before any cash goes out.
+ *
+ *   priorBalancePence ≤ 0 normally (0 = settled, negative = owes BMT).
+ *   transferPence  = what actually transfers to the mechanic (never negative,
+ *                    never more than the surplus after clearing the debt).
+ *   recoveredPence = how much of this payout was withheld to clear the debt.
+ *
+ * A positive prior balance (BMT owes the mechanic — e.g. an earlier transfer
+ * failed) is carried forward untouched here; recoveredPence stays 0.
+ */
+export function nettedPayout(
+  priorBalancePence: number,
+  grossPayoutPence: number,
+): { transferPence: number; recoveredPence: number } {
+  const gross = Math.max(0, Math.round(grossPayoutPence || 0));
+  const balanceAfterEarning = Math.round(priorBalancePence || 0) + gross;
+  const transferPence = Math.max(0, balanceAfterEarning);
+  const recoveredPence = Math.max(0, gross - transferPence);
+  return { transferPence, recoveredPence };
+}
+
 /** Convenience: just the mechanic's take-home pence. */
 export function mechanicSharePence(
   totalPence: number,

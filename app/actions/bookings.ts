@@ -2,6 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { refundPayment } from "@/lib/stripe/refund";
+import { recordRefundClawback } from "@/lib/mechanics/balance";
+import { formatPrice } from "@/lib/utils";
 
 export type BookingActionResult = { ok: true } | { ok: false; error: string };
 
@@ -107,6 +111,105 @@ export async function markDisputed(
     reason: trimmed,
     payload: { status_from: booking.status, status_to: "disputed" },
   });
+
+  revalidate(id);
+  return { ok: true };
+}
+
+/**
+ * Refund a customer (in whole or part) on a captured booking, and recover the
+ * value from the mechanic.
+ *
+ * Money model (owner decision 2026-07-01): BMT fronts the refund out of its own
+ * Stripe balance (that's how a platform-charge refund works). The mechanic was
+ * already paid instantly at completion, so we can't reverse that — instead the
+ * full refunded amount is debited from their balance ledger, taking it NEGATIVE.
+ * The debt is netted off their next job's payout (see completeAndCharge).
+ *
+ * Admin picks the amount; it's clamped to what's still refundable (charged minus
+ * anything already refunded). Runs its money ops under the service-role client so
+ * the ledger write (no browser INSERT policy) succeeds.
+ */
+export async function refundBooking(
+  id: string,
+  amountPence: number,
+  reason: string,
+): Promise<BookingActionResult> {
+  const guard = await requireAdmin();
+  if (!guard.ok) return guard;
+  const { actorId } = guard;
+
+  const trimmed = reason.trim();
+  if (!trimmed) return { ok: false, error: "A refund reason is required." };
+  const amount = Math.round(amountPence);
+  if (!Number.isFinite(amount) || amount <= 0)
+    return { ok: false, error: "Enter a refund amount greater than zero." };
+
+  const admin = createAdminClient();
+  const { data: booking } = await admin
+    .from("bookings")
+    .select(
+      "id, status, mechanic_id, total_pence, credit_applied_pence, stripe_payment_intent_id",
+    )
+    .eq("id", id)
+    .single();
+  if (!booking) return { ok: false, error: "Booking not found." };
+  if (!booking.stripe_payment_intent_id)
+    return { ok: false, error: "This booking has no captured payment to refund." };
+
+  // Refundable = what the customer actually paid, minus anything already refunded.
+  const chargedPence = Math.max(
+    0,
+    (booking.total_pence ?? 0) - (booking.credit_applied_pence ?? 0),
+  );
+  const { data: priorRefunds } = await admin
+    .from("booking_events")
+    .select("payload")
+    .eq("booking_id", id)
+    .eq("event_type", "payment_refunded");
+  const alreadyRefunded = (priorRefunds ?? []).reduce(
+    (sum, e) => sum + ((e.payload as { amount_pence?: number } | null)?.amount_pence ?? 0),
+    0,
+  );
+  const refundable = chargedPence - alreadyRefunded;
+  if (refundable <= 0)
+    return { ok: false, error: "This booking has already been fully refunded." };
+  if (amount > refundable)
+    return {
+      ok: false,
+      error: `Only ${formatPrice(refundable)} is left to refund on this booking.`,
+    };
+
+  // 1) Refund the customer's card from BMT's Stripe balance.
+  const r = await refundPayment(booking.stripe_payment_intent_id, amount);
+  if (!r.ok) return { ok: false, error: `Refund failed: ${r.error}. Nothing was changed — try again.` };
+
+  // 2) Audit the refund on the booking timeline.
+  await admin.from("booking_events").insert({
+    booking_id: id,
+    event_type: "payment_refunded",
+    actor_id: actorId,
+    actor_role: "admin",
+    reason: trimmed,
+    payload: { amount_pence: amount, refund_id: r.refundId },
+  });
+
+  // 3) Recover it from the mechanic — their balance goes negative and is netted
+  //    off their next payout. No mechanic (e.g. never assigned) → BMT absorbs it.
+  if (booking.mechanic_id) {
+    const bref = id.slice(0, 8).toUpperCase();
+    await recordRefundClawback(
+      admin,
+      booking.mechanic_id,
+      id,
+      amount,
+      r.refundId,
+      actorId,
+      `Refund on job ${bref}: ${trimmed}`,
+    );
+    revalidatePath(`/admin/mechanics/${booking.mechanic_id}`);
+    revalidatePath("/mechanic/earnings");
+  }
 
   revalidate(id);
   return { ok: true };

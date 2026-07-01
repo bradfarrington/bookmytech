@@ -19,6 +19,14 @@ import { Stars } from "@/components/ui/stars";
 import { Overline } from "@/components/ui/overline";
 import { cn, formatPrice } from "@/lib/utils";
 import { SuspensionControls } from "@/components/admin/suspension-controls";
+import { mechanicBalanceSummary } from "@/lib/mechanics/balance";
+
+const LEDGER_LABEL: Record<string, string> = {
+  earning: "Job earning",
+  payout: "Paid out",
+  refund_clawback: "Refund recovered",
+  adjustment: "Adjustment",
+};
 
 interface MechanicDetailPageProps {
   params: Promise<{ id: string }>;
@@ -162,6 +170,17 @@ export default async function MechanicDetailPage({
 
   const jobs = jobsRaw ?? [];
   const reviews = reviewsRaw ?? [];
+
+  // Balance ledger (0034) — instant-pay, so this sits at ~£0 unless a refund has
+  // taken it negative (a debt being recovered from upcoming payouts).
+  const balance = await mechanicBalanceSummary(admin, id);
+  const { data: ledgerRaw } = await admin
+    .from("mechanic_ledger")
+    .select("id, entry_type, amount_pence, description, created_at")
+    .eq("mechanic_id", id)
+    .order("created_at", { ascending: false })
+    .limit(8);
+  const ledger = ledgerRaw ?? [];
 
   // Resolve service names for the job list.
   const serviceIds = [...new Set(jobs.map((b) => b.service_id).filter(Boolean))];
@@ -309,6 +328,91 @@ export default async function MechanicDetailPage({
               </div>
             </Card>
           </div>
+
+          {/* Balance ledger */}
+          <Card className="space-y-4 p-6">
+            <h2 className="text-sm font-bold uppercase tracking-wide text-text-muted">
+              Balance
+            </h2>
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.04em] text-text-muted">
+                  Total earned
+                </p>
+                <p className="mt-0.5 text-lg font-bold text-text-primary">
+                  {formatPrice(balance.totalEarnedPence)}
+                </p>
+              </div>
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.04em] text-text-muted">
+                  Paid out
+                </p>
+                <p className="mt-0.5 text-lg font-bold text-text-primary">
+                  {formatPrice(balance.totalPaidOutPence)}
+                </p>
+              </div>
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.04em] text-text-muted">
+                  {balance.balancePence < 0 ? "Owed to BMT" : "Balance"}
+                </p>
+                <p
+                  className={cn(
+                    "mt-0.5 text-lg font-bold",
+                    balance.balancePence < 0
+                      ? "text-red-600"
+                      : balance.balancePence > 0
+                        ? "text-amber-700"
+                        : "text-text-primary",
+                  )}
+                >
+                  {formatPrice(Math.abs(balance.balancePence))}
+                </p>
+              </div>
+            </div>
+            {balance.balancePence < 0 && (
+              <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">
+                A refund was fronted by Book My Tech and is being recovered from this
+                mechanic&apos;s upcoming payouts. Their next job&apos;s earnings pay this
+                down before any cash is transferred.
+              </p>
+            )}
+            {balance.balancePence > 0 && (
+              <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                Book My Tech owes this mechanic — a payout is pending (likely a transfer
+                that needs retrying).
+              </p>
+            )}
+            {ledger.length > 0 && (
+              <div className="border-t border-border pt-4">
+                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-text-muted">
+                  Recent ledger
+                </p>
+                <ul className="space-y-1.5 text-sm">
+                  {ledger.map((l) => (
+                    <li key={l.id} className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <span className="text-text-primary">
+                          {LEDGER_LABEL[l.entry_type] ?? l.entry_type}
+                        </span>
+                        <span className="ml-2 text-xs text-text-muted">
+                          {new Date(l.created_at).toLocaleDateString("en-GB")}
+                        </span>
+                      </div>
+                      <span
+                        className={cn(
+                          "shrink-0 font-semibold tabular-nums",
+                          (l.amount_pence ?? 0) < 0 ? "text-red-600" : "text-success",
+                        )}
+                      >
+                        {(l.amount_pence ?? 0) < 0 ? "−" : "+"}
+                        {formatPrice(Math.abs(l.amount_pence ?? 0))}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </Card>
 
           <Card className="space-y-4 p-6">
             <h2 className="text-sm font-bold uppercase tracking-wide text-text-muted">

@@ -10,6 +10,8 @@ import { renderSmsTemplate } from "@/lib/sms/render-template";
 import { formatPrice, siteUrl } from "@/lib/utils";
 import { completedBookingCount, grantCredit } from "@/lib/credits/credits";
 import { REFERRAL_BONUS_PENCE } from "@/lib/credits/constants";
+import { mechanicBalancePence, recordEarning, recordPayout } from "@/lib/mechanics/balance";
+import { nettedPayout } from "@/lib/earnings";
 
 export type JobProgressResult = { ok: true } | { ok: false; error: string };
 
@@ -286,34 +288,75 @@ export async function completeAndCharge(bookingId: string): Promise<JobProgressR
   // total ('free') — in the free case there's no source_transaction, so the
   // payout draws from the platform balance (which funded the credit).
   const shouldPay = payoutPence > 0 && (captured || booking.payment_mode === "free");
-  if (shouldPay && stripe && mechanicAccount?.stripe_account_id) {
-    try {
-      const transfer = await stripe.transfers.create({
-        amount: payoutPence,
-        currency: "gbp",
-        destination: mechanicAccount.stripe_account_id,
-        // Release the payout from the funds of this booking's own charge as they
-        // settle — keeps payouts automatic without managing the platform balance.
-        ...(chargeId ? { source_transaction: chargeId } : {}),
-        transfer_group: bookingId,
-        metadata: { booking_id: bookingId, mechanic_id: guard.mechanicId },
-      });
-      await admin.from("booking_events").insert({
-        booking_id: bookingId,
-        event_type: "payout_transferred",
-        actor_id: guard.mechanicId,
-        actor_role: "mechanic",
-        payload: { amount_pence: payoutPence, transfer_id: transfer.id },
-      });
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "transfer failed";
-      console.error("Mechanic payout transfer failed for booking", bookingId, message);
+  if (shouldPay && booking.mechanic_id) {
+    const ref = bookingId.slice(0, 8).toUpperCase();
+    // 1) Read the mechanic's balance BEFORE this job (≤ 0 normally; negative when
+    //    a refund BMT fronted on an earlier job is still being recovered).
+    const priorBalance = await mechanicBalancePence(admin, booking.mechanic_id);
+
+    // 2) Record the gross earning — their share regardless of whether cash moves.
+    await recordEarning(admin, booking.mechanic_id, bookingId, payoutPence, `Job ${ref} payout`);
+
+    // 3) Net the payout against any debt: transfer only the surplus, withhold the
+    //    rest to recover what BMT fronted.
+    const { transferPence, recoveredPence } = nettedPayout(priorBalance, payoutPence);
+
+    if (transferPence > 0 && stripe && mechanicAccount?.stripe_account_id) {
+      try {
+        const transfer = await stripe.transfers.create({
+          amount: transferPence,
+          currency: "gbp",
+          destination: mechanicAccount.stripe_account_id,
+          // Release the payout from the funds of this booking's own charge as they
+          // settle — keeps payouts automatic without managing the platform balance.
+          ...(chargeId ? { source_transaction: chargeId } : {}),
+          transfer_group: bookingId,
+          metadata: { booking_id: bookingId, mechanic_id: guard.mechanicId },
+        });
+        // 3) Record the cash actually transferred (−) so the ledger settles back
+        //    toward zero (or repays the debt).
+        await recordPayout(admin, booking.mechanic_id, bookingId, transferPence, transfer.id, `Job ${ref} payout`);
+        await admin.from("booking_events").insert({
+          booking_id: bookingId,
+          event_type: "payout_transferred",
+          actor_id: guard.mechanicId,
+          actor_role: "mechanic",
+          payload: {
+            amount_pence: transferPence,
+            gross_payout_pence: payoutPence,
+            recovered_pence: recoveredPence,
+            transfer_id: transfer.id,
+          },
+        });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "transfer failed";
+        console.error("Mechanic payout transfer failed for booking", bookingId, message);
+        // No payout row is written, so the earning leaves the balance positive
+        // (BMT owes them) — surfaced for reconciliation/retry.
+        await admin.from("booking_events").insert({
+          booking_id: bookingId,
+          event_type: "note",
+          actor_id: guard.mechanicId,
+          actor_role: "mechanic",
+          payload: { note: `Payout transfer failed: ${message}`, amount_pence: transferPence },
+        });
+      }
+    }
+
+    // 4) If any of this payout was withheld to recover a prior refund, log it so
+    //    the timeline explains the reduced (or zero) transfer. The ledger earning
+    //    row already did the accounting; this is informational.
+    if (recoveredPence > 0 && (transferPence === 0 || (stripe && mechanicAccount?.stripe_account_id))) {
       await admin.from("booking_events").insert({
         booking_id: bookingId,
         event_type: "note",
-        actor_id: guard.mechanicId,
-        actor_role: "mechanic",
-        payload: { note: `Payout transfer failed: ${message}`, amount_pence: payoutPence },
+        actor_role: "system",
+        reason: `Withheld ${formatPrice(recoveredPence)} from this payout to recover the mechanic's outstanding balance.`,
+        payload: {
+          recovered_pence: recoveredPence,
+          gross_payout_pence: payoutPence,
+          transferred_pence: transferPence,
+        },
       });
     }
   }

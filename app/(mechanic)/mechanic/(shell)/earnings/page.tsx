@@ -53,6 +53,23 @@ export default async function MechanicEarningsPage() {
     .eq("id", user.id)
     .single();
 
+  // Balance ledger (0034). Instant-pay means this sits at ~£0 — it only goes
+  // negative when a refund BMT fronted is being recovered from upcoming payouts.
+  const { data: ledgerRows } = await supabase
+    .from("mechanic_ledger")
+    .select("entry_type, amount_pence")
+    .eq("mechanic_id", user.id);
+  let ledgerEarned = 0;
+  let ledgerPaid = 0;
+  let ledgerBalance = 0;
+  for (const r of ledgerRows ?? []) {
+    const a = r.amount_pence ?? 0;
+    ledgerBalance += a;
+    if (r.entry_type === "earning") ledgerEarned += a;
+    else if (r.entry_type === "payout") ledgerPaid += -a;
+  }
+  const hasLedger = (ledgerRows ?? []).length > 0;
+
   const since = new Date(Date.now() - CHART_DAYS * MS_DAY).toISOString();
   const { data: completedRows } = await supabase
     .from("bookings")
@@ -135,6 +152,59 @@ export default async function MechanicEarningsPage() {
           Your share after the platform fee, across completed jobs.
         </p>
       </header>
+
+      {hasLedger && (
+        <div
+          className={
+            ledgerBalance < 0
+              ? "rounded-card border border-red-200 bg-red-50 p-5"
+              : "rounded-card border border-border bg-surface-card p-5"
+          }
+        >
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.04em] text-text-muted">
+                {ledgerBalance < 0 ? "Balance being recovered" : "Current balance"}
+              </p>
+              <p
+                className={
+                  ledgerBalance < 0
+                    ? "mt-0.5 text-2xl font-bold text-red-600"
+                    : "mt-0.5 text-2xl font-bold text-text-primary"
+                }
+              >
+                {ledgerBalance < 0 ? "−" : ""}
+                {formatPrice(Math.abs(ledgerBalance))}
+              </p>
+            </div>
+            <div className="flex gap-6 text-right">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.04em] text-text-muted">
+                  Lifetime earned
+                </p>
+                <p className="mt-0.5 text-lg font-bold text-text-primary">
+                  {formatPrice(ledgerEarned)}
+                </p>
+              </div>
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.04em] text-text-muted">
+                  Paid out
+                </p>
+                <p className="mt-0.5 text-lg font-bold text-text-primary">
+                  {formatPrice(ledgerPaid)}
+                </p>
+              </div>
+            </div>
+          </div>
+          {ledgerBalance < 0 && (
+            <p className="mt-3 text-xs text-red-700">
+              A refund on one of your jobs was covered by Book My Tech. This amount is
+              being recovered from your upcoming payouts — your next job&apos;s earnings
+              clear it first, then the rest is paid out as normal.
+            </p>
+          )}
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <KPI
