@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendEmail } from "@/lib/email/send";
+import { renderTemplateEmail } from "@/emails/resolve";
 import { siteUrl } from "@/lib/utils";
 import { ESCALATION_HOURS } from "@/lib/disputes/constants";
 
@@ -43,16 +44,14 @@ async function runEscalation() {
     });
   }
 
-  await sendEmail({
-    to: ADMIN_EMAIL,
-    subject: `${due.length} dispute${due.length > 1 ? "s" : ""} escalated for arbitration`,
-    html: `
-      <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-        <h1 style="color:#1e3a8a;">Disputes need your decision</h1>
-        <p>${due.length} dispute${due.length > 1 ? "s have" : " has"} auto-escalated after ${ESCALATION_HOURS} hours without resolution.</p>
-        <p><a href="${siteUrl()}/admin/disputes">Open the disputes queue →</a></p>
-      </div>`,
-  }).catch((e) => console.error("escalation email failed", e));
+  const { subject, html } = await renderTemplateEmail("disputes_escalated_alert", {
+    count: due.length,
+    intro: `${due.length} dispute${due.length > 1 ? "s have" : " has"} auto-escalated after ${ESCALATION_HOURS} hours without resolution.`,
+    link: `${siteUrl()}/admin/disputes`,
+  });
+  await sendEmail({ to: ADMIN_EMAIL, subject, html }).catch((e) =>
+    console.error("escalation email failed", e),
+  );
 
   return { escalated: due.length };
 }

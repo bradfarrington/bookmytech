@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendEmail } from "@/lib/email/send";
+import { renderTemplateEmail } from "@/emails/resolve";
 import { sendSms } from "@/lib/sms/send-sms";
 import { renderSmsTemplate } from "@/lib/sms/render-template";
 import { formatPrice, siteUrl } from "@/lib/utils";
@@ -107,21 +108,11 @@ export async function startJourney(bookingId: string): Promise<JobProgressResult
   if (!res.ok) return res;
 
   const { booking } = res;
-  if (booking.customer_email) {
-    sendEmail({
-      to: booking.customer_email,
-      subject: "Your mechanic is on the way",
-      html: `
-        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-          <h1 style="color: #1e3a8a;">Your mechanic is on the way</h1>
-          <p>Hi ${booking.customer_name ?? "there"},</p>
-          <p>Your mechanic has set off and is heading to you now. Please make sure
-          your vehicle is accessible.</p>
-          <p style="color: #64748b; font-size: 14px;">Track your booking from your
-          confirmation page for live status updates.</p>
-        </div>
-      `,
-    }).catch(console.error);
+  const enRouteEmail = booking.customer_email;
+  if (enRouteEmail) {
+    renderTemplateEmail("booking_en_route", { name: booking.customer_name ?? "there" })
+      .then(({ subject, html }) => sendEmail({ to: enRouteEmail, subject, html }))
+      .catch(console.error);
   }
 
   // High-value SMS touchpoint — the customer wants to know the mechanic's coming.
@@ -331,47 +322,32 @@ export async function completeAndCharge(bookingId: string): Promise<JobProgressR
   const serviceName =
     (Array.isArray(booking.service) ? booking.service[0]?.name : (booking.service as { name?: string } | null)?.name) ??
     "your service";
-  if (booking.customer_email) {
-    // One-tap rating links: each star deep-links into the review form with the
-    // rating pre-selected (?rating=N).
-    const reviewUrl = `${siteUrl()}/review/${bookingId}`;
-    const starLinks = [1, 2, 3, 4, 5]
-      .map(
-        (n) =>
-          `<a href="${reviewUrl}?rating=${n}" style="text-decoration:none;font-size:28px;color:#f59e0b;">★</a>`,
-      )
-      .join("&nbsp;");
-    sendEmail({
-      to: booking.customer_email,
-      subject: "Your job is complete — receipt",
-      html: `
-        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-          <h1 style="color: #1e3a8a;">All done — thanks for using Book My Tech</h1>
-          <p>Hi ${booking.customer_name ?? "there"},</p>
-          <p>Your mechanic has marked <strong>${serviceName}</strong> complete.</p>
-          ${
-            (booking.credit_applied_pence ?? 0) > 0
-              ? `<p style="color: #64748b; font-size: 14px; margin: 0;">Service total ${formatPrice(booking.total_pence ?? 0)} · account credit −${formatPrice(booking.credit_applied_pence ?? 0)}</p>`
-              : ""
-          }
-          <p style="font-size: 18px; font-weight: 600; color: #1e3a8a;">
-            ${chargePence > 0 ? `Total charged: ${formatPrice(chargePence)}` : "Paid in full with your account credit — nothing to pay"}
-          </p>
-          <p style="color: #64748b; font-size: 14px;">${
-            chargePence === 0
-              ? "Your account credit covered this booking."
-              : captured
-                ? "Your card has now been charged."
-                : "Payment will be settled shortly."
-          }</p>
-          <div style="margin: 24px 0; padding: 20px; background: #f8fafc; border-radius: 12px; text-align: center;">
-            <p style="margin: 0 0 8px; font-weight: 600; color: #0f172a;">How did your mechanic do?</p>
-            <p style="margin: 0 0 12px;">${starLinks}</p>
-            <a href="${reviewUrl}" style="color: #2563eb; font-size: 14px; font-weight: 600;">Leave a review</a>
-          </div>
-        </div>
-      `,
-    }).catch(console.error);
+  const receiptEmail = booking.customer_email;
+  if (receiptEmail) {
+    const creditLine =
+      (booking.credit_applied_pence ?? 0) > 0
+        ? `Service total ${formatPrice(booking.total_pence ?? 0)} · account credit −${formatPrice(booking.credit_applied_pence ?? 0)}`
+        : "";
+    const chargeLine =
+      chargePence > 0
+        ? `Total charged: ${formatPrice(chargePence)}`
+        : "Paid in full with your account credit — nothing to pay";
+    const settleLine =
+      chargePence === 0
+        ? "Your account credit covered this booking."
+        : captured
+          ? "Your card has now been charged."
+          : "Payment will be settled shortly.";
+    renderTemplateEmail("job_complete", {
+      name: booking.customer_name ?? "there",
+      service: serviceName,
+      credit_line: creditLine,
+      charge_line: chargeLine,
+      settle_line: settleLine,
+      review_url: `${siteUrl()}/review/${bookingId}`,
+    })
+      .then(({ subject, html }) => sendEmail({ to: receiptEmail, subject, html }))
+      .catch(console.error);
   }
 
   if (booking.customer_phone) {

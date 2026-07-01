@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendEmail } from "@/lib/email/send";
+import { renderTemplateEmail } from "@/emails/resolve";
 
 export type OfferActionResult =
   | { ok: true; bookingId?: string }
@@ -139,37 +140,15 @@ export async function acceptOffer(offerId: string): Promise<OfferActionResult> {
           timeStyle: "short",
         })
       : "your booked time";
-    sendEmail({
-      to: booking.customer_email,
-      subject: isReplacement
-        ? "Good news — your replacement mechanic is confirmed"
-        : "Your mechanic is confirmed",
-      html: `
-        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-          <h1 style="color: #1e3a8a;">${
-            isReplacement
-              ? "We've found your replacement mechanic"
-              : "Your mechanic is confirmed"
-          }</h1>
-          <p>Hi ${booking.customer_name ?? "there"},</p>
-          <p>${
-            isReplacement
-              ? `Thanks for your patience — <strong>${mechanicName}</strong> has accepted your job and will be taking over.`
-              : `<strong>${mechanicName}</strong> has accepted your booking.`
-          }</p>
-          <table style="width:100%; border-collapse: collapse; margin: 20px 0;">
-            <tr><td style="padding: 8px 0; color: #64748b; font-size: 14px;">Service</td><td style="padding: 8px 0; font-weight: 600;">${serviceName}</td></tr>
-            <tr><td style="padding: 8px 0; color: #64748b; font-size: 14px;">Date &amp; time</td><td style="padding: 8px 0; font-weight: 600;">${slotLabel}</td></tr>
-          </table>
-          <p style="color: #64748b; font-size: 14px;">${
-            isReplacement
-              ? "Your existing pre-authorisation stays in place — no new charge."
-              : "We'll let you know the moment they set off."
-          }</p>
-          <p style="color: #64748b; font-size: 14px;">Track your booking any time from your account.</p>
-        </div>
-      `,
-    }).catch(console.error);
+    const to = booking.customer_email;
+    renderTemplateEmail(isReplacement ? "replacement_confirmed" : "mechanic_confirmed", {
+      name: booking.customer_name ?? "there",
+      mechanic: mechanicName,
+      service: serviceName,
+      when: slotLabel,
+    })
+      .then(({ subject, html }) => sendEmail({ to, subject, html }))
+      .catch(console.error);
   }
 
   revalidatePath("/mechanic/jobs");

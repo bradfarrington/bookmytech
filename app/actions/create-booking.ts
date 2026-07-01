@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendEmail } from "@/lib/email/send";
+import { renderTemplateEmail } from "@/emails/resolve";
 import { sendSms } from "@/lib/sms/send-sms";
 import { renderSmsTemplate } from "@/lib/sms/render-template";
 import { formatPrice } from "@/lib/utils";
@@ -188,26 +189,28 @@ export async function createBookingAction(
     mode === "free"
       ? `Covered in full by your account credit (${formatPrice(price.totalPence)}). Nothing to pay.`
       : `Amount pre-authorised${passedCredit > 0 ? ` (after ${formatPrice(passedCredit)} credit)` : ""}: ${formatPrice(chargedPence)}`;
-  sendEmail({
-    to: input.customerEmail,
-    subject: "Booking received — we're finding your mechanic",
-    html: `
-      <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-        <h1 style="color: #1e3a8a;">Your booking is confirmed!</h1>
-        <p>Hi ${input.customerName},</p>
-        <p>We've received your booking and are now matching you with the best available mechanic in your area. You'll hear from us as soon as one accepts — usually within minutes.</p>
-        <table style="width:100%; border-collapse: collapse; margin: 24px 0;">
-          <tr><td style="padding: 8px 0; color: #64748b; font-size: 14px;">Booking ref</td><td style="padding: 8px 0; font-weight: 600;">${data.id.slice(0, 8).toUpperCase()}</td></tr>
-          <tr><td style="padding: 8px 0; color: #64748b; font-size: 14px;">Vehicle</td><td style="padding: 8px 0; font-weight: 600;">${input.vehicleReg ? `${input.vehicleReg} — ` : ""}${input.vehicleMake}${input.vehicleModel ? ` ${input.vehicleModel}` : ""}</td></tr>
-          <tr><td style="padding: 8px 0; color: #64748b; font-size: 14px;">Service</td><td style="padding: 8px 0; font-weight: 600;">${input.serviceName}</td></tr>
-          <tr><td style="padding: 8px 0; color: #64748b; font-size: 14px;">Date &amp; time</td><td style="padding: 8px 0; font-weight: 600;">${new Date(input.scheduledAt).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })}${input.slotWindow ? ` · ${input.slotWindow}` : `, ${new Date(input.scheduledAt).toLocaleTimeString("en-GB", { hour: "numeric", minute: "2-digit" })}`}</td></tr>
-        </table>
-        <p style="font-weight: 600;">${payLine}</p>
-        <p style="color: #64748b; font-size: 14px;">No money has left your account yet. Your payment will only be captured once the job is complete and you've signed off.</p>
-        <p style="color: #64748b; font-size: 14px;">Questions? Email us at <a href="mailto:help@bookmytech.co.uk">help@bookmytech.co.uk</a></p>
-      </div>
-    `,
-  }).catch(console.error);
+  const whenLabel = `${new Date(input.scheduledAt).toLocaleDateString("en-GB", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  })}${
+    input.slotWindow
+      ? ` · ${input.slotWindow}`
+      : `, ${new Date(input.scheduledAt).toLocaleTimeString("en-GB", { hour: "numeric", minute: "2-digit" })}`
+  }`;
+  const vehicleLabel = `${input.vehicleReg ? `${input.vehicleReg} — ` : ""}${input.vehicleMake}${
+    input.vehicleModel ? ` ${input.vehicleModel}` : ""
+  }`;
+  renderTemplateEmail("booking_confirmed", {
+    name: input.customerName,
+    ref: data.id.slice(0, 8).toUpperCase(),
+    service: input.serviceName,
+    vehicle: vehicleLabel,
+    when: whenLabel,
+    pay_line: payLine,
+  })
+    .then(({ subject, html }) => sendEmail({ to: input.customerEmail, subject, html }))
+    .catch(console.error);
 
   if (customerPhone) {
     const body = await renderSmsTemplate("booking_received", {

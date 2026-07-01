@@ -1,6 +1,7 @@
 import "server-only";
 import type { createAdminClient } from "@/lib/supabase/admin";
 import { sendEmail } from "@/lib/email/send";
+import { renderTemplateEmail } from "@/emails/resolve";
 import { siteUrl } from "@/lib/utils";
 
 type Admin = ReturnType<typeof createAdminClient>;
@@ -36,20 +37,15 @@ export async function applySuspension(
   const email = await mechanicEmail(admin, mechanicId);
   if (email) {
     const untilLine = suspendedUntil
-      ? `Your account is suspended until <strong>${new Date(suspendedUntil).toLocaleDateString("en-GB", { dateStyle: "long" })}</strong>.`
+      ? `Your account is suspended until ${new Date(suspendedUntil).toLocaleDateString("en-GB", { dateStyle: "long" })}.`
       : "Your account is suspended pending review.";
-    sendEmail({
-      to: email,
-      subject: "Your Book My Tech account has been suspended",
-      html: `
-        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-          <h1 style="color:#1e3a8a;">Account suspended</h1>
-          <p>${untilLine}</p>
-          <p><strong>Reason:</strong> ${reason.replace(/</g, "&lt;")}</p>
-          <p>While suspended you won't receive new job offers. If you have questions, reply to this email or contact <a href="mailto:help@bookmytech.co.uk">help@bookmytech.co.uk</a>.</p>
-          <p style="color:#64748b;font-size:14px;"><a href="${siteUrl()}/mechanic">Open your dashboard →</a></p>
-        </div>`,
-    }).catch((e) => console.error("suspension email failed", e));
+    renderTemplateEmail("mechanic_suspended", {
+      until_line: untilLine,
+      reason,
+      dashboard_url: `${siteUrl()}/mechanic`,
+    })
+      .then(({ subject, html }) => sendEmail({ to: email, subject, html }))
+      .catch((e) => console.error("suspension email failed", e));
   }
 }
 
@@ -80,15 +76,10 @@ export async function liftMechanicSuspension(
 
   const email = await mechanicEmail(admin, mechanicId);
   if (email) {
-    sendEmail({
-      to: email,
-      subject: "Your Book My Tech account is active again",
-      html: `
-        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-          <h1 style="color:#1e3a8a;">You're back online</h1>
-          <p>Your suspension has been lifted — you'll start receiving job offers again once you go online.</p>
-          <p style="color:#64748b;font-size:14px;"><a href="${siteUrl()}/mechanic">Open your dashboard →</a></p>
-        </div>`,
-    }).catch((e) => console.error("lift email failed", e));
+    renderTemplateEmail("mechanic_suspension_lifted", {
+      dashboard_url: `${siteUrl()}/mechanic`,
+    })
+      .then(({ subject, html }) => sendEmail({ to: email, subject, html }))
+      .catch((e) => console.error("lift email failed", e));
   }
 }

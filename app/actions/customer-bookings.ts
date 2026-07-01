@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendEmail } from "@/lib/email/send";
+import { renderTemplateEmail } from "@/emails/resolve";
 import { sendSms } from "@/lib/sms/send-sms";
 import { renderSmsTemplate } from "@/lib/sms/render-template";
 import { formatPrice } from "@/lib/utils";
@@ -96,31 +97,14 @@ export async function respondToReschedule(
   });
 
   // Tell the mechanic the outcome so they don't have to keep checking.
-  const to = await mechanicEmail(admin, booking.mechanic_id);
-  if (to) {
-    sendEmail({
-      to,
-      subject: accepted
-        ? "Your reschedule was accepted"
-        : "Your reschedule was declined",
-      html: `
-        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-          <h1 style="color: #1e3a8a;">${
-            accepted ? "New time confirmed" : "Customer kept the original time"
-          }</h1>
-          <p>${
-            accepted
-              ? `The customer accepted your proposed time. This job is now booked for <strong>${fmt(
-                  proposed,
-                )}</strong>.`
-              : `The customer declined the new time. The job stays at its original slot of <strong>${fmt(
-                  original ?? proposed,
-                )}</strong>.`
-          }</p>
-          <p style="color: #64748b; font-size: 14px;">View it on your dashboard.</p>
-        </div>
-      `,
-    }).catch(console.error);
+  const outcomeTo = await mechanicEmail(admin, booking.mechanic_id);
+  if (outcomeTo) {
+    const email = accepted
+      ? renderTemplateEmail("mechanic_reschedule_accepted", { proposed: fmt(proposed) })
+      : renderTemplateEmail("mechanic_reschedule_declined", { original: fmt(original ?? proposed) });
+    email
+      .then(({ subject, html }) => sendEmail({ to: outcomeTo, subject, html }))
+      .catch(console.error);
   }
 
   revalidatePath(`/book/confirmed/${bookingId}`);
@@ -316,41 +300,26 @@ export async function cancelBooking(
   }
 
   // Tell the assigned mechanic their job is off.
-  const mechTo = await mechanicEmail(admin, booking.mechanic_id);
-  if (mechTo) {
-    sendEmail({
-      to: mechTo,
-      subject: "A job was cancelled by the customer",
-      html: `
-        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-          <h1 style="color: #1e3a8a;">Job cancelled</h1>
-          <p>The customer cancelled their booking. It's been removed from your jobs.</p>
-        </div>
-      `,
-    }).catch(console.error);
+  const cancelMechTo = await mechanicEmail(admin, booking.mechanic_id);
+  if (cancelMechTo) {
+    renderTemplateEmail("mechanic_job_cancelled", {})
+      .then(({ subject, html }) => sendEmail({ to: cancelMechTo, subject, html }))
+      .catch(console.error);
   }
 
   // Confirm to the customer.
-  if (booking.customer_email) {
-    sendEmail({
-      to: booking.customer_email,
-      subject: "Your booking has been cancelled",
-      html: `
-        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-          <h1 style="color: #1e3a8a;">Booking cancelled</h1>
-          <p>Hi ${booking.customer_name ?? "there"},</p>
-          <p>Your booking has been cancelled as requested.</p>
-          <p style="font-weight: 600;">${
-            charged > 0
-              ? `A cancellation fee of ${formatPrice(charged)} was charged (${FEE_LABELS[
-                  tier
-                ].toLowerCase()}). The rest of your pre-authorisation has been released.`
-              : "No cancellation fee applied — your full pre-authorisation has been released."
-          }</p>
-          <p style="color: #64748b; font-size: 14px;">Released holds can take a few days to clear with your bank.</p>
-        </div>
-      `,
-    }).catch(console.error);
+  const cancelEmail = booking.customer_email;
+  if (cancelEmail) {
+    const feeLine =
+      charged > 0
+        ? `A cancellation fee of ${formatPrice(charged)} was charged (${FEE_LABELS[tier].toLowerCase()}). The rest of your pre-authorisation has been released.`
+        : "No cancellation fee applied — your full pre-authorisation has been released.";
+    renderTemplateEmail("booking_cancelled", {
+      name: booking.customer_name ?? "there",
+      fee_line: feeLine,
+    })
+      .then(({ subject, html }) => sendEmail({ to: cancelEmail, subject, html }))
+      .catch(console.error);
   }
 
   if (booking.customer_phone) {
@@ -421,35 +390,21 @@ export async function rescheduleBooking(
 
   const slotLabel = fmt(when.toISOString());
 
-  const mechTo = await mechanicEmail(admin, booking.mechanic_id);
-  if (mechTo) {
-    sendEmail({
-      to: mechTo,
-      subject: "A customer moved their booking",
-      html: `
-        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-          <h1 style="color: #1e3a8a;">Booking rescheduled</h1>
-          <p>The customer moved their booking to <strong>${slotLabel}</strong>. If that
-          no longer works for you, you can propose another time or release the job
-          from your dashboard.</p>
-        </div>
-      `,
-    }).catch(console.error);
+  const moveMechTo = await mechanicEmail(admin, booking.mechanic_id);
+  if (moveMechTo) {
+    renderTemplateEmail("mechanic_booking_rescheduled", { slot: slotLabel })
+      .then(({ subject, html }) => sendEmail({ to: moveMechTo, subject, html }))
+      .catch(console.error);
   }
 
-  if (booking.customer_email) {
-    sendEmail({
-      to: booking.customer_email,
-      subject: "Your booking has been rescheduled",
-      html: `
-        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-          <h1 style="color: #1e3a8a;">New time confirmed</h1>
-          <p>Hi ${booking.customer_name ?? "there"},</p>
-          <p>Your booking is now set for <strong>${slotLabel}</strong>.</p>
-          <p style="color: #64748b; font-size: 14px;">Your pre-authorisation stays in place — no new charge.</p>
-        </div>
-      `,
-    }).catch(console.error);
+  const rescheduleEmail = booking.customer_email;
+  if (rescheduleEmail) {
+    renderTemplateEmail("booking_rescheduled", {
+      name: booking.customer_name ?? "there",
+      slot: slotLabel,
+    })
+      .then(({ subject, html }) => sendEmail({ to: rescheduleEmail, subject, html }))
+      .catch(console.error);
   }
 
   revalidatePath("/dashboard");

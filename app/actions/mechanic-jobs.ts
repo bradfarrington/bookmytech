@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { dispatchBooking } from "@/lib/dispatch/dispatch";
 import { sendEmail } from "@/lib/email/send";
+import { renderTemplateEmail } from "@/emails/resolve";
 
 export type MechanicJobResult = { ok: true } | { ok: false; error: string };
 
@@ -116,25 +117,11 @@ export async function cancelOwnJob(
   // Email 1 of 2: tell the customer we're sourcing a replacement. Email 2
   // ("a replacement has accepted") fires from acceptOffer (job-offers.ts) when
   // the next mechanic accepts — it detects the prior 'cancelled' event.
-  if (booking.customer_email) {
-    sendEmail({
-      to: booking.customer_email,
-      subject: "Update on your booking — finding you a replacement mechanic",
-      html: `
-        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-          <h1 style="color: #1e3a8a;">We're finding you a replacement</h1>
-          <p>Hi ${booking.customer_name ?? "there"},</p>
-          <p>Your original mechanic has had to cancel. We're sorry for the
-          disruption — we're already finding you a suitable replacement and will
-          confirm as soon as one accepts, usually within minutes.</p>
-          <p style="color: #64748b; font-size: 14px;">No money has left your
-          account. Your existing pre-authorisation stays in place and simply
-          transfers to your new mechanic.</p>
-          <p style="color: #64748b; font-size: 14px;">Questions? Email us at
-          <a href="mailto:help@bookmytech.co.uk">help@bookmytech.co.uk</a></p>
-        </div>
-      `,
-    }).catch(console.error);
+  const replacementEmail = booking.customer_email;
+  if (replacementEmail) {
+    renderTemplateEmail("finding_replacement", { name: booking.customer_name ?? "there" })
+      .then(({ subject, html }) => sendEmail({ to: replacementEmail, subject, html }))
+      .catch(console.error);
   }
 
   revalidatePath("/mechanic/jobs");
@@ -204,24 +191,15 @@ export async function proposeReschedule(
 
   // Notify the customer of the proposed slot. Their accept/decline/counter
   // path is Task 09; until that ships the email is the only touchpoint.
-  if (booking.customer_email) {
-    sendEmail({
-      to: booking.customer_email,
-      subject: "Your mechanic has proposed a new time",
-      html: `
-        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-          <h1 style="color: #1e3a8a;">A new time has been proposed</h1>
-          <p>Hi ${booking.customer_name ?? "there"},</p>
-          <p>Your mechanic has proposed moving your booking to:</p>
-          <p style="font-size: 18px; font-weight: 600; color: #1e3a8a;">${slotLabel}</p>
-          ${trimmedNote ? `<p style="color: #64748b; font-size: 14px;">Note from your mechanic: “${trimmedNote}”</p>` : ""}
-          <p style="color: #64748b; font-size: 14px;">We'll be in touch shortly so
-          you can accept this time, suggest another, or keep your original slot.</p>
-          <p style="color: #64748b; font-size: 14px;">Questions? Email us at
-          <a href="mailto:help@bookmytech.co.uk">help@bookmytech.co.uk</a></p>
-        </div>
-      `,
-    }).catch(console.error);
+  const proposeEmail = booking.customer_email;
+  if (proposeEmail) {
+    renderTemplateEmail("mechanic_proposed_time", {
+      name: booking.customer_name ?? "there",
+      slot: slotLabel,
+      optional_note: trimmedNote ? `Note from your mechanic: "${trimmedNote}"` : "",
+    })
+      .then(({ subject, html }) => sendEmail({ to: proposeEmail, subject, html }))
+      .catch(console.error);
   }
 
   revalidatePath("/mechanic/jobs");

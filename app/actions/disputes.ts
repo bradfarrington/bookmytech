@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendEmail } from "@/lib/email/send";
+import { renderTemplateEmail } from "@/emails/resolve";
 import { siteUrl, formatPrice } from "@/lib/utils";
 import {
   isValidReason,
@@ -266,46 +267,37 @@ async function notifyDisputeOpened(
   const ref = booking.id.slice(0, 8).toUpperCase();
 
   // Admin team.
-  sendEmail({
-    to: ADMIN_EMAIL,
-    subject: `New dispute opened — booking ${ref}`,
-    html: `
-      <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-        <h1 style="color:#1e3a8a;">A dispute has been opened</h1>
-        <p>The ${openerRole} opened a dispute on <strong>${svc}</strong> (ref ${ref}).</p>
-        <p style="color:#64748b;font-size:14px;">Monitor it and step in only if the parties can't resolve it themselves.</p>
-        <p><a href="${siteUrl()}/admin/disputes/${disputeId}">Open the dispute →</a></p>
-      </div>`,
-  }).catch((e) => console.error("dispute admin email failed", e));
+  renderTemplateEmail("dispute_opened_admin", {
+    opener_role: openerRole,
+    service: svc,
+    ref,
+    link: `${siteUrl()}/admin/disputes/${disputeId}`,
+  })
+    .then(({ subject, html }) => sendEmail({ to: ADMIN_EMAIL, subject, html }))
+    .catch((e) => console.error("dispute admin email failed", e));
 
   // The other party.
   if (openerRole === "customer") {
     const to = await mechanicEmail(admin, booking.mechanic_id);
     if (to) {
-      sendEmail({
-        to,
-        subject: `A customer raised an issue — booking ${ref}`,
-        html: `
-          <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-            <h1 style="color:#1e3a8a;">A customer raised an issue</h1>
-            <p>The customer on <strong>${svc}</strong> (ref ${ref}) has opened a dispute. Please add your account so we can resolve it quickly.</p>
-            <p><a href="${siteUrl()}/mechanic/disputes/${disputeId}">Respond to the dispute →</a></p>
-            <p style="color:#64748b;font-size:14px;">Your payout for this job is paused until the dispute is resolved.</p>
-          </div>`,
-      }).catch((e) => console.error("dispute mechanic email failed", e));
+      renderTemplateEmail("dispute_opened_mechanic", {
+        service: svc,
+        ref,
+        link: `${siteUrl()}/mechanic/disputes/${disputeId}`,
+      })
+        .then(({ subject, html }) => sendEmail({ to, subject, html }))
+        .catch((e) => console.error("dispute mechanic email failed", e));
     }
   } else if (booking.customer_email) {
-    sendEmail({
-      to: booking.customer_email,
-      subject: `Your mechanic raised an issue — booking ${ref}`,
-      html: `
-        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-          <h1 style="color:#1e3a8a;">Your mechanic raised an issue</h1>
-          <p>Hi ${booking.customer_name ?? "there"},</p>
-          <p>Your mechanic has opened a dispute on <strong>${svc}</strong> (ref ${ref}). Please respond so we can sort it out.</p>
-          <p><a href="${siteUrl()}/dashboard/disputes/${disputeId}">View the dispute →</a></p>
-        </div>`,
-    }).catch((e) => console.error("dispute customer email failed", e));
+    const to = booking.customer_email;
+    renderTemplateEmail("dispute_opened_customer", {
+      name: booking.customer_name ?? "there",
+      service: svc,
+      ref,
+      link: `${siteUrl()}/dashboard/disputes/${disputeId}`,
+    })
+      .then(({ subject, html }) => sendEmail({ to, subject, html }))
+      .catch((e) => console.error("dispute customer email failed", e));
   }
 }
 
@@ -401,11 +393,14 @@ export async function sendDisputeMessage(disputeId: string, body: string): Promi
       actor_role: role,
       payload: { dispute_id: disputeId },
     });
-    sendEmail({
-      to: ADMIN_EMAIL,
-      subject: `Dispute responded — booking ${booking.id.slice(0, 8).toUpperCase()}`,
-      html: `<p>The ${role} responded to the dispute on ${serviceName(booking)}. <a href="${siteUrl()}/admin/disputes/${disputeId}">Review →</a></p>`,
-    }).catch(() => {});
+    renderTemplateEmail("dispute_responded_admin", {
+      role,
+      service: serviceName(booking),
+      ref: booking.id.slice(0, 8).toUpperCase(),
+      link: `${siteUrl()}/admin/disputes/${disputeId}`,
+    })
+      .then(({ subject, html }) => sendEmail({ to: ADMIN_EMAIL, subject, html }))
+      .catch(() => {});
   }
 
   // Nudge the mechanic on every new reply from another party so they don't have
@@ -413,11 +408,14 @@ export async function sendDisputeMessage(disputeId: string, body: string): Promi
   if (role !== "mechanic") {
     const mechTo = await mechanicEmail(admin, booking.mechanic_id);
     if (mechTo)
-      sendEmail({
-        to: mechTo,
-        subject: `New message on a dispute — booking ${booking.id.slice(0, 8).toUpperCase()}`,
-        html: `<p>The ${role} posted a new message on the dispute for ${serviceName(booking)}. <a href="${siteUrl()}/mechanic/disputes/${disputeId}">Open the thread →</a></p>`,
-      }).catch(() => {});
+      renderTemplateEmail("dispute_new_message_mechanic", {
+        role,
+        service: serviceName(booking),
+        ref: booking.id.slice(0, 8).toUpperCase(),
+        link: `${siteUrl()}/mechanic/disputes/${disputeId}`,
+      })
+        .then(({ subject, html }) => sendEmail({ to: mechTo, subject, html }))
+        .catch(() => {});
   }
 
   revalidateDispute(disputeId, dispute.booking_id);
@@ -467,19 +465,17 @@ export async function withdrawDispute(disputeId: string): Promise<SimpleResult> 
 
   // Notify both parties.
   const ref = booking.id.slice(0, 8).toUpperCase();
-  if (booking.customer_email)
-    sendEmail({
-      to: booking.customer_email,
-      subject: `Dispute closed — booking ${ref}`,
-      html: `<p>The dispute on ${serviceName(booking)} has been withdrawn and closed. No further action is needed.</p>`,
-    }).catch(() => {});
+  if (booking.customer_email) {
+    const to = booking.customer_email;
+    renderTemplateEmail("dispute_withdrawn_customer", { service: serviceName(booking), ref })
+      .then(({ subject, html }) => sendEmail({ to, subject, html }))
+      .catch(() => {});
+  }
   const mechTo = await mechanicEmail(admin, booking.mechanic_id);
   if (mechTo)
-    sendEmail({
-      to: mechTo,
-      subject: `Dispute closed — booking ${ref}`,
-      html: `<p>The dispute on ${serviceName(booking)} has been withdrawn. Your payout for this job has been released.</p>`,
-    }).catch(() => {});
+    renderTemplateEmail("dispute_withdrawn_mechanic", { service: serviceName(booking), ref })
+      .then(({ subject, html }) => sendEmail({ to: mechTo, subject, html }))
+      .catch(() => {});
 
   revalidateDispute(disputeId, dispute.booking_id);
   return { ok: true };
@@ -508,21 +504,27 @@ export async function escalateDispute(disputeId: string): Promise<SimpleResult> 
     actor_role: role,
     payload: { dispute_id: disputeId, escalated_by: role },
   });
-  sendEmail({
-    to: ADMIN_EMAIL,
-    subject: `Dispute escalated — booking ${booking.id.slice(0, 8).toUpperCase()}`,
-    html: `<p>A dispute on ${serviceName(booking)} was escalated by the ${role} and needs arbitration. <a href="${siteUrl()}/admin/disputes/${disputeId}">Arbitrate →</a></p>`,
-  }).catch(() => {});
+  renderTemplateEmail("dispute_escalated_admin", {
+    role,
+    service: serviceName(booking),
+    ref: booking.id.slice(0, 8).toUpperCase(),
+    link: `${siteUrl()}/admin/disputes/${disputeId}`,
+  })
+    .then(({ subject, html }) => sendEmail({ to: ADMIN_EMAIL, subject, html }))
+    .catch(() => {});
 
   // Let the mechanic know when the other party escalates (admins can't escalate).
   if (role !== "mechanic") {
     const mechTo = await mechanicEmail(admin, booking.mechanic_id);
     if (mechTo)
-      sendEmail({
-        to: mechTo,
-        subject: `A dispute was escalated — booking ${booking.id.slice(0, 8).toUpperCase()}`,
-        html: `<p>The ${role} escalated the dispute on ${serviceName(booking)} to Book My Tech for arbitration. We'll review and let you know the outcome. <a href="${siteUrl()}/mechanic/disputes/${disputeId}">View →</a></p>`,
-      }).catch(() => {});
+      renderTemplateEmail("dispute_escalated_mechanic", {
+        role,
+        service: serviceName(booking),
+        ref: booking.id.slice(0, 8).toUpperCase(),
+        link: `${siteUrl()}/mechanic/disputes/${disputeId}`,
+      })
+        .then(({ subject, html }) => sendEmail({ to: mechTo, subject, html }))
+        .catch(() => {});
   }
 
   revalidateDispute(disputeId, dispute.booking_id);
@@ -662,42 +664,33 @@ export async function resolveDispute(
 
   // 6) Tell both parties.
   const ref = booking.id.slice(0, 8).toUpperCase();
-  const moneyLine =
-    refundPence > 0
-      ? `<p>A refund of <strong>${formatPrice(refundPence)}</strong> has been issued to your card.</p>`
-      : "";
-  const creditLine =
-    creditPence > 0 ? `<p>We've added <strong>${formatPrice(creditPence)}</strong> credit to your account.</p>` : "";
-  if (booking.customer_email)
-    sendEmail({
-      to: booking.customer_email,
-      subject: `Your dispute has been resolved — booking ${ref}`,
-      html: `
-        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-          <h1 style="color:#1e3a8a;">Dispute resolved</h1>
-          <p>${escapeForEmail(note)}</p>
-          ${moneyLine}${creditLine}
-        </div>`,
-    }).catch(() => {});
+  if (booking.customer_email) {
+    const to = booking.customer_email;
+    renderTemplateEmail("dispute_resolved_customer", {
+      ref,
+      note,
+      refund_line: refundPence > 0 ? `A refund of ${formatPrice(refundPence)} has been issued to your card.` : "",
+      credit_line: creditPence > 0 ? `We've added ${formatPrice(creditPence)} credit to your account.` : "",
+    })
+      .then(({ subject, html }) => sendEmail({ to, subject, html }))
+      .catch(() => {});
+  }
   const mechTo = await mechanicEmail(admin, booking.mechanic_id);
   if (mechTo)
-    sendEmail({
-      to: mechTo,
-      subject: `A dispute has been resolved — booking ${ref}`,
-      html: `
-        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-          <h1 style="color:#1e3a8a;">Dispute resolved</h1>
-          <p>Book My Tech has reviewed the dispute on ${serviceName(booking)} and reached a decision: <strong>${RESOLUTION_LABELS[input.resolution]}</strong>.</p>
-          ${refundPence > 0 ? `<p>A refund was issued to the customer; your payout for this job was adjusted accordingly.</p>` : `<p>Your payout for this job has been released.</p>`}
-        </div>`,
-    }).catch(() => {});
+    renderTemplateEmail("dispute_resolved_mechanic", {
+      ref,
+      service: serviceName(booking),
+      decision: RESOLUTION_LABELS[input.resolution],
+      payout_line:
+        refundPence > 0
+          ? "A refund was issued to the customer; your payout for this job was adjusted accordingly."
+          : "Your payout for this job has been released.",
+    })
+      .then(({ subject, html }) => sendEmail({ to: mechTo, subject, html }))
+      .catch(() => {});
 
   revalidateDispute(disputeId, dispute.booking_id);
   return { ok: true };
-}
-
-function escapeForEmail(s: string): string {
-  return s.replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 export async function releaseMechanicPayout(

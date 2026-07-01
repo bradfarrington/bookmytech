@@ -96,7 +96,7 @@ browser — prefixed `NEXT_PUBLIC_`) · **Required** = app breaks without it.
 4. Swap Stripe test keys → live keys, and create the prod Stripe webhook to get
    `STRIPE_WEBHOOK_SECRET`.
 5. Confirm `APP_ENCRYPTION_KEY` matches whatever encrypted the existing DB rows.
-6. Apply DB migrations up to and including `0030_sms_templates.sql`.
+6. Apply DB migrations up to and including `0031_email_templates.sql`.
 7. Redeploy so the new vars take effect (env changes don't apply to existing
    deployments).
 

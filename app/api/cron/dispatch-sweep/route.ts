@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendEmail } from "@/lib/email/send";
+import { renderTemplateEmail } from "@/emails/resolve";
 import { formatPrice } from "@/lib/utils";
 
 // Admin-notification sweep (Task 05 Stage 2).
@@ -78,27 +79,21 @@ async function runSweep() {
 
   // One summary email to the admin.
   const adminEmail = process.env.ADMIN_NOTIFY_EMAIL || "help@bookmytech.co.uk";
-  const rows = toFlag
+  const bookings = toFlag
     .map(
       (b) =>
-        `<tr><td style="padding:6px 0;font-weight:600;">${b.id.slice(0, 8).toUpperCase()}</td><td style="padding:6px 0;">${serviceName(b)}</td><td style="padding:6px 0;">${b.area ?? b.postcode ?? "—"}</td><td style="padding:6px 0;">${formatPrice(b.total_pence ?? 0)}</td></tr>`,
+        `${b.id.slice(0, 8).toUpperCase()} · ${serviceName(b)} · ${b.area ?? b.postcode ?? "—"} · ${formatPrice(b.total_pence ?? 0)}`,
     )
-    .join("");
-  await sendEmail({
-    to: adminEmail,
-    subject: `${toFlag.length} booking${toFlag.length > 1 ? "s" : ""} still need a mechanic`,
-    html: `
-      <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-        <h1 style="color:#1e3a8a;">Bookings awaiting a mechanic</h1>
-        <p>${toFlag.length} booking${toFlag.length > 1 ? "s have" : " has"} had no mechanic accept within ${STALL_MINUTES} minutes. Review and hand-assign in the admin console.</p>
-        <table style="width:100%;border-collapse:collapse;font-size:14px;margin:16px 0;">
-          <tr style="color:#64748b;text-align:left;"><th style="padding:6px 0;">Ref</th><th>Service</th><th>Area</th><th>Value</th></tr>
-          ${rows}
-        </table>
-        <p style="color:#64748b;font-size:14px;"><a href="${process.env.NEXT_PUBLIC_SITE_URL ?? ""}/admin/jobs">Open the bookings list →</a></p>
-      </div>
-    `,
-  }).catch((err) => console.error("Admin stall email failed", err));
+    .join("|");
+  const { subject, html } = await renderTemplateEmail("dispatch_stall_alert", {
+    count: toFlag.length,
+    intro: `${toFlag.length} booking${toFlag.length > 1 ? "s have" : " has"} had no mechanic accept within ${STALL_MINUTES} minutes.`,
+    bookings,
+    link: `${process.env.NEXT_PUBLIC_SITE_URL ?? ""}/admin/jobs`,
+  });
+  await sendEmail({ to: adminEmail, subject, html }).catch((err) =>
+    console.error("Admin stall email failed", err),
+  );
 
   return { notified: toFlag.length };
 }
