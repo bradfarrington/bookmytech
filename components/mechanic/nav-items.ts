@@ -3,6 +3,7 @@ import {
   CreditCard,
   FileText,
   Inbox,
+  LifeBuoy,
   PoundSterling,
   SlidersHorizontal,
   Star,
@@ -27,6 +28,7 @@ export const MECHANIC_NAV_ITEMS: readonly MechanicNavItem[] = [
   { label: "Availability", href: "/mechanic/availability", icon: SlidersHorizontal },
   { label: "Profile", href: "/mechanic/profile", icon: User },
   { label: "Documents", href: "/mechanic/documents", icon: FileText },
+  { label: "Get help", href: "/mechanic/resolutions", icon: LifeBuoy },
   { label: "Get paid", href: "/mechanic/onboarding/stripe", icon: CreditCard },
 ];
 

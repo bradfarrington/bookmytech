@@ -12,6 +12,7 @@ import {
   FileText,
   Folder,
   Home,
+  LifeBuoy,
   LogOut,
   type LucideIcon,
   Map,
@@ -49,6 +50,7 @@ const NAV_GROUPS: readonly NavGroup[] = [
       { label: "All jobs", href: "/admin/jobs", icon: Folder },
       { label: "Live monitor", href: "/admin/live", icon: Activity },
       { label: "Disputes", href: "/admin/disputes", icon: AlertTriangle },
+      { label: "Resolution Center", href: "/admin/resolutions", icon: LifeBuoy },
     ],
   },
   {

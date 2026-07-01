@@ -897,6 +897,56 @@ export const EMAIL_TEMPLATE_DEFS: readonly EmailTemplateDef[] = [
       { id: "link", type: "paragraph", text: "[Open the disputes queue →]({{link}})" },
     ],
   },
+
+  // ─── Resolution Center (internal mechanic ↔ admin) ──────────────────────
+  {
+    key: "resolution_opened_admin",
+    label: "Resolution case opened (admin alert)",
+    description:
+      "Internal alert to ops when a mechanic (or admin) raises a Resolution Center case about a job.",
+    category: "internal",
+    subject: "New resolution case — booking {{ref}}",
+    preheader: "A resolution case has been opened.",
+    variables: [
+      { name: "opener_role", description: "Who opened it", example: "mechanic" },
+      { name: "service", description: "Service name", example: "Full service" },
+      { name: "ref", description: "Booking reference", example: "A1B2C3D4" },
+      { name: "reason", description: "Chosen reason", example: "Can't complete this job" },
+      { name: "link", description: "Admin case link", example: "https://bookmytech.co.uk/admin/resolutions/…" },
+    ],
+    blocks: [
+      { id: "heading", type: "heading", text: "A resolution case has been opened" },
+      {
+        id: "body",
+        type: "paragraph",
+        text: "The {{opener_role}} raised a case on **{{service}}** (ref {{ref}}).\n\nReason: **{{reason}}**",
+      },
+      { id: "link", type: "paragraph", text: "[Open the case →]({{link}})" },
+    ],
+  },
+  {
+    key: "resolution_opened_mechanic",
+    label: "Resolution case opened (to mechanic)",
+    description: "Sent to the mechanic when an admin raises a Resolution Center case about their job.",
+    category: "mechanic",
+    subject: "We've opened a case on your job — booking {{ref}}",
+    preheader: "Book My Tech has opened a resolution case on your job.",
+    variables: [
+      { name: "service", description: "Service name", example: "Full service" },
+      { name: "ref", description: "Booking reference", example: "A1B2C3D4" },
+      { name: "reason", description: "Chosen reason", example: "Customer unreachable" },
+      { name: "link", description: "Mechanic case link", example: "https://bookmytech.co.uk/mechanic/resolutions/…" },
+    ],
+    blocks: [
+      { id: "heading", type: "heading", text: "We've opened a case on your job" },
+      {
+        id: "body",
+        type: "paragraph",
+        text: "Book My Tech has opened a resolution case on **{{service}}** (ref {{ref}}).\n\nReason: **{{reason}}**\n\nOpen the case to add your notes or ask a question.",
+      },
+      { id: "link", type: "paragraph", text: "[Open the case →]({{link}})" },
+    ],
+  },
 ];
 
 export const EMAIL_TEMPLATE_BY_KEY: Record<string, EmailTemplateDef> = Object.fromEntries(
