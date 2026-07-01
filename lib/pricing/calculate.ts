@@ -1,10 +1,16 @@
 // Pricing engine — the single source of truth for what a booking costs.
 //
-// Replaces "services.starting_price_pence as the booking total" with a total
-// that accounts for an area labour multiplier, an optional per-(service,area)
-// price override + dummy parts cost, and a commission rate. The full breakdown
-// is snapshotted onto the booking row at creation time so later pricing changes
-// never apply retroactively (Task 08 Stage 2 requirement).
+// Labour is derived from DURATION, not a fixed price (Task 15): the service's
+// duration in hours × a single global hourly rate. Duration can be overridden
+// per (service, area) so the same job costs differently in different postcodes.
+// Parts and a commission rate sit on top. The full breakdown is snapshotted
+// onto the booking row at creation time so later pricing changes never apply
+// retroactively (Task 08 Stage 2 requirement).
+//
+//   service_amount = duration_hours × hourly_rate_pence   (override wins if set)
+//   total          = service_amount + parts
+//   fee            = round(total × rate)
+//   payout         = total − fee   (transferred to the mechanic in Stage 3)
 //
 // Two layers:
 //   - computePrice(inputs)      — PURE maths, unit-tested (no DB, no I/O).
@@ -13,12 +19,11 @@
 //                                 loads the inputs and calls computePrice.
 //
 // Commission model (Task 08 spec, owner decision 2026-06-04): commission is
-// charged on the WHOLE total (base + parts), not labour only. So:
-//   total   = base + parts
-//   fee     = round(total × rate)
-//   payout  = total − fee   (transferred to the mechanic in Stage 3)
+// charged on the WHOLE total (base + parts), not labour only, and is taken OUT
+// of the total (the customer pays the total; the platform keeps its cut).
 //
-// Surge pricing is NOT part of this platform — there is no surge input or hook.
+// The area labour_multiplier is retired (Task 15): areas are resolved only to
+// pick a per-area duration override. Surge pricing is NOT part of this platform.
 //
 // NB: the service-role client is imported dynamically inside the async helpers
 // (not at module top) so the pure functions above stay importable in unit tests
@@ -29,14 +34,19 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 /** Fallback commission rate when no per-cell or platform setting is available. */
 export const DEFAULT_TAKE_RATE = 0.15;
 
+/** Fallback global hourly rate (pence) when platform_settings has no value. */
+export const DEFAULT_HOURLY_RATE_PENCE = 6000;
+
 export interface PriceBreakdown {
   /** Resolved area id (null when no area row matched and no Default exists). */
   areaId: string | null;
-  /** Labour-portion base in pence: override, or starting × multiplier. */
+  /** Labour-portion base in pence: override, or duration × hourly rate. */
   basePence: number;
-  /** Area labour multiplier applied (1.000 = no change). */
-  labourMultiplier: number;
-  /** Dummy parts cost for this service/area (0 if none). */
+  /** Service duration used for this booking, in hours. */
+  durationHours: number;
+  /** Global hourly rate applied, in pence. */
+  hourlyRatePence: number;
+  /** Parts cost for this service (0 if none). */
   partsPence: number;
   /** What the customer pays: base + parts. */
   totalPence: number;
@@ -49,9 +59,9 @@ export interface PriceBreakdown {
 }
 
 export interface ComputePriceInputs {
-  startingPricePence: number;
-  labourMultiplier: number;
-  /** If set, overrides startingPrice × multiplier as the base. */
+  durationHours: number;
+  hourlyRatePence: number;
+  /** If set, overrides duration × hourly rate as the labour base. */
   overridePricePence?: number | null;
   partsPence?: number | null;
   commissionRate: number;
@@ -59,14 +69,18 @@ export interface ComputePriceInputs {
 }
 
 /**
- * Pure pricing maths. Everything is integer pence; multiplier and rate are the
+ * Pure pricing maths. Everything is integer pence; duration and rate are the
  * only fractional inputs. No DB access — fully unit-testable.
  */
 export function computePrice(inputs: ComputePriceInputs): PriceBreakdown {
-  const starting = Math.max(0, Math.round(inputs.startingPricePence || 0));
-  const labourMultiplier = Number.isFinite(inputs.labourMultiplier)
-    ? inputs.labourMultiplier
-    : 1;
+  const durationHours =
+    Number.isFinite(inputs.durationHours) && inputs.durationHours > 0
+      ? inputs.durationHours
+      : 0;
+  const hourlyRatePence =
+    Number.isFinite(inputs.hourlyRatePence) && inputs.hourlyRatePence > 0
+      ? Math.round(inputs.hourlyRatePence)
+      : 0;
   const partsPence = Math.max(0, Math.round(inputs.partsPence || 0));
   const rate = Number.isFinite(inputs.commissionRate)
     ? inputs.commissionRate
@@ -76,7 +90,7 @@ export function computePrice(inputs: ComputePriceInputs): PriceBreakdown {
     inputs.overridePricePence != null && inputs.overridePricePence >= 0;
   const basePence = hasOverride
     ? Math.round(inputs.overridePricePence as number)
-    : Math.round(starting * labourMultiplier);
+    : Math.round(durationHours * hourlyRatePence);
 
   const totalPence = basePence + partsPence;
   const platformFeePence = Math.round(totalPence * rate);
@@ -85,7 +99,8 @@ export function computePrice(inputs: ComputePriceInputs): PriceBreakdown {
   return {
     areaId: inputs.areaId ?? null,
     basePence,
-    labourMultiplier,
+    durationHours,
+    hourlyRatePence,
     partsPence,
     totalPence,
     commissionRate: rate,
@@ -158,12 +173,14 @@ export async function calculatePrice(
 
   const { data: service, error: serviceError } = await db
     .from("services")
-    .select("id, starting_price_pence, commission_rate")
+    .select("id, duration_hours, starting_price_pence, commission_rate")
     .eq("id", serviceId)
     .single();
   if (serviceError || !service) {
     throw new Error("Service not found for pricing.");
   }
+
+  const hourlyRatePence = await getHourlyRatePence(db);
 
   const { data: areas } = await db
     .from("areas")
@@ -176,17 +193,30 @@ export async function calculatePrice(
     override_price_pence: number | null;
     parts_price_pence: number | null;
     commission_rate: number | null;
+    duration_hours: number | null;
   } | null = null;
   if (area) {
     const { data } = await db
       .from("service_area_prices")
-      .select("override_price_pence, parts_price_pence, commission_rate")
+      .select("override_price_pence, parts_price_pence, commission_rate, duration_hours")
       .eq("service_id", serviceId)
       .eq("area_id", area.id)
       .eq("is_active", true)
       .maybeSingle();
     sap = data ?? null;
   }
+
+  // Duration resolution, most-specific wins: per-(service,area) override →
+  // service default. Legacy fallback: if a service predates durations, derive
+  // one from its cached price so pricing never divides by a null.
+  const serviceDuration = numberOrNull(
+    (service as { duration_hours: number | null }).duration_hours,
+  );
+  const areaDuration = numberOrNull(sap?.duration_hours ?? null);
+  const durationHours =
+    areaDuration ??
+    serviceDuration ??
+    (hourlyRatePence > 0 ? service.starting_price_pence / hourlyRatePence : 0);
 
   // Commission resolution, most-specific wins:
   //   per-(service,area) cell override → per-service rate → platform default.
@@ -202,13 +232,20 @@ export async function calculatePrice(
   const partsPence = configuredParts > 0 ? configuredParts : (sap?.parts_price_pence ?? 0);
 
   return computePrice({
-    startingPricePence: service.starting_price_pence,
-    labourMultiplier: area?.labour_multiplier ?? 1,
+    durationHours,
+    hourlyRatePence,
     overridePricePence: sap?.override_price_pence ?? null,
     partsPence,
     commissionRate,
     areaId: area?.id ?? null,
   });
+}
+
+/** Coerce a Postgres numeric (number or numeric-string) to a number, or null. */
+function numberOrNull(raw: unknown): number | null {
+  if (raw == null) return null;
+  const n = typeof raw === "number" ? raw : Number(raw);
+  return Number.isFinite(n) ? n : null;
 }
 
 /**
@@ -229,5 +266,26 @@ export async function getTakeRateBase(client?: DbClient): Promise<number> {
     return Number.isFinite(n) && n > 0 ? n : DEFAULT_TAKE_RATE;
   } catch {
     return DEFAULT_TAKE_RATE;
+  }
+}
+
+/**
+ * Read the global hourly labour rate (pence) from platform_settings. Defensively
+ * returns DEFAULT_HOURLY_RATE_PENCE if the key doesn't exist yet (seeded in
+ * migration 0033) so the engine works before the admin control lands.
+ */
+export async function getHourlyRatePence(client?: DbClient): Promise<number> {
+  const db = client ?? (await import("@/lib/supabase/admin")).createAdminClient();
+  try {
+    const { data } = await db
+      .from("platform_settings")
+      .select("value")
+      .eq("key", "hourly_rate_pence")
+      .maybeSingle();
+    const raw = data?.value;
+    const n = typeof raw === "number" ? raw : Number(raw);
+    return Number.isFinite(n) && n > 0 ? Math.round(n) : DEFAULT_HOURLY_RATE_PENCE;
+  } catch {
+    return DEFAULT_HOURLY_RATE_PENCE;
   }
 }

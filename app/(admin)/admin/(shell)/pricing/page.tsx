@@ -13,6 +13,7 @@ export const dynamic = "force-dynamic";
 const SETTING_DEFAULTS: PlatformSettings = {
   take_rate_base: 0.15,
   take_rate_pro: 0.12,
+  hourly_rate_pence: 6000,
   cancel_fee_before_24h: 0,
   cancel_fee_within_24h: 3000,
   cancel_fee_mechanic_en_route: 5000,
@@ -25,7 +26,7 @@ export default async function AdminPricingPage() {
     await Promise.all([
       supabase
         .from("services")
-        .select("id, name, starting_price_pence, commission_rate, display_order")
+        .select("id, name, duration_hours, starting_price_pence, commission_rate, display_order")
         .order("display_order", { ascending: true })
         .order("name", { ascending: true }),
       supabase
@@ -38,7 +39,13 @@ export default async function AdminPricingPage() {
       supabase.from("platform_settings").select("key, value"),
     ]);
 
-  const serviceRows = (services ?? []) as ServicePriceRow[];
+  // Postgres numeric can arrive as a string — coerce durations to numbers.
+  const serviceRows = ((services ?? []) as Array<
+    Omit<ServicePriceRow, "duration_hours"> & { duration_hours: number | string | null }
+  >).map((s) => ({
+    ...s,
+    duration_hours: s.duration_hours == null ? null : Number(s.duration_hours),
+  })) as ServicePriceRow[];
   // Default area sorts last so the catch-all sits at the bottom of the table.
   const areaRows = ((areas ?? []) as AreaRowData[]).sort((a, b) =>
     a.name === "Default" ? 1 : b.name === "Default" ? -1 : a.name.localeCompare(b.name),
@@ -62,13 +69,18 @@ export default async function AdminPricingPage() {
           Pricing
         </h1>
         <p className="mt-1.5 max-w-2xl text-sm text-text-muted">
-          Base prices, commission, area multipliers, overrides and cancellation
-          fees. All edits are audited and apply to new bookings only — existing
-          bookings keep the rate snapshotted at the time they were made.
+          The global hourly rate, service durations, commission, areas, overrides
+          and cancellation fees. Labour = duration × the hourly rate. All edits
+          are audited and apply to new bookings only — existing bookings keep the
+          price snapshotted at the time they were made.
         </p>
       </header>
 
-      <ServicePricesSection services={serviceRows} defaultRatePct={defaultRatePct} />
+      <ServicePricesSection
+        services={serviceRows}
+        defaultRatePct={defaultRatePct}
+        hourlyRatePence={settings.hourly_rate_pence}
+      />
       <AreasSection areas={areaRows} />
       <OverridesSection
         services={serviceRows.map((s) => ({ id: s.id, name: s.name }))}

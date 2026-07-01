@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { getHourlyRatePence } from "@/lib/pricing/calculate";
 import { Icon } from "@/components/ui/icon";
 import { Overline } from "@/components/ui/overline";
 import {
@@ -27,6 +28,7 @@ export default async function AdminServiceCreatePage() {
 
   const nextDisplayOrder = (orderRow?.display_order ?? 0) + 1;
   const categoryOptions: CategoryOption[] = (categories ?? []) as CategoryOption[];
+  const hourlyRatePence = await getHourlyRatePence(supabase);
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -67,6 +69,7 @@ export default async function AdminServiceCreatePage() {
           mode="create"
           defaultDisplayOrder={nextDisplayOrder}
           categories={categoryOptions}
+          hourlyRatePence={hourlyRatePence}
         />
       )}
     </div>

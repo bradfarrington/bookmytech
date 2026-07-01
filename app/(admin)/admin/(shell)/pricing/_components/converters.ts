@@ -21,6 +21,17 @@ export const percent = {
   },
 };
 
+export const hours = {
+  toInput: (h: number) => String(Math.round(h * 100) / 100),
+  toDisplay: (h: number | null) =>
+    h == null ? "—" : `${Math.round(h * 100) / 100}h`,
+  parse: (raw: string): number | null => {
+    const n = Number(raw.replace(/h$/i, "").trim());
+    if (!Number.isFinite(n) || n <= 0 || n > 99.99) return null;
+    return Math.round(n * 100) / 100;
+  },
+};
+
 export const multiplier = {
   toInput: (m: number) => String(m),
   toDisplay: (m: number | null) => (m == null ? "—" : `×${m.toFixed(3)}`),

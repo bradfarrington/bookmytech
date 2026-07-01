@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getHourlyRatePence } from "@/lib/pricing/calculate";
 
 // Admin pricing controls (Task 08 Stage 2). Every mutation:
 //   1. verifies the caller is an admin (RLS-aware client),
@@ -76,31 +77,45 @@ function parseRate(
   return { ok: true, value: n };
 }
 
-// --- Base service prices ----------------------------------------------------
+// --- Service durations ------------------------------------------------------
+// Labour is duration × the global hourly rate (Task 15). Editing a duration
+// recomputes the service's cached indicative price (starting_price_pence).
 
-export async function updateServiceBasePrice(
+/** Hours as a positive decimal up to 2dp (matches numeric(4,2)). */
+function parseDuration(raw: unknown): { ok: true; value: number } | { ok: false } {
+  const n = typeof raw === "number" ? raw : Number(String(raw ?? "").trim());
+  if (!Number.isFinite(n) || n <= 0 || n > 99.99) return { ok: false };
+  return { ok: true, value: Math.round(n * 100) / 100 };
+}
+
+export async function updateServiceDuration(
   serviceId: string,
-  pricePence: number,
+  durationHours: number,
 ): Promise<PricingResult> {
   const guard = await requireAdmin();
   if (!guard.ok) return guard;
-  const parsed = parsePence(pricePence);
-  if (!parsed.ok) return { ok: false, error: "Enter a valid price in pence." };
+  const parsed = parseDuration(durationHours);
+  if (!parsed.ok) return { ok: false, error: "Enter a duration in hours greater than 0." };
 
   const admin = createAdminClient();
   const { data: prev } = await admin
     .from("services")
-    .select("starting_price_pence")
+    .select("duration_hours")
     .eq("id", serviceId)
     .single();
 
+  const hourlyRatePence = await getHourlyRatePence(admin);
   const { error } = await admin
     .from("services")
-    .update({ starting_price_pence: parsed.value, updated_at: new Date().toISOString() })
+    .update({
+      duration_hours: parsed.value,
+      starting_price_pence: Math.round(parsed.value * hourlyRatePence),
+      updated_at: new Date().toISOString(),
+    })
     .eq("id", serviceId);
   if (error) return { ok: false, error: error.message };
 
-  await audit(admin, guard.adminId, "service", serviceId, "starting_price_pence", prev?.starting_price_pence ?? null, parsed.value);
+  await audit(admin, guard.adminId, "service", serviceId, "duration_hours", prev?.duration_hours ?? null, parsed.value);
   revalidate();
   return { ok: true };
 }
@@ -262,6 +277,8 @@ export async function upsertServiceAreaPrice(input: {
   overridePence: number | null;
   partsPence: number | null;
   commissionRate: number | null;
+  /** Per-area duration override in hours. NULL = inherit the service default. */
+  durationHours?: number | null;
 }): Promise<PricingResult> {
   const guard = await requireAdmin();
   if (!guard.ok) return guard;
@@ -284,11 +301,17 @@ export async function upsertServiceAreaPrice(input: {
     if (!r.ok) return { ok: false, error: "Commission must be between 0% and 90%." };
     commissionRate = r.value;
   }
+  let durationHours: number | null = null;
+  if (input.durationHours != null) {
+    const d = parseDuration(input.durationHours);
+    if (!d.ok) return { ok: false, error: "Duration must be greater than 0 hours." };
+    durationHours = d.value;
+  }
 
   const admin = createAdminClient();
   const { data: prev } = await admin
     .from("service_area_prices")
-    .select("override_price_pence, parts_price_pence, commission_rate")
+    .select("override_price_pence, parts_price_pence, commission_rate, duration_hours")
     .eq("service_id", input.serviceId)
     .eq("area_id", input.areaId)
     .maybeSingle();
@@ -300,6 +323,7 @@ export async function upsertServiceAreaPrice(input: {
       override_price_pence: overridePence,
       parts_price_pence: partsPence,
       commission_rate: commissionRate,
+      duration_hours: durationHours,
       is_active: true,
       updated_at: new Date().toISOString(),
     },
@@ -311,6 +335,7 @@ export async function upsertServiceAreaPrice(input: {
     override_price_pence: overridePence,
     parts_price_pence: partsPence,
     commission_rate: commissionRate,
+    duration_hours: durationHours,
   });
   revalidate();
   return { ok: true };
@@ -321,6 +346,7 @@ export async function upsertServiceAreaPrice(input: {
 const SETTING_KEYS = [
   "take_rate_base",
   "take_rate_pro",
+  "hourly_rate_pence",
   "cancel_fee_before_24h",
   "cancel_fee_within_24h",
   "cancel_fee_mechanic_en_route",
@@ -335,7 +361,8 @@ export async function updatePlatformSetting(
   if (!guard.ok) return guard;
   if (!SETTING_KEYS.includes(key)) return { ok: false, error: "Unknown setting." };
 
-  // Commission keys are decimals 0–0.9; fee keys are pence (non-negative ints).
+  // Commission keys are decimals 0–0.9; everything else is pence (non-negative
+  // ints): the hourly rate and the cancellation fees.
   const isRate = key === "take_rate_base" || key === "take_rate_pro";
   if (isRate) {
     const r = parseRate(value, 0, 0.9);
@@ -343,7 +370,9 @@ export async function updatePlatformSetting(
     value = r.value;
   } else {
     const p = parsePence(value);
-    if (!p.ok) return { ok: false, error: "Fee must be a whole number of pence." };
+    if (!p.ok) return { ok: false, error: "Enter a whole number of pence." };
+    if (key === "hourly_rate_pence" && p.value <= 0)
+      return { ok: false, error: "Hourly rate must be greater than £0." };
     value = p.value;
   }
 
@@ -360,7 +389,32 @@ export async function updatePlatformSetting(
   );
   if (error) return { ok: false, error: error.message };
 
+  // The hourly rate feeds every service's cached indicative price — recompute
+  // them all so the "from £X" previews stay in step with duration × new rate.
+  if (key === "hourly_rate_pence") {
+    await recomputeCachedServicePrices(admin, value);
+  }
+
   await audit(admin, guard.adminId, "platform_setting", key, key, prev?.value ?? null, value);
   revalidate();
   return { ok: true };
+}
+
+/**
+ * Recompute every service's cached starting_price_pence from its duration and
+ * the given hourly rate. Cache-only — actual booking prices are recomputed live
+ * by the engine, so this never touches existing bookings.
+ */
+async function recomputeCachedServicePrices(admin: Admin, hourlyRatePence: number) {
+  const { data: services } = await admin
+    .from("services")
+    .select("id, duration_hours");
+  for (const s of services ?? []) {
+    const hours = Number((s as { duration_hours: number | null }).duration_hours);
+    if (!Number.isFinite(hours) || hours <= 0) continue;
+    await admin
+      .from("services")
+      .update({ starting_price_pence: Math.round(hours * hourlyRatePence) })
+      .eq("id", (s as { id: string }).id);
+  }
 }

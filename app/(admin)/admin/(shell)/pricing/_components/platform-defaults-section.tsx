@@ -7,6 +7,7 @@ import { pounds, percent } from "./converters";
 export interface PlatformSettings {
   take_rate_base: number;
   take_rate_pro: number;
+  hourly_rate_pence: number;
   cancel_fee_before_24h: number;
   cancel_fee_within_24h: number;
   cancel_fee_mechanic_en_route: number;
@@ -39,13 +40,22 @@ export function PlatformDefaultsSection({ settings }: { settings: PlatformSettin
       <section className="space-y-3">
         <div>
           <h2 className="text-lg font-bold tracking-tight text-text-primary">
-            Default commission
+            Labour rate &amp; commission
           </h2>
           <p className="text-sm text-text-muted">
-            Fallback rates used when a service has no rate of its own.
+            The global hourly rate that drives every service price, plus the
+            fallback commission rates used when a service has none of its own.
           </p>
         </div>
         <div className="overflow-hidden rounded-2xl border border-border bg-surface-card">
+          <Row label="Hourly labour rate" hint="Global — every service's price = duration × this">
+            <InlineNumber
+              value={settings.hourly_rate_pence}
+              {...pounds}
+              ariaLabel="Hourly labour rate"
+              onSave={(v) => updatePlatformSetting("hourly_rate_pence", v ?? 0)}
+            />
+          </Row>
           <Row label="Base take rate" hint="Standard mechanics">
             <InlineNumber
               value={settings.take_rate_base}

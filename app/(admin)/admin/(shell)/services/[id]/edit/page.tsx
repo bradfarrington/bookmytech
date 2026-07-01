@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { getHourlyRatePence } from "@/lib/pricing/calculate";
 import { Icon } from "@/components/ui/icon";
 import { Overline } from "@/components/ui/overline";
 import {
@@ -28,7 +29,7 @@ export default async function AdminServiceEditPage({
       supabase
         .from("services")
         .select(
-          "id, name, slug, category, description, starting_price_pence, display_order, is_active",
+          "id, name, slug, category, description, duration_hours, display_order, is_active",
         )
         .eq("id", id)
         .single(),
@@ -51,7 +52,15 @@ export default async function AdminServiceEditPage({
     notFound();
   }
 
-  const serviceData = service as ServiceFormValues;
+  const hourlyRatePence = await getHourlyRatePence(supabase);
+  // Postgres numeric can arrive as a string — coerce duration to a number.
+  const raw = service as Omit<ServiceFormValues, "duration_hours"> & {
+    duration_hours: number | string | null;
+  };
+  const serviceData: ServiceFormValues = {
+    ...raw,
+    duration_hours: raw.duration_hours == null ? null : Number(raw.duration_hours),
+  };
   // Show every category in the edit dropdown (active or not) so the current
   // selection is always representable. The settings UI is the place to manage
   // which categories are available for new services.
@@ -110,6 +119,7 @@ export default async function AdminServiceEditPage({
         mode="edit"
         defaultDisplayOrder={serviceData.display_order}
         categories={categoryOptions}
+        hourlyRatePence={hourlyRatePence}
         service={serviceData}
       />
 

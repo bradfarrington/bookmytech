@@ -8,45 +8,57 @@ import {
 } from "./calculate";
 
 describe("computePrice", () => {
-  it("applies the labour multiplier to the starting price as the base", () => {
+  it("derives the labour base from duration × hourly rate", () => {
     const r = computePrice({
-      startingPricePence: 10000,
-      labourMultiplier: 1.15,
+      durationHours: 2,
+      hourlyRatePence: 6000, // £60/hr
       commissionRate: 0.15,
     });
-    expect(r.basePence).toBe(11500); // 10000 × 1.15
+    expect(r.basePence).toBe(12000); // 2h × £60
+    expect(r.durationHours).toBe(2);
+    expect(r.hourlyRatePence).toBe(6000);
     expect(r.partsPence).toBe(0);
-    expect(r.totalPence).toBe(11500);
+    expect(r.totalPence).toBe(12000);
+  });
+
+  it("handles fractional durations, rounding to the nearest pence", () => {
+    const r = computePrice({
+      durationHours: 1.5,
+      hourlyRatePence: 6000,
+      commissionRate: 0.15,
+    });
+    expect(r.basePence).toBe(9000); // 1.5h × £60
   });
 
   it("adds parts on top of the labour base", () => {
     const r = computePrice({
-      startingPricePence: 18900,
-      labourMultiplier: 1.0,
+      durationHours: 3,
+      hourlyRatePence: 6000,
       partsPence: 4500,
       commissionRate: 0.15,
     });
-    expect(r.basePence).toBe(18900);
-    expect(r.totalPence).toBe(23400); // 18900 + 4500
+    expect(r.basePence).toBe(18000); // 3h × £60
+    expect(r.totalPence).toBe(22500); // 18000 + 4500
   });
 
-  it("charges commission on the whole total (base + parts)", () => {
+  it("charges commission on the whole total (base + parts), taken out of it", () => {
     const r = computePrice({
-      startingPricePence: 18900,
-      labourMultiplier: 1.0,
+      durationHours: 3,
+      hourlyRatePence: 6000,
       partsPence: 4500,
       commissionRate: 0.15,
     });
-    expect(r.platformFeePence).toBe(3510); // round(23400 × 0.15)
-    expect(r.mechanicPayoutPence).toBe(19890); // 23400 − 3510
+    expect(r.totalPence).toBe(22500);
+    expect(r.platformFeePence).toBe(3375); // round(22500 × 0.15)
+    expect(r.mechanicPayoutPence).toBe(19125); // 22500 − 3375
     // Fee + payout always reconcile to the total exactly (integer pence).
     expect(r.platformFeePence + r.mechanicPayoutPence).toBe(r.totalPence);
   });
 
-  it("uses the override price as the base instead of starting × multiplier", () => {
+  it("uses the override price as the base instead of duration × rate", () => {
     const r = computePrice({
-      startingPricePence: 18900,
-      labourMultiplier: 1.5, // would give 28350, but override wins
+      durationHours: 3, // would give 18000, but override wins
+      hourlyRatePence: 6000,
       overridePricePence: 20000,
       partsPence: 1000,
       commissionRate: 0.2,
@@ -59,8 +71,8 @@ describe("computePrice", () => {
 
   it("treats an override of 0 as a valid base (free labour)", () => {
     const r = computePrice({
-      startingPricePence: 18900,
-      labourMultiplier: 1.0,
+      durationHours: 3,
+      hourlyRatePence: 6000,
       overridePricePence: 0,
       partsPence: 5000,
       commissionRate: 0.15,
@@ -69,19 +81,10 @@ describe("computePrice", () => {
     expect(r.totalPence).toBe(5000);
   });
 
-  it("rounds the multiplied base to the nearest pence", () => {
-    const r = computePrice({
-      startingPricePence: 4501, // odd value
-      labourMultiplier: 1.105,
-      commissionRate: 0.15,
-    });
-    expect(r.basePence).toBe(Math.round(4501 * 1.105)); // 4974
-  });
-
   it("falls back to the default take rate for a non-finite commission", () => {
     const r = computePrice({
-      startingPricePence: 10000,
-      labourMultiplier: 1.0,
+      durationHours: 2,
+      hourlyRatePence: 5000,
       commissionRate: Number.NaN,
     });
     expect(r.commissionRate).toBe(DEFAULT_TAKE_RATE);
@@ -90,8 +93,8 @@ describe("computePrice", () => {
 
   it("clamps negative/garbage inputs to zero", () => {
     const r = computePrice({
-      startingPricePence: -500,
-      labourMultiplier: 1.0,
+      durationHours: -1,
+      hourlyRatePence: -6000,
       partsPence: -100,
       commissionRate: 0.15,
     });

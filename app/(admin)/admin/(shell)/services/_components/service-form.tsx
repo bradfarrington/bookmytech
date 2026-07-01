@@ -14,7 +14,7 @@ export interface ServiceFormValues {
   slug: string;
   category: string;
   description: string | null;
-  starting_price_pence: number;
+  duration_hours: number | null;
   display_order: number;
   is_active: boolean;
 }
@@ -28,6 +28,8 @@ export interface ServiceFormProps {
   mode: "create" | "edit";
   defaultDisplayOrder: number;
   categories: CategoryOption[];
+  /** Global hourly rate (pence) — shown so the admin sees the resulting price. */
+  hourlyRatePence: number;
   service?: ServiceFormValues;
 }
 
@@ -40,6 +42,7 @@ export function ServiceForm({
   mode,
   defaultDisplayOrder,
   categories,
+  hourlyRatePence,
   service,
 }: ServiceFormProps) {
   const [pending, startTransition] = useTransition();
@@ -50,8 +53,8 @@ export function ServiceForm({
     service?.category ?? categories[0]?.slug ?? "",
   );
   const [description, setDescription] = useState(service?.description ?? "");
-  const [priceInput, setPriceInput] = useState(
-    service ? (service.starting_price_pence / 100).toFixed(2) : "",
+  const [durationInput, setDurationInput] = useState(
+    service?.duration_hours != null ? String(service.duration_hours) : "",
   );
   const [displayOrder, setDisplayOrder] = useState(
     String(service?.display_order ?? defaultDisplayOrder),
@@ -63,6 +66,13 @@ export function ServiceForm({
     label: c.name,
   }));
 
+  // Live preview of the labour price: duration × global hourly rate.
+  const durationNum = Number(durationInput);
+  const previewPence =
+    Number.isFinite(durationNum) && durationNum > 0
+      ? Math.round(durationNum * hourlyRatePence)
+      : null;
+
   return (
     <form
       onSubmit={(event) => {
@@ -73,7 +83,7 @@ export function ServiceForm({
         fd.set("name", name);
         fd.set("category", category);
         fd.set("description", description);
-        fd.set("price", priceInput);
+        fd.set("duration", durationInput);
         fd.set("display_order", displayOrder);
         if (isActive) fd.set("is_active", "on");
         // Slug is derived server-side from name on create and preserved on edit
@@ -134,24 +144,23 @@ export function ServiceForm({
 
         <div className="grid gap-5 sm:grid-cols-2">
           <label className={FIELD_LABEL}>
-            <span>Starting price</span>
-            <div className="relative">
-              <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-semibold text-text-muted">
-                £
-              </span>
-              <input
-                type="text"
-                inputMode="decimal"
-                value={priceInput}
-                onChange={(e) => setPriceInput(e.target.value)}
-                required
-                disabled={pending}
-                placeholder="45.00"
-                className={`${FIELD_INPUT} pl-8`}
-              />
-            </div>
+            <span>Duration (hours)</span>
+            <input
+              type="text"
+              inputMode="decimal"
+              value={durationInput}
+              onChange={(e) => setDurationInput(e.target.value)}
+              required
+              disabled={pending}
+              placeholder="2"
+              className={FIELD_INPUT}
+            />
             <span className="text-xs font-normal text-text-muted">
-              Stored in pence. £45.99 → 4599.
+              Labour price = duration × £{(hourlyRatePence / 100).toFixed(2)}/hr
+              {previewPence != null
+                ? ` → £${(previewPence / 100).toFixed(2)}`
+                : ""}
+              . Parts and commission are added on top.
             </span>
           </label>
 

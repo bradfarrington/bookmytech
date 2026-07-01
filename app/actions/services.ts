@@ -3,7 +3,8 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { parsePrice, slugify } from "@/lib/utils";
+import { slugify } from "@/lib/utils";
+import { getHourlyRatePence } from "@/lib/pricing/calculate";
 
 export type ServiceActionResult = { error?: string } | void;
 
@@ -11,27 +12,36 @@ interface ParsedForm {
   name: string;
   category: string;
   description: string | null;
-  pricePence: number;
+  durationHours: number;
   displayOrder: number;
   isActive: boolean;
+}
+
+/** Parse a duration string in hours: positive, up to 2dp (matches numeric(4,2)). */
+function parseDuration(raw: string): number | null {
+  const n = Number(raw.trim());
+  if (!Number.isFinite(n) || n <= 0 || n > 99.99) return null;
+  return Math.round(n * 100) / 100;
+}
+
+/** Cached indicative price = round(duration × global hourly rate). */
+function cachedPricePence(durationHours: number, hourlyRatePence: number): number {
+  return Math.round(durationHours * hourlyRatePence);
 }
 
 function parseForm(formData: FormData): { ok: true; data: ParsedForm } | { ok: false; error: string } {
   const name = String(formData.get("name") ?? "").trim();
   const category = String(formData.get("category") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim() || null;
-  const pricePence = parsePrice(String(formData.get("price") ?? ""));
+  const durationHours = parseDuration(String(formData.get("duration") ?? ""));
   const displayOrderRaw = String(formData.get("display_order") ?? "");
   const displayOrder = displayOrderRaw === "" ? 0 : Number.parseInt(displayOrderRaw, 10);
   const isActive = formData.get("is_active") === "on";
 
   if (!name) return { ok: false, error: "Name is required." };
   if (!category) return { ok: false, error: "Choose a category." };
-  if (pricePence === null) {
-    return { ok: false, error: "Enter a valid starting price." };
-  }
-  if (pricePence <= 0) {
-    return { ok: false, error: "Starting price must be greater than £0." };
+  if (durationHours === null) {
+    return { ok: false, error: "Enter a valid duration in hours (greater than 0)." };
   }
   if (!Number.isFinite(displayOrder) || displayOrder < 0) {
     return { ok: false, error: "Display order must be a positive whole number." };
@@ -39,7 +49,7 @@ function parseForm(formData: FormData): { ok: true; data: ParsedForm } | { ok: f
 
   return {
     ok: true,
-    data: { name, category, description, pricePence, displayOrder, isActive },
+    data: { name, category, description, durationHours, displayOrder, isActive },
   };
 }
 
@@ -83,12 +93,15 @@ export async function createService(formData: FormData): Promise<ServiceActionRe
     };
   }
 
+  const hourlyRatePence = await getHourlyRatePence(supabase);
   const { error } = await supabase.from("services").insert({
     name: parsed.data.name,
     slug,
     category: parsed.data.category,
     description: parsed.data.description,
-    starting_price_pence: parsed.data.pricePence,
+    duration_hours: parsed.data.durationHours,
+    // Cached indicative price — recomputed here and never edited directly.
+    starting_price_pence: cachedPricePence(parsed.data.durationHours, hourlyRatePence),
     display_order: parsed.data.displayOrder,
     is_active: parsed.data.isActive,
   });
@@ -121,13 +134,15 @@ export async function updateService(
   // Note: slug is intentionally not updated. Renaming a service keeps its
   // original slug stable so landing-page icon refs (SERVICE_META) and any
   // future slug-based references don't drift.
+  const hourlyRatePence = await getHourlyRatePence(supabase);
   const { error } = await supabase
     .from("services")
     .update({
       name: parsed.data.name,
       category: parsed.data.category,
       description: parsed.data.description,
-      starting_price_pence: parsed.data.pricePence,
+      duration_hours: parsed.data.durationHours,
+      starting_price_pence: cachedPricePence(parsed.data.durationHours, hourlyRatePence),
       display_order: parsed.data.displayOrder,
       is_active: parsed.data.isActive,
       updated_at: new Date().toISOString(),
