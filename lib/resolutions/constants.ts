@@ -30,8 +30,3 @@ export const ADMIN_RESOLVABLE_STATUSES: ResolutionStatus[] = [
 
 export const MIN_DESCRIPTION_CHARS = 20;
 export const MAX_DESCRIPTION_CHARS = 2000;
-
-/** Short human-readable job reference, shared with the mechanic job pages. */
-export function bookingShortRef(bookingId: string): string {
-  return bookingId.slice(0, 8).toUpperCase();
-}

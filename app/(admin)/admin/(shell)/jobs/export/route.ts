@@ -1,5 +1,6 @@
 import { type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { formatJobNumber } from "@/lib/utils";
 
 // CSV export of bookings. A GET route handler (not client-side generation) so
 // customer PII is only ever assembled server-side under the admin's session.
@@ -54,7 +55,7 @@ export async function GET(request: NextRequest) {
   const { data: bookingsRaw } = await supabase
     .from("bookings")
     .select(
-      "id, status, area, total_pence, customer_name, customer_email, vehicle_reg, vehicle_make, vehicle_model, postcode, mechanic_id, service_id, scheduled_at, created_at",
+      "id, job_number, status, area, total_pence, customer_name, customer_email, vehicle_reg, vehicle_make, vehicle_model, postcode, mechanic_id, service_id, scheduled_at, created_at",
     )
     .order("created_at", { ascending: false })
     .limit(5000);
@@ -81,7 +82,7 @@ export async function GET(request: NextRequest) {
     if (area && b.area !== area) return false;
     if (service && b.service_id !== service) return false;
     if (q) {
-      const hay = `${b.id} ${b.customer_name ?? ""} ${b.vehicle_reg ?? ""} ${b.vehicle_make ?? ""} ${b.vehicle_model ?? ""}`.toLowerCase();
+      const hay = `${formatJobNumber(b.job_number)} ${b.id} ${b.customer_name ?? ""} ${b.vehicle_reg ?? ""} ${b.vehicle_make ?? ""} ${b.vehicle_model ?? ""}`.toLowerCase();
       if (!hay.includes(q)) return false;
     }
     return true;
@@ -107,7 +108,7 @@ export async function GET(request: NextRequest) {
   for (const b of filtered) {
     lines.push(
       [
-        b.id,
+        formatJobNumber(b.job_number),
         b.created_at,
         b.scheduled_at ?? "",
         b.status,

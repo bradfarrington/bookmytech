@@ -1,6 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ResolutionStatus } from "./constants";
-import { bookingShortRef } from "./constants";
+import { formatJobNumber } from "@/lib/utils";
+
+// One-to-one embeds arrive typed as arrays; normalise to a single row.
+function one<T>(value: T | T[] | null | undefined): T | null {
+  return Array.isArray(value) ? value[0] ?? null : value ?? null;
+}
 
 // Shared loaders for the Resolution Center. They take whichever Supabase client
 // the caller holds (RLS-aware server client for the mechanic, service-role admin
@@ -27,18 +32,21 @@ interface RawCase {
   reason_label: string;
   redistributed: boolean;
   created_at: string;
+  booking: { job_number: number | null } | { job_number: number | null }[] | null;
 }
 
 export async function listCases(client: Queryable): Promise<CaseListRow[]> {
   const { data } = await client
     .from("resolution_cases")
-    .select("id, booking_id, mechanic_id, status, reason_label, redistributed, created_at")
+    .select(
+      "id, booking_id, mechanic_id, status, reason_label, redistributed, created_at, booking:bookings(job_number)",
+    )
     .order("created_at", { ascending: false });
   return ((data as RawCase[] | null) ?? []).map((c) => ({
     id: c.id,
     status: c.status,
     reasonLabel: c.reason_label,
-    shortRef: bookingShortRef(c.booking_id),
+    shortRef: formatJobNumber(one(c.booking)?.job_number),
     mechanicId: c.mechanic_id,
     createdAt: c.created_at,
     redistributed: c.redistributed,
@@ -63,7 +71,7 @@ export async function loadCase(client: Queryable, id: string): Promise<CaseDetai
   const { data } = await client
     .from("resolution_cases")
     .select(
-      "id, booking_id, mechanic_id, status, reason_label, description, redistributed, resolution_note, created_at, opened_by_role",
+      "id, booking_id, mechanic_id, status, reason_label, description, redistributed, resolution_note, created_at, opened_by_role, booking:bookings(job_number)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -78,7 +86,7 @@ export async function loadCase(client: Queryable, id: string): Promise<CaseDetai
   return {
     id: c.id,
     bookingId: c.booking_id,
-    shortRef: bookingShortRef(c.booking_id),
+    shortRef: formatJobNumber(one(c.booking)?.job_number),
     mechanicId: c.mechanic_id,
     status: c.status,
     reasonLabel: c.reason_label,

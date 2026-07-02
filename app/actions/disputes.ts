@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendEmail } from "@/lib/email/send";
 import { renderTemplateEmail } from "@/emails/resolve";
-import { siteUrl, formatPrice } from "@/lib/utils";
+import { siteUrl, formatPrice, formatJobNumber } from "@/lib/utils";
 import {
   isValidReason,
   MIN_DESCRIPTION_CHARS,
@@ -41,6 +41,7 @@ async function requireUser() {
 
 interface DisputeBooking {
   id: string;
+  job_number: number | null;
   status: string;
   customer_id: string | null;
   customer_email: string | null;
@@ -52,7 +53,7 @@ interface DisputeBooking {
 }
 
 const DISPUTE_BOOKING_SELECT =
-  "id, status, customer_id, customer_email, customer_name, mechanic_id, completed_at, total_pence, service:services(name)";
+  "id, job_number, status, customer_id, customer_email, customer_name, mechanic_id, completed_at, total_pence, service:services(name)";
 
 function serviceName(b: DisputeBooking): string {
   const s = Array.isArray(b.service) ? b.service[0] : b.service;
@@ -264,7 +265,7 @@ async function notifyDisputeOpened(
   disputeId: string,
 ) {
   const svc = serviceName(booking);
-  const ref = booking.id.slice(0, 8).toUpperCase();
+  const ref = formatJobNumber(booking.job_number);
 
   // Admin team.
   renderTemplateEmail("dispute_opened_admin", {
@@ -396,7 +397,7 @@ export async function sendDisputeMessage(disputeId: string, body: string): Promi
     renderTemplateEmail("dispute_responded_admin", {
       role,
       service: serviceName(booking),
-      ref: booking.id.slice(0, 8).toUpperCase(),
+      ref: formatJobNumber(booking.job_number),
       link: `${siteUrl()}/admin/disputes/${disputeId}`,
     })
       .then(({ subject, html }) => sendEmail({ to: ADMIN_EMAIL, subject, html }))
@@ -411,7 +412,7 @@ export async function sendDisputeMessage(disputeId: string, body: string): Promi
       renderTemplateEmail("dispute_new_message_mechanic", {
         role,
         service: serviceName(booking),
-        ref: booking.id.slice(0, 8).toUpperCase(),
+        ref: formatJobNumber(booking.job_number),
         link: `${siteUrl()}/mechanic/disputes/${disputeId}`,
       })
         .then(({ subject, html }) => sendEmail({ to: mechTo, subject, html }))
@@ -464,7 +465,7 @@ export async function withdrawDispute(disputeId: string): Promise<SimpleResult> 
   if (dispute.payout_held) await releaseMechanicPayout(admin, booking);
 
   // Notify both parties.
-  const ref = booking.id.slice(0, 8).toUpperCase();
+  const ref = formatJobNumber(booking.job_number);
   if (booking.customer_email) {
     const to = booking.customer_email;
     renderTemplateEmail("dispute_withdrawn_customer", { service: serviceName(booking), ref })
@@ -507,7 +508,7 @@ export async function escalateDispute(disputeId: string): Promise<SimpleResult> 
   renderTemplateEmail("dispute_escalated_admin", {
     role,
     service: serviceName(booking),
-    ref: booking.id.slice(0, 8).toUpperCase(),
+    ref: formatJobNumber(booking.job_number),
     link: `${siteUrl()}/admin/disputes/${disputeId}`,
   })
     .then(({ subject, html }) => sendEmail({ to: ADMIN_EMAIL, subject, html }))
@@ -520,7 +521,7 @@ export async function escalateDispute(disputeId: string): Promise<SimpleResult> 
       renderTemplateEmail("dispute_escalated_mechanic", {
         role,
         service: serviceName(booking),
-        ref: booking.id.slice(0, 8).toUpperCase(),
+        ref: formatJobNumber(booking.job_number),
         link: `${siteUrl()}/mechanic/disputes/${disputeId}`,
       })
         .then(({ subject, html }) => sendEmail({ to: mechTo, subject, html }))
@@ -596,7 +597,7 @@ export async function resolveDispute(
 
   // 2) Compensation credit.
   if (creditPence > 0 && money?.customer_id) {
-    await grantCredit(admin, money.customer_id, creditPence, "compensation", `Dispute resolution — booking ${booking.id.slice(0, 8).toUpperCase()}`);
+    await grantCredit(admin, money.customer_id, creditPence, "compensation", `Dispute resolution — booking ${formatJobNumber(booking.job_number)}`);
   }
 
   // 3) Mechanic payout: refunds come out of the mechanic's share first. If the
@@ -663,7 +664,7 @@ export async function resolveDispute(
   });
 
   // 6) Tell both parties.
-  const ref = booking.id.slice(0, 8).toUpperCase();
+  const ref = formatJobNumber(booking.job_number);
   if (booking.customer_email) {
     const to = booking.customer_email;
     renderTemplateEmail("dispute_resolved_customer", {

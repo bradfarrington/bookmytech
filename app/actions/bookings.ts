@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { refundPayment } from "@/lib/stripe/refund";
 import { recordRefundClawback } from "@/lib/mechanics/balance";
-import { formatPrice } from "@/lib/utils";
+import { formatPrice, formatJobNumber } from "@/lib/utils";
 
 export type BookingActionResult = { ok: true } | { ok: false; error: string };
 
@@ -149,7 +149,7 @@ export async function refundBooking(
   const { data: booking } = await admin
     .from("bookings")
     .select(
-      "id, status, mechanic_id, total_pence, credit_applied_pence, stripe_payment_intent_id",
+      "id, job_number, status, mechanic_id, total_pence, credit_applied_pence, stripe_payment_intent_id",
     )
     .eq("id", id)
     .single();
@@ -197,7 +197,7 @@ export async function refundBooking(
   // 3) Recover it from the mechanic — their balance goes negative and is netted
   //    off their next payout. No mechanic (e.g. never assigned) → BMT absorbs it.
   if (booking.mechanic_id) {
-    const bref = id.slice(0, 8).toUpperCase();
+    const bref = formatJobNumber(booking.job_number);
     await recordRefundClawback(
       admin,
       booking.mechanic_id,

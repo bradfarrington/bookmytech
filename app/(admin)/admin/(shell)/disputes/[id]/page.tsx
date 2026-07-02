@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { formatPrice } from "@/lib/utils";
+import { formatPrice, formatJobNumber } from "@/lib/utils";
 import { DisputeThread } from "@/components/disputes/dispute-thread";
 import { ArbitrationPanel } from "@/components/disputes/arbitration-panel";
 import {
@@ -34,7 +34,7 @@ export default async function AdminDisputeDetailPage({
   const { data: booking } = await admin
     .from("bookings")
     .select(
-      `id, status, total_pence, credit_applied_pence, mechanic_payout_pence,
+      `id, job_number, status, total_pence, credit_applied_pence, mechanic_payout_pence,
        customer_id, customer_name, customer_email, mechanic_id,
        vehicle_reg, vehicle_make, vehicle_model, created_at, completed_at,
        service:services(name)`,
@@ -91,7 +91,7 @@ export default async function AdminDisputeDetailPage({
 
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-sm text-text-muted">Booking {booking.id.slice(0, 8).toUpperCase()}</p>
+          <p className="text-sm text-text-muted">Booking #{formatJobNumber(booking.job_number)}</p>
           <h1 className="text-2xl font-bold text-text-primary">{svc?.name ?? "Service"}</h1>
         </div>
         <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${DISPUTE_STATUS_TONES[dispute.status as DisputeStatus]}`}>

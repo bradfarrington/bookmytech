@@ -5,11 +5,12 @@ import { useRouter } from "next/navigation";
 import { Radio } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Pill } from "@/components/ui/pill";
-import { formatPrice } from "@/lib/utils";
+import { formatPrice, formatJobNumber } from "@/lib/utils";
 import { useStayFresh } from "@/lib/use-stay-fresh";
 
 export interface MonitorRow {
   id: string;
+  jobNumber: number | null;
   service: string;
   customer: string;
   mechanic: string | null;
@@ -62,10 +63,6 @@ const STATUS_LABEL: Record<string, string> = {
   cancelled: "Cancelled",
   disputed: "Disputed",
 };
-
-function shortId(id: string): string {
-  return id.slice(0, 8);
-}
 
 export function LiveMonitor({ rows }: { rows: MonitorRow[] }) {
   const [tab, setTab] = useState<Tab>("live");
@@ -134,7 +131,7 @@ export function LiveMonitor({ rows }: { rows: MonitorRow[] }) {
               {filtered.map((r) => (
                 <tr key={r.id} className="hover:bg-surface/50">
                   <td className="px-5 py-3 font-mono text-xs text-text-muted">
-                    {shortId(r.id)}
+                    #{formatJobNumber(r.jobNumber)}
                   </td>
                   <td className="px-5 py-3 font-semibold text-text-primary">
                     {r.service}

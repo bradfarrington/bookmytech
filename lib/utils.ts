@@ -65,6 +65,15 @@ export function slugify(input: string): string {
     .replace(/^-|-$/g, "");
 }
 
+// Formats a booking's sequential job number for display, zero-padded to at
+// least 5 digits: 1 → "00001", 42 → "00042", 123456 → "123456". Numbers only —
+// callers add any "#" or "Job " prefix in their own markup. Returns "—" when
+// the number is missing (e.g. a legacy row the backfill hasn't reached).
+export function formatJobNumber(jobNumber: number | null | undefined): string {
+  if (jobNumber == null || !Number.isFinite(jobNumber)) return "—";
+  return String(Math.trunc(jobNumber)).padStart(5, "0");
+}
+
 // Absolute site origin for links in emails (which have no request context).
 // Prefers an explicit NEXT_PUBLIC_SITE_URL, falls back to the Vercel-provided
 // deployment host, then localhost for dev. No trailing slash.

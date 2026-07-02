@@ -18,7 +18,7 @@ import { Icon } from "@/components/ui/icon";
 
 export interface ActivityEvent {
   id: string;
-  bookingRef: string; // short id, e.g. "8ED0549C"
+  bookingRef: string; // job number, e.g. "#00042"
   eventType: string;
   actorRole: string | null;
   payload: Record<string, unknown>;

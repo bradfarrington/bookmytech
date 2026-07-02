@@ -3,7 +3,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { CaseForm, type CaseJobOption, type CaseReasonOption } from "@/components/resolutions/case-form";
-import { bookingShortRef } from "@/lib/resolutions/constants";
+import { formatJobNumber } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +22,7 @@ export default async function MechanicNewCasePage() {
   // Any job assigned to this mechanic (RLS also scopes bookings to them).
   const { data: bookings } = await supabase
     .from("bookings")
-    .select("id, scheduled_at, service:services(name)")
+    .select("id, job_number, scheduled_at, service:services(name)")
     .eq("mechanic_id", user.id)
     .order("scheduled_at", { ascending: false });
 
@@ -37,7 +37,7 @@ export default async function MechanicNewCasePage() {
       : "";
     return {
       value: b.id,
-      label: `#${bookingShortRef(b.id)} · ${svc}${when ? ` · ${when}` : ""}`,
+      label: `#${formatJobNumber(b.job_number)} · ${svc}${when ? ` · ${when}` : ""}`,
     };
   });
 

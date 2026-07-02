@@ -7,7 +7,7 @@ import { sendEmail } from "@/lib/email/send";
 import { renderTemplateEmail } from "@/emails/resolve";
 import { sendSms } from "@/lib/sms/send-sms";
 import { renderSmsTemplate } from "@/lib/sms/render-template";
-import { formatPrice, siteUrl } from "@/lib/utils";
+import { formatPrice, siteUrl, formatJobNumber } from "@/lib/utils";
 import { completedBookingCount, grantCredit } from "@/lib/credits/credits";
 import { REFERRAL_BONUS_PENCE } from "@/lib/credits/constants";
 import { mechanicBalancePence, recordEarning, recordPayout } from "@/lib/mechanics/balance";
@@ -154,7 +154,7 @@ export async function completeAndCharge(bookingId: string): Promise<JobProgressR
   const { data: booking } = await admin
     .from("bookings")
     .select(
-      `id, status, mechanic_id, customer_id, customer_email, customer_name, customer_phone, total_pence,
+      `id, job_number, status, mechanic_id, customer_id, customer_email, customer_name, customer_phone, total_pence,
        mechanic_payout_pence, credit_applied_pence, payment_mode,
        stripe_payment_intent_id, service:services(name)`,
     )
@@ -289,7 +289,7 @@ export async function completeAndCharge(bookingId: string): Promise<JobProgressR
   // payout draws from the platform balance (which funded the credit).
   const shouldPay = payoutPence > 0 && (captured || booking.payment_mode === "free");
   if (shouldPay && booking.mechanic_id) {
-    const ref = bookingId.slice(0, 8).toUpperCase();
+    const ref = formatJobNumber(booking.job_number);
     // 1) Read the mechanic's balance BEFORE this job (≤ 0 normally; negative when
     //    a refund BMT fronted on an earlier job is still being recovered).
     const priorBalance = await mechanicBalancePence(admin, booking.mechanic_id);

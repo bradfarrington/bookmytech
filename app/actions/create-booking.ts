@@ -6,7 +6,7 @@ import { sendEmail } from "@/lib/email/send";
 import { renderTemplateEmail } from "@/emails/resolve";
 import { sendSms } from "@/lib/sms/send-sms";
 import { renderSmsTemplate } from "@/lib/sms/render-template";
-import { formatPrice } from "@/lib/utils";
+import { formatPrice, formatJobNumber } from "@/lib/utils";
 import { dispatchBooking } from "@/lib/dispatch/dispatch";
 import { calculatePrice } from "@/lib/pricing/calculate";
 import { trackEvent } from "@/app/actions/track-event";
@@ -126,7 +126,7 @@ export async function createBookingAction(
       preferred_mechanic_id: input.preferredMechanicId ?? null,
       payment_mode: mode,
     })
-    .select("id")
+    .select("id, job_number")
     .single();
 
   if (error || !data) {
@@ -204,7 +204,7 @@ export async function createBookingAction(
   }`;
   renderTemplateEmail("booking_confirmed", {
     name: input.customerName,
-    ref: data.id.slice(0, 8).toUpperCase(),
+    ref: formatJobNumber(data.job_number),
     service: input.serviceName,
     vehicle: vehicleLabel,
     when: whenLabel,
@@ -215,7 +215,7 @@ export async function createBookingAction(
 
   if (customerPhone) {
     const body = await renderSmsTemplate("booking_received", {
-      ref: data.id.slice(0, 8).toUpperCase(),
+      ref: formatJobNumber(data.job_number),
     });
     sendSms({ to: customerPhone, body }).catch(() => {});
   }

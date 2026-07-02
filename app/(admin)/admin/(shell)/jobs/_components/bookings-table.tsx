@@ -6,10 +6,11 @@ import { Download, Search } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Pill } from "@/components/ui/pill";
 import { Select } from "@/components/ui/select";
-import { formatPrice } from "@/lib/utils";
+import { formatPrice, formatJobNumber } from "@/lib/utils";
 
 export interface BookingRow {
   id: string;
+  jobNumber: number | null;
   service: string;
   serviceId: string;
   customer: string;
@@ -97,6 +98,7 @@ export function BookingsTable({ bookings, services, areas }: BookingsTableProps)
       if (
         q &&
         !(
+          formatJobNumber(b.jobNumber).includes(q) ||
           b.id.toLowerCase().includes(q) ||
           b.customer.toLowerCase().includes(q) ||
           b.vehicle.toLowerCase().includes(q)
@@ -222,7 +224,7 @@ export function BookingsTable({ bookings, services, areas }: BookingsTableProps)
                         href={`/admin/jobs/${b.id}`}
                         className="font-mono text-xs font-semibold text-brand-blue hover:underline"
                       >
-                        {b.id.slice(0, 8)}
+                        #{formatJobNumber(b.jobNumber)}
                       </Link>
                     </td>
                     <td className="px-5 py-3 font-semibold text-text-primary">

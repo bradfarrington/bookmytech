@@ -52,7 +52,7 @@ export default async function AdminOverviewPage() {
   const { data: bookingsRaw } = await supabase
     .from("bookings")
     .select(
-      "id, status, area, total_pence, platform_fee_pence, commission_rate, customer_name, mechanic_id, service_id, created_at",
+      "id, job_number, status, area, total_pence, platform_fee_pence, commission_rate, customer_name, mechanic_id, service_id, created_at",
     )
     .order("created_at", { ascending: false })
     .limit(1000);
@@ -139,6 +139,7 @@ export default async function AdminOverviewPage() {
   // --- Monitor rows ---------------------------------------------------------
   const monitorRows: MonitorRow[] = bookings.map((b) => ({
     id: b.id,
+    jobNumber: b.job_number,
     service: serviceName.get(b.service_id) ?? "Unknown service",
     customer: b.customer_name ?? "—",
     mechanic: b.mechanic_id ? mechanicName.get(b.mechanic_id) ?? "Assigned" : null,

@@ -8,12 +8,11 @@ import { sendSms } from "@/lib/sms/send-sms";
 import { renderTemplateEmail } from "@/emails/resolve";
 import { renderSmsTemplate } from "@/lib/sms/render-template";
 import type { SmsTemplateKey } from "@/lib/sms/templates";
-import { formatPrice, siteUrl } from "@/lib/utils";
+import { formatPrice, siteUrl, formatJobNumber } from "@/lib/utils";
 import { dispatchBooking } from "@/lib/dispatch/dispatch";
 import {
   MIN_DESCRIPTION_CHARS,
   MAX_DESCRIPTION_CHARS,
-  bookingShortRef,
   type ResolutionStatus,
 } from "@/lib/resolutions/constants";
 
@@ -66,6 +65,7 @@ async function requireAdmin() {
 
 interface CommsBooking {
   id: string;
+  job_number: number | null;
   customer_name: string | null;
   customer_email: string | null;
   customer_phone: string | null;
@@ -78,7 +78,7 @@ interface CommsBooking {
 }
 
 const COMMS_BOOKING_SELECT =
-  "id, customer_name, customer_email, customer_phone, vehicle_reg, vehicle_make, vehicle_model, scheduled_at, total_pence, service:services(name)";
+  "id, job_number, customer_name, customer_email, customer_phone, vehicle_reg, vehicle_make, vehicle_model, scheduled_at, total_pence, service:services(name)";
 
 function serviceName(b: CommsBooking): string {
   const s = Array.isArray(b.service) ? b.service[0] : b.service;
@@ -100,7 +100,7 @@ function customerVars(b: CommsBooking): Record<string, string> {
     : "";
   return {
     name: b.customer_name ?? "there",
-    ref: bookingShortRef(b.id),
+    ref: formatJobNumber(b.job_number),
     service: serviceName(b),
     vehicle,
     when,
@@ -143,7 +143,7 @@ async function notifyCaseOpened(
   admin: Admin,
   args: {
     caseId: string;
-    booking: { id: string; mechanic_id: string | null; service: { name: string | null } | { name: string | null }[] | null };
+    booking: { id: string; job_number: number | null; mechanic_id: string | null; service: { name: string | null } | { name: string | null }[] | null };
     openerRole: "mechanic" | "admin";
     reasonLabel: string;
   },
@@ -152,7 +152,7 @@ async function notifyCaseOpened(
   const svc =
     (Array.isArray(booking.service) ? booking.service[0]?.name : booking.service?.name) ??
     "the booking";
-  const ref = bookingShortRef(booking.id);
+  const ref = formatJobNumber(booking.job_number);
 
   // Admin team — always notified of a new case.
   renderTemplateEmail("resolution_opened_admin", {
@@ -199,9 +199,9 @@ export async function openResolutionCase(input: OpenCaseInput): Promise<Resoluti
 
   const { data: booking } = await admin
     .from("bookings")
-    .select("id, mechanic_id, service:services(name)")
+    .select("id, job_number, mechanic_id, service:services(name)")
     .eq("id", input.bookingId)
-    .maybeSingle<{ id: string; mechanic_id: string | null; service: { name: string | null } | { name: string | null }[] | null }>();
+    .maybeSingle<{ id: string; job_number: number | null; mechanic_id: string | null; service: { name: string | null } | { name: string | null }[] | null }>();
   if (!booking) return { ok: false, error: "That job no longer exists." };
   if (!booking.mechanic_id)
     return { ok: false, error: "That job isn't assigned to a mechanic yet." };

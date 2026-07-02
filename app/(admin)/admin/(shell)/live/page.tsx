@@ -1,5 +1,6 @@
 import { Wrench, Hourglass, Inbox, Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { formatJobNumber } from "@/lib/utils";
 import { Overline } from "@/components/ui/overline";
 import { KPI } from "@/components/ui/kpi";
 import { LiveMonitor, type MonitorRow } from "../_components/live-monitor";
@@ -32,7 +33,7 @@ export default async function AdminLiveMonitorPage() {
     supabase
       .from("bookings")
       .select(
-        "id, status, area, total_pence, customer_name, mechanic_id, service_id, created_at",
+        "id, job_number, status, area, total_pence, customer_name, mechanic_id, service_id, created_at",
       )
       .order("created_at", { ascending: false })
       .limit(1000),
@@ -84,6 +85,7 @@ export default async function AdminLiveMonitorPage() {
   // --- Live jobs table (reuses the overview's monitor component) ------------
   const monitorRows: MonitorRow[] = bookings.map((b) => ({
     id: b.id,
+    jobNumber: b.job_number,
     service: serviceName.get(b.service_id) ?? "Unknown service",
     customer: b.customer_name ?? "—",
     mechanic: b.mechanic_id ? profileName.get(b.mechanic_id) ?? "Assigned" : null,
@@ -105,9 +107,12 @@ export default async function AdminLiveMonitorPage() {
     .sort((a, b) => (a.status === b.status ? 0 : a.status === "online" ? -1 : 1));
 
   // --- Activity feed --------------------------------------------------------
+  // Job numbers come from the bookings we just loaded (recent events reference
+  // recent bookings); fall back to "—" for anything older than the window.
+  const jobNumberById = new Map(bookings.map((b) => [b.id, b.job_number]));
   const activity: ActivityEvent[] = events.map((e) => ({
     id: e.id,
-    bookingRef: String(e.booking_id).slice(0, 8).toUpperCase(),
+    bookingRef: `#${formatJobNumber(jobNumberById.get(String(e.booking_id)))}`,
     eventType: e.event_type,
     actorRole: e.actor_role,
     payload: (e.payload ?? {}) as Record<string, unknown>,

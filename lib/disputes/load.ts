@@ -2,6 +2,7 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { DisputeDetailData } from "@/components/disputes/dispute-detail";
 import type { DisputeStatus, ResolutionKind } from "@/lib/disputes/constants";
+import { formatJobNumber } from "@/lib/utils";
 
 export interface LoadedDispute {
   data: DisputeDetailData;
@@ -28,7 +29,7 @@ export async function loadDispute(disputeId: string, userId: string): Promise<Lo
 
   const { data: b } = await admin
     .from("bookings")
-    .select("id, customer_id, mechanic_id, service:services(name)")
+    .select("id, job_number, customer_id, mechanic_id, service:services(name)")
     .eq("id", d.booking_id)
     .single();
   if (!b) return null;
@@ -52,7 +53,7 @@ export async function loadDispute(disputeId: string, userId: string): Promise<Lo
     disputeId: d.id,
     status: d.status as DisputeStatus,
     serviceName,
-    ref: d.booking_id.slice(0, 8).toUpperCase(),
+    ref: formatJobNumber((b as { job_number: number | null }).job_number),
     reasonCategory: d.reason_category,
     description: d.description,
     photos: d.photos ?? [],

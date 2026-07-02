@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendEmail } from "@/lib/email/send";
 import { renderTemplateEmail } from "@/emails/resolve";
-import { formatPrice } from "@/lib/utils";
+import { formatPrice, formatJobNumber } from "@/lib/utils";
 
 // Admin-notification sweep (Task 05 Stage 2).
 //
@@ -21,6 +21,7 @@ const STALL_MINUTES = 5;
 
 interface StalledBooking {
   id: string;
+  job_number: number | null;
   customer_name: string | null;
   postcode: string | null;
   area: string | null;
@@ -40,7 +41,7 @@ async function runSweep() {
   const { data: stalled } = await admin
     .from("bookings")
     .select(
-      "id, customer_name, postcode, area, total_pence, service:services(name)",
+      "id, job_number, customer_name, postcode, area, total_pence, service:services(name)",
     )
     .eq("status", "sourcing_mechanic")
     .lt("created_at", cutoff);
@@ -82,7 +83,7 @@ async function runSweep() {
   const bookings = toFlag
     .map(
       (b) =>
-        `${b.id.slice(0, 8).toUpperCase()} · ${serviceName(b)} · ${b.area ?? b.postcode ?? "—"} · ${formatPrice(b.total_pence ?? 0)}`,
+        `#${formatJobNumber(b.job_number)} · ${serviceName(b)} · ${b.area ?? b.postcode ?? "—"} · ${formatPrice(b.total_pence ?? 0)}`,
     )
     .join("|");
   const { subject, html } = await renderTemplateEmail("dispatch_stall_alert", {

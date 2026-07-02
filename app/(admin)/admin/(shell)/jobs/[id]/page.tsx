@@ -18,7 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Pill } from "@/components/ui/pill";
 import { Overline } from "@/components/ui/overline";
-import { formatPrice } from "@/lib/utils";
+import { formatPrice, formatJobNumber } from "@/lib/utils";
 import { calcEarnings } from "@/lib/earnings";
 import { Timeline, type TimelineEvent } from "./_components/timeline";
 import { BookingActions } from "./_components/booking-actions";
@@ -94,7 +94,7 @@ export default async function BookingDetailPage({ params }: PageProps) {
   const { data: booking } = await supabase
     .from("bookings")
     .select(
-      `id, status, area, postcode, total_pence, base_price_pence, parts_price_pence,
+      `id, job_number, status, area, postcode, total_pence, base_price_pence, parts_price_pence,
        commission_rate, platform_fee_pence, mechanic_payout_pence, credit_applied_pence,
        customer_name, customer_email,
        vehicle_reg, vehicle_make, vehicle_model, service_id, mechanic_id,
@@ -185,7 +185,7 @@ export default async function BookingDetailPage({ params }: PageProps) {
           <Overline>Operations</Overline>
           <div className="mt-1 flex items-center gap-3">
             <h1 className="font-mono text-2xl font-bold tracking-tight text-text-primary">
-              {booking.id.slice(0, 8)}
+              #{formatJobNumber(booking.job_number)}
             </h1>
             <Pill tone={statusTone(booking.status)}>
               {STATUS_LABEL[booking.status] ?? booking.status}

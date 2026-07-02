@@ -4,6 +4,7 @@ import { geocodePostcode, haversineMiles, type LatLng } from "@/lib/geo/postcode
 import { mechanicSharePence } from "@/lib/earnings";
 import { estimatedDurationLabel } from "@/lib/jobs/estimates";
 import { formatBookingSlot } from "@/lib/slots";
+import { formatJobNumber } from "@/lib/utils";
 import { JobDetail, type JobDetailProps } from "./_components/job-detail";
 import type { TimelineEvent } from "@/app/(admin)/admin/(shell)/jobs/[id]/_components/timeline";
 
@@ -35,7 +36,7 @@ export default async function MechanicJobDetailPage({ params }: PageProps) {
   const { data: booking } = await supabase
     .from("bookings")
     .select(
-      `id, status, mechanic_id, scheduled_at, slot_window, created_at, total_pence, commission_rate,
+      `id, job_number, status, mechanic_id, scheduled_at, slot_window, created_at, total_pence, commission_rate,
        platform_fee_pence, mechanic_payout_pence,
        vehicle_reg, vehicle_make, vehicle_model, postcode, area,
        address_line_1, address_line_2,
@@ -169,7 +170,7 @@ export default async function MechanicJobDetailPage({ params }: PageProps) {
   const detail: JobDetailProps = {
     bookingId: booking.id,
     status: booking.status,
-    shortRef: booking.id.slice(0, 8).toUpperCase(),
+    shortRef: formatJobNumber(booking.job_number),
     createdAt: booking.created_at,
     serviceName: service?.name ?? "Service",
     vehicle: [booking.vehicle_make, booking.vehicle_model].filter(Boolean).join(" ") || "Vehicle",

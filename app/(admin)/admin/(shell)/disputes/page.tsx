@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Scale } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { formatJobNumber } from "@/lib/utils";
 import {
   REASON_LABELS,
   DISPUTE_STATUS_LABELS,
@@ -26,7 +27,7 @@ interface Row {
   opened_by_role: string;
   reason_category: string;
   created_at: string;
-  booking: { id: string; service: { name: string | null } | { name: string | null }[] | null } | { id: string; service: unknown }[] | null;
+  booking: { id: string; job_number: number | null; service: { name: string | null } | { name: string | null }[] | null } | { id: string; job_number: number | null; service: unknown }[] | null;
 }
 
 function bookingOf(r: Row) {
@@ -50,7 +51,7 @@ export default async function AdminDisputesPage() {
   const admin = createAdminClient();
   const { data } = await admin
     .from("disputes")
-    .select("id, status, opened_by_role, reason_category, created_at, booking:bookings(id, service:services(name))")
+    .select("id, status, opened_by_role, reason_category, created_at, booking:bookings(id, job_number, service:services(name))")
     .order("created_at", { ascending: true });
 
   const rows = ((data as Row[]) ?? []).sort(
@@ -94,7 +95,7 @@ export default async function AdminDisputesPage() {
                   <tr key={r.id} className="border-b border-border last:border-0 hover:bg-surface">
                     <td className="px-4 py-3">
                       <Link href={`/admin/disputes/${r.id}`} className="font-semibold text-brand-blue hover:underline">
-                        {b?.id?.slice(0, 8).toUpperCase() ?? "—"}
+                        #{formatJobNumber(b?.job_number)}
                       </Link>
                     </td>
                     <td className="px-4 py-3 text-text-primary">{serviceName(r)}</td>

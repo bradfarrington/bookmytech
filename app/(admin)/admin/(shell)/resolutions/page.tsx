@@ -2,7 +2,8 @@ import Link from "next/link";
 import { LifeBuoy, Settings } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { StatusPill } from "@/components/resolutions/status-pill";
-import { bookingShortRef, type ResolutionStatus } from "@/lib/resolutions/constants";
+import { type ResolutionStatus } from "@/lib/resolutions/constants";
+import { formatJobNumber } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +19,7 @@ interface CaseRow {
   redistributed: boolean;
   created_at: string;
   mechanic: { full_name: string | null } | { full_name: string | null }[] | null;
+  booking: { job_number: number | null } | { job_number: number | null }[] | null;
 }
 
 export default async function AdminResolutionsPage() {
@@ -28,7 +30,7 @@ export default async function AdminResolutionsPage() {
   const { data } = await supabase
     .from("resolution_cases")
     .select(
-      "id, booking_id, status, reason_label, redistributed, created_at, mechanic:profiles!resolution_cases_mechanic_id_fkey(full_name)",
+      "id, booking_id, status, reason_label, redistributed, created_at, mechanic:profiles!resolution_cases_mechanic_id_fkey(full_name), booking:bookings(job_number)",
     )
     .order("created_at", { ascending: false });
 
@@ -86,7 +88,7 @@ export default async function AdminResolutionsPage() {
                       href={`/admin/resolutions/${c.id}`}
                       className="font-semibold text-brand-blue hover:underline"
                     >
-                      #{bookingShortRef(c.booking_id)}
+                      #{formatJobNumber(one(c.booking)?.job_number)}
                     </Link>
                   </td>
                   <td className="px-4 py-3 text-text-primary">

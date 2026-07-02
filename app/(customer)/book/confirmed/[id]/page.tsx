@@ -3,7 +3,7 @@ import Link from "next/link";
 import { CheckCircle, ArrowRight } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { formatPrice } from "@/lib/utils";
+import { formatPrice, formatJobNumber } from "@/lib/utils";
 import { formatBookingSlot } from "@/lib/slots";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -29,7 +29,7 @@ export default async function ConfirmedPage({ params }: ConfirmedPageProps) {
 
   const { data: booking } = await supabase
     .from("bookings")
-    .select("id, vehicle_reg, vehicle_make, vehicle_model, scheduled_at, slot_window, created_at, total_pence, customer_name, customer_email, address_line_1, status, mechanic_id, reschedule_status, reschedule_proposed_at, reschedule_note")
+    .select("id, job_number, vehicle_reg, vehicle_make, vehicle_model, scheduled_at, slot_window, created_at, total_pence, customer_name, customer_email, address_line_1, status, mechanic_id, reschedule_status, reschedule_proposed_at, reschedule_note")
     .eq("id", id)
     .single();
 
@@ -65,7 +65,7 @@ export default async function ConfirmedPage({ params }: ConfirmedPageProps) {
     }
   }
 
-  const ref = booking.id.slice(0, 8).toUpperCase();
+  const ref = formatJobNumber(booking.job_number);
   const slotDate = booking.scheduled_at
     ? formatBookingSlot(booking.scheduled_at, booking.slot_window)
     : null;
