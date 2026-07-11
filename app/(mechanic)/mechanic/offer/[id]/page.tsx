@@ -46,7 +46,7 @@ export default async function OfferPage({ params }: PageProps) {
       `id, response, mechanic_id, offered_at,
        booking:bookings(id, vehicle_reg, vehicle_make, vehicle_model, area, postcode,
          scheduled_at, slot_window, total_pence, commission_rate, special_instructions,
-         service:services(name))`,
+         repair_description, service:services(name))`,
     )
     .eq("id", id)
     .maybeSingle();
@@ -66,6 +66,7 @@ export default async function OfferPage({ params }: PageProps) {
         total_pence: number | null;
         commission_rate: number | null;
         special_instructions: string | null;
+        repair_description: string | null;
         service: unknown;
       }
     | null;
@@ -132,7 +133,7 @@ export default async function OfferPage({ params }: PageProps) {
         offerId={offer.id}
         bookingId={booking.id}
         mechanicId={user.id}
-        serviceName={service?.name ?? "Service"}
+        serviceName={booking.repair_description ?? service?.name ?? "Service"}
         vehicle={[booking.vehicle_make, booking.vehicle_model].filter(Boolean).join(" ") || "Vehicle"}
         reg={booking.vehicle_reg}
         whenLabel={formatBookingSlot(booking.scheduled_at, booking.slot_window, { relative: true })}

@@ -98,6 +98,7 @@ export default async function BookingDetailPage({ params }: PageProps) {
        commission_rate, platform_fee_pence, mechanic_payout_pence, credit_applied_pence,
        customer_name, customer_email,
        vehicle_reg, vehicle_make, vehicle_model, service_id, mechanic_id,
+       repair_description,
        scheduled_at, created_at, address_line_1, address_line_2, parking_type,
        special_instructions, stripe_payment_intent_id`,
     )
@@ -225,7 +226,11 @@ export default async function BookingDetailPage({ params }: PageProps) {
                 .filter(Boolean)
                 .join(" · ") || "—"}
             />
-            <Row icon={Wrench} label="Service" value={service?.name ?? "Unknown service"} />
+            <Row
+              icon={Wrench}
+              label="Service"
+              value={booking.repair_description ?? service?.name ?? "Unknown service"}
+            />
             <Row icon={Wrench} label="Mechanic" value={currentMechanicName ?? "Unassigned"} />
             <Row
               icon={CalendarClock}

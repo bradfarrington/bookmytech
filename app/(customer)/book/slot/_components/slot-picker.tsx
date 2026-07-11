@@ -47,6 +47,8 @@ interface SlotPickerProps {
   defaultPostcode?: string;
   serviceName: string;
   serviceId: string;
+  /** Set for one-off HaynesPro repair bookings (Task 16 Stage G). */
+  repairNodeId?: string;
   pricePence: number;
   preferredMechanicId?: string;
   /** Signed-in customer's spendable account credit (0 for guests). */
@@ -60,6 +62,7 @@ export function SlotPicker({
   defaultPostcode = "",
   serviceName,
   serviceId,
+  repairNodeId,
   pricePence,
   preferredMechanicId,
   availableCreditPence = 0,
@@ -92,7 +95,7 @@ export function SlotPicker({
     track(FUNNEL_EVENTS.slotPicked, { serviceId, slot: selectedSlot });
     setStripeError(null);
     startTransition(async () => {
-      const result = await prepareCheckout({ serviceId, postcode });
+      const result = await prepareCheckout({ serviceId, postcode, vehicleReg: reg, repairNodeId });
       if (!result.ok) {
         setStripeError(result.error);
         return;
@@ -113,6 +116,7 @@ export function SlotPicker({
     model,
     serviceName,
     serviceId,
+    repairNodeId,
     preferredMechanicId,
   };
 
@@ -308,6 +312,7 @@ interface ConfirmCommon {
   model?: string;
   serviceName: string;
   serviceId: string;
+  repairNodeId?: string;
   preferredMechanicId?: string;
 }
 
@@ -324,6 +329,7 @@ function bookingInputFrom(
     vehicleModel: c.model,
     serviceName: c.serviceName,
     serviceId: c.serviceId,
+    repairNodeId: c.repairNodeId,
     scheduledAt: c.selectedSlot,
     slotWindow: c.selectedWindow || undefined,
     customerEmail: email.trim(),

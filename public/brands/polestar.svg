@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generator: Adobe Illustrator 25.4.0, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
+<svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px" 	 width="138px" height="138px" viewBox="0 0 250 250" enable-background="new 0 0 250 250" xml:space="preserve" onload="RunScript(evt)">
+	<script  type="text/ecmascript">
+		<![CDATA[
+			function RunScript(LoadEvent) {
+				SVGDoc = LoadEvent.target.ownerDocument;
+				try {
+					top.applyScript(SVGDoc);
+				} catch (e) {
+				}
+			}
+		]]>
+	</script>
+ 
+<g>
+	<polygon points="228.95,120.07 225.03,123.99 126.76,123.24 126.01,24.97 129.93,21.05 130.89,25.61 147.23,102.77 224.39,119.11 	
+		"/>
+	<polygon points="120.07,228.95 123.99,225.03 123.24,126.76 24.97,126.01 21.05,129.93 25.61,130.89 102.77,147.23 119.11,224.39 	
+		"/>
+</g>
+</svg>
+

@@ -80,7 +80,7 @@ export function VehicleConfirmCard({ details, reg, nextHref }: VehicleConfirmCar
           {details.motStatus && (
             <Row
               label="MOT"
-              value={details.motStatus}
+              value={displayStatus(details.motStatus)}
               tone={statusTone(details.motStatus)}
             />
           )}
@@ -138,10 +138,16 @@ function Row({
   );
 }
 
+// DVLA's raw wording is awkward in a pill — remap the worst offenders.
+function displayStatus(status: string): string {
+  return status.toLowerCase() === "not valid" ? "Expired" : status;
+}
+
 function statusTone(status: string): "success" | "error" | "pending" | "neutral" {
   const l = status.toLowerCase();
+  // Negatives first — "Not valid" contains "valid" and "Untaxed" contains "taxed".
+  if (l.startsWith("not") || l.includes("expired") || l.includes("untaxed") || l.includes("sorn")) return "error";
   if (l.includes("valid") || l.includes("taxed")) return "success";
-  if (l.includes("expired") || l.includes("untaxed") || l.includes("sorn")) return "error";
   if (l.includes("due")) return "pending";
   return "neutral";
 }

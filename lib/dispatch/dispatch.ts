@@ -39,7 +39,7 @@ export async function dispatchBooking(bookingId: string): Promise<DispatchResult
   const { data: booking } = await admin
     .from("bookings")
     .select(
-      "id, postcode, area, status, mechanic_id, preferred_mechanic_id, service:services(slug)",
+      "id, postcode, area, status, mechanic_id, preferred_mechanic_id, repair_node_id, service:services(slug)",
     )
     .eq("id", bookingId)
     .single();
@@ -77,9 +77,12 @@ export async function dispatchBooking(bookingId: string): Promise<DispatchResult
       continue;
     }
     // Specialism filter — skip only when they have declared specialisms that
-    // don't include this service.
+    // don't include this service. One-off repair bookings (Task 16 Stage G)
+    // sit on the generic container service, which maps to no specialism —
+    // broadcast those to everyone in range.
     if (
       slug &&
+      !(booking as { repair_node_id: string | null }).repair_node_id &&
       Array.isArray(m.specialisms) &&
       m.specialisms.length > 0 &&
       !m.specialisms.includes(slug)

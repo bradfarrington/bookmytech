@@ -5,7 +5,12 @@ import { lookupMotVehicle } from "@/lib/dvla/mot-client";
 import type { LookupResult } from "@/lib/dvla/types";
 import { normaliseReg } from "@/lib/utils";
 
-const UK_REG_REGEX = /^[A-Z0-9]{2,3} ?[A-Z0-9]{3,4}$/i;
+// Loose shape check before hitting DVLA, tested against the space-stripped
+// reg. Covers current (AB12 CDE), prefix (A123 BCD), suffix (ABC 123D) and
+// dateless/NI (digits+letters either way round) formats — DVLA is the
+// authority on whether the reg actually exists.
+const UK_REG_REGEX =
+  /^(?:[A-Z]{2}\d{2}[A-Z]{3}|[A-Z]\d{1,3}[A-Z]{3}|[A-Z]{3}\d{1,3}[A-Z]|[A-Z]{1,3}\d{1,4}|\d{1,4}[A-Z]{1,3})$/i;
 
 // In-memory cache keyed by reg. Booking flow refreshes the vehicle page on
 // back-navigation and form submits — without this, each refresh hits both
@@ -16,7 +21,7 @@ const cache = new Map<string, { result: LookupResult; expiresAt: number }>();
 
 export async function lookupVehicleAction(reg: string): Promise<LookupResult> {
   const normalised = normaliseReg(reg);
-  if (!normalised || !UK_REG_REGEX.test(normalised)) {
+  if (!normalised || !UK_REG_REGEX.test(normalised.replace(/ /g, ""))) {
     return {
       ok: false,
       code: "invalid_reg",

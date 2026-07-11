@@ -120,12 +120,8 @@ export function VehicleLookupModal({
             {details.motStatus && (
               <DetailRow
                 label="MOT"
-                value={details.motStatus}
-                hint={
-                  details.motExpiryDate
-                    ? `until ${formatDate(details.motExpiryDate)}`
-                    : undefined
-                }
+                value={displayStatus(details.motStatus)}
+                hint={expiryHint(details.motStatus, details.motExpiryDate)}
                 tone={statusTone(details.motStatus)}
               />
             )}
@@ -133,11 +129,7 @@ export function VehicleLookupModal({
               <DetailRow
                 label="Tax"
                 value={details.taxStatus}
-                hint={
-                  details.taxDueDate
-                    ? `until ${formatDate(details.taxDueDate)}`
-                    : undefined
-                }
+                hint={expiryHint(details.taxStatus, details.taxDueDate)}
                 tone={statusTone(details.taxStatus)}
               />
             )}
@@ -214,10 +206,32 @@ function DetailRow({
 
 function statusTone(status: string): "success" | "error" | "pending" | "neutral" {
   const lower = status.toLowerCase();
+  // Negatives first — "Not valid" contains "valid" and "Untaxed" contains "taxed".
+  if (
+    lower.startsWith("not") ||
+    lower.includes("expired") ||
+    lower.includes("untaxed") ||
+    lower.includes("sorn")
+  ) {
+    return "error";
+  }
   if (lower.includes("valid") || lower.includes("taxed")) return "success";
-  if (lower.includes("expired") || lower.includes("untaxed") || lower.includes("sorn")) return "error";
   if (lower.includes("due")) return "pending";
   return "neutral";
+}
+
+// DVLA's raw wording is awkward in a pill — remap the worst offenders.
+function displayStatus(status: string): string {
+  return status.toLowerCase() === "not valid" ? "Expired" : status;
+}
+
+function expiryHint(status: string, date?: string): string | undefined {
+  if (!date) return undefined;
+  if (statusTone(status) !== "error") return `until ${formatDate(date)}`;
+  // When the pill itself reads "Expired", the bare date is enough.
+  return displayStatus(status) === "Expired"
+    ? formatDate(date)
+    : `expired on ${formatDate(date)}`;
 }
 
 function titleCase(value: string): string {

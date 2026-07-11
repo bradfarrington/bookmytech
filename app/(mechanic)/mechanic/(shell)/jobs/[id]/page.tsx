@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { geocodePostcode, haversineMiles, type LatLng } from "@/lib/geo/postcodes";
 import { mechanicSharePence } from "@/lib/earnings";
 import { estimatedDurationLabel } from "@/lib/jobs/estimates";
+import { isHaynesProSsoConfigured } from "@/lib/haynespro/sso";
 import { formatBookingSlot } from "@/lib/slots";
 import { formatJobNumber } from "@/lib/utils";
 import { JobDetail, type JobDetailProps } from "./_components/job-detail";
@@ -42,6 +43,7 @@ export default async function MechanicJobDetailPage({ params }: PageProps) {
        address_line_1, address_line_2,
        customer_name, customer_phone, special_instructions,
        cancellation_reason, reschedule_status, reschedule_proposed_at,
+       repair_description, service_duration_hours,
        service:services(name, slug)`,
     )
     .eq("id", id)
@@ -172,12 +174,16 @@ export default async function MechanicJobDetailPage({ params }: PageProps) {
     status: booking.status,
     shortRef: formatJobNumber(booking.job_number),
     createdAt: booking.created_at,
-    serviceName: service?.name ?? "Service",
+    serviceName: booking.repair_description ?? service?.name ?? "Service",
     vehicle: [booking.vehicle_make, booking.vehicle_model].filter(Boolean).join(" ") || "Vehicle",
     reg: booking.vehicle_reg,
     whenLabel,
     distanceLabel,
-    durationLabel: estimatedDurationLabel(slug),
+    // Repair bookings carry an exact billed duration; packaged services use
+    // the per-slug estimate label.
+    durationLabel: booking.repair_description
+      ? `~${Number(booking.service_duration_hours ?? 1)}h`
+      : estimatedDurationLabel(slug),
     earningsPence:
       mechanicSharePence(booking.total_pence ?? 0, booking.commission_rate ?? 0.15) -
       bmtPartsPence,
@@ -201,6 +207,7 @@ export default async function MechanicJobDetailPage({ params }: PageProps) {
     signatureUrl,
     hasSignature: signatureUrl != null,
     disputeId: disputeRow?.id ?? null,
+    technicalDataEnabled: isHaynesProSsoConfigured(),
   };
 
   return <JobDetail {...detail} />;

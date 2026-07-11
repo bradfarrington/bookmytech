@@ -16,7 +16,7 @@ export default async function AdminJobsPage() {
   const { data: bookingsRaw } = await supabase
     .from("bookings")
     .select(
-      "id, job_number, status, area, total_pence, customer_name, vehicle_reg, vehicle_make, vehicle_model, mechanic_id, service_id, scheduled_at, created_at",
+      "id, job_number, status, area, total_pence, customer_name, vehicle_reg, vehicle_make, vehicle_model, mechanic_id, service_id, repair_description, scheduled_at, created_at",
     )
     .order("created_at", { ascending: false })
     .limit(1000);
@@ -39,7 +39,7 @@ export default async function AdminJobsPage() {
   const rows: BookingRow[] = bookings.map((b) => ({
     id: b.id,
     jobNumber: b.job_number,
-    service: serviceName.get(b.service_id) ?? "Unknown service",
+    service: b.repair_description ?? serviceName.get(b.service_id) ?? "Unknown service",
     serviceId: b.service_id,
     customer: b.customer_name ?? "—",
     vehicle: vehicleLabel(b.vehicle_reg, b.vehicle_make, b.vehicle_model),

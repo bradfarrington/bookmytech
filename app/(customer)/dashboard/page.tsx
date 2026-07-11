@@ -47,7 +47,7 @@ export default async function DashboardPage() {
       `id, status, scheduled_at, slot_window, created_at, completed_at, total_pence,
        vehicle_reg, vehicle_make, vehicle_model, address_line_1, postcode,
        mechanic_id, reschedule_status, reschedule_proposed_at, reschedule_note,
-       service:services(name, slug)`,
+       repair_description, service:services(name, slug)`,
     )
     .or(`customer_id.eq.${user.id},customer_email.eq.${email}`)
     .order("scheduled_at", { ascending: false });
@@ -70,6 +70,7 @@ export default async function DashboardPage() {
     rescheduleProposedAt: b.reschedule_proposed_at,
     rescheduleNote: b.reschedule_note,
     serviceName:
+      b.repair_description ??
       (Array.isArray(b.service) ? b.service[0]?.name : (b.service as { name?: string } | null)?.name) ??
       "Service",
     serviceSlug:

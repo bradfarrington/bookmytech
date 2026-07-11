@@ -5,9 +5,18 @@ interface PriceHeroProps {
   serviceName: string;
   pricePence: number;
   description?: string | null;
+  /** Billed hours when priced from the HaynesPro time for this exact vehicle. */
+  estimatedHours?: number | null;
+  vehicleName?: string | null;
 }
 
-export function PriceHero({ serviceName, pricePence, description }: PriceHeroProps) {
+export function PriceHero({
+  serviceName,
+  pricePence,
+  description,
+  estimatedHours,
+  vehicleName,
+}: PriceHeroProps) {
   return (
     <div className="flex flex-col gap-4">
       {/* Price hero card */}
@@ -22,6 +31,13 @@ export function PriceHero({ serviceName, pricePence, description }: PriceHeroPro
 
         {description && (
           <p className="mt-2 text-sm text-blue-200 leading-relaxed">{description}</p>
+        )}
+
+        {estimatedHours != null && estimatedHours > 0 && (
+          <p className="mt-2 text-sm font-semibold text-blue-100">
+            Estimated time on your {vehicleName || "vehicle"}: {estimatedHours}{" "}
+            {estimatedHours === 1 ? "hour" : "hours"}
+          </p>
         )}
 
         <ul className="mt-4 flex flex-col gap-1.5 text-sm text-blue-100">

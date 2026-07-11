@@ -1,7 +1,9 @@
 import Link from "next/link";
 import {
   ArrowLeft,
+  BookOpen,
   Car,
+  ExternalLink,
   MapPin,
   CalendarClock,
   Clock,
@@ -73,6 +75,8 @@ export interface JobDetailProps {
   hasSignature: boolean;
   // Dispute (Task 12): id of an existing dispute on this job, if any.
   disputeId: string | null;
+  // Technical data (Task 16): HaynesPro SSO configured → show the deep links.
+  technicalDataEnabled: boolean;
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -112,6 +116,7 @@ export function JobDetail(props: JobDetailProps) {
     signatureUrl,
     hasSignature,
     disputeId,
+    technicalDataEnabled,
   } = props;
 
   const canEditPhotos = ["confirmed", "en_route", "in_progress"].includes(status);
@@ -237,6 +242,39 @@ export function JobDetail(props: JobDetailProps) {
               <p className="text-sm text-text-muted">No notes left for this job.</p>
             )}
           </Card>
+
+          {/* Technical data — one-time SSO deep links into WorkshopData Touch
+              for THIS booking's vehicle (Task 16). Links mint per click, so
+              plain anchors hit the route handler directly. */}
+          {technicalDataEnabled && (
+            <Card className="space-y-3 p-6">
+              <CardTitle icon={BookOpen}>Technical data</CardTitle>
+              <p className="text-sm text-text-secondary">
+                Manufacturer data for this vehicle — opens in HaynesPro
+                WorkshopData.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {(
+                  [
+                    ["repairmanuals", "Repair manuals"],
+                    ["maintenance", "Service data"],
+                    ["electronics", "Wiring & electronics"],
+                  ] as const
+                ).map(([subject, label]) => (
+                  <a
+                    key={subject}
+                    href={`/api/haynespro/sso?booking=${bookingId}&subject=${subject}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3.5 py-2 text-sm font-semibold text-text-primary transition-colors hover:border-brand-blue/50 hover:text-brand-blue"
+                  >
+                    {label}
+                    <ExternalLink size={13} className="text-text-muted" />
+                  </a>
+                ))}
+              </div>
+            </Card>
+          )}
 
           {/* Job photos — mechanic-captured evidence of the work */}
           <Card className="space-y-3 p-6">

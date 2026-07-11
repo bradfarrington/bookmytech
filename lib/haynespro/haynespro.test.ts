@@ -1,0 +1,399 @@
+import { describe, expect, it } from "vitest";
+import { extractStatusCode, isAuthFailure } from "./client";
+import { combineNodeTimes, maintenanceHours } from "./durations";
+import {
+  excludedRepairNodeIdsForLabel,
+  excludedServiceIdsForLabel,
+  normaliseLabel,
+} from "./exclusions";
+import {
+  buildModelCandidates,
+  deriveModelLabel,
+  pickBestCandidate,
+  scoreCandidate,
+} from "./vehicle";
+import type { HpCarType, HpMaintenanceSystem } from "./types";
+
+describe("extractStatusCode", () => {
+  it("reads the auth envelope ({statusCode})", () => {
+    expect(extractStatusCode({ vrid: "ABC", statusCode: 0 })).toBe(0);
+    expect(extractStatusCode({ statusCode: 2 })).toBe(2);
+  });
+
+  it("reads a per-item status inside arrays (verified live shape for a bad vrid)", () => {
+    const payload = [
+      {
+        make: null,
+        repairtimeTypeId: null,
+        status: { statusCode: 5, confirmationLink: "incorrect vrid: DEAD" },
+      },
+    ];
+    expect(extractStatusCode(payload)).toBe(5);
+    expect(isAuthFailure(extractStatusCode(payload))).toBe(true);
+  });
+
+  it("treats status-0 items and missing statuses as OK", () => {
+    expect(extractStatusCode([{ status: { statusCode: 0 } }, { status: null }])).toBeNull();
+    expect(extractStatusCode([{ description: "x", value: 70 }])).toBeNull();
+    expect(extractStatusCode(null)).toBeNull();
+  });
+});
+
+describe("combineNodeTimes", () => {
+  // Live Golf IV genart-402 reply shape (2026-07-09).
+  const brakeNodes = [
+    { description: "Renew the front right brake pads", value: 40 },
+    { description: "Renew the front left brake pads", value: 40 },
+    { description: "Renew the front brake pads", value: 70 },
+    { description: "Renew the rear brake pads", value: 90 },
+    { description: "Renew all the brake pads", value: 160 },
+    { description: "Brakes", value: null }, // group node — ignored
+  ];
+
+  it("filters by case-insensitive substring and combines with max", () => {
+    expect(
+      combineNodeTimes(brakeNodes, {
+        descriptionFilter: "front brake pads",
+        combine: "max",
+      }),
+    ).toBe(0.7);
+  });
+
+  it("no filter → combines across all timed nodes", () => {
+    expect(combineNodeTimes(brakeNodes, { descriptionFilter: null, combine: "max" })).toBe(1.6);
+    expect(combineNodeTimes(brakeNodes, { descriptionFilter: null, combine: "min" })).toBe(0.4);
+  });
+
+  it("sum adds the matches", () => {
+    expect(
+      combineNodeTimes(brakeNodes, {
+        descriptionFilter: "front brake pads",
+        combine: "sum",
+      }),
+      // 0.4 + 0.4 + 0.7 — the left/right singles do NOT contain the contiguous
+      // "front brake pads"… actually they do not: "front right brake pads".
+    ).toBe(0.7);
+  });
+
+  it("max across clutch gearbox variants = safe quote", () => {
+    const clutch = [
+      { description: "Renew the clutch assembly (manual transmission) 02K", value: 360 },
+      { description: "Renew the clutch assembly (manual transmission) 02M", value: 480 },
+      { description: "Renew the clutch (gearbox removed)", value: 70 },
+    ];
+    expect(
+      combineNodeTimes(clutch, { descriptionFilter: "clutch assembly", combine: "max" }),
+    ).toBe(4.8);
+  });
+
+  it("returns null when nothing matches", () => {
+    expect(
+      combineNodeTimes(brakeNodes, { descriptionFilter: "handbrake", combine: "max" }),
+    ).toBeNull();
+    expect(combineNodeTimes([], { descriptionFilter: null, combine: "max" })).toBeNull();
+  });
+});
+
+describe("maintenanceHours", () => {
+  // Live Golf IV getMaintenanceSystemsV7 shape (2026-07-09).
+  const systems: HpMaintenanceSystem[] = [
+    {
+      name: "Time/distance dependent service, ( - 1999)",
+      maintenancePeriods: [
+        {
+          name: "Every 15,000 km/Oil service",
+          times: [{ type: "COMMERCIAL_TIME", value: 50, selected: true }],
+        },
+        {
+          name: "30,000 km/12 months",
+          times: [
+            { type: "COMPUTED_TIME", value: 150, selected: false },
+            { type: "COMMERCIAL_TIME", value: 160, selected: true },
+          ],
+        },
+      ],
+    },
+  ];
+
+  it("max = the full service, min = the interim/oil service", () => {
+    expect(maintenanceHours(systems, "max")).toBe(1.6);
+    expect(maintenanceHours(systems, "min")).toBe(0.5);
+  });
+
+  it("only counts the selected time of each period", () => {
+    // The unselected COMPUTED_TIME (1.5h) must not win the min.
+    expect(maintenanceHours(systems, "min")).not.toBe(1.5);
+  });
+
+  it("returns null when no times exist", () => {
+    expect(maintenanceHours([], "max")).toBeNull();
+    expect(maintenanceHours([{ maintenancePeriods: [] }], "max")).toBeNull();
+  });
+});
+
+describe("scoreCandidate / pickBestCandidate", () => {
+  const details = {
+    make: "VOLKSWAGEN",
+    model: "GOLF",
+    engineCapacity: 1390,
+    fuelType: "PETROL",
+    yearOfManufacture: 1999,
+  };
+
+  const golf14: HpCarType = {
+    id: 26650,
+    fullName: "VOLKSWAGEN Golf IV (1J) 1.4",
+    capacity: 1390,
+    fuelType: ["PETROL"],
+    madeFrom: "1998",
+    madeUntil: "2001",
+  };
+  const golf19tdi: HpCarType = {
+    id: 26800,
+    fullName: "VOLKSWAGEN Golf IV (1J) 1.9 TDi",
+    capacity: 1896,
+    fuelType: ["DIESEL"],
+    madeFrom: "1998",
+    madeUntil: "2003",
+  };
+  const golf16: HpCarType = {
+    id: 26700,
+    fullName: "VOLKSWAGEN Golf IV (1J) 1.6",
+    capacity: 1595,
+    fuelType: ["PETROL"],
+    madeFrom: "1998",
+    madeUntil: "2003",
+  };
+
+  it("rejects wrong engine sizes and wrong fuels outright", () => {
+    expect(scoreCandidate(golf19tdi, details)).toBe(-1);
+    expect(scoreCandidate(golf16, details)).toBe(-1); // 1595 vs 1390 > 100cc
+  });
+
+  it("prefers the exact-capacity, in-production-window candidate", () => {
+    expect(pickBestCandidate([golf19tdi, golf16, golf14], details)).toBe(golf14);
+  });
+
+  it("out-of-range year loses points but is not disqualifying", () => {
+    const outOfRange = { ...golf14, madeFrom: "1998", madeUntil: "1998" };
+    expect(scoreCandidate(outOfRange, details)).toBeGreaterThan(0);
+    expect(
+      scoreCandidate(outOfRange, details) < scoreCandidate(golf14, details),
+    ).toBe(true);
+  });
+
+  it("returns null when every candidate is rejected", () => {
+    expect(pickBestCandidate([golf19tdi], details)).toBeNull();
+    expect(pickBestCandidate([], details)).toBeNull();
+  });
+
+  it("tolerates missing details (fuel/capacity unknown → no filter applied)", () => {
+    expect(
+      pickBestCandidate([golf14, golf16], { make: "VOLKSWAGEN", model: "GOLF" }),
+    ).toBe(golf14); // tie on 0 → first wins
+  });
+
+  // Live Cayenne shapes (2026-07-10): HaynesPro tags hybrids as PETROL with
+  // "Hybrid" only in the type name; DVLA says "HYBRID ELECTRIC".
+  describe("hybrids and EVs", () => {
+    const hybridDetails = {
+      make: "PORSCHE",
+      model: "CAYENNE",
+      engineCapacity: 2995,
+      fuelType: "HYBRID ELECTRIC",
+      yearOfManufacture: 2023,
+    };
+    const cayennePetrol: HpCarType = {
+      id: 619009373,
+      fullName: "PORSCHE Cayenne (9YA) 3.0",
+      capacity: 2995,
+      fuelType: "PETROL",
+      madeFrom: "2018",
+      madeUntil: null,
+    };
+    const cayenneEHybrid: HpCarType = {
+      id: 619013069,
+      fullName: "PORSCHE Cayenne (9YA) 3.0 E-Hybrid",
+      capacity: 2995,
+      fuelType: "PETROL",
+      madeFrom: "2018",
+      madeUntil: null,
+    };
+    const cayenneDiesel: HpCarType = {
+      id: 102001922,
+      fullName: "PORSCHE Cayenne (92A) 3.0 Diesel",
+      capacity: 2967,
+      fuelType: "DIESEL",
+      madeFrom: "2011",
+      madeUntil: "2013",
+    };
+
+    it("a petrol hybrid is NOT disqualified by HaynesPro's PETROL tag", () => {
+      expect(scoreCandidate(cayennePetrol, hybridDetails)).toBeGreaterThan(0);
+    });
+
+    it("prefers the hybrid-named variant for an electrified vehicle", () => {
+      expect(
+        pickBestCandidate([cayennePetrol, cayenneEHybrid], hybridDetails),
+      ).toBe(cayenneEHybrid);
+    });
+
+    it("diesel candidates still disqualify against a petrol hybrid", () => {
+      expect(scoreCandidate(cayenneDiesel, hybridDetails)).toBe(-1);
+    });
+
+    it("diesel hybrids ('ELECTRIC DIESEL') accept DIESEL candidates", () => {
+      expect(
+        scoreCandidate(cayenneDiesel, {
+          engineCapacity: 2967,
+          fuelType: "ELECTRIC DIESEL",
+          yearOfManufacture: 2012,
+        }),
+      ).toBeGreaterThan(0);
+    });
+
+    it("pure EVs ('ELECTRICITY') reject combustion candidates", () => {
+      expect(
+        scoreCandidate(cayennePetrol, { fuelType: "ELECTRICITY" }),
+      ).toBe(-1);
+    });
+  });
+});
+
+describe("deriveModelLabel", () => {
+  it("strips the type-name suffix off the full name", () => {
+    expect(deriveModelLabel("VOLKSWAGEN Golf IV (1J) 1.4", "1.4")).toBe(
+      "VOLKSWAGEN Golf IV (1J)",
+    );
+    expect(deriveModelLabel("AUDI Q3 (8U) 1.4 TSI", "1.4 TSI")).toBe("AUDI Q3 (8U)");
+  });
+
+  it("suffix match is case-insensitive", () => {
+    expect(deriveModelLabel("FORD Focus II 1.6 TDCi", "1.6 tdci")).toBe("FORD Focus II");
+  });
+
+  it("keeps the full name when the type name is missing or not a suffix", () => {
+    expect(deriveModelLabel("VOLKSWAGEN Golf IV (1J) 1.4", null)).toBe(
+      "VOLKSWAGEN Golf IV (1J) 1.4",
+    );
+    expect(deriveModelLabel("VOLKSWAGEN Golf IV (1J) 1.4", "2.0 GTI")).toBe(
+      "VOLKSWAGEN Golf IV (1J) 1.4",
+    );
+  });
+
+  it("never returns an empty label", () => {
+    expect(deriveModelLabel(null, "1.4")).toBeNull();
+    expect(deriveModelLabel("  ", "1.4")).toBeNull();
+    // pathological: full name IS the type name — keep it rather than empty
+    expect(deriveModelLabel("1.4", "1.4")).toBe("1.4");
+  });
+});
+
+describe("buildModelCandidates", () => {
+  it("walks trim-noisy DVLA model strings down to the bare model name", () => {
+    // Real case (2026-07-10): a 2024 Ranger's DVLA/MOT model string.
+    expect(buildModelCandidates("RANGER WILDTRAK ECOBLUE 4X4 A")).toEqual([
+      "RANGER WILDTRAK ECOBLUE 4X4 A",
+      "RANGER WILDTRAK ECOBLUE 4X4",
+      "RANGER WILDTRAK ECOBLUE",
+      "RANGER WILDTRAK",
+      "RANGER",
+    ]);
+  });
+
+  it("single-word models yield a single candidate", () => {
+    expect(buildModelCandidates("GOLF")).toEqual(["GOLF"]);
+  });
+
+  it("collapses odd whitespace and handles empty input", () => {
+    expect(buildModelCandidates("  GRAND   CHEROKEE ")).toEqual([
+      "GRAND CHEROKEE",
+      "GRAND",
+    ]);
+    expect(buildModelCandidates("")).toEqual([]);
+  });
+
+  // HaynesPro names these series "3 (F30…)", "C (W205)", "3 (BM, BN)" —
+  // verified live 2026-07-10. The derived candidates are LAST resorts.
+  it("derives the series from BMW-style badges", () => {
+    expect(buildModelCandidates("320D M SPORT")).toEqual([
+      "320D M SPORT",
+      "320D M",
+      "320D",
+      "3",
+    ]);
+    expect(buildModelCandidates("118I SPORT").at(-1)).toBe("1");
+  });
+
+  it("derives the class from Mercedes-style badges", () => {
+    expect(buildModelCandidates("C220 D AMG LINE AUTO").at(-1)).toBe("C");
+    expect(buildModelCandidates("GLC250 4MATIC").at(-1)).toBe("GLC");
+    expect(buildModelCandidates("A180 SPORT CDI").at(-1)).toBe("A");
+  });
+
+  it("strips a leading make prefix off the model (MAZDA3 → 3)", () => {
+    expect(buildModelCandidates("MAZDA3 SE-L NAV D", "MAZDA")).toContain("3");
+  });
+
+  it("plain models gain no derived candidates", () => {
+    expect(buildModelCandidates("FIESTA ZETEC")).toEqual([
+      "FIESTA ZETEC",
+      "FIESTA",
+    ]);
+  });
+});
+
+describe("service vehicle exclusions", () => {
+  const rows = [
+    { service_id: "svc-cambelt", make_name: "VOLKSWAGEN", model_name: "Golf IV (1J)" },
+    { service_id: "svc-regas", make_name: "VOLKSWAGEN", model_name: "Golf IV (1J)" },
+    { service_id: "svc-cambelt", make_name: "TESLA", model_name: "Model 3" },
+  ];
+
+  it("matches on normalised make+model label, case/spacing-insensitively", () => {
+    expect(excludedServiceIdsForLabel("VOLKSWAGEN Golf IV (1J)", rows)).toEqual(
+      new Set(["svc-cambelt", "svc-regas"]),
+    );
+    expect(excludedServiceIdsForLabel("volkswagen  golf iv (1j)", rows)).toEqual(
+      new Set(["svc-cambelt", "svc-regas"]),
+    );
+    expect(excludedServiceIdsForLabel("TESLA Model 3", rows)).toEqual(
+      new Set(["svc-cambelt"]),
+    );
+  });
+
+  it("unresolved vehicles and unlisted models match nothing (default ON)", () => {
+    expect(excludedServiceIdsForLabel(null, rows).size).toBe(0);
+    expect(excludedServiceIdsForLabel("", rows).size).toBe(0);
+    expect(excludedServiceIdsForLabel("FORD Focus II", rows).size).toBe(0);
+  });
+
+  it("normaliseLabel collapses whitespace and uppercases", () => {
+    expect(normaliseLabel("  Volkswagen   Golf IV  (1J) ")).toBe(
+      "VOLKSWAGEN GOLF IV (1J)",
+    );
+    expect(normaliseLabel(null)).toBe("");
+  });
+});
+
+describe("repair node exclusions", () => {
+  const rows = [
+    { node_id: "1F11100000GCJ", make_name: "FORD", model_name: "Ranger" }, // group
+    { node_id: "1F11101000WV0", make_name: "FORD", model_name: "Ranger" }, // leaf
+    { node_id: "1F11101000WV0", make_name: "VOLKSWAGEN", model_name: "Golf IV (1J1, 1J5, 9B1)" },
+  ];
+
+  it("matches groups and leaves for the vehicle's model label", () => {
+    expect(excludedRepairNodeIdsForLabel("FORD Ranger", rows)).toEqual(
+      new Set(["1F11100000GCJ", "1F11101000WV0"]),
+    );
+    expect(
+      excludedRepairNodeIdsForLabel("VOLKSWAGEN Golf IV (1J1, 1J5, 9B1)", rows),
+    ).toEqual(new Set(["1F11101000WV0"]));
+  });
+
+  it("unresolved vehicles and other models match nothing (default ON)", () => {
+    expect(excludedRepairNodeIdsForLabel(null, rows).size).toBe(0);
+    expect(excludedRepairNodeIdsForLabel("FORD Focus II", rows).size).toBe(0);
+  });
+});

@@ -43,6 +43,7 @@ interface BookingJoin {
   slot_window: string | null;
   total_pence: number | null;
   commission_rate: number | null;
+  repair_description: string | null;
   service: unknown;
 }
 
@@ -56,6 +57,7 @@ interface ScheduleRow {
   commission_rate: number | null;
   vehicle_make: string | null;
   vehicle_model: string | null;
+  repair_description: string | null;
   service: unknown;
 }
 
@@ -109,7 +111,7 @@ export default async function MechanicJobsPage() {
   const { data: offerRows } = await supabase
     .from("job_offers")
     .select(
-      "id, offered_at, booking:bookings(id, vehicle_reg, vehicle_make, vehicle_model, area, postcode, scheduled_at, slot_window, total_pence, commission_rate, service:services(name))",
+      "id, offered_at, booking:bookings(id, vehicle_reg, vehicle_make, vehicle_model, area, postcode, scheduled_at, slot_window, total_pence, commission_rate, repair_description, service:services(name))",
     )
     .eq("mechanic_id", user.id)
     .is("response", null)
@@ -130,7 +132,7 @@ export default async function MechanicJobsPage() {
       id: row.id,
       bookingId: b.id,
       offeredAt: row.offered_at,
-      serviceName: serviceName(b.service),
+      serviceName: b.repair_description ?? serviceName(b.service),
       vehicle: [b.vehicle_make, b.vehicle_model].filter(Boolean).join(" ") || "Vehicle",
       reg: b.vehicle_reg ?? "",
       area: b.area ?? b.postcode ?? "—",
@@ -144,7 +146,7 @@ export default async function MechanicJobsPage() {
   const { data: bookingRows } = await supabase
     .from("bookings")
     .select(
-      "id, scheduled_at, status, postcode, area, total_pence, commission_rate, vehicle_make, vehicle_model, service:services(name)",
+      "id, scheduled_at, status, postcode, area, total_pence, commission_rate, vehicle_make, vehicle_model, repair_description, service:services(name)",
     )
     .eq("mechanic_id", user.id)
     .gte("scheduled_at", startOfToday().toISOString())
@@ -163,7 +165,7 @@ export default async function MechanicJobsPage() {
 
   for (const b of (bookingRows ?? []) as ScheduleRow[]) {
     const whenMs = b.scheduled_at ? new Date(b.scheduled_at).getTime() : 0;
-    const title = `${serviceName(b.service)} · ${[b.vehicle_make, b.vehicle_model].filter(Boolean).join(" ") || "Vehicle"}`;
+    const title = `${b.repair_description ?? serviceName(b.service)} · ${[b.vehicle_make, b.vehicle_model].filter(Boolean).join(" ") || "Vehicle"}`;
     const status = b.status as ScheduleItem["status"];
 
     if (whenMs >= todayStartMs && whenMs < tomorrowStartMs) {

@@ -6,11 +6,14 @@ import {
   Wrench,
   Cpu,
   CircleDot,
+  Disc,
   Battery,
+  Cog,
   Settings,
+  Gauge,
+  RefreshCw,
+  Snowflake,
   ClipboardCheck,
-  ChevronDown,
-  ChevronUp,
 } from "lucide-react";
 import { cn, formatPrice } from "@/lib/utils";
 import { Pill } from "@/components/ui/pill";
@@ -32,29 +35,27 @@ interface ServiceGridProps {
   postcode?: string;
 }
 
-const PRIMARY_SLUGS = [
-  "full-service",
-  "diagnostic",
-  "brakes-tyres",
-  "battery",
-  "clutch-gears",
-  "mot-pre-check",
-];
-
+// Icons keyed by the REAL seeded slugs (0001_seed_services.sql); services the
+// admin adds later fall back to the wrench. Every service available for the
+// vehicle renders in ONE grid — no primary/secondary split, so nothing
+// bookable ever hides behind a toggle.
 const SLUG_ICONS: Record<string, React.ElementType> = {
   "full-service": Settings,
+  "interim-service": Gauge,
   diagnostic: Cpu,
-  "brakes-tyres": CircleDot,
-  battery: Battery,
-  "clutch-gears": Settings,
-  "mot-pre-check": ClipboardCheck,
+  "front-brake-pads": CircleDot,
+  "front-brake-discs-pads": Disc,
+  "battery-replacement": Battery,
+  "clutch-replacement": Cog,
+  "cambelt-replacement": RefreshCw,
+  "mot-precheck": ClipboardCheck,
+  "air-con-regas": Snowflake,
 };
 
 const POPULAR_SLUG = "diagnostic";
 
 export function ServiceGrid({ services, reg, make, model, postcode }: ServiceGridProps) {
   const [query, setQuery] = useState("");
-  const [showAll, setShowAll] = useState(false);
 
   const vehicleParams = [
     make ? `make=${encodeURIComponent(make)}` : null,
@@ -79,8 +80,7 @@ export function ServiceGrid({ services, reg, make, model, postcode }: ServiceGri
       )
     : services;
 
-  const primary = filtered.filter((s) => PRIMARY_SLUGS.includes(s.slug));
-  const secondary = filtered.filter((s) => !PRIMARY_SLUGS.includes(s.slug));
+  const hasDiagnostic = services.some((s) => s.slug === "diagnostic");
 
   return (
     <div className="flex flex-col gap-5">
@@ -96,10 +96,10 @@ export function ServiceGrid({ services, reg, make, model, postcode }: ServiceGri
         />
       </label>
 
-      {/* Primary grid */}
-      {primary.length > 0 && (
+      {/* Every service available for this vehicle */}
+      {filtered.length > 0 && (
         <div className="grid grid-cols-2 gap-3">
-          {primary.map((service) => (
+          {filtered.map((service) => (
             <ServiceCard
               key={service.id}
               service={service}
@@ -112,7 +112,7 @@ export function ServiceGrid({ services, reg, make, model, postcode }: ServiceGri
       )}
 
       {/* "Not sure?" card */}
-      {!query && (
+      {!query && hasDiagnostic && (
         <a
           href={serviceHref("diagnostic")}
           onClick={() => onSelect("diagnostic")}
@@ -124,32 +124,6 @@ export function ServiceGrid({ services, reg, make, model, postcode }: ServiceGri
           </div>
           <Wrench size={20} className="shrink-0 text-brand-blue" />
         </a>
-      )}
-
-      {/* Secondary services */}
-      {secondary.length > 0 && (
-        <div>
-          <button
-            type="button"
-            onClick={() => setShowAll((v) => !v)}
-            className="flex w-full items-center justify-between py-2 text-sm font-semibold text-text-secondary hover:text-text-primary"
-          >
-            <span>More services ({secondary.length})</span>
-            {showAll ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-          </button>
-          {showAll && (
-            <div className="mt-3 grid grid-cols-2 gap-3">
-              {secondary.map((service) => (
-                <ServiceCard
-                  key={service.id}
-                  service={service}
-                  href={serviceHref(service.slug)}
-                  onSelect={() => onSelect(service.slug)}
-                />
-              ))}
-            </div>
-          )}
-        </div>
       )}
 
       {filtered.length === 0 && (

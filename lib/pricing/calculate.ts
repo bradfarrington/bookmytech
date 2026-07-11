@@ -56,7 +56,18 @@ export interface PriceBreakdown {
   platformFeePence: number;
   /** What the mechanic receives: total − platform fee. */
   mechanicPayoutPence: number;
+  /**
+   * Where the duration came from (Task 16): 'vehicle' = HaynesPro OEM time for
+   * the actual car (billed hours after rounding), 'area' = per-(service,area)
+   * override, 'service' = service default, 'legacy' = price ÷ rate fallback.
+   * Set by calculatePrice; absent when computePrice is called directly.
+   */
+  durationSource?: DurationSource;
+  /** Raw (unrounded) HaynesPro hours when durationSource is 'vehicle'. */
+  vehicleRawDurationHours?: number | null;
 }
+
+export type DurationSource = "vehicle" | "area" | "service" | "legacy";
 
 export interface ComputePriceInputs {
   durationHours: number;
@@ -161,6 +172,13 @@ type DbClient = SupabaseClient;
  * Uses the service-role client by default (pricing reference data is fine to
  * read server-side); pass a client to reuse an existing connection.
  *
+ * When `vehicle.reg` is supplied (Task 16), the duration ladder tries the
+ * HaynesPro OEM book time for that exact vehicle first — rounded UP to whole
+ * billable hours (min 1h, owner decision 2026-07-09) — before falling back to
+ * the per-area override and the service default. The HaynesPro lookup is
+ * cached per reg in Supabase, so match → slot → create-booking all price
+ * identically, and any HaynesPro failure silently falls through the ladder.
+ *
  * Throws if the service doesn't exist — callers in the booking flow already
  * guard on a valid service before reaching payment.
  */
@@ -168,6 +186,7 @@ export async function calculatePrice(
   serviceId: string,
   postcode: string,
   client?: DbClient,
+  vehicle?: { reg?: string | null },
 ): Promise<PriceBreakdown> {
   const db = client ?? (await import("@/lib/supabase/admin")).createAdminClient();
 
@@ -206,17 +225,47 @@ export async function calculatePrice(
     sap = data ?? null;
   }
 
-  // Duration resolution, most-specific wins: per-(service,area) override →
-  // service default. Legacy fallback: if a service predates durations, derive
-  // one from its cached price so pricing never divides by a null.
+  // Duration resolution, most-specific wins: HaynesPro vehicle-specific time →
+  // per-(service,area) override → service default. Legacy fallback: if a
+  // service predates durations, derive one from its cached price so pricing
+  // never divides by a null.
+  //
+  // The vehicle rung (Task 16) fires only when a reg is supplied and the
+  // HaynesPro env is configured: the raw OEM book time is rounded UP to whole
+  // billable hours (min 1h — billableHours). Raw hours are cached per
+  // (reg, service) on the Supabase vehicle row, so match → slot →
+  // create-booking price identically; any lookup failure returns null and the
+  // ladder falls through — the funnel never blocks on HaynesPro.
+  let vehicleBilledHours: number | null = null;
+  let vehicleRawHours: number | null = null;
+  const reg = vehicle?.reg?.trim();
+  if (reg) {
+    const { isHaynesProConfigured } = await import("@/lib/haynespro/client");
+    if (isHaynesProConfigured()) {
+      const { vehicleRawDurationHours } = await import("@/lib/haynespro/durations");
+      const { billableHours } = await import("@/lib/pricing/billable");
+      vehicleRawHours = await vehicleRawDurationHours(serviceId, reg, db);
+      vehicleBilledHours = billableHours(vehicleRawHours);
+    }
+  }
+
   const serviceDuration = numberOrNull(
     (service as { duration_hours: number | null }).duration_hours,
   );
   const areaDuration = numberOrNull(sap?.duration_hours ?? null);
   const durationHours =
+    vehicleBilledHours ??
     areaDuration ??
     serviceDuration ??
     (hourlyRatePence > 0 ? service.starting_price_pence / hourlyRatePence : 0);
+  const durationSource: DurationSource =
+    vehicleBilledHours != null
+      ? "vehicle"
+      : areaDuration != null
+        ? "area"
+        : serviceDuration != null
+          ? "service"
+          : "legacy";
 
   // Commission resolution, most-specific wins:
   //   per-(service,area) cell override → per-service rate → platform default.
@@ -231,14 +280,18 @@ export async function calculatePrice(
   const configuredParts = await configuredPartsTotalPence(serviceId, db);
   const partsPence = configuredParts > 0 ? configuredParts : (sap?.parts_price_pence ?? 0);
 
-  return computePrice({
-    durationHours,
-    hourlyRatePence,
-    overridePricePence: sap?.override_price_pence ?? null,
-    partsPence,
-    commissionRate,
-    areaId: area?.id ?? null,
-  });
+  return {
+    ...computePrice({
+      durationHours,
+      hourlyRatePence,
+      overridePricePence: sap?.override_price_pence ?? null,
+      partsPence,
+      commissionRate,
+      areaId: area?.id ?? null,
+    }),
+    durationSource,
+    vehicleRawDurationHours: durationSource === "vehicle" ? vehicleRawHours : null,
+  };
 }
 
 /** Coerce a Postgres numeric (number or numeric-string) to a number, or null. */
