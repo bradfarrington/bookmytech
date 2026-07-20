@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { requireMechanic } from "@/lib/mechanics/require-mechanic";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   ACCEPTED_DOC_MIME,
@@ -14,22 +15,6 @@ const DOCS_BUCKET = "mechanic-docs";
 const SIGNED_URL_TTL = 60 * 60;
 
 export type DocumentsResult = { ok: true; url?: string } | { ok: false; error: string };
-
-async function requireMechanic() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { ok: false as const, error: "Not signed in." };
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-  if (profile?.role !== "mechanic")
-    return { ok: false as const, error: "Mechanics only." };
-  return { ok: true as const, mechanicId: user.id };
-}
 
 async function requireAdmin() {
   const supabase = await createClient();

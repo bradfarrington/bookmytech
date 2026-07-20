@@ -77,15 +77,24 @@ export async function signIn(
   redirect("/admin");
 }
 
-// Mechanic-only sign-in for the dedicated /mechanic/login page. Mirrors the
-// admin guard; middleware re-checks the role on every /mechanic/* request.
+// Mechanic-only sign-in for the dedicated /mechanic/login page. Mechanic
+// access = having a mechanics row (an admin can also be a mechanic while
+// keeping role='admin'); middleware re-checks on every /mechanic/* request.
 export async function signInMechanic(
   _prevState: SignInState,
   formData: FormData,
 ): Promise<SignInState> {
   const result = await authenticate(formData);
   if ("error" in result) return result;
-  if (result.role !== "mechanic") {
+  const {
+    data: { user },
+  } = await result.supabase.auth.getUser();
+  const { data: mech } = await result.supabase
+    .from("mechanics")
+    .select("id")
+    .eq("id", user?.id ?? "")
+    .maybeSingle();
+  if (!mech) {
     await result.supabase.auth.signOut();
     return { error: "This account isn't set up as a mechanic." };
   }

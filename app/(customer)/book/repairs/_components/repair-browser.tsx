@@ -10,7 +10,7 @@ import { resolveVehicle } from "@/lib/haynespro/vehicle";
 
 // Customer-facing browse of the HaynesPro repair-times tree for THEIR car
 // (Task 16 Stage G). Groups drill down (?node=…) until timed leaf repairs,
-// each priced from its OEM book time (billed whole hours × hourly rate) with
+// each priced from its OEM book time (exact hours, min 1h, × hourly rate) with
 // a Book link straight into the existing match → slot → pay funnel.
 //
 // Server component: all HaynesPro traffic stays server-side and memoised.

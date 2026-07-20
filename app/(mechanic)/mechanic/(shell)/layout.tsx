@@ -23,19 +23,21 @@ export default async function MechanicShellLayout({
     redirect("/mechanic/login");
   }
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("full_name, role")
-    .eq("id", user.id)
-    .single();
-
-  if (profile?.role !== "mechanic") {
-    redirect("/");
-  }
-
+  // Mechanic access = having a mechanics row (an admin who also works jobs
+  // keeps role='admin' but holds one), so the row itself is the gate.
   const { data: mechanic } = await supabase
     .from("mechanics")
     .select("status, stripe_payouts_enabled")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (!mechanic) {
+    redirect("/");
+  }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("full_name")
     .eq("id", user.id)
     .single();
 

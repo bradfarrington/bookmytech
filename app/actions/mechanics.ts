@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendEmail } from "@/lib/email/send";
 import { renderMechanicInviteEmail } from "@/emails/mechanic-invite";
+import { ensureMechanicAccount } from "@/lib/mechanics/provision";
 
 export type MechanicActionResult = { error?: string } | void;
 
@@ -83,57 +84,19 @@ export async function createMechanicAction(
 
   const admin = createAdminClient();
 
-  // Step 1 — create the auth user. email_confirm: true lets them sign in via
-  // the magic link without a separate confirmation step.
-  // The handle_new_user trigger auto-inserts a profile with role='customer'.
-  const { data: created, error: createErr } = await admin.auth.admin.createUser({
+  // Steps 1-3 — create the auth user (or reuse an existing customer/admin
+  // account), set the profile, insert the mechanics row. Shared with the
+  // application-approval flow — see lib/mechanics/provision.ts.
+  const account = await ensureMechanicAccount(admin, {
     email: parsed.data.email,
-    email_confirm: true,
-    user_metadata: { full_name: parsed.data.fullName },
-  });
-  if (createErr || !created.user) {
-    const msg = createErr?.message ?? "Failed to create user.";
-    return {
-      error: msg.toLowerCase().includes("registered")
-        ? "A user with that email already exists."
-        : msg,
-    };
-  }
-
-  const newUserId = created.user.id;
-
-  // Step 2 — flip the auto-created profile to role='mechanic' and write name/phone.
-  const { error: profileErr } = await admin
-    .from("profiles")
-    .update({
-      role: "mechanic",
-      full_name: parsed.data.fullName,
-      phone: parsed.data.phone,
-    })
-    .eq("id", newUserId);
-
-  if (profileErr) {
-    // Best-effort cleanup: delete the auth user so we don't leave an orphan.
-    await admin.auth.admin.deleteUser(newUserId).catch(() => {});
-    return { error: `Couldn't set up profile: ${profileErr.message}` };
-  }
-
-  // Step 3 — insert the mechanics row. Mark `approved_at` now since admin
-  // creation implies admin approval; the proper onboarding flow in task 07
-  // moves approval into the documents-review step.
-  const { error: mechErr } = await admin.from("mechanics").insert({
-    id: newUserId,
-    base_postcode: parsed.data.basePostcode,
-    service_radius_miles: parsed.data.serviceRadiusMiles,
+    fullName: parsed.data.fullName,
+    phone: parsed.data.phone,
+    basePostcode: parsed.data.basePostcode,
+    serviceRadiusMiles: parsed.data.serviceRadiusMiles,
     specialisms: parsed.data.specialisms,
     bio: parsed.data.bio,
-    approved_at: new Date().toISOString(),
   });
-
-  if (mechErr) {
-    await admin.auth.admin.deleteUser(newUserId).catch(() => {});
-    return { error: `Couldn't create mechanic profile: ${mechErr.message}` };
-  }
+  if (!account.ok) return { error: account.error };
 
   // Step 4 — generate a set-password (recovery) link and email it. We never
   // enable Supabase's built-in mailer; the link goes through our MJML template

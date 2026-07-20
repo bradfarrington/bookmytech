@@ -2,9 +2,9 @@
 // Task 17 removed the packaged-services catalogue).
 //
 // A customer picks a single repair operation from the HaynesPro tree for
-// THEIR car and books it. The price is the operation's OEM book time billed in
-// whole hours (round up, min 1h) × the global hourly rate — no parts line,
-// commission comes out of the total.
+// THEIR car and books it. The price is the operation's exact OEM book time
+// (min 1h) × the global hourly rate — no parts line, commission comes out of
+// the total.
 //
 // The quote is re-derived SERVER-SIDE from (reg, nodeId) at every funnel step
 // (match → slot → checkout hold → booking create) — the client never supplies

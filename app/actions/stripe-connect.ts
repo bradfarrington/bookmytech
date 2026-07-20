@@ -1,8 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { requireMechanic as requireMechanicRow } from "@/lib/mechanics/require-mechanic";
 
 // Mechanic-side Stripe Connect onboarding (Task 08 Stage 3).
 //
@@ -17,19 +17,12 @@ export type StripeConnectResult =
   | { ok: false; error: string };
 
 async function requireMechanic() {
-  const supabase = await createClient();
+  const guard = await requireMechanicRow();
+  if (!guard.ok) return guard;
   const {
     data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { ok: false as const, error: "Not signed in." };
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role, full_name")
-    .eq("id", user.id)
-    .single();
-  if (profile?.role !== "mechanic")
-    return { ok: false as const, error: "Mechanics only." };
-  return { ok: true as const, userId: user.id, email: user.email ?? null };
+  } = await guard.supabase.auth.getUser();
+  return { ok: true as const, userId: guard.mechanicId, email: user?.email ?? null };
 }
 
 export async function startStripeOnboarding(): Promise<StripeConnectResult> {

@@ -339,10 +339,13 @@ async function partyForDispute(disputeId: string) {
     .eq("id", guard.userId)
     .single();
 
+  // Booking relationship wins over profile role: an admin who is this
+  // booking's mechanic acts on the dispute as its mechanic (and so can't
+  // arbitrate their own job).
   let role: "customer" | "mechanic" | "admin" | null = null;
-  if (profile?.role === "admin") role = "admin";
-  else if (booking.customer_id === guard.userId) role = "customer";
+  if (booking.customer_id === guard.userId) role = "customer";
   else if (booking.mechanic_id === guard.userId) role = "mechanic";
+  else if (profile?.role === "admin") role = "admin";
   if (!role) return { ok: false as const, error: "You're not a party to this dispute." };
 
   return { ok: true as const, admin, dispute, booking, userId: guard.userId, role };

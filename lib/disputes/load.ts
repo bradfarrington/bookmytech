@@ -34,14 +34,16 @@ export async function loadDispute(disputeId: string, userId: string): Promise<Lo
     .single();
   if (!b) return null;
 
+  // Booking relationship wins over profile role: an admin who is this
+  // booking's mechanic views the dispute as its mechanic, not as an admin.
   const { data: profile } = await admin.from("profiles").select("role").eq("id", userId).single();
   const viewerRole: "customer" | "mechanic" | "admin" | null =
-    profile?.role === "admin"
-      ? "admin"
-      : b.customer_id === userId
-        ? "customer"
-        : b.mechanic_id === userId
-          ? "mechanic"
+    b.customer_id === userId
+      ? "customer"
+      : b.mechanic_id === userId
+        ? "mechanic"
+        : profile?.role === "admin"
+          ? "admin"
           : null;
   if (!viewerRole) return null;
 

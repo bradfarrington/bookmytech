@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+import { requireMechanic } from "@/lib/mechanics/require-mechanic";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export type ProfileActionResult = { ok: true } | { ok: false; error: string };
@@ -11,22 +11,6 @@ export type ProfileActionResult = { ok: true } | { ok: false; error: string };
 // `mechanics` (0004) and a self-update policy on `profiles` + own rows on
 // `mechanic_availability` (0010). Avatar upload additionally uses the
 // service-role client for the Storage write.
-
-async function requireMechanic() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { ok: false as const, error: "Not signed in." };
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-  if (profile?.role !== "mechanic")
-    return { ok: false as const, error: "Mechanics only." };
-  return { ok: true as const, supabase, mechanicId: user.id };
-}
 
 function revalidate() {
   revalidatePath("/mechanic/profile");

@@ -74,17 +74,19 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // /mechanic/* role gate — same shape as admin, exempt the login page
+  // /mechanic/* gate — exempt the login page. Access = having a mechanics row
+  // (RLS lets a user select their own), not role='mechanic': an admin who is
+  // also a mechanic keeps role='admin' but holds a mechanics row.
   if (isMechanicArea && !isMechanicLogin) {
     if (!user) {
       return redirectKeepingCookies(request, response, "/mechanic/login");
     }
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role")
+    const { data: mech } = await supabase
+      .from("mechanics")
+      .select("id")
       .eq("id", user.id)
-      .single();
-    if (profile?.role !== "mechanic") {
+      .maybeSingle();
+    if (!mech) {
       return redirectKeepingCookies(request, response, "/");
     }
   }
@@ -123,12 +125,12 @@ export async function middleware(request: NextRequest) {
 
   // Already-signed-in mechanic landing on /mechanic/login → bounce to dashboard
   if (isMechanicLogin && user) {
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role")
+    const { data: mech } = await supabase
+      .from("mechanics")
+      .select("id")
       .eq("id", user.id)
-      .single();
-    if (profile?.role === "mechanic") {
+      .maybeSingle();
+    if (mech) {
       return redirectKeepingCookies(request, response, "/mechanic/jobs");
     }
   }

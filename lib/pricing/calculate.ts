@@ -1,7 +1,7 @@
 // Pricing engine — the single source of truth for what a booking costs.
 //
-// Labour is derived from DURATION: the repair's billed hours (HaynesPro OEM
-// book time, rounded up to whole hours, min 1h — see lib/pricing/billable.ts)
+// Labour is derived from DURATION: the repair's billed hours (exact HaynesPro
+// OEM book time, min 1h — see lib/pricing/billable.ts)
 // × a single global hourly rate. The full breakdown is snapshotted onto the
 // booking row at creation time so later pricing changes never apply
 // retroactively (Task 08 Stage 2 requirement). Quoting from a (reg, repair

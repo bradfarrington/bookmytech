@@ -9,7 +9,7 @@ Wires the HaynesPro Data Exchange demo account (full supplier assessment: `docs/
 ## Owner decisions consumed (2026-07-09)
 
 1. **Prices vary per vehicle**, auto-calculated from HaynesPro OEM book times.
-2. **Billing rounds UP to whole hours, minimum 1 hour**: 0.7 → 1h; 1.2 → 2h; 1.5 → 2h; 1.6 → 2h; 2.3 → 3h (exact whole hours stay). Applies only to the HaynesPro-derived duration; admin-entered durations are used as-is.
+2. ~~**Billing rounds UP to whole hours, minimum 1 hour**~~ **Amended 2026-07-20: billing uses the EXACT book time, minimum 1 hour**: 0.7 → 1h; 1.2 → 1.2h; 2.3 → 2.3h (`lib/pricing/billable.ts`). Applies only to the HaynesPro-derived duration; admin-entered durations are used as-is.
 3. **Ambiguous variants → quote the longest** (e.g. clutch time differs by gearbox and we can't know which — never under-quote).
 4. **Booking flow**: reg → find the vehicle → show the services *available for that car* (admin-toggleable per vehicle) → picked service enters the existing booking flow.
 5. **Admin gets a Vehicles area**: brand-logo grid → make/model drill-down → per-model view of available Haynes repair operations, the repair manuals for them, and vehicle documentation — plus the per-model service availability toggles.

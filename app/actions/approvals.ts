@@ -8,6 +8,7 @@ import { siteUrl } from "@/lib/utils";
 import { renderApplicationApprovedEmail } from "@/emails/application-approved";
 import { renderApplicationRejectedEmail } from "@/emails/application-rejected";
 import { renderApplicationNeedsInfoEmail } from "@/emails/application-needs-info";
+import { ensureMechanicAccount } from "@/lib/mechanics/provision";
 
 const DOCS_BUCKET = "mechanic-docs";
 const SIGNED_URL_TTL = 60 * 60; // 1 hour, per spec
@@ -119,8 +120,10 @@ function outstandingItems(app: Record<string, unknown>): string[] {
 }
 
 // Shared: provision the mechanic account from an approved application and email
-// a magic-link sign-in. Mirrors createMechanicAction (Task 04). Best-effort on
-// the post-create steps so a Resend hiccup doesn't strand a created mechanic.
+// a magic-link sign-in. Account creation/reuse lives in ensureMechanicAccount
+// (an existing customer converts; an existing admin keeps role='admin' and
+// just gains a mechanics row). Best-effort on the post-create steps so a
+// Resend hiccup doesn't strand a created mechanic.
 async function provisionMechanic(
   admin: ReturnType<typeof createAdminClient>,
   app: Record<string, unknown>,
@@ -129,42 +132,16 @@ async function provisionMechanic(
   const email = String(app.email);
   const fullName = String(app.full_name);
 
-  const { data: created, error: createErr } = await admin.auth.admin.createUser({
+  const account = await ensureMechanicAccount(admin, {
     email,
-    email_confirm: true,
-    user_metadata: { full_name: fullName },
+    fullName,
+    phone: (app.phone as string | null) ?? null,
+    basePostcode: (app.postcode as string | null) ?? null,
+    serviceRadiusMiles: (app.service_radius_miles as number | null) ?? 10,
+    specialisms: (app.specialisms as string[] | null) ?? [],
   });
-  if (createErr || !created.user) {
-    const msg = createErr?.message ?? "Failed to create user.";
-    return {
-      ok: false,
-      error: msg.toLowerCase().includes("registered")
-        ? "A user with that email already exists."
-        : msg,
-    };
-  }
-  const userId = created.user.id;
-
-  const { error: profileErr } = await admin
-    .from("profiles")
-    .update({ role: "mechanic", full_name: fullName, phone: app.phone ?? null })
-    .eq("id", userId);
-  if (profileErr) {
-    await admin.auth.admin.deleteUser(userId).catch(() => {});
-    return { ok: false, error: `Couldn't set up profile: ${profileErr.message}` };
-  }
-
-  const { error: mechErr } = await admin.from("mechanics").insert({
-    id: userId,
-    base_postcode: app.postcode ?? null,
-    service_radius_miles: app.service_radius_miles ?? 10,
-    specialisms: app.specialisms ?? [],
-    approved_at: new Date().toISOString(),
-  });
-  if (mechErr) {
-    await admin.auth.admin.deleteUser(userId).catch(() => {});
-    return { ok: false, error: `Couldn't create mechanic profile: ${mechErr.message}` };
-  }
+  if (!account.ok) return account;
+  const userId = account.userId;
 
   // Seed the mechanic's documents from the application's uploads so the
   // /mechanic/documents + /admin/documents views aren't empty post-approval.

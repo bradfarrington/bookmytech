@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+import { requireMechanic } from "@/lib/mechanics/require-mechanic";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export type JobMediaResult =
@@ -23,22 +23,6 @@ const MAX_SIGNATURE_BYTES = 2 * 1024 * 1024;
 // Photos can be taken before and during the visit; the signature is part of
 // completing the job.
 const PHOTO_STATUSES = ["confirmed", "en_route", "in_progress"];
-
-async function requireMechanic() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { ok: false as const, error: "Not signed in." };
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-  if (profile?.role !== "mechanic")
-    return { ok: false as const, error: "Mechanics only." };
-  return { ok: true as const, mechanicId: user.id };
-}
 
 // Re-read the booking under service-role and confirm the caller owns it.
 async function ownedBooking(bookingId: string, mechanicId: string) {

@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+import { requireMechanic } from "@/lib/mechanics/require-mechanic";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendEmail } from "@/lib/email/send";
 import { renderTemplateEmail } from "@/emails/resolve";
@@ -15,22 +15,6 @@ export type OfferActionResult =
 //   - accept assigns the booking + supersedes every sibling offer, and must be
 //     atomic across rows — not expressible as a row policy.
 //   - decline / supersede touch the offer row only.
-async function requireMechanic() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { ok: false as const, error: "Not signed in." };
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-  if (profile?.role !== "mechanic")
-    return { ok: false as const, error: "Mechanics only." };
-  return { ok: true as const, mechanicId: user.id };
-}
-
 export async function acceptOffer(offerId: string): Promise<OfferActionResult> {
   const guard = await requireMechanic();
   if (!guard.ok) return guard;

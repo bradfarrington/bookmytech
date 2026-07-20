@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+import { requireMechanic } from "@/lib/mechanics/require-mechanic";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { dispatchBooking } from "@/lib/dispatch/dispatch";
 import { sendEmail } from "@/lib/email/send";
@@ -16,22 +16,6 @@ export type MechanicJobResult = { ok: true } | { ok: false; error: string };
 // owns the job in an RLS-aware client, then write via the service-role client.
 // Each action re-reads the booking under the admin client and re-checks
 // ownership + status before mutating, so a stale page can't drive a bad write.
-
-async function requireMechanic() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { ok: false as const, error: "Not signed in." };
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-  if (profile?.role !== "mechanic")
-    return { ok: false as const, error: "Mechanics only." };
-  return { ok: true as const, mechanicId: user.id };
-}
 
 // Cancellable up to the point work starts. Once en_route/in_progress the
 // mechanic manages the live job from the mobile app (Task 06), not here.

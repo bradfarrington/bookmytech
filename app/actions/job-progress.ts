@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+import { requireMechanic } from "@/lib/mechanics/require-mechanic";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendEmail } from "@/lib/email/send";
 import { renderTemplateEmail } from "@/emails/resolve";
@@ -29,22 +29,6 @@ export type JobProgressResult = { ok: true } | { ok: false; error: string };
 // an RLS-aware client, re-read + re-check status under the service-role client,
 // then mutate. Each action only fires from one specific status, so a stale page
 // can't skip a step or double-fire.
-
-async function requireMechanic() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { ok: false as const, error: "Not signed in." };
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-  if (profile?.role !== "mechanic")
-    return { ok: false as const, error: "Mechanics only." };
-  return { ok: true as const, mechanicId: user.id };
-}
 
 // Shared guard + transition. `from` is the only status the action is valid
 // from; `to` is the new status; `stamp` is the lifecycle timestamp column to

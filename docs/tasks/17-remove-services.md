@@ -29,7 +29,7 @@ Survivors: `repair_vehicle_exclusions` (0039), `bookings.repair_node_id`/`repair
 
 ### Pricing
 
-- `calculatePrice(serviceId, …)` and the whole duration ladder are deleted from `lib/pricing/calculate.ts`. What remains: `computePrice` (pure), `resolveArea` (coverage, used by admin areas), `getHourlyRatePence`, `getTakeRateBase`. `quoteRepair` (lib/haynespro/repair-booking.ts) is the only quoting path: billed hours (round up, min 1h) × global hourly rate, commission = platform default.
+- `calculatePrice(serviceId, …)` and the whole duration ladder are deleted from `lib/pricing/calculate.ts`. What remains: `computePrice` (pure), `resolveArea` (coverage, used by admin areas), `getHourlyRatePence`, `getTakeRateBase`. `quoteRepair` (lib/haynespro/repair-booking.ts) is the only quoting path: billed hours (exact book time since 2026-07-20, min 1h) × global hourly rate, commission = platform default.
 - `lib/haynespro/durations.ts` + `admin-durations.ts` deleted (service_time_mappings strategies); `getGenartNodes`/`getMaintenanceSystems` removed from `tree.ts`; `resolveVehicle` no longer reads/writes a `durations` map.
 - `lib/haynespro/exclusions.ts` is repair-only (`excludedServiceIdsFor*` gone).
 - `/admin/pricing` keeps the global hourly rate, commission defaults, cancellation fees and areas; the per-service durations table and per-(service,area) overrides grid are gone (`service-prices-section.tsx`, `overrides-section.tsx`, `updateServiceDuration`, `updateServiceCommission`, `upsertServiceAreaPrice` deleted).
