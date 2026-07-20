@@ -276,9 +276,9 @@ async function RepairsPanel({
         </p>
       )}
 
-      {/* Sub-groups — icon tiles, same treatment as the brand grid. */}
+      {/* Sub-groups — icon tiles, same density as the brand grid. */}
       {groups.length > 0 && (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+        <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8">
           {groups.map((node) => {
             const id = node.id as string;
             const hidden = excluded.has(id);
@@ -291,7 +291,7 @@ async function RepairsPanel({
                   hidden && "opacity-60",
                 )}
               >
-                <div className="absolute right-3 top-3 z-10">
+                <div className="absolute right-2 top-2 z-10">
                   <RepairToggle
                     makeName={makeName}
                     modelName={modelName}
@@ -302,29 +302,29 @@ async function RepairsPanel({
                 </div>
                 <Link
                   href={nodeHref(id, node.description ?? id)}
-                  className="flex h-full flex-col items-center gap-3 p-4 pt-10 text-center"
+                  className="flex h-full flex-col items-center gap-2 p-3 pt-7 text-center"
                 >
                   <span
                     className={cn(
-                      "flex size-12 items-center justify-center rounded-xl",
+                      "flex size-10 items-center justify-center rounded-xl",
                       hidden ? "bg-surface" : "bg-blue-50",
                     )}
                   >
                     <GroupIcon
-                      size={22}
+                      size={18}
                       className={hidden ? "text-text-muted" : "text-brand-blue"}
                     />
                   </span>
                   <span
                     className={cn(
-                      "text-sm font-semibold leading-tight",
+                      "text-xs font-semibold leading-tight",
                       hidden ? "text-text-muted" : "text-text-primary",
                     )}
                   >
                     {node.description}
                   </span>
                   {hidden && (
-                    <span className="text-[11px] font-medium text-text-muted">
+                    <span className="text-[10px] font-medium text-text-muted">
                       Hidden from customers
                     </span>
                   )}

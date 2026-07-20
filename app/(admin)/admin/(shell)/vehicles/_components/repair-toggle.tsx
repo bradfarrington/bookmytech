@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { Check } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { setRepairVehicleAvailability } from "@/app/actions/vehicle-exclusions";
@@ -53,17 +54,14 @@ export function RepairToggle({
       disabled={pending}
       title={available ? "Shown to customers" : "Hidden from customers"}
       className={cn(
-        "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors",
-        available ? "bg-success" : "bg-border",
+        "flex size-5 shrink-0 items-center justify-center rounded-full border transition-colors",
+        available
+          ? "border-brand-blue bg-brand-blue text-white"
+          : "border-border bg-surface-card text-transparent hover:border-brand-blue/50",
         pending && "opacity-60",
       )}
     >
-      <span
-        className={cn(
-          "inline-block size-4 transform rounded-full bg-white shadow transition-transform",
-          available ? "translate-x-6" : "translate-x-1",
-        )}
-      />
+      <Check size={12} strokeWidth={3} />
       <span className="sr-only">
         {available ? "Shown to customers" : "Hidden from customers"}
       </span>
