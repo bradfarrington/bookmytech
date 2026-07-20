@@ -16,7 +16,6 @@
 import { haynesProCall } from "./client";
 import type {
   HpAdjustment,
-  HpMaintenanceSystem,
   HpRepairtimeNode,
   HpStoryInfo,
   HpStoryOverviewItem,
@@ -147,38 +146,6 @@ export async function getRepairNodesByIds(
     }),
   );
   return nodes ?? [];
-}
-
-/** Repair-time leaf nodes for a set of genart ids (memoised genart lookup). */
-export async function getGenartNodes(
-  repairtimeTypeId: number,
-  genartIds: number[],
-): Promise<HpRepairtimeNode[]> {
-  const key = `genart:${repairtimeTypeId}:${[...genartIds].sort().join(",")}`;
-  const nodes = await memoised(key, DATA_TTL_MS, () =>
-    haynesProCall<HpRepairtimeNode[]>("getRepairtimeNodesByGenartsV4", {
-      descriptionLanguage: "en",
-      repairtimeTypeId,
-      typeCategory: "CAR",
-      genArtNumbers: genartIds,
-    }),
-  );
-  return nodes ?? [];
-}
-
-/** Maintenance systems incl. service times (memoised per car type). */
-export async function getMaintenanceSystems(
-  carTypeId: number,
-): Promise<HpMaintenanceSystem[]> {
-  const systems = await memoised(`maint:${carTypeId}`, DATA_TTL_MS, () =>
-    haynesProCall<HpMaintenanceSystem[]>("getMaintenanceSystemsV7", {
-      descriptionLanguage: "en",
-      carTypeId,
-      useImperial: false,
-      includeServiceTimes: true,
-    }),
-  );
-  return systems ?? [];
 }
 
 /** Repair manuals available for the car type. */

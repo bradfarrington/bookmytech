@@ -31,8 +31,8 @@ export default async function AdminPartsListPage() {
           <p className="mt-1.5 max-w-2xl text-sm text-text-muted">
             The parts BMT sources on behalf of mechanics. Supplier cost and
             margin are platform-only — mechanics and customers only ever see the
-            BMT price. Attach parts to a service from its edit page so bookings
-            arrive itemised.
+            BMT price. Mechanics add parts to a job as needed; repairs are
+            priced labour-only up front.
           </p>
         </div>
         <div className="flex items-center gap-2">

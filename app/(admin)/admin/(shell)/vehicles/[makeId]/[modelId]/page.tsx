@@ -1,10 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, BookOpen, ClipboardList, Clock, Wrench } from "lucide-react";
+import { ArrowLeft, BookOpen, ClipboardList, Clock } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
 import { Overline } from "@/components/ui/overline";
-import { serviceDurationsForType } from "@/lib/haynespro/admin-durations";
 import {
   getAdjustments,
   getCapacities,
@@ -16,19 +15,17 @@ import {
   getStoryList,
 } from "@/lib/haynespro/tree";
 import type { HpAdjustment, HpStoryLine, HpTreeNode } from "@/lib/haynespro/types";
-import { AvailabilityToggle } from "../../_components/availability-toggle";
 import { RepairToggle } from "../../_components/repair-toggle";
 import { TypePicker } from "../../_components/type-picker";
 
-// Admin model page (Task 16 Stage E): per-model service availability toggles
-// with the resolved HaynesPro durations, plus read-only browsing of the
-// repair-times tree, repair manuals and vehicle technical data for a chosen
-// engine variant. Deep data is per-TYPE — the picker swaps the variant.
+// Admin model page (Task 16 Stage E): per-model repair availability toggles
+// over the repair-times tree, plus read-only browsing of repair manuals and
+// vehicle technical data for a chosen engine variant. Deep data is per-TYPE —
+// the picker swaps the variant.
 
 export const dynamic = "force-dynamic";
 
 const TABS = [
-  { key: "services", label: "Services & pricing", icon: Wrench },
   { key: "repairs", label: "Repair times", icon: Clock },
   { key: "manuals", label: "Manuals", icon: BookOpen },
   { key: "data", label: "Technical data", icon: ClipboardList },
@@ -66,7 +63,7 @@ export default async function AdminVehicleModelPage({
     types.find((t) => t.id === requestedType) ?? types[0] ?? null;
 
   const tab: TabKey = (TABS.find((t) => t.key === query.tab)?.key ??
-    "services") as TabKey;
+    "repairs") as TabKey;
 
   // "VOLKSWAGEN Golf IV (1J1…)" minus the model name = the make name — the
   // exclusion keys (Stage D) that the booking-funnel matcher compares against.
@@ -147,12 +144,6 @@ export default async function AdminVehicleModelPage({
         <div className="rounded-button border border-border bg-surface-card px-4 py-8 text-center text-sm text-text-muted">
           No engine variants found for this model.
         </div>
-      ) : tab === "services" ? (
-        <ServicesPanel
-          carTypeId={selectedType.id}
-          makeName={makeName}
-          modelName={modelName}
-        />
       ) : tab === "repairs" ? (
         <RepairsPanel
           carTypeId={selectedType.id}
@@ -195,90 +186,7 @@ function fmtHours(n: number): string {
 }
 
 // ---------------------------------------------------------------------------
-// Services & pricing — availability toggles + resolved durations.
-// ---------------------------------------------------------------------------
-
-async function ServicesPanel({
-  carTypeId,
-  makeName,
-  modelName,
-}: {
-  carTypeId: number;
-  makeName: string;
-  modelName: string;
-}) {
-  const supabase = await createClient();
-  const [rows, { data: exclusions }] = await Promise.all([
-    serviceDurationsForType(carTypeId, supabase),
-    supabase
-      .from("service_vehicle_exclusions")
-      .select("service_id")
-      .eq("make_name", makeName)
-      .eq("model_name", modelName),
-  ]);
-  const excluded = new Set((exclusions ?? []).map((e) => e.service_id));
-
-  return (
-    <div className="overflow-hidden rounded-2xl border border-border bg-surface-card shadow-card">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-border bg-surface text-left text-xs font-semibold uppercase tracking-wide text-text-muted">
-            <th className="px-4 py-3">Service</th>
-            <th className="px-4 py-3">HaynesPro time (this variant)</th>
-            <th className="px-4 py-3">Billed</th>
-            <th className="px-4 py-3 text-right">Available on this model</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr key={row.serviceId} className="border-b border-border-subtle last:border-0">
-              <td className="px-4 py-3 font-semibold text-text-primary">
-                {row.serviceName}
-              </td>
-              <td className="px-4 py-3 text-text-secondary">
-                {row.rawHours != null ? (
-                  fmtHours(row.rawHours)
-                ) : (
-                  <span className="text-text-muted">
-                    — uses default{" "}
-                    {row.defaultHours != null ? fmtHours(row.defaultHours) : ""}
-                  </span>
-                )}
-              </td>
-              <td className="px-4 py-3 font-semibold text-text-primary">
-                {row.billedHours != null ? (
-                  `${row.billedHours}h`
-                ) : row.defaultHours != null ? (
-                  <span className="font-normal text-text-muted">
-                    {fmtHours(row.defaultHours)}
-                  </span>
-                ) : (
-                  "—"
-                )}
-              </td>
-              <td className="px-4 py-3 text-right">
-                <AvailabilityToggle
-                  serviceId={row.serviceId}
-                  makeName={makeName}
-                  modelName={modelName}
-                  initialAvailable={!excluded.has(row.serviceId)}
-                />
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      <p className="border-t border-border-subtle px-4 py-3 text-xs text-text-muted">
-        Times are OEM book times for the selected engine variant, billed in
-        whole hours (always rounded up, 1-hour minimum). Switching a service
-        off hides it from the booking flow for every variant of this model.
-      </p>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Repair times — read-only tree browse.
+// Repair times — tree browse with per-model availability toggles.
 // ---------------------------------------------------------------------------
 
 async function RepairsPanel({

@@ -6,7 +6,7 @@ Supabase Postgres schema for Book My Tech. Row Level Security (RLS) is enabled o
 
 ## Current schema (as of Task 04 Stage 1)
 
-Tables: `profiles`, `services`, `service_categories`, `bookings`, `mechanics`, `booking_events`. More will be added as later tasks need them (`payments`, `reviews`, `disputes`, `platform_settings`).
+Tables: `profiles`, `bookings`, `mechanics`, `booking_events`. More were added as later tasks needed them (`platform_settings`, `reviews`, `disputes`, `parts`, `areas`, HaynesPro caches, …) — see the migrations. **The services catalogue is gone** (Task 17, migration `0040`): `services`, `service_categories`, `service_area_prices`, `service_parts`, `service_time_mappings` and `service_vehicle_exclusions` were all dropped. Every booking is a HaynesPro repair identified by `bookings.repair_node_id` + `repair_description`.
 
 ### `profiles`
 
@@ -23,39 +23,15 @@ Extends Supabase's built-in `auth.users` with role and contact info.
 
 A trigger (`handle_new_user`) auto-inserts a profile with role='customer' whenever a new `auth.users` row is created. Admins are promoted manually via SQL.
 
-### `services`
+### `services` / `service_categories` — REMOVED (Task 17)
 
-The bookable services catalogue. Admin manages these; booking flow reads them.
-
-| Column                | Type        | Notes                                       |
-|-----------------------|-------------|---------------------------------------------|
-| id                    | uuid PK     | default gen_random_uuid()                   |
-| name                  | text        | e.g. "Full Service", "Diagnostic"           |
-| slug                  | text UNIQUE | URL-safe identifier; auto-generated from name on create, stable on edit |
-| description           | text        | nullable                                    |
-| starting_price_pence  | integer     | store money in pence, never floats          |
-| category              | text        | soft-FK slug → `service_categories.slug`    |
-| is_active             | boolean     | default true; soft delete via this flag     |
-| display_order         | integer     | default 0; controls order in booking flow   |
-| created_at            | timestamptz | default now()                               |
-| updated_at            | timestamptz | default now()                               |
-
-### `service_categories`
-
-Admin-managed list of categories that services are grouped under. Added in Task 02 Stage 4.
-
-| Column        | Type        | Notes                                                              |
-|---------------|-------------|--------------------------------------------------------------------|
-| id            | uuid PK     | default gen_random_uuid()                                          |
-| name          | text        | e.g. "Brakes"                                                      |
-| slug          | text UNIQUE | URL-safe identifier; auto-generated from name on create, stable on edit |
-| description   | text        | nullable; internal admin note                                      |
-| display_order | integer     | default 0; controls order in admin dropdowns                       |
-| is_active     | boolean     | default true; inactive categories are hidden from new-service form |
-| created_at    | timestamptz | default now()                                                      |
-| updated_at    | timestamptz | default now()                                                      |
-
-`services.category` stores the **slug** of a row in `service_categories`. It's deliberately a soft reference (no FK constraint) so renaming a category's display name is free and `services` rows never need migrating. Slugs are kept stable on edit (the admin UI never updates them) to protect this reference. Hard-deleting a category is blocked by the admin UI when services reference it; soft-delete via `is_active` is the safe default.
+Dropped by migration `0040_remove_services.sql` along with every service-keyed
+table (`service_area_prices`, `service_parts`, `service_time_mappings`,
+`service_vehicle_exclusions`). Bookings carry their own display name in
+`repair_description` (backfilled from the old service names), so nothing joins
+`services` any more. NB `public.is_admin()` was defined in
+`0002_service_categories.sql` and survives the table drop — fresh environments
+still run 0002 for it.
 
 ### `bookings`
 
@@ -66,7 +42,8 @@ The core transaction record. The columns below the first divider were added in `
 | id                         | uuid PK     | default gen_random_uuid()                                             |
 | customer_id                | uuid FK     | → profiles(id), nullable for guest flows                              |
 | mechanic_id                | uuid FK     | → profiles(id), nullable until assigned                               |
-| service_id                 | uuid FK     | → services(id), required                                              |
+| repair_node_id             | text        | HaynesPro repair-tree node id (0038); the booking's identity          |
+| repair_description         | text        | display name, e.g. "Renew the front brake pads" (0038; 0040 backfilled legacy rows) |
 | vehicle_reg                | text        | UK reg plate                                                          |
 | vehicle_make               | text        | from DVLA lookup                                                      |
 | vehicle_model              | text        | from DVLA + DVSA MOT enrichment                                       |
@@ -119,7 +96,7 @@ Extends `profiles` (1:1 by `id`) with marketplace-specific fields. A row exists 
 | service_radius_miles  | integer        | CHECK between 1 and 100, default 10                                  |
 | base_postcode         | text           | mechanic's home base — drives dispatch matching (Task 05)            |
 | bio                   | text           | nullable, shown to customers post-assignment                         |
-| specialisms           | text[]         | array of service slugs the mechanic is qualified for                 |
+| specialisms           | text[]         | informational specialism slugs (static list in `lib/specialisms.ts`); dispatch does NOT filter on them |
 | rating                | numeric(3,2)   | CHECK 0–5, derived from completed-job reviews (Task 11 wires this)   |
 | job_count             | integer        | cumulative completed-job count, incremented on completion            |
 | is_pro                | boolean        | Pro-tier flag (Task 11) — defaults false, ignored elsewhere          |
@@ -170,20 +147,6 @@ A `public.is_admin()` `SECURITY DEFINER` function is the single source of truth 
 - `SELECT`: `Users can view own profile` — `using (auth.uid() = id)`
 - `INSERT`: `Profiles can be created on signup` — `with check (auth.uid() = id)`
 - ❌ **No "admins can read all profiles" policy.** See RLS pattern #1 below — if you need one in the future, build it via a different `SECURITY DEFINER` helper (not an inline subquery on `profiles`).
-
-**`services`**
-- `SELECT`: `Services are viewable by everyone` — `using (is_active = true)` (public, anon)
-- `SELECT`: `Admins can view all services` — `using (public.is_admin())` (admin override — required, see pattern #2)
-- `INSERT`: `Admins can insert services` — `with check (public.is_admin())`
-- `UPDATE`: `Admins can update services` — `using (public.is_admin()) with check (public.is_admin())`
-- `DELETE`: `Admins can delete services` — `using (public.is_admin())`
-
-**`service_categories`**
-- `SELECT`: `Categories are viewable by everyone` — `using (is_active = true)`
-- `SELECT`: `Admins can view all categories` — `using (public.is_admin())`
-- `INSERT`: `Admins can insert categories` — `with check (public.is_admin())`
-- `UPDATE`: `Admins can update categories` — `using (public.is_admin()) with check (public.is_admin())`
-- `DELETE`: `Admins can delete categories` — `using (public.is_admin())`
 
 **`bookings`** — defined in `0003_booking_flow.sql`.
 - `INSERT`: `Anyone can create a booking` — `with check (true)` (guest + signed-in flows; anti-spam will move to a separate gate later)

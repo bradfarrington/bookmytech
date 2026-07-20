@@ -122,7 +122,7 @@ function UpcomingRow({
     <div className="rounded-2xl border border-border bg-surface-card p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="font-semibold text-text-primary">{booking.serviceName}</p>
+          <p className="font-semibold text-text-primary">{booking.repairDescription}</p>
           <p className="mt-0.5 text-sm text-text-secondary">{formatSlot(booking.scheduledAt, booking.slotWindow)}</p>
           <p className="mt-0.5 text-sm text-text-muted">
             {mechanic ? mechanic.name : "Finding your mechanic"}

@@ -97,7 +97,7 @@ export default async function BookingDetailPage({ params }: PageProps) {
       `id, job_number, status, area, postcode, total_pence, base_price_pence, parts_price_pence,
        commission_rate, platform_fee_pence, mechanic_payout_pence, credit_applied_pence,
        customer_name, customer_email,
-       vehicle_reg, vehicle_make, vehicle_model, service_id, mechanic_id,
+       vehicle_reg, vehicle_make, vehicle_model, mechanic_id,
        repair_description,
        scheduled_at, created_at, address_line_1, address_line_2, parking_type,
        special_instructions, stripe_payment_intent_id`,
@@ -107,9 +107,8 @@ export default async function BookingDetailPage({ params }: PageProps) {
 
   if (!booking) notFound();
 
-  const [{ data: service }, { data: events }, { data: mechRows }, paymentStatus] =
+  const [{ data: events }, { data: mechRows }, paymentStatus] =
     await Promise.all([
-      supabase.from("services").select("name").eq("id", booking.service_id).single(),
       supabase
         .from("booking_events")
         .select("id, event_type, actor_role, reason, payload, created_at")
@@ -215,7 +214,7 @@ export default async function BookingDetailPage({ params }: PageProps) {
           </Card>
 
           <Card className="space-y-4 p-6">
-            <CardTitle icon={Car}>Vehicle &amp; service</CardTitle>
+            <CardTitle icon={Car}>Vehicle &amp; repair</CardTitle>
             <Row
               icon={Car}
               label="Vehicle"
@@ -228,8 +227,8 @@ export default async function BookingDetailPage({ params }: PageProps) {
             />
             <Row
               icon={Wrench}
-              label="Service"
-              value={booking.repair_description ?? service?.name ?? "Unknown service"}
+              label="Repair"
+              value={booking.repair_description ?? "Vehicle repair"}
             />
             <Row icon={Wrench} label="Mechanic" value={currentMechanicName ?? "Unassigned"} />
             <Row

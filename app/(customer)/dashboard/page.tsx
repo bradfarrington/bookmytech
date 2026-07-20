@@ -47,7 +47,7 @@ export default async function DashboardPage() {
       `id, status, scheduled_at, slot_window, created_at, completed_at, total_pence,
        vehicle_reg, vehicle_make, vehicle_model, address_line_1, postcode,
        mechanic_id, reschedule_status, reschedule_proposed_at, reschedule_note,
-       repair_description, service:services(name, slug)`,
+       repair_description, repair_node_id`,
     )
     .or(`customer_id.eq.${user.id},customer_email.eq.${email}`)
     .order("scheduled_at", { ascending: false });
@@ -69,13 +69,8 @@ export default async function DashboardPage() {
     rescheduleStatus: b.reschedule_status,
     rescheduleProposedAt: b.reschedule_proposed_at,
     rescheduleNote: b.reschedule_note,
-    serviceName:
-      b.repair_description ??
-      (Array.isArray(b.service) ? b.service[0]?.name : (b.service as { name?: string } | null)?.name) ??
-      "Service",
-    serviceSlug:
-      (Array.isArray(b.service) ? b.service[0]?.slug : (b.service as { slug?: string } | null)?.slug) ??
-      null,
+    repairDescription: b.repair_description ?? "Vehicle repair",
+    repairNodeId: b.repair_node_id ?? null,
   }));
 
   // Resolve the assigned mechanics in one round-trip each (profile + rating).

@@ -45,10 +45,10 @@ interface SlotPickerProps {
   make: string;
   model?: string;
   defaultPostcode?: string;
-  serviceName: string;
-  serviceId: string;
-  /** Set for one-off HaynesPro repair bookings (Task 16 Stage G). */
-  repairNodeId?: string;
+  /** Display name of the repair being booked, e.g. "Renew the front brake pads". */
+  repairName: string;
+  /** HaynesPro repair node id — the server re-quotes from (reg, node). */
+  repairNodeId: string;
   pricePence: number;
   preferredMechanicId?: string;
   /** Signed-in customer's spendable account credit (0 for guests). */
@@ -60,8 +60,7 @@ export function SlotPicker({
   make,
   model,
   defaultPostcode = "",
-  serviceName,
-  serviceId,
+  repairName,
   repairNodeId,
   pricePence,
   preferredMechanicId,
@@ -92,10 +91,10 @@ export function SlotPicker({
 
   function handleProceedToPayment() {
     if (!canProceed) return;
-    track(FUNNEL_EVENTS.slotPicked, { serviceId, slot: selectedSlot });
+    track(FUNNEL_EVENTS.slotPicked, { repairNodeId, slot: selectedSlot });
     setStripeError(null);
     startTransition(async () => {
-      const result = await prepareCheckout({ serviceId, postcode, vehicleReg: reg, repairNodeId });
+      const result = await prepareCheckout({ postcode, vehicleReg: reg, repairNodeId });
       if (!result.ok) {
         setStripeError(result.error);
         return;
@@ -114,8 +113,7 @@ export function SlotPicker({
     reg,
     make,
     model,
-    serviceName,
-    serviceId,
+    repairName,
     repairNodeId,
     preferredMechanicId,
   };
@@ -310,9 +308,8 @@ interface ConfirmCommon {
   reg: string;
   make: string;
   model?: string;
-  serviceName: string;
-  serviceId: string;
-  repairNodeId?: string;
+  repairName: string;
+  repairNodeId: string;
   preferredMechanicId?: string;
 }
 
@@ -327,8 +324,6 @@ function bookingInputFrom(
     vehicleReg: c.reg,
     vehicleMake: c.make,
     vehicleModel: c.model,
-    serviceName: c.serviceName,
-    serviceId: c.serviceId,
     repairNodeId: c.repairNodeId,
     scheduledAt: c.selectedSlot,
     slotWindow: c.selectedWindow || undefined,
@@ -357,7 +352,7 @@ function PriceSummary({
   return (
     <div className="rounded-xl border border-border bg-surface p-4 text-sm">
       <div className="flex items-center justify-between text-text-secondary">
-        <span>Service total</span>
+        <span>Repair total</span>
         <span>{formatPrice(totalPence)}</span>
       </div>
       {creditAppliedPence > 0 && (
@@ -435,7 +430,7 @@ function CheckoutForm({
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-6">
       <div className="rounded-xl border border-border bg-surface p-4 text-sm">
-        <p className="font-semibold text-text-primary">{c.serviceName}</p>
+        <p className="font-semibold text-text-primary">{c.repairName}</p>
         <p className="text-text-secondary">{vehicleLabel(c.reg, c.make, c.model)} · {formatBookingSlot(c.selectedSlot, c.selectedWindow)}</p>
       </div>
 
@@ -537,7 +532,7 @@ function FreeCheckoutForm({
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-6">
       <div className="rounded-xl border border-border bg-surface p-4 text-sm">
-        <p className="font-semibold text-text-primary">{c.serviceName}</p>
+        <p className="font-semibold text-text-primary">{c.repairName}</p>
         <p className="text-text-secondary">{vehicleLabel(c.reg, c.make, c.model)} · {formatBookingSlot(c.selectedSlot, c.selectedWindow)}</p>
       </div>
 

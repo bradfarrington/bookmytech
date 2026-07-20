@@ -19,17 +19,40 @@ import { TEST_USERS, storageStateFor } from "./helpers/users";
 //      path that verifies the confirmation screen, the booking row, and the
 //      "we're finding your mechanic" email (assert-senders via the test outbox).
 //
-// Both start at /book/service rather than the home page: the /book/vehicle step
-// calls the live DVLA/MOT lookup (flaky external dep). The reg/make/model the
-// lookup would set are passed as query params — what the manual-entry path
-// produces. A separate test can cover the DVLA lookup UI.
+// Both start at /book/repairs rather than the home page: the /book/vehicle
+// step calls the live DVLA/MOT lookup (flaky external dep). Every booking is a
+// HaynesPro repair priced from the reg (Task 17), so these tests need BOTH the
+// HaynesPro env configured and a real reg that resolves — set E2E_REG to a
+// known-good registration (the reg → repair tree → price chain is live).
+//
+// Without HaynesPro credentials the whole spec skips: there is no bookable
+// path that avoids the repair pricing chain any more.
 
-const START_URL = "/book/service?reg=TE57ABC&make=FORD&model=FIESTA&postcode=SW1A1AA";
+const HAYNESPRO_CONFIGURED = Boolean(
+  process.env.HAYNESPRO_DISTRIBUTOR_USERNAME &&
+    process.env.HAYNESPRO_DISTRIBUTOR_PASSWORD,
+);
+const E2E_REG = process.env.E2E_REG ?? "";
 
-/** Drive the funnel: pick the first service → review price → pick today's morning slot. */
+test.skip(
+  !HAYNESPRO_CONFIGURED || !E2E_REG,
+  "Repairs funnel needs HAYNESPRO_* env + E2E_REG (a reg that resolves live)",
+);
+
+const START_URL = `/book/repairs?reg=${encodeURIComponent(E2E_REG)}&postcode=SW1A1AA`;
+
+/**
+ * Drive the funnel: drill the repair tree to the first bookable repair →
+ * review price → pick today's morning slot.
+ */
 async function funnelToCheckout(page: Page) {
   await page.goto(START_URL);
-  // First service card (robust to which services are configured) → /book/match.
+  // Drill down group links until a priced "book" link (→ /book/match) appears.
+  for (let depth = 0; depth < 8; depth++) {
+    const bookLink = page.locator('a[href*="/book/match"]').first();
+    if ((await bookLink.count()) > 0) break;
+    await page.locator('a[href*="/book/repairs"][href*="node="]').first().click();
+  }
   await page.locator('a[href*="/book/match"]').first().click();
   await expect(page).toHaveURL(/\/book\/match/);
   await page.getByRole("button", { name: /Pick a time/i }).click();
@@ -80,7 +103,7 @@ test.describe("signed-in, credit-covered", () => {
   test("§1.1 a fully-credited booking confirms and emails the customer", async ({ page }) => {
     resetOutbox();
     const customerId = await getUserId(TEST_USERS.customer.email);
-    await setTestCredit(customerId, 100_000); // £1,000 — covers any service total
+    await setTestCredit(customerId, 100_000); // £1,000 — covers any repair total
     const email = `e2e-credit-${Date.now()}@bookmytech.test`;
 
     await funnelToCheckout(page);

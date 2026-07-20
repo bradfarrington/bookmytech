@@ -38,11 +38,11 @@ const COLUMNS: FooterColumn[] = [
   {
     heading: "For Customers",
     links: [
-      { label: "Book a service", href: "/book" },
+      { label: "Book a repair", href: "/book" },
       { label: "How it works", href: "/#how-it-works" },
-      { label: "Services", href: "/services" },
+      { label: "Repairs", href: "/#repairs" },
       { label: "Reviews", href: "/#reviews" },
-      { label: "Pricing", href: "/services" },
+      { label: "Pricing", href: "/book" },
     ],
   },
   {
@@ -57,7 +57,7 @@ const COLUMNS: FooterColumn[] = [
   {
     heading: "Company",
     links: [
-      { label: "Services", href: "/services" },
+      { label: "Repairs", href: "/#repairs" },
       { label: "Help & FAQ", href: "/help" },
       { label: "For mechanics", href: "/mechanics" },
       { label: "Contact", href: "/help" },

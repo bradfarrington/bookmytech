@@ -3,7 +3,6 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getHourlyRatePence } from "@/lib/pricing/calculate";
 
 // Admin pricing controls (Task 08 Stage 2). Every mutation:
 //   1. verifies the caller is an admin (RLS-aware client),
@@ -75,83 +74,6 @@ function parseRate(
   const n = typeof raw === "number" ? raw : Number(String(raw ?? "").trim());
   if (!Number.isFinite(n) || n < min || n > max) return { ok: false };
   return { ok: true, value: n };
-}
-
-// --- Service durations ------------------------------------------------------
-// Labour is duration × the global hourly rate (Task 15). Editing a duration
-// recomputes the service's cached indicative price (starting_price_pence).
-
-/** Hours as a positive decimal up to 2dp (matches numeric(4,2)). */
-function parseDuration(raw: unknown): { ok: true; value: number } | { ok: false } {
-  const n = typeof raw === "number" ? raw : Number(String(raw ?? "").trim());
-  if (!Number.isFinite(n) || n <= 0 || n > 99.99) return { ok: false };
-  return { ok: true, value: Math.round(n * 100) / 100 };
-}
-
-export async function updateServiceDuration(
-  serviceId: string,
-  durationHours: number,
-): Promise<PricingResult> {
-  const guard = await requireAdmin();
-  if (!guard.ok) return guard;
-  const parsed = parseDuration(durationHours);
-  if (!parsed.ok) return { ok: false, error: "Enter a duration in hours greater than 0." };
-
-  const admin = createAdminClient();
-  const { data: prev } = await admin
-    .from("services")
-    .select("duration_hours")
-    .eq("id", serviceId)
-    .single();
-
-  const hourlyRatePence = await getHourlyRatePence(admin);
-  const { error } = await admin
-    .from("services")
-    .update({
-      duration_hours: parsed.value,
-      starting_price_pence: Math.round(parsed.value * hourlyRatePence),
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", serviceId);
-  if (error) return { ok: false, error: error.message };
-
-  await audit(admin, guard.adminId, "service", serviceId, "duration_hours", prev?.duration_hours ?? null, parsed.value);
-  revalidate();
-  return { ok: true };
-}
-
-// --- Per-service commission -------------------------------------------------
-
-export async function updateServiceCommission(
-  serviceId: string,
-  rate: number | null,
-): Promise<PricingResult> {
-  const guard = await requireAdmin();
-  if (!guard.ok) return guard;
-
-  let value: number | null = null;
-  if (rate != null) {
-    const parsed = parseRate(rate, 0, 0.9);
-    if (!parsed.ok) return { ok: false, error: "Commission must be between 0% and 90%." };
-    value = parsed.value;
-  }
-
-  const admin = createAdminClient();
-  const { data: prev } = await admin
-    .from("services")
-    .select("commission_rate")
-    .eq("id", serviceId)
-    .single();
-
-  const { error } = await admin
-    .from("services")
-    .update({ commission_rate: value, updated_at: new Date().toISOString() })
-    .eq("id", serviceId);
-  if (error) return { ok: false, error: error.message };
-
-  await audit(admin, guard.adminId, "service", serviceId, "commission_rate", prev?.commission_rate ?? null, value);
-  revalidate();
-  return { ok: true };
 }
 
 // --- Area labour multipliers ------------------------------------------------
@@ -269,78 +191,6 @@ export async function deleteArea(areaId: string): Promise<PricingResult> {
   return { ok: true };
 }
 
-// --- Service/area overrides + dummy parts costs -----------------------------
-
-export async function upsertServiceAreaPrice(input: {
-  serviceId: string;
-  areaId: string;
-  overridePence: number | null;
-  partsPence: number | null;
-  commissionRate: number | null;
-  /** Per-area duration override in hours. NULL = inherit the service default. */
-  durationHours?: number | null;
-}): Promise<PricingResult> {
-  const guard = await requireAdmin();
-  if (!guard.ok) return guard;
-
-  let overridePence: number | null = null;
-  if (input.overridePence != null) {
-    const p = parsePence(input.overridePence);
-    if (!p.ok) return { ok: false, error: "Override price must be a whole number of pence." };
-    overridePence = p.value;
-  }
-  let partsPence: number | null = null;
-  if (input.partsPence != null) {
-    const p = parsePence(input.partsPence);
-    if (!p.ok) return { ok: false, error: "Parts price must be a whole number of pence." };
-    partsPence = p.value;
-  }
-  let commissionRate: number | null = null;
-  if (input.commissionRate != null) {
-    const r = parseRate(input.commissionRate, 0, 0.9);
-    if (!r.ok) return { ok: false, error: "Commission must be between 0% and 90%." };
-    commissionRate = r.value;
-  }
-  let durationHours: number | null = null;
-  if (input.durationHours != null) {
-    const d = parseDuration(input.durationHours);
-    if (!d.ok) return { ok: false, error: "Duration must be greater than 0 hours." };
-    durationHours = d.value;
-  }
-
-  const admin = createAdminClient();
-  const { data: prev } = await admin
-    .from("service_area_prices")
-    .select("override_price_pence, parts_price_pence, commission_rate, duration_hours")
-    .eq("service_id", input.serviceId)
-    .eq("area_id", input.areaId)
-    .maybeSingle();
-
-  const { error } = await admin.from("service_area_prices").upsert(
-    {
-      service_id: input.serviceId,
-      area_id: input.areaId,
-      override_price_pence: overridePence,
-      parts_price_pence: partsPence,
-      commission_rate: commissionRate,
-      duration_hours: durationHours,
-      is_active: true,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: "service_id,area_id" },
-  );
-  if (error) return { ok: false, error: error.message };
-
-  await audit(admin, guard.adminId, "service_area_price", `${input.serviceId}:${input.areaId}`, "override", prev ?? null, {
-    override_price_pence: overridePence,
-    parts_price_pence: partsPence,
-    commission_rate: commissionRate,
-    duration_hours: durationHours,
-  });
-  revalidate();
-  return { ok: true };
-}
-
 // --- Platform defaults (commission) + cancellation fee tiers -----------------
 
 const SETTING_KEYS = [
@@ -389,32 +239,7 @@ export async function updatePlatformSetting(
   );
   if (error) return { ok: false, error: error.message };
 
-  // The hourly rate feeds every service's cached indicative price — recompute
-  // them all so the "from £X" previews stay in step with duration × new rate.
-  if (key === "hourly_rate_pence") {
-    await recomputeCachedServicePrices(admin, value);
-  }
-
   await audit(admin, guard.adminId, "platform_setting", key, key, prev?.value ?? null, value);
   revalidate();
   return { ok: true };
-}
-
-/**
- * Recompute every service's cached starting_price_pence from its duration and
- * the given hourly rate. Cache-only — actual booking prices are recomputed live
- * by the engine, so this never touches existing bookings.
- */
-async function recomputeCachedServicePrices(admin: Admin, hourlyRatePence: number) {
-  const { data: services } = await admin
-    .from("services")
-    .select("id, duration_hours");
-  for (const s of services ?? []) {
-    const hours = Number((s as { duration_hours: number | null }).duration_hours);
-    if (!Number.isFinite(hours) || hours <= 0) continue;
-    await admin
-      .from("services")
-      .update({ starting_price_pence: Math.round(hours * hourlyRatePence) })
-      .eq("id", (s as { id: string }).id);
-  }
 }

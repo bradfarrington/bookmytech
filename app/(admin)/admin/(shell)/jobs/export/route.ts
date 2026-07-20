@@ -4,7 +4,7 @@ import { formatJobNumber } from "@/lib/utils";
 
 // CSV export of bookings. A GET route handler (not client-side generation) so
 // customer PII is only ever assembled server-side under the admin's session.
-// Mirrors the list filters via query params: ?tab=&area=&service=&q=.
+// Mirrors the list filters via query params: ?tab=&area=&q=.
 
 export const dynamic = "force-dynamic";
 
@@ -49,38 +49,29 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const tab = searchParams.get("tab");
   const area = searchParams.get("area");
-  const service = searchParams.get("service");
   const q = (searchParams.get("q") ?? "").trim().toLowerCase();
 
   const { data: bookingsRaw } = await supabase
     .from("bookings")
     .select(
-      "id, job_number, status, area, total_pence, customer_name, customer_email, vehicle_reg, vehicle_make, vehicle_model, postcode, mechanic_id, service_id, scheduled_at, created_at",
+      "id, job_number, status, area, total_pence, customer_name, customer_email, vehicle_reg, vehicle_make, vehicle_model, postcode, mechanic_id, repair_description, scheduled_at, created_at",
     )
     .order("created_at", { ascending: false })
     .limit(5000);
 
   const bookings = bookingsRaw ?? [];
 
-  const serviceIds = [...new Set(bookings.map((b) => b.service_id).filter(Boolean))];
   const mechanicIds = [...new Set(bookings.map((b) => b.mechanic_id).filter(Boolean))];
 
-  const [{ data: services }, { data: mechProfiles }] = await Promise.all([
-    serviceIds.length
-      ? supabase.from("services").select("id, name").in("id", serviceIds)
-      : Promise.resolve({ data: [] as { id: string; name: string }[] }),
-    mechanicIds.length
-      ? supabase.from("profiles").select("id, full_name").in("id", mechanicIds)
-      : Promise.resolve({ data: [] as { id: string; full_name: string | null }[] }),
-  ]);
+  const { data: mechProfiles } = mechanicIds.length
+    ? await supabase.from("profiles").select("id, full_name").in("id", mechanicIds)
+    : { data: [] as { id: string; full_name: string | null }[] };
 
-  const serviceName = new Map((services ?? []).map((s) => [s.id, s.name]));
   const mechanicName = new Map((mechProfiles ?? []).map((p) => [p.id, p.full_name]));
 
   const filtered = bookings.filter((b) => {
     if (!matchesTab(b.status, tab)) return false;
     if (area && b.area !== area) return false;
-    if (service && b.service_id !== service) return false;
     if (q) {
       const hay = `${formatJobNumber(b.job_number)} ${b.id} ${b.customer_name ?? ""} ${b.vehicle_reg ?? ""} ${b.vehicle_make ?? ""} ${b.vehicle_model ?? ""}`.toLowerCase();
       if (!hay.includes(q)) return false;
@@ -93,7 +84,7 @@ export async function GET(request: NextRequest) {
     "Created",
     "Scheduled",
     "Status",
-    "Service",
+    "Repair",
     "Customer",
     "Email",
     "Vehicle reg",
@@ -112,7 +103,7 @@ export async function GET(request: NextRequest) {
         b.created_at,
         b.scheduled_at ?? "",
         b.status,
-        serviceName.get(b.service_id) ?? "",
+        b.repair_description ?? "",
         b.customer_name ?? "",
         b.customer_email ?? "",
         b.vehicle_reg ?? "",

@@ -42,10 +42,10 @@ export function StepSpecialisms({ services }: { services: ServiceOption[] }) {
     >
       <div className={FIELD_LABEL}>
         <span>What do you work on?</span>
-        <span className={FIELD_HINT}>Select all that apply — drives which jobs you're matched to.</span>
+        <span className={FIELD_HINT}>Select all that apply — shown on your profile.</span>
         {services.length === 0 ? (
           <p className="text-sm text-text-muted">
-            No services are configured yet. Please try again later.
+            No specialisms defined. Please try again later.
           </p>
         ) : (
           <div className="grid grid-cols-2 gap-2 pt-1 sm:grid-cols-3">

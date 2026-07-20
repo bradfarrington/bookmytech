@@ -18,7 +18,7 @@ export async function GET(
 
   const { data: reminder } = await admin
     .from("reminder_schedules")
-    .select("id, vehicle_reg, service_suggestion_slug, acted_on_at")
+    .select("id, vehicle_reg, acted_on_at")
     .eq("token", token)
     .maybeSingle();
 
@@ -34,10 +34,13 @@ export async function GET(
       .eq("id", reminder.id);
   }
 
-  // Pull the latest booking for this car to pre-fill make / model / postcode.
+  // Pull the latest booking for this car to pre-fill the postcode, then land
+  // on vehicle confirmation — from there the customer browses the repairs for
+  // their car. (The old flow could deep-link a suggested service straight to
+  // the slot picker; repairs are per-vehicle so the picker is the entry now.)
   const { data: lastBooking } = await admin
     .from("bookings")
-    .select("vehicle_make, vehicle_model, postcode")
+    .select("postcode")
     .eq("vehicle_reg", reminder.vehicle_reg)
     .order("created_at", { ascending: false })
     .limit(1)
@@ -45,15 +48,6 @@ export async function GET(
 
   const params2 = new URLSearchParams({ reg: reminder.vehicle_reg });
   if (lastBooking?.postcode) params2.set("postcode", lastBooking.postcode);
-
-  // If we know which service to suggest and have enough to skip ahead, land on
-  // the slot picker; otherwise start at vehicle confirmation.
-  if (reminder.service_suggestion_slug && lastBooking?.vehicle_make) {
-    params2.set("service", reminder.service_suggestion_slug);
-    params2.set("make", lastBooking.vehicle_make);
-    if (lastBooking.vehicle_model) params2.set("model", lastBooking.vehicle_model);
-    return NextResponse.redirect(new URL(`/book/slot?${params2.toString()}`, base));
-  }
 
   return NextResponse.redirect(new URL(`/book/vehicle?${params2.toString()}`, base));
 }

@@ -18,6 +18,7 @@ import { Pill } from "@/components/ui/pill";
 import { Stars } from "@/components/ui/stars";
 import { Overline } from "@/components/ui/overline";
 import { cn, formatPrice } from "@/lib/utils";
+import { specialismName } from "@/lib/specialisms";
 import { SuspensionControls } from "@/components/admin/suspension-controls";
 import { mechanicBalanceSummary } from "@/lib/mechanics/balance";
 
@@ -154,7 +155,7 @@ export default async function MechanicDetailPage({
       supabase
         .from("bookings")
         .select(
-          "id, status, area, total_pence, customer_name, service_id, scheduled_at, created_at",
+          "id, status, area, total_pence, customer_name, repair_description, scheduled_at, created_at",
         )
         .eq("mechanic_id", id)
         .order("created_at", { ascending: false }),
@@ -181,13 +182,6 @@ export default async function MechanicDetailPage({
     .order("created_at", { ascending: false })
     .limit(8);
   const ledger = ledgerRaw ?? [];
-
-  // Resolve service names for the job list.
-  const serviceIds = [...new Set(jobs.map((b) => b.service_id).filter(Boolean))];
-  const { data: services } = serviceIds.length
-    ? await supabase.from("services").select("id, name").in("id", serviceIds)
-    : { data: [] as { id: string; name: string }[] };
-  const serviceName = new Map((services ?? []).map((s) => [s.id, s.name]));
 
   const TABS: ReadonlyArray<{ value: Tab; label: string; count?: number }> = [
     { value: "overview", label: "Overview" },
@@ -422,7 +416,7 @@ export default async function MechanicDetailPage({
               <div className="flex flex-wrap gap-2">
                 {mechanic.specialisms.map((slug: string) => (
                   <Pill key={slug} tone="neutral">
-                    {slug}
+                    {specialismName(slug)}
                   </Pill>
                 ))}
               </div>
@@ -534,7 +528,7 @@ export default async function MechanicDetailPage({
                             href={`/admin/jobs/${j.id}`}
                             className="font-semibold text-text-primary hover:text-brand-blue"
                           >
-                            {serviceName.get(j.service_id) ?? "Service"}
+                            {j.repair_description ?? "Vehicle repair"}
                           </Link>
                           <p className="text-xs text-text-muted">
                             {j.customer_name ?? "—"}

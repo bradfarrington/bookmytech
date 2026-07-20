@@ -44,7 +44,6 @@ interface BookingJoin {
   total_pence: number | null;
   commission_rate: number | null;
   repair_description: string | null;
-  service: unknown;
 }
 
 interface ScheduleRow {
@@ -58,7 +57,6 @@ interface ScheduleRow {
   vehicle_make: string | null;
   vehicle_model: string | null;
   repair_description: string | null;
-  service: unknown;
 }
 
 interface CompletedRow {
@@ -80,11 +78,6 @@ function startOfWeek(): Date {
   const diff = (d.getDay() + 6) % 7; // days since Monday
   d.setDate(d.getDate() - diff);
   return d;
-}
-
-function serviceName(service: unknown): string {
-  const s = one(service as never) as { name?: string | null } | null;
-  return s?.name ?? "Service";
 }
 
 export default async function MechanicJobsPage() {
@@ -111,7 +104,7 @@ export default async function MechanicJobsPage() {
   const { data: offerRows } = await supabase
     .from("job_offers")
     .select(
-      "id, offered_at, booking:bookings(id, vehicle_reg, vehicle_make, vehicle_model, area, postcode, scheduled_at, slot_window, total_pence, commission_rate, repair_description, service:services(name))",
+      "id, offered_at, booking:bookings(id, vehicle_reg, vehicle_make, vehicle_model, area, postcode, scheduled_at, slot_window, total_pence, commission_rate, repair_description)",
     )
     .eq("mechanic_id", user.id)
     .is("response", null)
@@ -132,7 +125,7 @@ export default async function MechanicJobsPage() {
       id: row.id,
       bookingId: b.id,
       offeredAt: row.offered_at,
-      serviceName: b.repair_description ?? serviceName(b.service),
+      serviceName: b.repair_description ?? "Vehicle repair",
       vehicle: [b.vehicle_make, b.vehicle_model].filter(Boolean).join(" ") || "Vehicle",
       reg: b.vehicle_reg ?? "",
       area: b.area ?? b.postcode ?? "—",
@@ -146,7 +139,7 @@ export default async function MechanicJobsPage() {
   const { data: bookingRows } = await supabase
     .from("bookings")
     .select(
-      "id, scheduled_at, status, postcode, area, total_pence, commission_rate, vehicle_make, vehicle_model, repair_description, service:services(name)",
+      "id, scheduled_at, status, postcode, area, total_pence, commission_rate, vehicle_make, vehicle_model, repair_description",
     )
     .eq("mechanic_id", user.id)
     .gte("scheduled_at", startOfToday().toISOString())
@@ -165,7 +158,7 @@ export default async function MechanicJobsPage() {
 
   for (const b of (bookingRows ?? []) as ScheduleRow[]) {
     const whenMs = b.scheduled_at ? new Date(b.scheduled_at).getTime() : 0;
-    const title = `${b.repair_description ?? serviceName(b.service)} · ${[b.vehicle_make, b.vehicle_model].filter(Boolean).join(" ") || "Vehicle"}`;
+    const title = `${b.repair_description ?? "Vehicle repair"} · ${[b.vehicle_make, b.vehicle_model].filter(Boolean).join(" ") || "Vehicle"}`;
     const status = b.status as ScheduleItem["status"];
 
     if (whenMs >= todayStartMs && whenMs < tomorrowStartMs) {

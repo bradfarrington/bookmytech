@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { parsePrice, slugify } from "@/lib/utils";
 
 // Admin parts-catalogue actions (Task 10 Stage 2). All run under the admin
-// session and rely on the admin-only RLS on `parts` / `service_parts`.
+// session and rely on the admin-only RLS on `parts`.
 
 export type PartActionResult = { error?: string } | void;
 
@@ -302,49 +302,4 @@ function parseCsv(text: string): string[][] {
     rows.push(row);
   }
   return rows;
-}
-
-// --- Service ↔ parts configuration -----------------------------------------
-
-export async function attachServicePart(
-  serviceId: string,
-  partId: string,
-  quantity: number,
-): Promise<PartActionResult> {
-  if (!serviceId || !partId) return { error: "Pick a part to add." };
-  const qty = Math.max(1, Math.round(quantity || 1));
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from("service_parts")
-    .insert({ service_id: serviceId, part_id: partId, quantity: qty });
-  if (error) {
-    if (error.code === "23505") return { error: "That part is already on this service." };
-    return { error: error.message };
-  }
-  revalidatePath(`/admin/services/${serviceId}/edit`);
-}
-
-export async function setServicePartQuantity(
-  id: string,
-  serviceId: string,
-  quantity: number,
-): Promise<PartActionResult> {
-  const qty = Math.max(1, Math.round(quantity || 1));
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from("service_parts")
-    .update({ quantity: qty })
-    .eq("id", id);
-  if (error) return { error: error.message };
-  revalidatePath(`/admin/services/${serviceId}/edit`);
-}
-
-export async function detachServicePart(
-  id: string,
-  serviceId: string,
-): Promise<PartActionResult> {
-  const supabase = await createClient();
-  const { error } = await supabase.from("service_parts").delete().eq("id", id);
-  if (error) return { error: error.message };
-  revalidatePath(`/admin/services/${serviceId}/edit`);
 }

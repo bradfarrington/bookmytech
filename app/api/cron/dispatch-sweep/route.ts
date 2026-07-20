@@ -26,12 +26,11 @@ interface StalledBooking {
   postcode: string | null;
   area: string | null;
   total_pence: number | null;
-  service: { name: string | null } | { name: string | null }[] | null;
+  repair_description: string | null;
 }
 
 function serviceName(b: StalledBooking): string {
-  const s = Array.isArray(b.service) ? b.service[0] : b.service;
-  return s?.name ?? "Service";
+  return b.repair_description ?? "Vehicle repair";
 }
 
 async function runSweep() {
@@ -41,7 +40,7 @@ async function runSweep() {
   const { data: stalled } = await admin
     .from("bookings")
     .select(
-      "id, job_number, customer_name, postcode, area, total_pence, service:services(name)",
+      "id, job_number, customer_name, postcode, area, total_pence, repair_description",
     )
     .eq("status", "sourcing_mechanic")
     .lt("created_at", cutoff);

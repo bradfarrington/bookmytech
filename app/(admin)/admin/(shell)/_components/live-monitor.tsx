@@ -119,7 +119,7 @@ export function LiveMonitor({ rows }: { rows: MonitorRow[] }) {
             <thead className="border-b border-border bg-surface text-[11px] font-semibold uppercase tracking-[0.04em] text-text-muted">
               <tr>
                 <th className="px-5 py-3">Ref</th>
-                <th className="px-5 py-3">Service</th>
+                <th className="px-5 py-3">Repair</th>
                 <th className="px-5 py-3">Customer</th>
                 <th className="px-5 py-3">Mechanic</th>
                 <th className="px-5 py-3">Area</th>

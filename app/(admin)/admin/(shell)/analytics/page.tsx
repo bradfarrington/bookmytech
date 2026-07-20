@@ -21,7 +21,7 @@ export const dynamic = "force-dynamic";
 
 const FUNNEL_LABELS: Record<string, string> = {
   reg_lookup_started: "Reg lookup started",
-  service_selected: "Service selected",
+  service_selected: "Repair selected",
   price_viewed: "Price viewed",
   slot_picked: "Slot picked",
   booking_confirmed: "Booked & confirmed",
@@ -33,7 +33,7 @@ interface BookingLite {
   area: string | null;
   total_pence: number | null;
   platform_fee_pence: number | null;
-  service_id: string | null;
+  repair_description: string | null;
   mechanic_id: string | null;
   customer_id: string | null;
   customer_email: string | null;
@@ -76,7 +76,7 @@ export default async function AdminAnalyticsPage({
   const { data: allBookingsRaw } = await supabase
     .from("bookings")
     .select(
-      "id, status, area, total_pence, platform_fee_pence, service_id, mechanic_id, customer_id, customer_email, created_at",
+      "id, status, area, total_pence, platform_fee_pence, repair_description, mechanic_id, customer_id, customer_email, created_at",
     )
     .order("created_at", { ascending: true })
     .limit(5000);
@@ -167,14 +167,10 @@ export default async function AdminAnalyticsPage({
     prior: i < prevGmvSeries.length ? prevGmvSeries[i] : null,
   }));
 
-  // --- Service mix + top areas + top mechanics (JS aggregation) -------------
-  const serviceIds = [...new Set(periodBookings.map((b) => b.service_id).filter(Boolean))] as string[];
+  // --- Repair mix + top areas + top mechanics (JS aggregation) --------------
   const mechanicIds = [...new Set(periodBookings.map((b) => b.mechanic_id).filter(Boolean))] as string[];
 
-  const [{ data: services }, { data: mechProfiles }, { data: mechanics }] = await Promise.all([
-    serviceIds.length
-      ? supabase.from("services").select("id, name").in("id", serviceIds)
-      : Promise.resolve({ data: [] as { id: string; name: string }[] }),
+  const [{ data: mechProfiles }, { data: mechanics }] = await Promise.all([
     mechanicIds.length
       ? supabase.from("profiles").select("id, full_name").in("id", mechanicIds)
       : Promise.resolve({ data: [] as { id: string; full_name: string | null }[] }),
@@ -183,7 +179,6 @@ export default async function AdminAnalyticsPage({
       : Promise.resolve({ data: [] as { id: string; rating: number; job_count: number }[] }),
   ]);
 
-  const serviceName = new Map((services ?? []).map((s) => [s.id, s.name]));
   const mechanicName = new Map((mechProfiles ?? []).map((p) => [p.id, p.full_name]));
   const mechanicMeta = new Map(
     (mechanics ?? []).map((m) => [m.id, { rating: Number(m.rating) }]),
@@ -194,13 +189,14 @@ export default async function AdminAnalyticsPage({
   const mechMap = new Map<string, number>();
   for (const b of periodBookings.filter(revenueable)) {
     const gmv = b.total_pence ?? 0;
-    if (b.service_id) mixMap.set(b.service_id, (mixMap.get(b.service_id) ?? 0) + gmv);
+    const repair = b.repair_description ?? "Vehicle repair";
+    mixMap.set(repair, (mixMap.get(repair) ?? 0) + gmv);
     if (b.area) areaMap.set(b.area, (areaMap.get(b.area) ?? 0) + gmv);
     if (b.mechanic_id) mechMap.set(b.mechanic_id, (mechMap.get(b.mechanic_id) ?? 0) + gmv);
   }
 
   const serviceMix: ServiceMixDatum[] = [...mixMap.entries()]
-    .map(([id, gmvPence]) => ({ name: serviceName.get(id) ?? "Unknown", gmvPence }))
+    .map(([name, gmvPence]) => ({ name, gmvPence }))
     .sort((a, b) => b.gmvPence - a.gmvPence)
     .slice(0, 8);
 

@@ -2,6 +2,8 @@
 
 **Status:** ✅ Complete (2026-07-09) — Stages A–F all built, tested (75 unit tests green) and production-build clean. **Owner action required before this goes live: apply migrations `0036` + `0037` via Studio** — until then the funnel prices exactly as before (the vehicle rung silently falls through), but *booking creation would fail* on the new snapshot columns. Deviations from spec: none of substance; the admin per-service "mapping panel" originally floated for the service edit page landed as the richer `/admin/vehicles` model page instead (owner-requested pivot), and mapping rules are seeded/edited in SQL for now.
 
+> **Superseded in part by Task 17 (2026-07-20):** the packaged-services catalogue this task priced (Stages B–D: `service_time_mappings`, per-service durations, `service_vehicle_exclusions`, the admin "Services & pricing" tab) was removed — Stage G's bookable repairs became the ONLY booking type. Stages A (client), E (Vehicles area minus the services tab), F (SSO) and G survive. See `docs/tasks/17-remove-services.md`.
+
 Wires the HaynesPro Data Exchange demo account (full supplier assessment: `docs/04-supplier-apis.md`) into the platform. Production switch-over = swapping the `HAYNESPRO_*` env values. Demo expires **2026-08-09**.
 
 ## Owner decisions consumed (2026-07-09)

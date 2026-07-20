@@ -47,7 +47,7 @@ export function PastJobs({ jobs, mechanics, ratedByBooking, disputes }: PastJobs
             <div key={job.id} className="rounded-2xl border border-border bg-surface-card p-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="font-semibold text-text-primary">{job.serviceName}</p>
+                  <p className="font-semibold text-text-primary">{job.repairDescription}</p>
                   <p className="mt-0.5 text-sm text-text-muted">
                     {completedDate}
                     {mechanic ? ` · ${mechanic.name}` : ""}
@@ -76,7 +76,7 @@ export function PastJobs({ jobs, mechanics, ratedByBooking, disputes }: PastJobs
                   <RebookControl
                     reg={job.vehicleReg}
                     postcode={job.postcode}
-                    serviceSlug={job.serviceSlug}
+                    repairNodeId={job.repairNodeId}
                     make={job.vehicleMake}
                     model={job.vehicleModel}
                     mechanicId={job.mechanicId}

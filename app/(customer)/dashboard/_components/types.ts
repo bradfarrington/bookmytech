@@ -20,8 +20,8 @@ export interface DashboardBooking {
   rescheduleStatus: string | null;
   rescheduleProposedAt: string | null;
   rescheduleNote: string | null;
-  serviceName: string;
-  serviceSlug: string | null;
+  repairDescription: string;
+  repairNodeId: string | null;
 }
 
 export interface MechanicLite {

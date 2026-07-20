@@ -23,16 +23,13 @@ export default async function MechanicMessagesPage({ params }: PageProps) {
   // message on jobs we actually hold, so require the assignment.
   const { data: booking } = await supabase
     .from("bookings")
-    .select("id, mechanic_id, customer_name, service:services(name)")
+    .select("id, mechanic_id, customer_name, repair_description")
     .eq("id", id)
     .maybeSingle();
 
   if (!booking || booking.mechanic_id !== user.id) notFound();
 
-  const service =
-    (Array.isArray(booking.service)
-      ? booking.service[0]?.name
-      : (booking.service as { name?: string } | null)?.name) ?? "this job";
+  const repairName = booking.repair_description ?? "this job";
   const customerName = booking.customer_name?.split(" ")[0] || "the customer";
 
   return (
@@ -49,7 +46,7 @@ export default async function MechanicMessagesPage({ params }: PageProps) {
         <h1 className="text-2xl font-bold tracking-tight text-text-primary">
           Messages — {customerName}
         </h1>
-        <p className="text-sm text-text-muted">About your {service} booking.</p>
+        <p className="text-sm text-text-muted">About your {repairName} booking.</p>
       </div>
 
       <MessagesThread bookingId={id} viewerRole="mechanic" counterpartName={customerName} />

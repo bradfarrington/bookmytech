@@ -46,7 +46,7 @@ export default async function OfferPage({ params }: PageProps) {
       `id, response, mechanic_id, offered_at,
        booking:bookings(id, vehicle_reg, vehicle_make, vehicle_model, area, postcode,
          scheduled_at, slot_window, total_pence, commission_rate, special_instructions,
-         repair_description, service:services(name))`,
+         repair_description)`,
     )
     .eq("id", id)
     .maybeSingle();
@@ -67,7 +67,6 @@ export default async function OfferPage({ params }: PageProps) {
         commission_rate: number | null;
         special_instructions: string | null;
         repair_description: string | null;
-        service: unknown;
       }
     | null;
   if (!booking) notFound();
@@ -114,8 +113,6 @@ export default async function OfferPage({ params }: PageProps) {
     if (base && job) distanceLabel = `${haversineMiles(base, job).toFixed(1)} mi`;
   }
 
-  const service = one(booking.service as never) as { name?: string } | null;
-
   return (
     <Shell>
       <header className="flex h-14 items-center gap-2 px-4">
@@ -133,7 +130,7 @@ export default async function OfferPage({ params }: PageProps) {
         offerId={offer.id}
         bookingId={booking.id}
         mechanicId={user.id}
-        serviceName={booking.repair_description ?? service?.name ?? "Service"}
+        serviceName={booking.repair_description ?? "Vehicle repair"}
         vehicle={[booking.vehicle_make, booking.vehicle_model].filter(Boolean).join(" ") || "Vehicle"}
         reg={booking.vehicle_reg}
         whenLabel={formatBookingSlot(booking.scheduled_at, booking.slot_window, { relative: true })}

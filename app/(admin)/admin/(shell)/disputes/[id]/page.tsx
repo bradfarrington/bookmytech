@@ -16,10 +16,6 @@ import {
 
 export const dynamic = "force-dynamic";
 
-function one<T>(v: T | T[] | null | undefined): T | null {
-  return Array.isArray(v) ? (v[0] ?? null) : (v ?? null);
-}
-
 export default async function AdminDisputeDetailPage({
   params,
 }: {
@@ -37,13 +33,11 @@ export default async function AdminDisputeDetailPage({
       `id, job_number, status, total_pence, credit_applied_pence, mechanic_payout_pence,
        customer_id, customer_name, customer_email, mechanic_id,
        vehicle_reg, vehicle_make, vehicle_model, created_at, completed_at,
-       service:services(name)`,
+       repair_description`,
     )
     .eq("id", dispute.booking_id)
     .single();
   if (!booking) notFound();
-
-  const svc = one(booking.service as never) as { name?: string } | null;
 
   // Customer + mechanic profiles, mechanic rating, customer history (for the rule).
   const [{ data: customer }, { data: mechProfile }, { data: mech }, { count: customerBookings }] =
@@ -92,7 +86,7 @@ export default async function AdminDisputeDetailPage({
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-sm text-text-muted">Booking #{formatJobNumber(booking.job_number)}</p>
-          <h1 className="text-2xl font-bold text-text-primary">{svc?.name ?? "Service"}</h1>
+          <h1 className="text-2xl font-bold text-text-primary">{booking.repair_description ?? "Vehicle repair"}</h1>
         </div>
         <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${DISPUTE_STATUS_TONES[dispute.status as DisputeStatus]}`}>
           {DISPUTE_STATUS_LABELS[dispute.status as DisputeStatus]}

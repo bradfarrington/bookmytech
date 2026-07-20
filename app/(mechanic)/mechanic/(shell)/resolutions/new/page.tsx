@@ -7,11 +7,6 @@ import { formatJobNumber } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
-// One-to-one Supabase joins arrive typed as arrays; normalise to a single row.
-function one<T>(value: T | T[] | null | undefined): T | null {
-  return Array.isArray(value) ? value[0] ?? null : value ?? null;
-}
-
 export default async function MechanicNewCasePage() {
   const supabase = await createClient();
   const {
@@ -22,12 +17,12 @@ export default async function MechanicNewCasePage() {
   // Any job assigned to this mechanic (RLS also scopes bookings to them).
   const { data: bookings } = await supabase
     .from("bookings")
-    .select("id, job_number, scheduled_at, service:services(name)")
+    .select("id, job_number, scheduled_at, repair_description")
     .eq("mechanic_id", user.id)
     .order("scheduled_at", { ascending: false });
 
   const jobs: CaseJobOption[] = (bookings ?? []).map((b) => {
-    const svc = one(b.service as never as { name?: string })?.name ?? "Job";
+    const svc = b.repair_description ?? "Job";
     const when = b.scheduled_at
       ? new Date(b.scheduled_at).toLocaleDateString("en-GB", {
           weekday: "short",

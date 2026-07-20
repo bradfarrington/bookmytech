@@ -29,7 +29,7 @@ export async function loadDispute(disputeId: string, userId: string): Promise<Lo
 
   const { data: b } = await admin
     .from("bookings")
-    .select("id, job_number, customer_id, mechanic_id, service:services(name)")
+    .select("id, job_number, customer_id, mechanic_id, repair_description")
     .eq("id", d.booking_id)
     .single();
   if (!b) return null;
@@ -46,8 +46,7 @@ export async function loadDispute(disputeId: string, userId: string): Promise<Lo
   if (!viewerRole) return null;
 
   const serviceName =
-    (Array.isArray(b.service) ? b.service[0]?.name : (b.service as { name?: string } | null)?.name) ??
-    "Your booking";
+    (b as { repair_description: string | null }).repair_description ?? "Vehicle repair";
 
   const data: DisputeDetailData = {
     disputeId: d.id,

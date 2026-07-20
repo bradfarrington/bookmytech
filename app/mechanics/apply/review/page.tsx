@@ -1,12 +1,6 @@
-import { createClient } from "@/lib/supabase/server";
+import { SPECIALISMS } from "@/lib/specialisms";
 import { ReviewStep } from "../_components/review-step";
 
-export default async function ReviewPage() {
-  const supabase = await createClient();
-  const { data: services } = await supabase
-    .from("services")
-    .select("slug, name")
-    .eq("is_active", true);
-
-  return <ReviewStep services={services ?? []} />;
+export default function ReviewPage() {
+  return <ReviewStep services={SPECIALISMS} />;
 }

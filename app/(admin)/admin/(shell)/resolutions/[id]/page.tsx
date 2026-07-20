@@ -12,10 +12,6 @@ import { SMS_TEMPLATE_DEFS } from "@/lib/sms/templates";
 
 export const dynamic = "force-dynamic";
 
-function one<T>(value: T | T[] | null | undefined): T | null {
-  return Array.isArray(value) ? value[0] ?? null : value ?? null;
-}
-
 const emailTemplates: TemplateOption[] = EMAIL_TEMPLATE_DEFS.filter(
   (t) => t.category === "customer",
 ).map((t) => ({ value: t.key, label: t.label }));
@@ -36,7 +32,7 @@ export default async function AdminCasePage({ params }: { params: Promise<{ id: 
   const { data: booking } = await supabase
     .from("bookings")
     .select(
-      "id, status, customer_name, customer_email, customer_phone, vehicle_reg, service:services(name)",
+      "id, status, customer_name, customer_email, customer_phone, vehicle_reg, repair_description",
     )
     .eq("id", kase.bookingId)
     .maybeSingle();
@@ -47,7 +43,7 @@ export default async function AdminCasePage({ params }: { params: Promise<{ id: 
     .eq("id", kase.mechanicId)
     .maybeSingle();
 
-  const svc = one(booking?.service as never as { name?: string })?.name ?? "—";
+  const svc = booking?.repair_description ?? "Vehicle repair";
   const bookingStatus = booking?.status as string | undefined;
   const canRedistribute =
     bookingStatus != null && bookingStatus !== "completed" && bookingStatus !== "cancelled";

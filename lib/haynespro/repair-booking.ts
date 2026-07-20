@@ -1,9 +1,10 @@
-// Bookable HaynesPro repairs (Task 16 Stage G).
+// Bookable HaynesPro repairs (Task 16 Stage G; the only booking type since
+// Task 17 removed the packaged-services catalogue).
 //
-// A customer can pick a single repair operation from the HaynesPro tree for
-// THEIR car and book it. The price is the operation's OEM book time billed in
+// A customer picks a single repair operation from the HaynesPro tree for
+// THEIR car and books it. The price is the operation's OEM book time billed in
 // whole hours (round up, min 1h) × the global hourly rate — no parts line,
-// commission comes out of the total exactly like a packaged service.
+// commission comes out of the total.
 //
 // The quote is re-derived SERVER-SIDE from (reg, nodeId) at every funnel step
 // (match → slot → checkout hold → booking create) — the client never supplies
@@ -21,9 +22,6 @@ import {
 import { billableHours } from "@/lib/pricing/billable";
 import { getRepairNodesByIds } from "./tree";
 import { resolveVehicle } from "./vehicle";
-
-/** Slug of the hidden container service repair bookings attach to (0038). */
-export const REPAIR_CONTAINER_SLUG = "custom-repair";
 
 export interface RepairQuote {
   nodeId: string;
@@ -93,16 +91,4 @@ export async function quoteRepair(
     console.error("[haynespro] repair quote failed:", err);
     return null;
   }
-}
-
-/** The hidden container service's id (null when 0038 hasn't been applied). */
-export async function repairContainerServiceId(
-  db: SupabaseClient,
-): Promise<string | null> {
-  const { data } = await db
-    .from("services")
-    .select("id")
-    .eq("slug", REPAIR_CONTAINER_SLUG)
-    .maybeSingle();
-  return data?.id ?? null;
 }

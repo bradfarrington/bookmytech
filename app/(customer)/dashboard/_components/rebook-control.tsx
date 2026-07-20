@@ -5,15 +5,16 @@ import { useState } from "react";
 import { RotateCcw } from "lucide-react";
 
 // One-tap rebook with a "same mechanic if available" preference (Task 11 Stage
-// 1). When we know the service slug we deep-link straight to the slot picker
-// with the vehicle + postcode pre-filled (skipping reg lookup / service pick);
-// otherwise we fall back to the start of the booking flow. Ticking "same
-// mechanic" threads ?pref=<mechanicId> through to the booking, which
-// dispatchBooking uses to offer the job to that mechanic first.
+// 1). When we know the repair node we deep-link straight to the price/match
+// step with the vehicle + postcode pre-filled (skipping reg lookup / repair
+// browse); otherwise (legacy service-era booking with no repair node) we fall
+// back to the start of the booking flow. Ticking "same mechanic" threads
+// ?pref=<mechanicId> through to /book/slot, which dispatchBooking uses to offer
+// the job to that mechanic first.
 export function RebookControl({
   reg,
   postcode,
-  serviceSlug,
+  repairNodeId,
   make,
   model,
   mechanicId,
@@ -21,7 +22,7 @@ export function RebookControl({
 }: {
   reg: string;
   postcode: string | null;
-  serviceSlug: string | null;
+  repairNodeId: string | null;
   make: string | null;
   model: string | null;
   mechanicId: string | null;
@@ -29,21 +30,19 @@ export function RebookControl({
 }) {
   const [sameMechanic, setSameMechanic] = useState(true);
 
-  const params = new URLSearchParams({ reg });
-  if (postcode) params.set("postcode", postcode);
-
   let href: string;
-  if (serviceSlug) {
-    params.set("service", serviceSlug);
+  if (repairNodeId) {
+    const params = new URLSearchParams({ reg, repair: repairNodeId });
+    if (postcode) params.set("postcode", postcode);
     if (make) params.set("make", make);
     if (model) params.set("model", model);
     if (mechanicId && sameMechanic) params.set("pref", mechanicId);
-    href = `/book/slot?${params.toString()}`;
+    href = `/book/match?${params.toString()}`;
   } else {
-    href = `/book/vehicle?${params.toString()}`;
+    href = `/book?reg=${encodeURIComponent(reg)}`;
   }
 
-  const canPreferMechanic = Boolean(mechanicId && serviceSlug);
+  const canPreferMechanic = Boolean(mechanicId && repairNodeId);
 
   return (
     <div className="flex flex-col gap-1.5">

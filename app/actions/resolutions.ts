@@ -74,15 +74,14 @@ interface CommsBooking {
   vehicle_model: string | null;
   scheduled_at: string | null;
   total_pence: number | null;
-  service: { name: string | null } | { name: string | null }[] | null;
+  repair_description: string | null;
 }
 
 const COMMS_BOOKING_SELECT =
-  "id, job_number, customer_name, customer_email, customer_phone, vehicle_reg, vehicle_make, vehicle_model, scheduled_at, total_pence, service:services(name)";
+  "id, job_number, customer_name, customer_email, customer_phone, vehicle_reg, vehicle_make, vehicle_model, scheduled_at, total_pence, repair_description";
 
 function serviceName(b: CommsBooking): string {
-  const s = Array.isArray(b.service) ? b.service[0] : b.service;
-  return s?.name ?? "your booking";
+  return b.repair_description ?? "Vehicle repair";
 }
 
 function customerVars(b: CommsBooking): Record<string, string> {
@@ -143,15 +142,13 @@ async function notifyCaseOpened(
   admin: Admin,
   args: {
     caseId: string;
-    booking: { id: string; job_number: number | null; mechanic_id: string | null; service: { name: string | null } | { name: string | null }[] | null };
+    booking: { id: string; job_number: number | null; mechanic_id: string | null; repair_description: string | null };
     openerRole: "mechanic" | "admin";
     reasonLabel: string;
   },
 ) {
   const { caseId, booking, openerRole, reasonLabel } = args;
-  const svc =
-    (Array.isArray(booking.service) ? booking.service[0]?.name : booking.service?.name) ??
-    "the booking";
+  const svc = booking.repair_description ?? "Vehicle repair";
   const ref = formatJobNumber(booking.job_number);
 
   // Admin team — always notified of a new case.
@@ -199,9 +196,9 @@ export async function openResolutionCase(input: OpenCaseInput): Promise<Resoluti
 
   const { data: booking } = await admin
     .from("bookings")
-    .select("id, job_number, mechanic_id, service:services(name)")
+    .select("id, job_number, mechanic_id, repair_description")
     .eq("id", input.bookingId)
-    .maybeSingle<{ id: string; job_number: number | null; mechanic_id: string | null; service: { name: string | null } | { name: string | null }[] | null }>();
+    .maybeSingle<{ id: string; job_number: number | null; mechanic_id: string | null; repair_description: string | null }>();
   if (!booking) return { ok: false, error: "That job no longer exists." };
   if (!booking.mechanic_id)
     return { ok: false, error: "That job isn't assigned to a mechanic yet." };

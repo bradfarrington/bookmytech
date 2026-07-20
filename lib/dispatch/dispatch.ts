@@ -7,13 +7,14 @@ import { geocodePostcode, haversineMiles, outwardCode } from "@/lib/geo/postcode
 //
 // Eligibility for a mechanic:
 //   1. status = 'online' and approved (approved_at is set)
-//   2. specialism match — the booking's service slug is in mechanic.specialisms.
-//      A mechanic who hasn't declared any specialisms is treated as a generalist
-//      and stays eligible (so they still get offers before they set up).
-//   3. the job address falls inside their service radius. We geocode both
+//   2. the job address falls inside their service radius. We geocode both
 //      postcodes via postcodes.io and compare straight-line distance against
 //      service_radius_miles. If either postcode can't be geocoded we fall back
 //      to a coarse same-outward-code (district) match.
+//
+// There is no specialism filter: every booking is a granular HaynesPro repair
+// (Task 17), which maps to no catalogue specialism — jobs broadcast to every
+// mechanic in range. mechanics.specialisms remains as vetting/profile info.
 //
 // Writes use the service-role client: the caller is usually a guest customer
 // with no session, and we're inserting offer rows for many other users.
@@ -22,7 +23,6 @@ interface MechanicRow {
   id: string;
   base_postcode: string | null;
   service_radius_miles: number | null;
-  specialisms: string[] | null;
   is_suspended: boolean | null;
   suspended_until: string | null;
 }
@@ -38,9 +38,7 @@ export async function dispatchBooking(bookingId: string): Promise<DispatchResult
 
   const { data: booking } = await admin
     .from("bookings")
-    .select(
-      "id, postcode, area, status, mechanic_id, preferred_mechanic_id, repair_node_id, service:services(slug)",
-    )
+    .select("id, postcode, area, status, mechanic_id, preferred_mechanic_id")
     .eq("id", bookingId)
     .single();
 
@@ -49,15 +47,9 @@ export async function dispatchBooking(bookingId: string): Promise<DispatchResult
     return { offered: 0, usedFallback: false };
   }
 
-  // service is a to-one join; supabase-js may type it as an array.
-  const service = Array.isArray(booking.service)
-    ? booking.service[0]
-    : booking.service;
-  const slug: string | null = service?.slug ?? null;
-
   const { data: mechanics } = await admin
     .from("mechanics")
-    .select("id, base_postcode, service_radius_miles, specialisms, is_suspended, suspended_until")
+    .select("id, base_postcode, service_radius_miles, is_suspended, suspended_until")
     .eq("status", "online")
     .not("approved_at", "is", null);
 
@@ -74,19 +66,6 @@ export async function dispatchBooking(bookingId: string): Promise<DispatchResult
     // Suspended mechanics never get offers. An expired time-boxed suspension
     // auto-lifts (the daily cron clears the flag; here we just stop excluding).
     if (m.is_suspended && (!m.suspended_until || new Date(m.suspended_until).getTime() > now)) {
-      continue;
-    }
-    // Specialism filter — skip only when they have declared specialisms that
-    // don't include this service. One-off repair bookings (Task 16 Stage G)
-    // sit on the generic container service, which maps to no specialism —
-    // broadcast those to everyone in range.
-    if (
-      slug &&
-      !(booking as { repair_node_id: string | null }).repair_node_id &&
-      Array.isArray(m.specialisms) &&
-      m.specialisms.length > 0 &&
-      !m.specialisms.includes(slug)
-    ) {
       continue;
     }
     if (!m.base_postcode) continue;

@@ -33,7 +33,7 @@ export default async function AdminLiveMonitorPage() {
     supabase
       .from("bookings")
       .select(
-        "id, job_number, status, area, total_pence, customer_name, mechanic_id, service_id, created_at",
+        "id, job_number, status, area, total_pence, customer_name, mechanic_id, repair_description, created_at",
       )
       .order("created_at", { ascending: false })
       .limit(1000),
@@ -53,9 +53,8 @@ export default async function AdminLiveMonitorPage() {
   const mechanics = mechanicsRaw ?? [];
   const events = eventsRaw ?? [];
 
-  // Resolve service + mechanic display names in bulk (admins read all profiles
+  // Resolve mechanic display names in bulk (admins read all profiles
   // via the is_admin() policy — avoids brittle embedded FK joins).
-  const serviceIds = [...new Set(bookings.map((b) => b.service_id).filter(Boolean))];
   const onlineMechs = mechanics.filter((m) => ONLINE_STATUSES.has(m.status));
   const nameIds = [
     ...new Set([
@@ -64,16 +63,10 @@ export default async function AdminLiveMonitorPage() {
     ]),
   ];
 
-  const [{ data: services }, { data: profiles }] = await Promise.all([
-    serviceIds.length
-      ? supabase.from("services").select("id, name").in("id", serviceIds)
-      : Promise.resolve({ data: [] as { id: string; name: string }[] }),
-    nameIds.length
-      ? supabase.from("profiles").select("id, full_name").in("id", nameIds)
-      : Promise.resolve({ data: [] as { id: string; full_name: string | null }[] }),
-  ]);
+  const { data: profiles } = nameIds.length
+    ? await supabase.from("profiles").select("id, full_name").in("id", nameIds)
+    : { data: [] as { id: string; full_name: string | null }[] };
 
-  const serviceName = new Map((services ?? []).map((s) => [s.id, s.name]));
   const profileName = new Map((profiles ?? []).map((p) => [p.id, p.full_name]));
 
   // --- KPIs -----------------------------------------------------------------
@@ -86,7 +79,7 @@ export default async function AdminLiveMonitorPage() {
   const monitorRows: MonitorRow[] = bookings.map((b) => ({
     id: b.id,
     jobNumber: b.job_number,
-    service: serviceName.get(b.service_id) ?? "Unknown service",
+    service: b.repair_description ?? "Vehicle repair",
     customer: b.customer_name ?? "—",
     mechanic: b.mechanic_id ? profileName.get(b.mechanic_id) ?? "Assigned" : null,
     area: b.area,

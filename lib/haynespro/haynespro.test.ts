@@ -1,18 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { extractStatusCode, isAuthFailure } from "./client";
-import { combineNodeTimes, maintenanceHours } from "./durations";
-import {
-  excludedRepairNodeIdsForLabel,
-  excludedServiceIdsForLabel,
-  normaliseLabel,
-} from "./exclusions";
+import { excludedRepairNodeIdsForLabel, normaliseLabel } from "./exclusions";
 import {
   buildModelCandidates,
   deriveModelLabel,
   pickBestCandidate,
   scoreCandidate,
 } from "./vehicle";
-import type { HpCarType, HpMaintenanceSystem } from "./types";
+import type { HpCarType } from "./types";
 
 describe("extractStatusCode", () => {
   it("reads the auth envelope ({statusCode})", () => {
@@ -36,98 +31,6 @@ describe("extractStatusCode", () => {
     expect(extractStatusCode([{ status: { statusCode: 0 } }, { status: null }])).toBeNull();
     expect(extractStatusCode([{ description: "x", value: 70 }])).toBeNull();
     expect(extractStatusCode(null)).toBeNull();
-  });
-});
-
-describe("combineNodeTimes", () => {
-  // Live Golf IV genart-402 reply shape (2026-07-09).
-  const brakeNodes = [
-    { description: "Renew the front right brake pads", value: 40 },
-    { description: "Renew the front left brake pads", value: 40 },
-    { description: "Renew the front brake pads", value: 70 },
-    { description: "Renew the rear brake pads", value: 90 },
-    { description: "Renew all the brake pads", value: 160 },
-    { description: "Brakes", value: null }, // group node — ignored
-  ];
-
-  it("filters by case-insensitive substring and combines with max", () => {
-    expect(
-      combineNodeTimes(brakeNodes, {
-        descriptionFilter: "front brake pads",
-        combine: "max",
-      }),
-    ).toBe(0.7);
-  });
-
-  it("no filter → combines across all timed nodes", () => {
-    expect(combineNodeTimes(brakeNodes, { descriptionFilter: null, combine: "max" })).toBe(1.6);
-    expect(combineNodeTimes(brakeNodes, { descriptionFilter: null, combine: "min" })).toBe(0.4);
-  });
-
-  it("sum adds the matches", () => {
-    expect(
-      combineNodeTimes(brakeNodes, {
-        descriptionFilter: "front brake pads",
-        combine: "sum",
-      }),
-      // 0.4 + 0.4 + 0.7 — the left/right singles do NOT contain the contiguous
-      // "front brake pads"… actually they do not: "front right brake pads".
-    ).toBe(0.7);
-  });
-
-  it("max across clutch gearbox variants = safe quote", () => {
-    const clutch = [
-      { description: "Renew the clutch assembly (manual transmission) 02K", value: 360 },
-      { description: "Renew the clutch assembly (manual transmission) 02M", value: 480 },
-      { description: "Renew the clutch (gearbox removed)", value: 70 },
-    ];
-    expect(
-      combineNodeTimes(clutch, { descriptionFilter: "clutch assembly", combine: "max" }),
-    ).toBe(4.8);
-  });
-
-  it("returns null when nothing matches", () => {
-    expect(
-      combineNodeTimes(brakeNodes, { descriptionFilter: "handbrake", combine: "max" }),
-    ).toBeNull();
-    expect(combineNodeTimes([], { descriptionFilter: null, combine: "max" })).toBeNull();
-  });
-});
-
-describe("maintenanceHours", () => {
-  // Live Golf IV getMaintenanceSystemsV7 shape (2026-07-09).
-  const systems: HpMaintenanceSystem[] = [
-    {
-      name: "Time/distance dependent service, ( - 1999)",
-      maintenancePeriods: [
-        {
-          name: "Every 15,000 km/Oil service",
-          times: [{ type: "COMMERCIAL_TIME", value: 50, selected: true }],
-        },
-        {
-          name: "30,000 km/12 months",
-          times: [
-            { type: "COMPUTED_TIME", value: 150, selected: false },
-            { type: "COMMERCIAL_TIME", value: 160, selected: true },
-          ],
-        },
-      ],
-    },
-  ];
-
-  it("max = the full service, min = the interim/oil service", () => {
-    expect(maintenanceHours(systems, "max")).toBe(1.6);
-    expect(maintenanceHours(systems, "min")).toBe(0.5);
-  });
-
-  it("only counts the selected time of each period", () => {
-    // The unselected COMPUTED_TIME (1.5h) must not win the min.
-    expect(maintenanceHours(systems, "min")).not.toBe(1.5);
-  });
-
-  it("returns null when no times exist", () => {
-    expect(maintenanceHours([], "max")).toBeNull();
-    expect(maintenanceHours([{ maintenancePeriods: [] }], "max")).toBeNull();
   });
 });
 
@@ -343,32 +246,8 @@ describe("buildModelCandidates", () => {
   });
 });
 
-describe("service vehicle exclusions", () => {
-  const rows = [
-    { service_id: "svc-cambelt", make_name: "VOLKSWAGEN", model_name: "Golf IV (1J)" },
-    { service_id: "svc-regas", make_name: "VOLKSWAGEN", model_name: "Golf IV (1J)" },
-    { service_id: "svc-cambelt", make_name: "TESLA", model_name: "Model 3" },
-  ];
-
-  it("matches on normalised make+model label, case/spacing-insensitively", () => {
-    expect(excludedServiceIdsForLabel("VOLKSWAGEN Golf IV (1J)", rows)).toEqual(
-      new Set(["svc-cambelt", "svc-regas"]),
-    );
-    expect(excludedServiceIdsForLabel("volkswagen  golf iv (1j)", rows)).toEqual(
-      new Set(["svc-cambelt", "svc-regas"]),
-    );
-    expect(excludedServiceIdsForLabel("TESLA Model 3", rows)).toEqual(
-      new Set(["svc-cambelt"]),
-    );
-  });
-
-  it("unresolved vehicles and unlisted models match nothing (default ON)", () => {
-    expect(excludedServiceIdsForLabel(null, rows).size).toBe(0);
-    expect(excludedServiceIdsForLabel("", rows).size).toBe(0);
-    expect(excludedServiceIdsForLabel("FORD Focus II", rows).size).toBe(0);
-  });
-
-  it("normaliseLabel collapses whitespace and uppercases", () => {
+describe("normaliseLabel", () => {
+  it("collapses whitespace and uppercases", () => {
     expect(normaliseLabel("  Volkswagen   Golf IV  (1J) ")).toBe(
       "VOLKSWAGEN GOLF IV (1J)",
     );

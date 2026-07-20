@@ -21,7 +21,7 @@ export default async function MechanicNewDisputePage({
   // RLS scopes this to the mechanic's own bookings.
   const { data: booking } = await supabase
     .from("bookings")
-    .select("id, status, mechanic_id, total_pence, service:services(name)")
+    .select("id, status, mechanic_id, total_pence, repair_description")
     .eq("id", bookingId)
     .maybeSingle();
 
@@ -36,9 +36,7 @@ export default async function MechanicNewDisputePage({
     .maybeSingle();
   if (existing) redirect(`/mechanic/disputes/${existing.id}`);
 
-  const svc =
-    (Array.isArray(booking.service) ? booking.service[0]?.name : (booking.service as { name?: string } | null)?.name) ??
-    "This job";
+  const svc = booking.repair_description ?? "This job";
 
   return (
     <div className="mx-auto flex max-w-xl flex-col gap-6">

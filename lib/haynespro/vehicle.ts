@@ -35,8 +35,6 @@ export interface ResolvedVehicle {
    * database updates while numeric ids are not.
    */
   hpModelLabel: string | null;
-  /** serviceId → raw (unrounded) duration hours, filled lazily by durations.ts */
-  durations: Record<string, number>;
 }
 
 /**
@@ -242,7 +240,7 @@ export async function resolveVehicle(
   const { data: cached } = await db
     .from("haynespro_vehicle_cache")
     .select(
-      "reg, car_type_id, repairtime_type_id, description, hp_make, hp_model_label, durations, expires_at",
+      "reg, car_type_id, repairtime_type_id, description, hp_make, hp_model_label, expires_at",
     )
     .eq("reg", key)
     .maybeSingle();
@@ -254,7 +252,6 @@ export async function resolveVehicle(
       description: cached.description,
       hpMake: cached.hp_make,
       hpModelLabel: cached.hp_model_label,
-      durations: (cached.durations ?? {}) as Record<string, number>,
     };
   }
 
@@ -271,7 +268,7 @@ export async function resolveVehicle(
     return null;
   }
 
-  // 3. Cache it (upsert replaces an expired row and resets the TTL + durations).
+  // 3. Cache it (upsert replaces an expired row and resets the TTL).
   await db.from("haynespro_vehicle_cache").upsert({
     reg: key,
     car_type_id: resolved.carTypeId,
@@ -280,7 +277,6 @@ export async function resolveVehicle(
     hp_make: resolved.hpMake,
     hp_model_label: resolved.hpModelLabel,
     resolved_via: resolved.via,
-    durations: {},
     created_at: new Date().toISOString(),
     expires_at: new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString(),
   });
@@ -292,30 +288,7 @@ export async function resolveVehicle(
     description: resolved.description,
     hpMake: resolved.hpMake,
     hpModelLabel: resolved.hpModelLabel,
-    durations: {},
   };
-}
-
-/** Persist a lazily-computed raw duration onto the vehicle's cache row. */
-export async function storeCachedDuration(
-  reg: string,
-  serviceId: string,
-  rawHours: number,
-  db: DbClient,
-): Promise<void> {
-  const key = cacheKey(reg);
-  const { data } = await db
-    .from("haynespro_vehicle_cache")
-    .select("durations")
-    .eq("reg", key)
-    .maybeSingle();
-  if (!data) return;
-  const durations = { ...((data.durations ?? {}) as Record<string, number>) };
-  durations[serviceId] = rawHours;
-  await db
-    .from("haynespro_vehicle_cache")
-    .update({ durations })
-    .eq("reg", key);
 }
 
 // ---------------------------------------------------------------------------

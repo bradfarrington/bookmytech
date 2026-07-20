@@ -3,6 +3,7 @@ import { CalendarRange } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { geocodePostcode, type LatLng } from "@/lib/geo/postcodes";
 import { Overline } from "@/components/ui/overline";
+import { SPECIALISMS } from "@/lib/specialisms";
 import {
   AvailabilityEditor,
   type DayHours,
@@ -13,7 +14,6 @@ export const dynamic = "force-dynamic";
 
 // Mon-first display order, JS day_of_week values.
 const DAY_ORDER = [1, 2, 3, 4, 5, 6, 0];
-const MS_WEEK = 7 * 86_400_000;
 
 interface AvailRow {
   day_of_week: number;
@@ -46,34 +46,6 @@ export default async function MechanicAvailabilityPage() {
     .select("day_of_week, is_active, start_time, end_time")
     .eq("mechanic_id", user.id);
 
-  const { data: services } = await supabase
-    .from("services")
-    .select("name, slug")
-    .eq("is_active", true)
-    .order("display_order", { ascending: true });
-
-  // Own offers in the last 7 days, grouped by the booking's service slug — a
-  // RLS-safe proxy for "demand for this specialism" (a mechanic can't see other
-  // mechanics' offers, so a true area-wide count isn't available here).
-  const weekAgo = new Date(Date.now() - MS_WEEK).toISOString();
-  const { data: recentOffers } = await supabase
-    .from("job_offers")
-    .select("booking:bookings(service:services(slug))")
-    .eq("mechanic_id", user.id)
-    .gte("offered_at", weekAgo);
-
-  const offerCounts = new Map<string, number>();
-  for (const row of (recentOffers ?? []) as Array<{ booking: unknown }>) {
-    const booking = Array.isArray(row.booking) ? row.booking[0] : row.booking;
-    const service = booking
-      ? Array.isArray((booking as { service: unknown }).service)
-        ? (booking as { service: { slug?: string }[] }).service[0]
-        : (booking as { service: { slug?: string } }).service
-      : null;
-    const slug = service?.slug;
-    if (slug) offerCounts.set(slug, (offerCounts.get(slug) ?? 0) + 1);
-  }
-
   const baseCoords: LatLng | null = await geocodePostcode(mechanic?.base_postcode);
 
   // Build exactly 7 day rows in Mon-first order.
@@ -92,13 +64,7 @@ export default async function MechanicAvailabilityPage() {
     };
   });
 
-  const specialismTiles: SpecialismTile[] = (services ?? []).map(
-    (s: { name: string; slug: string }) => ({
-      slug: s.slug,
-      name: s.name,
-      weekCount: offerCounts.get(s.slug) ?? 0,
-    }),
-  );
+  const specialismTiles: SpecialismTile[] = SPECIALISMS;
 
   return (
     <div className="space-y-6">
@@ -109,7 +75,7 @@ export default async function MechanicAvailabilityPage() {
           Availability
         </h1>
         <p className="mt-1 text-sm text-text-muted">
-          Set your working hours, how far you&apos;ll travel, and the services you take.
+          Set your working hours, how far you&apos;ll travel, and your specialisms.
         </p>
       </header>
 

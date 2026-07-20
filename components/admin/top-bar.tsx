@@ -6,7 +6,7 @@ import { Icon } from "@/components/ui/icon";
 
 // Maps a route to its breadcrumb pair: [group, label]. New admin routes need
 // adding here so the top-bar can render their crumb. Patterns with `[id]` are
-// matched by `/admin/services/{id}/edit` etc. — see `matchCrumb`.
+// matched by `/admin/parts/{id}/edit` etc. — see `matchCrumb`.
 const CRUMBS: Record<string, readonly [string, string]> = {
   "/admin": ["Operations", "Overview"],
   "/admin/jobs": ["Operations", "All jobs"],
@@ -21,15 +21,6 @@ const CRUMBS: Record<string, readonly [string, string]> = {
   "/admin/pricing": ["Commercial", "Pricing"],
   "/admin/areas": ["Commercial", "Areas & demand"],
   "/admin/analytics": ["Commercial", "Analytics"],
-  "/admin/services": ["Commercial", "Services"],
-  "/admin/services/new": ["Services", "New service"],
-  "/admin/services/[id]/edit": ["Services", "Edit service"],
-  "/admin/services/settings": ["Services", "Settings"],
-  "/admin/services/settings/categories/new": ["Settings", "New category"],
-  "/admin/services/settings/categories/[id]/edit": [
-    "Settings",
-    "Edit category",
-  ],
   "/admin/parts": ["Commercial", "Parts catalogue"],
   "/admin/parts/new": ["Parts", "New part"],
   "/admin/parts/[id]/edit": ["Parts", "Edit part"],

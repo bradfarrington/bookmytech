@@ -156,7 +156,7 @@ export async function completeAndCharge(bookingId: string): Promise<JobProgressR
     .select(
       `id, job_number, status, mechanic_id, customer_id, customer_email, customer_name, customer_phone, total_pence,
        mechanic_payout_pence, credit_applied_pence, payment_mode,
-       stripe_payment_intent_id, service:services(name)`,
+       stripe_payment_intent_id, repair_description`,
     )
     .eq("id", bookingId)
     .single();
@@ -362,14 +362,12 @@ export async function completeAndCharge(bookingId: string): Promise<JobProgressR
   }
 
   // --- Receipt email --------------------------------------------------------
-  const serviceName =
-    (Array.isArray(booking.service) ? booking.service[0]?.name : (booking.service as { name?: string } | null)?.name) ??
-    "your service";
+  const serviceName = booking.repair_description ?? "Vehicle repair";
   const receiptEmail = booking.customer_email;
   if (receiptEmail) {
     const creditLine =
       (booking.credit_applied_pence ?? 0) > 0
-        ? `Service total ${formatPrice(booking.total_pence ?? 0)} · account credit −${formatPrice(booking.credit_applied_pence ?? 0)}`
+        ? `Repair total ${formatPrice(booking.total_pence ?? 0)} · account credit −${formatPrice(booking.credit_applied_pence ?? 0)}`
         : "";
     const chargeLine =
       chargePence > 0

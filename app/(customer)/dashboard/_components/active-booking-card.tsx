@@ -44,7 +44,7 @@ export function ActiveBookingCard({ booking, mechanic }: ActiveBookingCardProps)
           <p className="text-xs font-semibold uppercase tracking-wide text-white/70">
             Your active booking
           </p>
-          <p className="mt-0.5 font-bold">{booking.serviceName}</p>
+          <p className="mt-0.5 font-bold">{booking.repairDescription}</p>
         </div>
         <span className="rounded-full bg-white/20 px-3 py-1 text-xs font-semibold">
           {STATUS_LABELS[booking.status] ?? booking.status}

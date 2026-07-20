@@ -1,23 +1,11 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { Overline } from "@/components/ui/overline";
-import {
-  MechanicForm,
-  type ServiceOption,
-} from "../_components/mechanic-form";
+import { SPECIALISMS } from "@/lib/specialisms";
+import { MechanicForm } from "../_components/mechanic-form";
 
-export default async function NewMechanicPage() {
-  const supabase = await createClient();
-  const { data: services } = await supabase
-    .from("services")
-    .select("slug, name")
-    .eq("is_active", true)
-    .order("display_order", { ascending: true });
-
-  const serviceOptions: ServiceOption[] = (services ?? []) as ServiceOption[];
-
+export default function NewMechanicPage() {
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <Link href="/admin/mechanics">
@@ -38,7 +26,7 @@ export default async function NewMechanicPage() {
         </p>
       </header>
 
-      <MechanicForm services={serviceOptions} />
+      <MechanicForm services={SPECIALISMS} />
     </div>
   );
 }

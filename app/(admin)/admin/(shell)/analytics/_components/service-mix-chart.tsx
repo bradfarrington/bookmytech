@@ -30,7 +30,7 @@ export function ServiceMixChart({ data }: { data: ServiceMixDatum[] }) {
       <div className="flex items-center gap-2">
         <PieIcon size={16} className="text-brand-blue" />
         <h2 className="text-sm font-bold tracking-tight text-text-primary">
-          Service mix
+          Repair mix
         </h2>
         <span className="text-xs text-text-muted">share of GMV</span>
       </div>

@@ -26,8 +26,6 @@ export interface DayHours {
 export interface SpecialismTile {
   slug: string;
   name: string;
-  /** Mechanic's own offers for this service in the last 7 days. */
-  weekCount: number;
 }
 
 export interface AvailabilityEditorProps {
@@ -287,7 +285,8 @@ function Specialisms({
   return (
     <Card padded={false}>
       <SectionHeader icon={Wrench} title="Specialisms">
-        Pick the services you take. Leave all off to be offered every job type.
+        The work you&apos;re strongest at — shown on your profile. You&apos;re
+        offered every job in your travel range either way.
       </SectionHeader>
       <div className="grid grid-cols-2 gap-3 p-5 sm:grid-cols-3">
         {tiles.map((t) => {
@@ -316,17 +315,12 @@ function Specialisms({
                 </span>
                 {on && <Check size={14} className="shrink-0 text-brand-blue" />}
               </span>
-              <span className="text-[11px] text-text-muted">
-                {t.weekCount > 0
-                  ? `${t.weekCount} offer${t.weekCount === 1 ? "" : "s"} this week`
-                  : "No recent offers"}
-              </span>
             </button>
           );
         })}
         {tiles.length === 0 && (
           <p className="col-span-full text-sm text-text-muted">
-            No services configured yet.
+            No specialisms defined.
           </p>
         )}
       </div>

@@ -4,7 +4,7 @@ import { Footer } from "./_components/footer";
 import { Hero } from "./_components/hero";
 import { HowItWorks } from "./_components/how-it-works";
 import { Reviews } from "./_components/reviews";
-import { ServicesPreview } from "./_components/services-preview";
+import { RepairsPreview } from "./_components/repairs-preview";
 import { TrustStrip } from "./_components/trust-strip";
 import { WhyBmt } from "./_components/why-bmt";
 
@@ -15,7 +15,7 @@ export default function HomePage() {
       <TrustStrip />
       <HowItWorks />
       <Reviews />
-      <ServicesPreview />
+      <RepairsPreview />
       <WhyBmt />
       <Faq />
       <FinalCta />

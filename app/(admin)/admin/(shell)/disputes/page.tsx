@@ -27,16 +27,14 @@ interface Row {
   opened_by_role: string;
   reason_category: string;
   created_at: string;
-  booking: { id: string; job_number: number | null; service: { name: string | null } | { name: string | null }[] | null } | { id: string; job_number: number | null; service: unknown }[] | null;
+  booking: { id: string; job_number: number | null; repair_description: string | null } | { id: string; job_number: number | null; repair_description: string | null }[] | null;
 }
 
 function bookingOf(r: Row) {
   return Array.isArray(r.booking) ? r.booking[0] : r.booking;
 }
-function serviceName(r: Row): string {
-  const b = bookingOf(r) as { service?: { name?: string } | { name?: string }[] } | null;
-  const s = Array.isArray(b?.service) ? b?.service[0] : b?.service;
-  return s?.name ?? "Service";
+function repairName(r: Row): string {
+  return bookingOf(r)?.repair_description ?? "Vehicle repair";
 }
 
 function ago(iso: string): string {
@@ -51,7 +49,7 @@ export default async function AdminDisputesPage() {
   const admin = createAdminClient();
   const { data } = await admin
     .from("disputes")
-    .select("id, status, opened_by_role, reason_category, created_at, booking:bookings(id, job_number, service:services(name))")
+    .select("id, status, opened_by_role, reason_category, created_at, booking:bookings(id, job_number, repair_description)")
     .order("created_at", { ascending: true });
 
   const rows = ((data as Row[]) ?? []).sort(
@@ -81,7 +79,7 @@ export default async function AdminDisputesPage() {
             <thead className="border-b border-border bg-surface text-left text-xs uppercase tracking-wide text-text-muted">
               <tr>
                 <th className="px-4 py-3 font-semibold">Ref</th>
-                <th className="px-4 py-3 font-semibold">Service</th>
+                <th className="px-4 py-3 font-semibold">Repair</th>
                 <th className="px-4 py-3 font-semibold">Reason</th>
                 <th className="px-4 py-3 font-semibold">Raised by</th>
                 <th className="px-4 py-3 font-semibold">Age</th>
@@ -98,7 +96,7 @@ export default async function AdminDisputesPage() {
                         #{formatJobNumber(b?.job_number)}
                       </Link>
                     </td>
-                    <td className="px-4 py-3 text-text-primary">{serviceName(r)}</td>
+                    <td className="px-4 py-3 text-text-primary">{repairName(r)}</td>
                     <td className="px-4 py-3 text-text-secondary">{REASON_LABELS[r.reason_category] ?? r.reason_category}</td>
                     <td className="px-4 py-3 capitalize text-text-secondary">{r.opened_by_role}</td>
                     <td className="px-4 py-3 text-text-muted">{ago(r.created_at)}</td>

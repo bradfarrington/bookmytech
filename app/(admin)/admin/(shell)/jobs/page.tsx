@@ -16,31 +16,25 @@ export default async function AdminJobsPage() {
   const { data: bookingsRaw } = await supabase
     .from("bookings")
     .select(
-      "id, job_number, status, area, total_pence, customer_name, vehicle_reg, vehicle_make, vehicle_model, mechanic_id, service_id, repair_description, scheduled_at, created_at",
+      "id, job_number, status, area, total_pence, customer_name, vehicle_reg, vehicle_make, vehicle_model, mechanic_id, repair_description, scheduled_at, created_at",
     )
     .order("created_at", { ascending: false })
     .limit(1000);
 
   const bookings = bookingsRaw ?? [];
 
-  const serviceIds = [...new Set(bookings.map((b) => b.service_id).filter(Boolean))];
   const mechanicIds = [...new Set(bookings.map((b) => b.mechanic_id).filter(Boolean))];
 
-  const [{ data: allServices }, { data: mechProfiles }] = await Promise.all([
-    supabase.from("services").select("id, name").order("display_order"),
-    mechanicIds.length
-      ? supabase.from("profiles").select("id, full_name").in("id", mechanicIds)
-      : Promise.resolve({ data: [] as { id: string; full_name: string | null }[] }),
-  ]);
+  const { data: mechProfiles } = mechanicIds.length
+    ? await supabase.from("profiles").select("id, full_name").in("id", mechanicIds)
+    : { data: [] as { id: string; full_name: string | null }[] };
 
-  const serviceName = new Map((allServices ?? []).map((s) => [s.id, s.name]));
   const mechanicName = new Map((mechProfiles ?? []).map((p) => [p.id, p.full_name]));
 
   const rows: BookingRow[] = bookings.map((b) => ({
     id: b.id,
     jobNumber: b.job_number,
-    service: b.repair_description ?? serviceName.get(b.service_id) ?? "Unknown service",
-    serviceId: b.service_id,
+    service: b.repair_description ?? "Vehicle repair",
     customer: b.customer_name ?? "—",
     vehicle: vehicleLabel(b.vehicle_reg, b.vehicle_make, b.vehicle_model),
     area: b.area,
@@ -50,8 +44,7 @@ export default async function AdminJobsPage() {
     scheduledAt: b.scheduled_at,
   }));
 
-  // Filter options — only services that actually appear, plus distinct areas.
-  const usedServices = (allServices ?? []).filter((s) => serviceIds.includes(s.id));
+  // Filter options — distinct areas.
   const areas = [
     ...new Set(bookings.map((b) => b.area).filter((a): a is string => Boolean(a))),
   ].sort();
@@ -69,7 +62,7 @@ export default async function AdminJobsPage() {
         </p>
       </header>
 
-      <BookingsTable bookings={rows} services={usedServices} areas={areas} />
+      <BookingsTable bookings={rows} areas={areas} />
     </div>
   );
 }

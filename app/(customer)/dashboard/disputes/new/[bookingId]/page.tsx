@@ -31,7 +31,7 @@ export default async function NewDisputePage({
 
   const { data: booking } = await admin
     .from("bookings")
-    .select("id, status, customer_id, completed_at, total_pence, service:services(name)")
+    .select("id, status, customer_id, completed_at, total_pence, repair_description")
     .eq("id", bookingId)
     .single();
 
@@ -50,9 +50,7 @@ export default async function NewDisputePage({
   if (existing) redirect(`/dashboard/disputes/${existing.id}`);
   if (!inWindow) redirect("/dashboard");
 
-  const svc =
-    (Array.isArray(booking.service) ? booking.service[0]?.name : (booking.service as { name?: string } | null)?.name) ??
-    "Your booking";
+  const svc = booking.repair_description ?? "Your booking";
 
   return (
     <div className="min-h-dvh bg-surface">

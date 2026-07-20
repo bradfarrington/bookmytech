@@ -49,15 +49,14 @@ interface DisputeBooking {
   mechanic_id: string | null;
   completed_at: string | null;
   total_pence: number | null;
-  service: { name: string | null } | { name: string | null }[] | null;
+  repair_description: string | null;
 }
 
 const DISPUTE_BOOKING_SELECT =
-  "id, job_number, status, customer_id, customer_email, customer_name, mechanic_id, completed_at, total_pence, service:services(name)";
+  "id, job_number, status, customer_id, customer_email, customer_name, mechanic_id, completed_at, total_pence, repair_description";
 
 function serviceName(b: DisputeBooking): string {
-  const s = Array.isArray(b.service) ? b.service[0] : b.service;
-  return s?.name ?? "your booking";
+  return b.repair_description ?? "Vehicle repair";
 }
 
 /** The mechanic's email lives on the auth user, not the profile. */

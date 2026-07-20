@@ -9,11 +9,6 @@ import { toast } from "sonner";
 // this listener picks it up post-navigation, fires the toast, and strips the
 // param from the URL so a refresh doesn't re-toast.
 const FLASH_MESSAGES: Record<string, string> = {
-  "service-created": "Service created.",
-  "service-updated": "Service updated.",
-  "category-created": "Category created.",
-  "category-updated": "Category updated.",
-  "category-deleted": "Category deleted.",
   "mechanic-created": "Mechanic created. Invite email sent.",
   "mechanic-updated": "Mechanic updated.",
   "mechanic-deleted": "Mechanic deleted.",

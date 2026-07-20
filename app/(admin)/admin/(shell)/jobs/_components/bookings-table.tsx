@@ -12,7 +12,6 @@ export interface BookingRow {
   id: string;
   jobNumber: number | null;
   service: string;
-  serviceId: string;
   customer: string;
   vehicle: string;
   area: string | null;
@@ -24,7 +23,6 @@ export interface BookingRow {
 
 interface BookingsTableProps {
   bookings: BookingRow[];
-  services: ReadonlyArray<{ id: string; name: string }>;
   areas: readonly string[];
 }
 
@@ -83,10 +81,9 @@ function formatDate(iso: string | null): string {
   });
 }
 
-export function BookingsTable({ bookings, services, areas }: BookingsTableProps) {
+export function BookingsTable({ bookings, areas }: BookingsTableProps) {
   const [tab, setTab] = useState<Tab>("all");
   const [area, setArea] = useState<string>("all");
-  const [service, setService] = useState<string>("all");
   const [query, setQuery] = useState("");
 
   const filtered = useMemo(() => {
@@ -94,7 +91,6 @@ export function BookingsTable({ bookings, services, areas }: BookingsTableProps)
     return bookings.filter((b) => {
       if (!matchesTab(b.status, tab)) return false;
       if (area !== "all" && b.area !== area) return false;
-      if (service !== "all" && b.serviceId !== service) return false;
       if (
         q &&
         !(
@@ -107,7 +103,7 @@ export function BookingsTable({ bookings, services, areas }: BookingsTableProps)
         return false;
       return true;
     });
-  }, [bookings, tab, area, service, query]);
+  }, [bookings, tab, area, query]);
 
   // CSV export mirrors the active filters; the route handler re-queries
   // server-side so PII is never assembled in the browser.
@@ -115,19 +111,14 @@ export function BookingsTable({ bookings, services, areas }: BookingsTableProps)
     const params = new URLSearchParams();
     if (tab !== "all") params.set("tab", tab);
     if (area !== "all") params.set("area", area);
-    if (service !== "all") params.set("service", service);
     if (query.trim()) params.set("q", query.trim());
     const qs = params.toString();
     return `/admin/jobs/export${qs ? `?${qs}` : ""}`;
-  }, [tab, area, service, query]);
+  }, [tab, area, query]);
 
   const areaOptions = [
     { value: "all", label: "All areas" },
     ...areas.map((a) => ({ value: a, label: a })),
-  ];
-  const serviceOptions = [
-    { value: "all", label: "All services" },
-    ...services.map((s) => ({ value: s.id, label: s.name })),
   ];
 
   return (
@@ -164,13 +155,6 @@ export function BookingsTable({ bookings, services, areas }: BookingsTableProps)
             />
           </div>
           <Select<string>
-            value={service}
-            onChange={setService}
-            options={serviceOptions}
-            aria-label="Filter by service"
-            className="max-w-[180px]"
-          />
-          <Select<string>
             value={area}
             onChange={setArea}
             options={areaOptions}
@@ -206,7 +190,7 @@ export function BookingsTable({ bookings, services, areas }: BookingsTableProps)
               <thead className="border-b border-border bg-surface text-[11px] font-semibold uppercase tracking-[0.04em] text-text-muted">
                 <tr>
                   <th className="px-5 py-3">Ref</th>
-                  <th className="px-5 py-3">Service</th>
+                  <th className="px-5 py-3">Repair</th>
                   <th className="px-5 py-3">Customer</th>
                   <th className="px-5 py-3">Vehicle</th>
                   <th className="px-5 py-3">Area</th>

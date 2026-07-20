@@ -12,7 +12,7 @@ import { Icon } from "@/components/ui/icon";
 const NAV_ITEMS = [
   { label: "Book", href: "/book" },
   { label: "How it works", href: "/#how-it-works" },
-  { label: "Services", href: "/services" },
+  { label: "Repairs", href: "/#repairs" },
   { label: "For mechanics", href: "/mechanics" },
   { label: "Help", href: "/help" },
 ] as const;

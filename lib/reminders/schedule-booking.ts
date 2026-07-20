@@ -12,12 +12,13 @@ interface BookingForReminders {
   customer_email: string | null;
   completed_at: string | null;
   scheduled_at: string | null;
-  service: { slug: string | null } | { slug: string | null }[] | null;
+  repair_description: string | null;
 }
 
+// derive.ts keys the brake follow-up off the old "brakes-tyres" service slug;
+// with the packaged catalogue gone, infer it from the repair description.
 function serviceSlug(b: BookingForReminders): string | null {
-  const s = Array.isArray(b.service) ? b.service[0] : b.service;
-  return s?.slug ?? null;
+  return /brake/i.test(b.repair_description ?? "") ? "brakes-tyres" : null;
 }
 
 /**
@@ -91,4 +92,4 @@ export async function scheduleRemindersForBooking(
 
 /** The select string callers should use to load a booking for this helper. */
 export const REMINDER_BOOKING_SELECT =
-  "id, vehicle_reg, customer_id, customer_email, completed_at, scheduled_at, service:services(slug)";
+  "id, vehicle_reg, customer_id, customer_email, completed_at, scheduled_at, repair_description";

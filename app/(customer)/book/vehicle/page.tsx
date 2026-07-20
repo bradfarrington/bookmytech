@@ -10,9 +10,6 @@ import { VehicleConfirmCard } from "./_components/vehicle-confirm-card";
 interface VehiclePageProps {
   searchParams: Promise<{
     reg?: string;
-    make?: string;
-    model?: string;
-    year?: string;
     postcode?: string;
   }>;
 }
@@ -21,34 +18,15 @@ export default async function VehiclePage({ searchParams }: VehiclePageProps) {
   const params = await searchParams;
   const raw = params.reg ?? "";
 
-  // Need either a registration (plate path) or a make (car-details path).
-  if (!raw.trim() && !params.make) {
+  // Repairs are priced from the reg (DVLA → HaynesPro), so it's required.
+  if (!raw.trim()) {
     redirect("/book");
   }
 
   const reg = normaliseReg(raw);
   const postcode = (params.postcode ?? "").trim();
   const postcodeSuffix = postcode ? `&postcode=${encodeURIComponent(postcode)}` : "";
-  const nextHref = `/book/service?reg=${encodeURIComponent(reg)}${postcodeSuffix}`;
-
-  // If we already have manually-entered vehicle details, skip the lookup
-  if (params.make) {
-    const make = params.make.toUpperCase();
-    const model = params.model ?? "";
-    const year = params.year ? parseInt(params.year, 10) : undefined;
-    return (
-      <VehicleConfirmCard
-        details={{
-          registrationNumber: reg,
-          make,
-          model: model || undefined,
-          yearOfManufacture: year,
-        }}
-        reg={reg}
-        nextHref={`${nextHref}&make=${encodeURIComponent(make)}&model=${encodeURIComponent(model)}`}
-      />
-    );
-  }
+  const nextHref = `/book/repairs?reg=${encodeURIComponent(reg)}${postcodeSuffix}`;
 
   const result = await lookupVehicleAction(reg);
 

@@ -12,12 +12,6 @@ import { Overline } from "@/components/ui/overline";
 
 export const dynamic = "force-dynamic";
 
-// One-to-one Supabase joins arrive typed as arrays; normalise to a single row.
-function one<T>(value: T | T[] | null | undefined): T | null {
-  if (Array.isArray(value)) return value[0] ?? null;
-  return value ?? null;
-}
-
 type JobStatus =
   | "confirmed"
   | "en_route"
@@ -48,7 +42,7 @@ interface BookingRow {
   commission_rate: number | null;
   vehicle_make: string | null;
   vehicle_model: string | null;
-  service: unknown;
+  repair_description: string | null;
 }
 
 interface JobItem {
@@ -59,11 +53,6 @@ interface JobItem {
   title: string;
   where: string;
   earnings: string;
-}
-
-function serviceName(service: unknown): string {
-  const s = one(service as never) as { name?: string | null } | null;
-  return s?.name ?? "Service";
 }
 
 function whenLabel(iso: string | null, window: string | null): string {
@@ -116,7 +105,7 @@ export default async function MechanicSchedulePage() {
   const { data: rows } = await supabase
     .from("bookings")
     .select(
-      "id, scheduled_at, slot_window, status, postcode, area, total_pence, commission_rate, vehicle_make, vehicle_model, service:services(name)",
+      "id, scheduled_at, slot_window, status, postcode, area, total_pence, commission_rate, vehicle_make, vehicle_model, repair_description",
     )
     .eq("mechanic_id", user.id)
     .order("scheduled_at", { ascending: true });
@@ -130,7 +119,7 @@ export default async function MechanicSchedulePage() {
       status,
       whenLabel: whenLabel(b.scheduled_at, b.slot_window),
       sortKey: b.scheduled_at ? new Date(b.scheduled_at).getTime() : 0,
-      title: `${serviceName(b.service)} · ${[b.vehicle_make, b.vehicle_model].filter(Boolean).join(" ") || "Vehicle"}`,
+      title: `${b.repair_description ?? "Vehicle repair"} · ${[b.vehicle_make, b.vehicle_model].filter(Boolean).join(" ") || "Vehicle"}`,
       where: b.area ?? b.postcode ?? "—",
       earnings: formatPrice(
         mechanicSharePence(b.total_pence ?? 0, b.commission_rate ?? 0.15),

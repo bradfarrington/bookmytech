@@ -153,16 +153,11 @@ export function MechanicForm({ services }: MechanicFormProps) {
         <div className={FIELD_LABEL}>
           <span>Specialisms</span>
           <span className="text-xs font-normal text-text-muted">
-            Which services this mechanic can handle. Drives dispatch matching later.
+            The work this mechanic is strongest at — profile and vetting
+            context only. Jobs are offered to every mechanic in range.
           </span>
           {services.length === 0 ? (
-            <p className="text-sm text-text-muted">
-              No services defined yet. Add some in{" "}
-              <Link href="/admin/services" className="text-brand-blue hover:underline">
-                Services
-              </Link>{" "}
-              first.
-            </p>
+            <p className="text-sm text-text-muted">No specialisms defined.</p>
           ) : (
             <div className="grid grid-cols-2 gap-2 pt-1 sm:grid-cols-3">
               {services.map((service) => (

@@ -2,7 +2,6 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { geocodePostcode, haversineMiles, type LatLng } from "@/lib/geo/postcodes";
 import { mechanicSharePence } from "@/lib/earnings";
-import { estimatedDurationLabel } from "@/lib/jobs/estimates";
 import { isHaynesProSsoConfigured } from "@/lib/haynespro/sso";
 import { formatBookingSlot } from "@/lib/slots";
 import { formatJobNumber } from "@/lib/utils";
@@ -13,12 +12,6 @@ export const dynamic = "force-dynamic";
 
 interface PageProps {
   params: Promise<{ id: string }>;
-}
-
-// One-to-one Supabase joins arrive typed as arrays; normalise to a single row.
-function one<T>(value: T | T[] | null | undefined): T | null {
-  if (Array.isArray(value)) return value[0] ?? null;
-  return value ?? null;
 }
 
 const REVEAL_PHONE_STATUSES = ["en_route", "in_progress"];
@@ -43,15 +36,12 @@ export default async function MechanicJobDetailPage({ params }: PageProps) {
        address_line_1, address_line_2,
        customer_name, customer_phone, special_instructions,
        cancellation_reason, reschedule_status, reschedule_proposed_at,
-       repair_description, service_duration_hours,
-       service:services(name, slug)`,
+       repair_description, service_duration_hours`,
     )
     .eq("id", id)
     .maybeSingle();
 
   if (!booking) notFound();
-
-  const service = one(booking.service as never) as { name?: string; slug?: string } | null;
 
   const { data: mechanic } = await supabase
     .from("mechanics")
@@ -123,7 +113,6 @@ export default async function MechanicJobDetailPage({ params }: PageProps) {
 
   // --- Match reasons --------------------------------------------------------
   const specialisms: string[] = Array.isArray(mechanic?.specialisms) ? mechanic.specialisms : [];
-  const slug = service?.slug ?? null;
   const rating = mechanic?.rating ?? 0;
 
   const matchReasons: Array<{ label: string; detail: string }> = [];
@@ -138,12 +127,7 @@ export default async function MechanicJobDetailPage({ params }: PageProps) {
       detail: `Within your ${radiusMiles}-mile coverage`,
     });
   }
-  if (slug && specialisms.includes(slug)) {
-    matchReasons.push({
-      label: "Specialism match",
-      detail: `${service?.name ?? "This service"} is one of your declared specialisms`,
-    });
-  } else if (specialisms.length === 0) {
+  if (specialisms.length === 0) {
     matchReasons.push({
       label: "Open to all services",
       detail: "You haven't restricted to specific specialisms",
@@ -174,16 +158,13 @@ export default async function MechanicJobDetailPage({ params }: PageProps) {
     status: booking.status,
     shortRef: formatJobNumber(booking.job_number),
     createdAt: booking.created_at,
-    serviceName: booking.repair_description ?? service?.name ?? "Service",
+    serviceName: booking.repair_description ?? "Vehicle repair",
     vehicle: [booking.vehicle_make, booking.vehicle_model].filter(Boolean).join(" ") || "Vehicle",
     reg: booking.vehicle_reg,
     whenLabel,
     distanceLabel,
-    // Repair bookings carry an exact billed duration; packaged services use
-    // the per-slug estimate label.
-    durationLabel: booking.repair_description
-      ? `~${Number(booking.service_duration_hours ?? 1)}h`
-      : estimatedDurationLabel(slug),
+    // Every booking carries its exact billed duration (book time).
+    durationLabel: `~${Number(booking.service_duration_hours ?? 1)}h`,
     earningsPence:
       mechanicSharePence(booking.total_pence ?? 0, booking.commission_rate ?? 0.15) -
       bmtPartsPence,

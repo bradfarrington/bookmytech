@@ -39,17 +39,23 @@ export async function RepairBrowser({
   if (!vehicle) {
     return (
       <Empty>
-        We couldn&apos;t match your reg to a repair database entry, so
-        per-repair booking isn&apos;t available for this vehicle yet. Our
-        standard services above are all still bookable.
+        We couldn&apos;t match your reg to our repair database, so we
+        can&apos;t price repairs for this vehicle online yet. Please{" "}
+        <Link href="/help" className="font-semibold text-brand-blue hover:underline">
+          get in touch
+        </Link>{" "}
+        and we&apos;ll sort it for you.
       </Empty>
     );
   }
   if (vehicle.repairtimeTypeId == null) {
     return (
       <Empty>
-        There&apos;s no repair-time data for this exact vehicle yet. Our
-        standard services are all still bookable.
+        There&apos;s no repair-time data for this exact vehicle yet. Please{" "}
+        <Link href="/help" className="font-semibold text-brand-blue hover:underline">
+          get in touch
+        </Link>{" "}
+        and we&apos;ll sort it for you.
       </Empty>
     );
   }
@@ -71,7 +77,7 @@ export async function RepairBrowser({
   ]
     .filter(Boolean)
     .join("&");
-  const base = `/book/service?reg=${encodeURIComponent(reg)}${vehicleParams ? `&${vehicleParams}` : ""}&view=repairs`;
+  const base = `/book/repairs?reg=${encodeURIComponent(reg)}${vehicleParams ? `&${vehicleParams}` : ""}`;
 
   const trail = crumbs
     ? crumbs.split("|").map((part) => {

@@ -2,6 +2,16 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   devIndicators: false,
+  async redirects() {
+    return [
+      // The packaged-services catalogue is gone (Task 17): every booking is a
+      // HaynesPro repair. Keep old links (emails, bookmarks, in-flight
+      // sessions) landing somewhere sensible. Query strings pass through, so
+      // an old /book/service?reg=… link keeps its reg.
+      { source: "/book/service", destination: "/book/repairs", permanent: true },
+      { source: "/services", destination: "/book", permanent: true },
+    ];
+  },
   experimental: {
     serverActions: {
       // Uploads (onboarding docs, job photos, avatars) go through Server Actions.

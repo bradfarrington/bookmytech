@@ -8,7 +8,7 @@ import { sendSms } from "@/lib/sms/send-sms";
 import { renderSmsTemplate } from "@/lib/sms/render-template";
 import { formatPrice, formatJobNumber } from "@/lib/utils";
 import { dispatchBooking } from "@/lib/dispatch/dispatch";
-import { calculatePrice } from "@/lib/pricing/calculate";
+import { quoteRepair } from "@/lib/haynespro/repair-booking";
 import { trackEvent } from "@/app/actions/track-event";
 import { FUNNEL_EVENTS } from "@/lib/analytics/events";
 import { availableCreditPence, redeemCreditForBooking } from "@/lib/credits/credits";
@@ -21,11 +21,9 @@ export interface CreateBookingInput {
   vehicleReg: string;
   vehicleMake: string;
   vehicleModel?: string;
-  serviceName: string;
-  serviceId: string;
-  /** HaynesPro repair node id — a one-off repair booking (Task 16 Stage G).
-   *  The server re-quotes it from (reg, nodeId); nothing priced client-side. */
-  repairNodeId?: string;
+  /** HaynesPro repair node id — what's being booked. The server re-quotes it
+   *  from (reg, nodeId); nothing is priced client-side. */
+  repairNodeId: string;
   scheduledAt: string; // ISO string — the window start
   /** Human arrival window the customer picked ("8am–10am" … "All day (8am–8pm)"). */
   slotWindow?: string;
@@ -78,41 +76,22 @@ export async function createBookingAction(
   const passedCredit = customerId ? Math.max(0, Math.round(input.creditAppliedPence ?? 0)) : 0;
 
   // Recompute the canonical price server-side — never trust a client-supplied
-  // total. The same inputs produced the prepare amount moments earlier. The
-  // full breakdown is snapshotted onto the row so later pricing changes never
-  // apply retroactively. One-off repairs (Task 16 Stage G) re-quote from
-  // (reg, repair node) and attach to the hidden container service.
-  let price;
-  let serviceId = input.serviceId;
-  let repairDescription: string | null = null;
-  try {
-    if (input.repairNodeId) {
-      const { quoteRepair, repairContainerServiceId } = await import(
-        "@/lib/haynespro/repair-booking"
-      );
-      const admin = createAdminClient();
-      const [quote, containerId] = await Promise.all([
-        quoteRepair(input.vehicleReg, input.repairNodeId, admin),
-        repairContainerServiceId(admin),
-      ]);
-      if (!quote || !containerId) {
-        return {
-          ok: false,
-          error: "We couldn't price this repair. Please start the booking again.",
-        };
-      }
-      price = quote.breakdown;
-      serviceId = containerId;
-      repairDescription = quote.description;
-    } else {
-      price = await calculatePrice(input.serviceId, input.postcode, undefined, {
-        reg: input.vehicleReg,
-      });
-    }
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Pricing failed";
-    return { ok: false, error: message };
+  // total. The same (reg, repair node) inputs produced the prepare amount
+  // moments earlier. The full breakdown is snapshotted onto the row so later
+  // pricing changes never apply retroactively.
+  const quote = await quoteRepair(
+    input.vehicleReg,
+    input.repairNodeId,
+    createAdminClient(),
+  );
+  if (!quote) {
+    return {
+      ok: false,
+      error: "We couldn't price this repair. Please start the booking again.",
+    };
   }
+  const price = quote.breakdown;
+  const repairDescription = quote.description;
 
   // Write the booking through the service-role client (the codebase convention —
   // see 0023: "all writes go through the service-role client in the server").
@@ -126,8 +105,7 @@ export async function createBookingAction(
     .from("bookings")
     .insert({
       customer_id: customerId,
-      service_id: serviceId,
-      repair_node_id: input.repairNodeId ?? null,
+      repair_node_id: input.repairNodeId,
       repair_description: repairDescription,
       vehicle_reg: input.vehicleReg,
       vehicle_make: input.vehicleMake,
@@ -177,36 +155,10 @@ export async function createBookingAction(
     }
   }
 
-  // Snapshot the service's configured parts as booking line items (see Task 10
-  // Stage 2). Service-role; default sourcing 'self'. Non-fatal.
-  try {
-    const { createAdminClient: mk } = await import("@/lib/supabase/admin");
-    const { getConfiguredParts } = await import("@/lib/parts/service-parts");
-    const admin = mk();
-    const parts = await getConfiguredParts(serviceId, admin);
-    if (parts.length > 0) {
-      await admin.from("booking_parts").insert(
-        parts.map((p) => ({
-          booking_id: data.id,
-          part_id: p.partId,
-          part_name: p.name,
-          quantity: p.quantity,
-          unit_price_pence: p.unitPricePence,
-          total_pence: p.totalPence,
-          sourcing: "self",
-          status: "pending",
-        })),
-      );
-    }
-  } catch (err) {
-    console.error("Failed to snapshot booking parts for", data.id, err);
-  }
-
   // Record the final funnel step (server-side so it's never lost to navigation).
   void trackEvent(FUNNEL_EVENTS.bookingConfirmed, {
     bookingId: data.id,
-    serviceId,
-    repairNodeId: input.repairNodeId ?? undefined,
+    repairNodeId: input.repairNodeId,
     totalPence: price.totalPence,
   });
 
@@ -238,7 +190,7 @@ export async function createBookingAction(
   renderTemplateEmail("booking_confirmed", {
     name: input.customerName,
     ref: formatJobNumber(data.job_number),
-    service: repairDescription ?? input.serviceName,
+    service: repairDescription,
     vehicle: vehicleLabel,
     when: whenLabel,
     pay_line: payLine,
@@ -281,39 +233,25 @@ export type PrepareCheckoutResult =
  *     there is genuinely nothing to authorise.
  */
 export async function prepareCheckout(input: {
-  serviceId: string;
   postcode: string;
-  /** Booking vehicle reg — vehicle-specific pricing must hold the same amount
-   *  createBookingAction recomputes moments later (Task 16). */
-  vehicleReg?: string;
-  /** One-off repair booking (Task 16 Stage G) — priced from (reg, node). */
-  repairNodeId?: string;
+  /** Booking vehicle reg — the hold must match the amount createBookingAction
+   *  re-quotes from the same (reg, node) moments later. */
+  vehicleReg: string;
+  /** HaynesPro repair node id — what's being booked. */
+  repairNodeId: string;
 }): Promise<PrepareCheckoutResult> {
-  let totalPence: number;
-  try {
-    if (input.repairNodeId) {
-      const { quoteRepair } = await import("@/lib/haynespro/repair-booking");
-      const quote = await quoteRepair(
-        input.vehicleReg ?? "",
-        input.repairNodeId,
-        createAdminClient(),
-      );
-      if (!quote) {
-        return {
-          ok: false,
-          error: "We couldn't price this repair. Please start the booking again.",
-        };
-      }
-      totalPence = quote.breakdown.totalPence;
-    } else {
-      const price = await calculatePrice(input.serviceId, input.postcode, undefined, {
-        reg: input.vehicleReg,
-      });
-      totalPence = price.totalPence;
-    }
-  } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : "Pricing failed" };
+  const quote = await quoteRepair(
+    input.vehicleReg,
+    input.repairNodeId,
+    createAdminClient(),
+  );
+  if (!quote) {
+    return {
+      ok: false,
+      error: "We couldn't price this repair. Please start the booking again.",
+    };
   }
+  const totalPence = quote.breakdown.totalPence;
 
   const supabase = await createClient();
   const {
@@ -347,7 +285,7 @@ export async function prepareCheckout(input: {
       amount: chargePence,
       currency: "gbp",
       capture_method: "manual",
-      description: "Book My Tech — service pre-authorisation",
+      description: "Book My Tech — repair pre-authorisation",
     });
     if (!intent.client_secret) return { ok: false, error: "Couldn't start the payment. Please try again." };
     return {

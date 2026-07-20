@@ -120,7 +120,7 @@ export async function acceptOffer(offerId: string): Promise<OfferActionResult> {
   // replacement has accepted and nothing else changes.
   const { data: booking } = await admin
     .from("bookings")
-    .select("customer_email, customer_name, scheduled_at, service:services(name)")
+    .select("customer_email, customer_name, scheduled_at, repair_description")
     .eq("id", offer.booking_id)
     .single();
   if (booking?.customer_email) {
@@ -130,10 +130,7 @@ export async function acceptOffer(offerId: string): Promise<OfferActionResult> {
       .eq("id", guard.mechanicId)
       .single();
     const mechanicName = profile?.full_name ?? "Your mechanic";
-    const serviceName =
-      (Array.isArray(booking.service)
-        ? booking.service[0]?.name
-        : (booking.service as { name?: string } | null)?.name) ?? "your service";
+    const serviceName = booking.repair_description ?? "Vehicle repair";
     const slotLabel = booking.scheduled_at
       ? new Date(booking.scheduled_at).toLocaleString("en-GB", {
           dateStyle: "full",

@@ -52,23 +52,19 @@ export default async function AdminOverviewPage() {
   const { data: bookingsRaw } = await supabase
     .from("bookings")
     .select(
-      "id, job_number, status, area, total_pence, platform_fee_pence, commission_rate, customer_name, mechanic_id, service_id, created_at",
+      "id, job_number, status, area, total_pence, platform_fee_pence, commission_rate, customer_name, mechanic_id, repair_description, created_at",
     )
     .order("created_at", { ascending: false })
     .limit(1000);
 
   const bookings = bookingsRaw ?? [];
 
-  // Resolve service + assigned-mechanic names in bulk (avoids brittle embedded
+  // Resolve assigned-mechanic names in bulk (avoids brittle embedded
   // FK joins; admins can read all profiles via the is_admin() policy).
-  const serviceIds = [...new Set(bookings.map((b) => b.service_id).filter(Boolean))];
   const mechanicIds = [...new Set(bookings.map((b) => b.mechanic_id).filter(Boolean))];
 
-  const [{ data: services }, { data: mechProfiles }, { data: mechanics }, { data: acceptedOffers }] =
+  const [{ data: mechProfiles }, { data: mechanics }, { data: acceptedOffers }] =
     await Promise.all([
-      serviceIds.length
-        ? supabase.from("services").select("id, name").in("id", serviceIds)
-        : Promise.resolve({ data: [] as { id: string; name: string }[] }),
       mechanicIds.length
         ? supabase.from("profiles").select("id, full_name").in("id", mechanicIds)
         : Promise.resolve({ data: [] as { id: string; full_name: string | null }[] }),
@@ -82,7 +78,6 @@ export default async function AdminOverviewPage() {
         .limit(200),
     ]);
 
-  const serviceName = new Map((services ?? []).map((s) => [s.id, s.name]));
   const mechanicName = new Map(
     (mechProfiles ?? []).map((p) => [p.id, p.full_name]),
   );
@@ -140,7 +135,7 @@ export default async function AdminOverviewPage() {
   const monitorRows: MonitorRow[] = bookings.map((b) => ({
     id: b.id,
     jobNumber: b.job_number,
-    service: serviceName.get(b.service_id) ?? "Unknown service",
+    service: b.repair_description ?? "Vehicle repair",
     customer: b.customer_name ?? "—",
     mechanic: b.mechanic_id ? mechanicName.get(b.mechanic_id) ?? "Assigned" : null,
     area: b.area,
