@@ -22,7 +22,7 @@ export default async function AdminVehiclesPage() {
         </h1>
         <p className="mt-1.5 max-w-2xl text-sm text-text-muted">
           Every car make covered by HaynesPro. Drill into a model to toggle
-          which services are bookable on it, check the OEM repair times behind
+          which repairs are bookable on it, check the OEM repair times behind
           vehicle-specific pricing, and browse manuals and technical data.
         </p>
       </header>

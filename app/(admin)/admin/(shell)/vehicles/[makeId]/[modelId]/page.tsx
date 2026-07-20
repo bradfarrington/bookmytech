@@ -15,6 +15,7 @@ import {
   getStoryList,
 } from "@/lib/haynespro/tree";
 import type { HpAdjustment, HpStoryLine, HpTreeNode } from "@/lib/haynespro/types";
+import { repairGroupIcon } from "@/lib/repair-group-icons";
 import { RepairToggle } from "../../_components/repair-toggle";
 import { TypePicker } from "../../_components/type-picker";
 
@@ -225,6 +226,10 @@ async function RepairsPanel({
       .eq("model_name", modelName),
   ]);
   const excluded = new Set((exclusionRows ?? []).map((r) => r.node_id));
+  // Groups render as an icon-tile grid (same treatment as the brand grid);
+  // timed leaf repairs keep the hours + toggle list below.
+  const groups = nodes.filter((n) => n.id != null && n.hasSubnodes);
+  const leaves = nodes.filter((n) => n.id != null && !n.hasSubnodes);
   // crumbs = "id~label|id~label" trail down to the current node.
   const trail = crumbs
     ? crumbs.split("|").map((part) => {
@@ -265,35 +270,91 @@ async function RepairsPanel({
         ))}
       </nav>
 
-      <div className="overflow-hidden rounded-2xl border border-border bg-surface-card shadow-card">
-        {nodes.length === 0 && (
-          <p className="px-4 py-8 text-center text-sm text-text-muted">
-            Nothing under this group.
-          </p>
-        )}
-        <ul className="divide-y divide-border-subtle">
-          {nodes.map((node) => {
-            if (node.id == null) return null;
-            const hidden = excluded.has(node.id);
-            const toggle = (
-              <RepairToggle
-                makeName={makeName}
-                modelName={modelName}
-                nodeId={node.id}
-                description={node.description}
-                initialAvailable={!hidden}
-              />
-            );
-            return node.hasSubnodes ? (
-              <li key={node.id} className="flex items-center gap-3 px-4 py-3">
+      {nodes.length === 0 && (
+        <p className="rounded-2xl border border-border bg-surface-card px-4 py-8 text-center text-sm text-text-muted shadow-card">
+          Nothing under this group.
+        </p>
+      )}
+
+      {/* Sub-groups — icon tiles, same treatment as the brand grid. */}
+      {groups.length > 0 && (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+          {groups.map((node) => {
+            const id = node.id as string;
+            const hidden = excluded.has(id);
+            const GroupIcon = repairGroupIcon(node.description);
+            return (
+              <div
+                key={id}
+                className={cn(
+                  "relative rounded-2xl border border-border bg-surface-card shadow-card transition-all hover:-translate-y-0.5 hover:border-brand-blue/40 hover:shadow-md",
+                  hidden && "opacity-60",
+                )}
+              >
+                <div className="absolute right-3 top-3 z-10">
+                  <RepairToggle
+                    makeName={makeName}
+                    modelName={modelName}
+                    nodeId={id}
+                    description={node.description}
+                    initialAvailable={!hidden}
+                  />
+                </div>
                 <Link
-                  href={nodeHref(node.id, node.description ?? node.id)}
-                  className={cn(
-                    "flex min-w-0 flex-1 items-center justify-between gap-3 text-sm font-semibold transition-colors hover:text-brand-blue",
-                    hidden ? "text-text-muted" : "text-text-primary",
-                  )}
+                  href={nodeHref(id, node.description ?? id)}
+                  className="flex h-full flex-col items-center gap-3 p-4 pt-10 text-center"
                 >
-                  <span>
+                  <span
+                    className={cn(
+                      "flex size-12 items-center justify-center rounded-xl",
+                      hidden ? "bg-surface" : "bg-blue-50",
+                    )}
+                  >
+                    <GroupIcon
+                      size={22}
+                      className={hidden ? "text-text-muted" : "text-brand-blue"}
+                    />
+                  </span>
+                  <span
+                    className={cn(
+                      "text-sm font-semibold leading-tight",
+                      hidden ? "text-text-muted" : "text-text-primary",
+                    )}
+                  >
+                    {node.description}
+                  </span>
+                  {hidden && (
+                    <span className="text-[11px] font-medium text-text-muted">
+                      Hidden from customers
+                    </span>
+                  )}
+                </Link>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Timed leaf repairs — hours + availability toggle. */}
+      {leaves.length > 0 && (
+        <div className="overflow-hidden rounded-2xl border border-border bg-surface-card shadow-card">
+          {groups.length > 0 && (
+            <p className="border-b border-border-subtle bg-surface px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-text-muted">
+              Timed repairs
+            </p>
+          )}
+          <ul className="divide-y divide-border-subtle">
+            {leaves.map((node) => {
+              const id = node.id as string;
+              const hidden = excluded.has(id);
+              return (
+                <li key={id} className="flex items-center gap-3 px-4 py-3 text-sm">
+                  <span
+                    className={cn(
+                      "min-w-0 flex-1",
+                      hidden ? "text-text-muted" : "text-text-secondary",
+                    )}
+                  >
                     {node.description}
                     {hidden && (
                       <span className="ml-2 text-[11px] font-medium text-text-muted">
@@ -301,41 +362,29 @@ async function RepairsPanel({
                       </span>
                     )}
                   </span>
-                  <span className="shrink-0 text-xs font-normal text-text-muted">Open ›</span>
-                </Link>
-                {toggle}
-              </li>
-            ) : (
-              <li key={node.id} className="flex items-center gap-3 px-4 py-3 text-sm">
-                <span
-                  className={cn(
-                    "min-w-0 flex-1",
-                    hidden ? "text-text-muted" : "text-text-secondary",
-                  )}
-                >
-                  {node.description}
-                  {hidden && (
-                    <span className="ml-2 text-[11px] font-medium text-text-muted">
-                      Hidden from customers
-                    </span>
-                  )}
-                </span>
-                <span
-                  className={cn(
-                    "shrink-0 font-semibold",
-                    hidden ? "text-text-muted" : "text-text-primary",
-                  )}
-                >
-                  {typeof node.value === "number" && node.value > 0
-                    ? fmtHours(node.value / 100)
-                    : "—"}
-                </span>
-                {toggle}
-              </li>
-            );
-          })}
-        </ul>
-      </div>
+                  <span
+                    className={cn(
+                      "shrink-0 font-semibold",
+                      hidden ? "text-text-muted" : "text-text-primary",
+                    )}
+                  >
+                    {typeof node.value === "number" && node.value > 0
+                      ? fmtHours(node.value / 100)
+                      : "—"}
+                  </span>
+                  <RepairToggle
+                    makeName={makeName}
+                    modelName={modelName}
+                    nodeId={id}
+                    description={node.description}
+                    initialAvailable={!hidden}
+                  />
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
       <p className="text-xs text-text-muted">
         Switching a repair or group off hides it from the customer
         &ldquo;Repairs for your car&rdquo; browser for every variant of this
