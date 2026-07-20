@@ -277,8 +277,8 @@ async function RepairsPanel({
       )}
 
       {/* Sub-groups — compact rows: icon left, label left, drill-in chevron.
-          The availability tick stays quiet while a group is ON (fades in on
-          hover); a hidden group greys out and shows its empty ring always. */}
+          The availability tick is always visible: filled blue = bookable,
+          empty ring = hidden (row also greys out). */}
       {groups.length > 0 && (
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {groups.map((node) => {
@@ -289,18 +289,11 @@ async function RepairsPanel({
               <div
                 key={id}
                 className={cn(
-                  "group relative rounded-xl border border-border bg-surface-card shadow-card transition-colors hover:border-brand-blue/40",
+                  "relative rounded-xl border border-border bg-surface-card shadow-card transition-colors hover:border-brand-blue/40",
                   hidden && "opacity-60",
                 )}
               >
-                <span
-                  className={cn(
-                    "absolute right-8 top-1/2 z-10 -translate-y-1/2 transition-opacity",
-                    hidden
-                      ? "opacity-100"
-                      : "opacity-0 focus-within:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100",
-                  )}
-                >
+                <span className="absolute right-8 top-1/2 z-10 -translate-y-1/2">
                   <RepairToggle
                     makeName={makeName}
                     modelName={modelName}
