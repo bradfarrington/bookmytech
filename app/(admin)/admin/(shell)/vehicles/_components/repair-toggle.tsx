@@ -56,8 +56,8 @@ export function RepairToggle({
       className={cn(
         "flex size-5 shrink-0 items-center justify-center rounded-full border transition-colors",
         available
-          ? "border-brand-blue bg-brand-blue text-white"
-          : "border-border bg-surface-card text-transparent hover:border-brand-blue/50",
+          ? "border-success bg-success text-white"
+          : "border-border bg-surface-card text-transparent hover:border-success/50",
         pending && "opacity-60",
       )}
     >
