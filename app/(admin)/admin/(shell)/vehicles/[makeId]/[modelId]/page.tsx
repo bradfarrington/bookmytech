@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, BookOpen, ClipboardList, Clock } from "lucide-react";
+import { ArrowLeft, BookOpen, ChevronRight, ClipboardList, Clock } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
 import { Overline } from "@/components/ui/overline";
@@ -276,9 +276,11 @@ async function RepairsPanel({
         </p>
       )}
 
-      {/* Sub-groups — icon tiles, same density as the brand grid. */}
+      {/* Sub-groups — compact rows: icon left, label left, drill-in chevron.
+          The availability tick stays quiet while a group is ON (fades in on
+          hover); a hidden group greys out and shows its empty ring always. */}
       {groups.length > 0 && (
-        <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {groups.map((node) => {
             const id = node.id as string;
             const hidden = excluded.has(id);
@@ -287,11 +289,18 @@ async function RepairsPanel({
               <div
                 key={id}
                 className={cn(
-                  "relative rounded-2xl border border-border bg-surface-card shadow-card transition-all hover:-translate-y-0.5 hover:border-brand-blue/40 hover:shadow-md",
+                  "group relative rounded-xl border border-border bg-surface-card shadow-card transition-colors hover:border-brand-blue/40",
                   hidden && "opacity-60",
                 )}
               >
-                <div className="absolute right-2 top-2 z-10">
+                <span
+                  className={cn(
+                    "absolute right-8 top-1/2 z-10 -translate-y-1/2 transition-opacity",
+                    hidden
+                      ? "opacity-100"
+                      : "opacity-0 focus-within:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100",
+                  )}
+                >
                   <RepairToggle
                     makeName={makeName}
                     modelName={modelName}
@@ -299,35 +308,35 @@ async function RepairsPanel({
                     description={node.description}
                     initialAvailable={!hidden}
                   />
-                </div>
+                </span>
                 <Link
                   href={nodeHref(id, node.description ?? id)}
-                  className="flex h-full flex-col items-center gap-2 p-3 pt-7 text-center"
+                  className="flex items-center gap-2.5 py-2.5 pl-2.5 pr-14"
                 >
                   <span
                     className={cn(
-                      "flex size-10 items-center justify-center rounded-xl",
+                      "flex size-8 shrink-0 items-center justify-center rounded-lg",
                       hidden ? "bg-surface" : "bg-blue-50",
                     )}
                   >
                     <GroupIcon
-                      size={18}
+                      size={16}
                       className={hidden ? "text-text-muted" : "text-brand-blue"}
                     />
                   </span>
                   <span
                     className={cn(
-                      "text-xs font-semibold leading-tight",
+                      "min-w-0 flex-1 truncate text-sm font-semibold",
                       hidden ? "text-text-muted" : "text-text-primary",
                     )}
+                    title={node.description ?? undefined}
                   >
                     {node.description}
                   </span>
-                  {hidden && (
-                    <span className="text-[10px] font-medium text-text-muted">
-                      Hidden from customers
-                    </span>
-                  )}
+                  <ChevronRight
+                    size={14}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-muted"
+                  />
                 </Link>
               </div>
             );
