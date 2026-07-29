@@ -76,6 +76,27 @@ browser — prefixed `NEXT_PUBLIC_`) · **Required** = app breaks without it.
 | `XERO_CONTACT_NAME` | ⬜ | plain | Invoice contact name. |
 | `XERO_SALES_ACCOUNT_CODE` | ⬜ | plain | Xero sales account code. |
 
+## Mobile API (`app/api/mobile/v1/**`) — no new variables
+
+The mobile app's endpoints introduce **no environment variables of their own**.
+They reuse `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` (the
+Bearer-authenticated client in `lib/supabase/mobile.ts`),
+`SUPABASE_SERVICE_ROLE_KEY` (account creation and the rate-limit counters) and
+the DVLA/MOT keys above.
+
+Two things that are configuration but deliberately **not** env vars:
+
+- **Rate limits** live in the `platform_settings` table (`mobile_lookup_*`,
+  `mobile_signup_*`), so they can be retuned in the database without a redeploy.
+  Seeded by migration `0043`.
+- **The app's base URL** is set in the app repo (`EXPO_PUBLIC_API_BASE_URL`),
+  not here. This repo doesn't need to know the app exists at runtime.
+
+⚠️ Migration `0043_api_rate_limits.sql` **must be applied** in every environment.
+Until it is, every mobile endpoint returns 429 — the limiter fails closed on
+purpose, so a missing guard can never become an open one on endpoints that spend
+money and create accounts.
+
 ## Provided automatically — do NOT set
 
 | Var | Notes |
@@ -96,7 +117,7 @@ browser — prefixed `NEXT_PUBLIC_`) · **Required** = app breaks without it.
 4. Swap Stripe test keys → live keys, and create the prod Stripe webhook to get
    `STRIPE_WEBHOOK_SECRET`.
 5. Confirm `APP_ENCRYPTION_KEY` matches whatever encrypted the existing DB rows.
-6. Apply DB migrations up to and including `0031_email_templates.sql`.
+6. Apply DB migrations up to and including `0043_api_rate_limits.sql`.
 7. Redeploy so the new vars take effect (env changes don't apply to existing
    deployments).
 

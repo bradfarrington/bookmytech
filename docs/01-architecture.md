@@ -24,6 +24,41 @@ This gives separate deploys (you can deploy customer changes without touching ad
 
 For now, only one Vercel project exists. The second and third are added when the mechanic and admin sections become substantial enough to warrant their own domains.
 
+## Two clients, one backend
+
+This repo is no longer only a web app. A **customer mobile app** (React Native /
+Expo, separate repo `bmt-customer-app`) shares this database, this business
+logic and these integrations. There are now two clients:
+
+| | Web app (this repo's pages) | Mobile app (`bmt-customer-app`) |
+|---|---|---|
+| Entry point | Server Actions in `app/actions/` | HTTP route handlers in `app/api/mobile/v1/` |
+| Auth | Supabase **cookie** session (`lib/supabase/server.ts`) | `Authorization: Bearer <access token>` (`lib/supabase/mobile.ts`) |
+| Reads | Server components read via the cookie client | Route handlers, plus **direct Supabase reads under the existing customer RLS policies** |
+| Responses | HTML, `redirect()` | JSON only — **never a redirect**, the app cannot follow one |
+| Updating | A deploy puts everyone on the new version at once | Old builds stay on phones for months |
+
+**Business logic lives in one place and both clients call it.** The app must
+never reimplement pricing, dispatch or notifications — a route handler is a thin
+wrapper over `lib/` and `app/actions/`. Where an action isn't callable from a
+route handler (it takes `FormData`, or ends in `redirect()`), the fix is to
+extract its core into a plain async function that both callers use. That is why
+`lib/customers/provision.ts` exists: `createCustomerAccount()` is called by the
+web Server Action, the booking funnel *and* the mobile signup route, so an
+account has the same shape however it was made. Copying logic instead would let
+the two clients drift.
+
+The consequence that shapes everything else: **a shipped API path, response
+shape or field name is a contract**, because a phone running last month's build
+still calls it. Additive changes are safe; renames, removals and changed
+semantics are not. The standing rules — including when to tell Brad a change
+needs work in the app repo — live in `AGENTS.md`; the build itself is
+`docs/tasks/18-mobile-api.md`.
+
+Note this is the one sanctioned exception to "don't add a separate REST API
+layer" below: it exists solely because a native client cannot call Server
+Actions. Web features still use Server Actions.
+
 ## Folder structure
 
 ```
@@ -48,13 +83,16 @@ bookmytech/
 │   │       └── approvals/
 │   ├── actions/                   # server actions (e.g. lookup-vehicle.ts when DVLA lands)
 │   └── api/                       # API routes (rare — prefer server actions)
+│       ├── cron/                  # Vercel cron endpoints (CRON_SECRET-gated)
+│       ├── webhooks/              # Stripe / GoCardless receivers
+│       └── mobile/v1/             # the mobile app's HTTP contract — Bearer auth, JSON only
 ├── components/
 │   ├── ui/                        # design-system primitives (Button, Card, Pill, Icon, etc.)
 │   ├── customer/                  # cross-page customer composites (if any — page-local stays in (customer)/_components)
 │   ├── mechanic/                  # mechanic-specific
 │   └── admin/                     # admin-specific
 ├── lib/
-│   ├── supabase/                  # client.ts, server.ts
+│   ├── supabase/                  # client.ts (browser), server.ts (cookies), admin.ts (service-role), mobile.ts (Bearer)
 │   ├── dvla/                      # API wrapper (added when DVLA key lands)
 │   ├── stripe/                    # added later
 │   └── utils.ts                   # cn(), normaliseReg(), formatPrice(), etc.
@@ -91,7 +129,8 @@ bookmytech/
 
 ## What NOT to do
 
-- Don't add a separate REST/GraphQL API layer — use server actions
+- Don't add a separate REST/GraphQL API layer for **web** features — use server actions. The one exception is `app/api/mobile/v1/**`, which exists because a native client can't call Server Actions (see "Two clients, one backend")
+- Don't use `lib/supabase/server.ts` from a mobile route handler — it derives auth from cookies the app never sends, and the caller silently comes back `null`
 - Don't add Redux, Zustand, or any global state library — URL state + React state handles this
 - Don't add `react-router-dom` — Next has its own router
 - Don't put secrets in code or in `NEXT_PUBLIC_*` env vars — those ship to the browser
