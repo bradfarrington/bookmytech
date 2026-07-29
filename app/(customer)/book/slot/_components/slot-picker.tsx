@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { loadStripe } from "@stripe/stripe-js";
 import {
   Elements,
@@ -9,12 +10,14 @@ import {
   useElements,
 } from "@stripe/react-stripe-js";
 import { addDays, format, isToday, isTomorrow } from "date-fns";
-import { Loader2, Lock } from "lucide-react";
+import { Loader2, Lock, CheckCircle2, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
+import { createClient } from "@/lib/supabase/client";
 import { cn, formatPrice, vehicleLabel } from "@/lib/utils";
 import { prepareCheckout, createBookingAction } from "@/app/actions/create-booking";
 import type { CreateBookingInput, PrepareCheckoutResult } from "@/app/actions/create-booking";
+import { ensureCustomerAccount, requestPasswordReset } from "@/app/actions/booking-account";
 import { TWO_HOUR_SLOTS, ALL_DAY_SLOT, slotIso, formatBookingSlot } from "@/lib/slots";
 import { track, FUNNEL_EVENTS } from "@/lib/analytics/track";
 
@@ -27,9 +30,14 @@ const PARKING_OPTIONS: ReadonlyArray<{ value: ParkingType; label: string }> = [
   { value: "other", label: "Other" },
 ];
 
+const MIN_PASSWORD_LENGTH = 8;
+
 const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
   ? loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
   : null;
+
+const inputClass =
+  "h-12 rounded-lg border border-border bg-surface-card px-3 text-sm text-text-primary outline-none transition-colors placeholder:text-text-muted focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/25";
 
 function dayName(date: Date) {
   if (isToday(date)) return "Today";
@@ -53,6 +61,19 @@ interface SlotPickerProps {
   preferredMechanicId?: string;
   /** Signed-in customer's spendable account credit (0 for guests). */
   availableCreditPence?: number;
+  /** Whether the visitor is signed in AS A CUSTOMER — hides the account block. */
+  signedIn?: boolean;
+  /**
+   * Set when the session belongs to an admin or mechanic. They can't book as
+   * themselves (middleware keeps them out of /dashboard, so the job would be
+   * invisible to them), so we ask them to sign out rather than silently
+   * attaching the booking to a staff account.
+   */
+  wrongRole?: string;
+  /** Signed-in customer's details, used in place of the account block. */
+  customerName?: string;
+  customerEmail?: string;
+  customerPhone?: string;
 }
 
 export function SlotPicker({
@@ -65,7 +86,13 @@ export function SlotPicker({
   pricePence,
   preferredMechanicId,
   availableCreditPence = 0,
+  signedIn = false,
+  wrongRole,
+  customerName = "",
+  customerEmail = "",
+  customerPhone = "",
 }: SlotPickerProps) {
+  const router = useRouter();
   const days = Array.from({ length: 7 }, (_, i) => addDays(new Date(), i));
   const [selectedDay, setSelectedDay] = useState(days[0]);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
@@ -77,6 +104,23 @@ export function SlotPicker({
   const [postcode, setPostcode] = useState(defaultPostcode);
   const [parkingType, setParkingType] = useState<ParkingType>("driveway");
   const [instructions, setInstructions] = useState("");
+
+  // --- Account (guests only) -------------------------------------------------
+  // Every booking needs an account so the customer lands on a dashboard that
+  // owns their job. It's created BEFORE the pre-auth: a failure here costs the
+  // customer nothing, and the session lets prepareCheckout price their credit.
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [password, setPassword] = useState("");
+  // "signin" once we've found their email already has an account.
+  const [accountMode, setAccountMode] = useState<"create" | "signin">("create");
+  const [accountReady, setAccountReady] = useState(false);
+  const [accountError, setAccountError] = useState<string | null>(null);
+  const [resetSent, setResetSent] = useState(false);
+  const [resetPending, startResetTransition] = useTransition();
+  const [signOutPending, startSignOutTransition] = useTransition();
+
   // The server prices, applies any account credit, and decides the payment mode
   // (pre-auth hold, or 'free' when credit covers the whole total) when the
   // customer confirms — that, not the URL estimate, is authoritative.
@@ -84,22 +128,71 @@ export function SlotPicker({
   const [stripeError, setStripeError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
+  const hasAccount = signedIn || accountReady;
+  const accountFilled =
+    name.trim().length > 1 &&
+    email.trim().includes("@") &&
+    password.length >= MIN_PASSWORD_LENGTH;
+
   const canProceed =
+    !wrongRole &&
     !!selectedSlot &&
     addressLine1.trim().length > 3 &&
-    postcode.trim().length >= 5;
+    postcode.trim().length >= 5 &&
+    (hasAccount || accountFilled);
+
+  // Clear the staff session in the browser and re-render the page as a guest —
+  // a server sign-out would redirect away and lose the funnel.
+  function handleSignOut() {
+    startSignOutTransition(async () => {
+      await createClient().auth.signOut();
+      router.refresh();
+    });
+  }
 
   function handleProceedToPayment() {
     if (!canProceed) return;
     track(FUNNEL_EVENTS.slotPicked, { repairNodeId, slot: selectedSlot });
     setStripeError(null);
+    setAccountError(null);
     startTransition(async () => {
+      // Account first — nothing is authorised until this succeeds.
+      if (!hasAccount) {
+        const account = await ensureCustomerAccount({
+          fullName: name,
+          email,
+          password,
+          phone,
+        });
+        if (!account.ok) {
+          setAccountError(account.error);
+          if (account.needsPassword) {
+            setAccountMode("signin");
+            setPassword("");
+          }
+          return;
+        }
+        setAccountReady(true);
+      }
+
       const result = await prepareCheckout({ postcode, vehicleReg: reg, repairNodeId });
       if (!result.ok) {
         setStripeError(result.error);
         return;
       }
       setCheckout(result);
+    });
+  }
+
+  function handleForgotPassword() {
+    startResetTransition(async () => {
+      const result = await requestPasswordReset(email);
+      if (!result.ok) {
+        setAccountError(result.error);
+        return;
+      }
+      setResetSent(true);
+      setAccountError(null);
     });
   }
 
@@ -116,6 +209,10 @@ export function SlotPicker({
     repairName,
     repairNodeId,
     preferredMechanicId,
+    // Identity is settled before this step — the checkout no longer asks.
+    customerName: signedIn ? customerName : name.trim(),
+    customerEmail: signedIn ? customerEmail : email.trim(),
+    customerPhone: signedIn ? customerPhone : phone.trim(),
   };
 
   if (checkout && selectedSlot) {
@@ -224,7 +321,7 @@ export function SlotPicker({
           value={addressLine1}
           onChange={(e) => setAddressLine1(e.target.value)}
           placeholder="House number and street"
-          className="h-12 rounded-lg border border-border bg-surface-card px-3 text-sm text-text-primary outline-none transition-colors placeholder:text-text-muted focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/25"
+          className={inputClass}
         />
         <input
           type="text"
@@ -262,6 +359,126 @@ export function SlotPicker({
         </div>
       </div>
 
+      {/* Account — created before payment so the booking lands on a dashboard */}
+      {wrongRole ? (
+        <div className="flex flex-col gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
+          <div className="flex items-start gap-2.5">
+            <ShieldAlert size={18} className="mt-0.5 shrink-0 text-amber-700" />
+            <div>
+              <p className="text-sm font-semibold text-amber-900">
+                You&apos;re signed in as {wrongRole === "mechanic" ? "a mechanic" : "an admin"}
+              </p>
+              <p className="mt-0.5 text-[13px] text-amber-800">
+                Staff accounts can&apos;t book — the job wouldn&apos;t show on a customer
+                dashboard. Sign out to book (or test the flow) as a customer.
+              </p>
+            </div>
+          </div>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={handleSignOut}
+            disabled={signOutPending}
+            iconLeft={signOutPending ? Loader2 : undefined}
+          >
+            {signOutPending ? "Signing out…" : "Sign out and continue"}
+          </Button>
+        </div>
+      ) : signedIn ? (
+        <p className="rounded-lg bg-surface px-4 py-3 text-sm text-text-secondary">
+          Booking as{" "}
+          <span className="font-semibold text-text-primary">{customerEmail}</span>
+        </p>
+      ) : (
+        <div className="flex flex-col gap-3">
+          <div>
+            <p className="text-sm font-semibold text-text-primary">
+              {accountMode === "signin" ? "Sign in to continue" : "Your details"}
+            </p>
+            <p className="mt-0.5 text-[13px] text-text-muted">
+              {accountMode === "signin"
+                ? "You've booked with us before — enter your password."
+                : "We'll create your account so you can track this job, message your mechanic and rebook in a tap."}
+            </p>
+          </div>
+
+          {accountMode === "create" && (
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Full name"
+              autoComplete="name"
+              className={inputClass}
+            />
+          )}
+
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="Email address"
+            autoComplete="email"
+            className={inputClass}
+          />
+
+          {accountMode === "create" && (
+            <input
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="Mobile number (optional — for text updates)"
+              autoComplete="tel"
+              className={inputClass}
+            />
+          )}
+
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder={
+              accountMode === "signin"
+                ? "Your password"
+                : `Create a password (${MIN_PASSWORD_LENGTH}+ characters)`
+            }
+            autoComplete={accountMode === "signin" ? "current-password" : "new-password"}
+            minLength={MIN_PASSWORD_LENGTH}
+            className={inputClass}
+          />
+
+          {accountMode === "signin" && !resetSent && (
+            <button
+              type="button"
+              onClick={handleForgotPassword}
+              disabled={resetPending}
+              className="self-start text-[13px] font-semibold text-brand-blue hover:underline disabled:opacity-50"
+            >
+              {resetPending ? "Sending…" : "Forgotten your password?"}
+            </button>
+          )}
+
+          {resetSent && (
+            <p className="rounded-lg bg-blue-50 px-4 py-3 text-sm text-brand-blue">
+              We&apos;ve emailed you a link to set a new password. Open it, choose a
+              password, then come back and finish your booking.
+            </p>
+          )}
+
+          {accountError && (
+            <p role="alert" className="rounded-lg bg-red-50 px-4 py-3 text-sm text-danger">
+              {accountError}
+            </p>
+          )}
+        </div>
+      )}
+
+      {accountReady && !signedIn && (
+        <p className="flex items-center gap-2 rounded-lg bg-green-50 px-4 py-3 text-sm font-medium text-success">
+          <CheckCircle2 size={16} /> Your account is ready.
+        </p>
+      )}
+
       {availableCreditPence > 0 && (
         <p className="rounded-lg bg-green-50 px-4 py-3 text-sm font-medium text-success">
           You have {formatPrice(availableCreditPence)} in credit — it&apos;ll be applied at the next step.
@@ -286,7 +503,7 @@ export function SlotPicker({
           onClick={handleProceedToPayment}
           iconLeft={pending ? Loader2 : Lock}
         >
-          {pending ? "Setting up…" : "Confirm booking"}
+          {pending ? "Setting up…" : "Continue to payment"}
         </Button>
         <p className="mt-2 text-center text-[11px] text-text-muted">
           No money taken until your job is complete
@@ -311,13 +528,14 @@ interface ConfirmCommon {
   repairName: string;
   repairNodeId: string;
   preferredMechanicId?: string;
+  /** Resolved before this step — the customer always has an account by now. */
+  customerName: string;
+  customerEmail: string;
+  customerPhone: string;
 }
 
 function bookingInputFrom(
   c: ConfirmCommon,
-  name: string,
-  email: string,
-  phone: string,
   extra: Partial<CreateBookingInput>,
 ): CreateBookingInput {
   return {
@@ -327,9 +545,9 @@ function bookingInputFrom(
     repairNodeId: c.repairNodeId,
     scheduledAt: c.selectedSlot,
     slotWindow: c.selectedWindow || undefined,
-    customerEmail: email.trim(),
-    customerName: name.trim(),
-    customerPhone: phone.trim() || undefined,
+    customerEmail: c.customerEmail,
+    customerName: c.customerName,
+    customerPhone: c.customerPhone || undefined,
     addressLine1: c.addressLine1,
     postcode: c.postcode.trim().toUpperCase(),
     parkingType: c.parkingType,
@@ -369,6 +587,21 @@ function PriceSummary({
   );
 }
 
+// Job + account recap at the top of the confirm step.
+function BookingRecap({ c }: { c: ConfirmCommon }) {
+  return (
+    <div className="rounded-xl border border-border bg-surface p-4 text-sm">
+      <p className="font-semibold text-text-primary">{c.repairName}</p>
+      <p className="text-text-secondary">
+        {vehicleLabel(c.reg, c.make, c.model)} · {formatBookingSlot(c.selectedSlot, c.selectedWindow)}
+      </p>
+      <p className="mt-2 border-t border-border pt-2 text-text-muted">
+        Booking as <span className="font-medium text-text-secondary">{c.customerEmail}</span>
+      </p>
+    </div>
+  );
+}
+
 // --- Stripe checkout form: pre-auth hold (always taken at booking) ----------
 
 function CheckoutForm({
@@ -377,19 +610,12 @@ function CheckoutForm({
 }: ConfirmCommon & { checkout: Extract<ReadyCheckout, { mode: "preauth" }> }) {
   const stripe = useStripe();
   const elements = useElements();
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!stripe || !elements) return;
-    if (!name.trim() || !email.trim()) {
-      setError("Please enter your name and email.");
-      return;
-    }
     setSubmitting(true);
     setError(null);
 
@@ -397,7 +623,11 @@ function CheckoutForm({
     // always taken — credit only reduces its amount.
     const { error: confirmError, paymentIntent } = await stripe.confirmPayment({
       elements,
-      confirmParams: { payment_method_data: { billing_details: { name, email } } },
+      confirmParams: {
+        payment_method_data: {
+          billing_details: { name: c.customerName, email: c.customerEmail },
+        },
+      },
       redirect: "if_required",
     });
     if (confirmError) {
@@ -413,7 +643,7 @@ function CheckoutForm({
     const piId = checkout.clientSecret.split("_secret_")[0];
 
     const result = await createBookingAction(
-      bookingInputFrom(c, name, email, phone, {
+      bookingInputFrom(c, {
         paymentMode: "preauth",
         creditAppliedPence: checkout.creditAppliedPence,
         stripePaymentIntentId: piId,
@@ -429,43 +659,13 @@ function CheckoutForm({
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-6">
-      <div className="rounded-xl border border-border bg-surface p-4 text-sm">
-        <p className="font-semibold text-text-primary">{c.repairName}</p>
-        <p className="text-text-secondary">{vehicleLabel(c.reg, c.make, c.model)} · {formatBookingSlot(c.selectedSlot, c.selectedWindow)}</p>
-      </div>
+      <BookingRecap c={c} />
 
       <PriceSummary
         totalPence={checkout.totalPence}
         creditAppliedPence={checkout.creditAppliedPence}
         chargePence={checkout.chargePence}
       />
-
-      <div className="flex flex-col gap-3">
-        <p className="text-sm font-semibold text-text-primary">Your details</p>
-        <input
-          type="text"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="Full name"
-          required
-          className="h-12 rounded-lg border border-border bg-surface-card px-3 text-sm text-text-primary outline-none transition-colors placeholder:text-text-muted focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/25"
-        />
-        <input
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="Email address"
-          required
-          className="h-12 rounded-lg border border-border bg-surface-card px-3 text-sm text-text-primary outline-none transition-colors placeholder:text-text-muted focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/25"
-        />
-        <input
-          type="tel"
-          value={phone}
-          onChange={(e) => setPhone(e.target.value)}
-          placeholder="Mobile number (optional — for text updates)"
-          className="h-12 rounded-lg border border-border bg-surface-card px-3 text-sm text-text-primary outline-none transition-colors placeholder:text-text-muted focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/25"
-        />
-      </div>
 
       <div>
         <p className="mb-3 text-sm font-semibold text-text-primary">Payment details</p>
@@ -501,22 +701,15 @@ function FreeCheckoutForm({
   checkout,
   ...c
 }: ConfirmCommon & { checkout: Extract<ReadyCheckout, { mode: "free" }> }) {
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!name.trim() || !email.trim()) {
-      setError("Please enter your name and email.");
-      return;
-    }
     setSubmitting(true);
     setError(null);
     const result = await createBookingAction(
-      bookingInputFrom(c, name, email, phone, {
+      bookingInputFrom(c, {
         paymentMode: "free",
         creditAppliedPence: checkout.creditAppliedPence,
       }),
@@ -531,10 +724,7 @@ function FreeCheckoutForm({
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-6">
-      <div className="rounded-xl border border-border bg-surface p-4 text-sm">
-        <p className="font-semibold text-text-primary">{c.repairName}</p>
-        <p className="text-text-secondary">{vehicleLabel(c.reg, c.make, c.model)} · {formatBookingSlot(c.selectedSlot, c.selectedWindow)}</p>
-      </div>
+      <BookingRecap c={c} />
 
       <PriceSummary
         totalPence={checkout.totalPence}
@@ -545,33 +735,6 @@ function FreeCheckoutForm({
       <p className="rounded-lg bg-green-50 px-4 py-3 text-sm font-medium text-success">
         Your account credit covers this booking in full — there&apos;s nothing to pay.
       </p>
-
-      <div className="flex flex-col gap-3">
-        <p className="text-sm font-semibold text-text-primary">Your details</p>
-        <input
-          type="text"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="Full name"
-          required
-          className="h-12 rounded-lg border border-border bg-surface-card px-3 text-sm text-text-primary outline-none transition-colors placeholder:text-text-muted focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/25"
-        />
-        <input
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="Email address"
-          required
-          className="h-12 rounded-lg border border-border bg-surface-card px-3 text-sm text-text-primary outline-none transition-colors placeholder:text-text-muted focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/25"
-        />
-        <input
-          type="tel"
-          value={phone}
-          onChange={(e) => setPhone(e.target.value)}
-          placeholder="Mobile number (optional — for text updates)"
-          className="h-12 rounded-lg border border-border bg-surface-card px-3 text-sm text-text-primary outline-none transition-colors placeholder:text-text-muted focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/25"
-        />
-      </div>
 
       {error && (
         <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-danger">{error}</p>

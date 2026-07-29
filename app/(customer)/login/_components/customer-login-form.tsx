@@ -1,15 +1,32 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState, useTransition } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { signInUnified } from "@/app/actions/sign-in";
 import type { SignInState } from "@/app/actions/sign-in";
+import { requestPasswordReset } from "@/app/actions/booking-account";
 
 const initialState: SignInState = null;
 
 export function CustomerLoginForm({ justCreated }: { justCreated?: boolean }) {
   const [state, formAction, pending] = useActionState(signInUnified, initialState);
+  const [email, setEmail] = useState("");
+  const [resetSent, setResetSent] = useState(false);
+  const [resetError, setResetError] = useState<string | null>(null);
+  const [resetPending, startResetTransition] = useTransition();
+
+  function handleForgotPassword() {
+    setResetError(null);
+    startResetTransition(async () => {
+      const result = await requestPasswordReset(email);
+      if (!result.ok) {
+        setResetError(result.error);
+        return;
+      }
+      setResetSent(true);
+    });
+  }
 
   return (
     <form action={formAction} className="flex flex-col gap-4">
@@ -27,6 +44,8 @@ export function CustomerLoginForm({ justCreated }: { justCreated?: boolean }) {
           autoComplete="email"
           required
           disabled={pending}
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
           placeholder="you@email.com"
           className="h-11 rounded-button border border-border bg-surface-card px-3.5 text-sm text-text-primary placeholder:text-text-disabled focus:border-brand-blue focus:outline-none focus:ring-2 focus:ring-brand-blue/20 disabled:opacity-50"
         />
@@ -53,9 +72,32 @@ export function CustomerLoginForm({ justCreated }: { justCreated?: boolean }) {
         </p>
       )}
 
+      {resetSent && (
+        <p className="rounded-button border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-brand-blue">
+          Check your inbox — we&apos;ve emailed you a link to set a new password.
+        </p>
+      )}
+
+      {resetError && (
+        <p role="alert" className="rounded-button border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          {resetError}
+        </p>
+      )}
+
       <Button type="submit" variant="primary" size="lg" fullWidth disabled={pending} className="mt-2">
         {pending ? "Signing in…" : "Sign in"}
       </Button>
+
+      {!resetSent && (
+        <button
+          type="button"
+          onClick={handleForgotPassword}
+          disabled={resetPending || !email.trim()}
+          className="text-center text-sm font-semibold text-brand-blue hover:underline disabled:opacity-50 disabled:no-underline"
+        >
+          {resetPending ? "Sending…" : "Forgotten your password?"}
+        </button>
+      )}
 
       <p className="text-center text-sm text-text-secondary">
         New here?{" "}

@@ -1,12 +1,14 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
-import { Download, Search } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { Download, Search, ChevronLeft, ChevronRight } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Pill } from "@/components/ui/pill";
 import { Select } from "@/components/ui/select";
 import { formatPrice, formatJobNumber } from "@/lib/utils";
+import { JOB_TABS, LIVE_STATUSES, type JobTab } from "@/lib/admin/job-filters";
 
 export interface BookingRow {
   id: string;
@@ -24,37 +26,18 @@ export interface BookingRow {
 interface BookingsTableProps {
   bookings: BookingRow[];
   areas: readonly string[];
+  total: number;
+  page: number;
+  pageSize: number;
+  tab: JobTab;
+  area: string;
+  search: string;
 }
 
-type Tab = "all" | "live" | "pending" | "complete" | "disputed";
-
-const TABS: ReadonlyArray<{ value: Tab; label: string }> = [
-  { value: "all", label: "All" },
-  { value: "live", label: "Live" },
-  { value: "pending", label: "Pending" },
-  { value: "complete", label: "Complete" },
-  { value: "disputed", label: "Disputed" },
-];
-
-const LIVE_STATUSES = new Set(["confirmed", "en_route", "in_progress"]);
-
-function matchesTab(status: string, tab: Tab): boolean {
-  switch (tab) {
-    case "all":
-      return true;
-    case "live":
-      return LIVE_STATUSES.has(status);
-    case "pending":
-      return status === "sourcing_mechanic";
-    case "complete":
-      return status === "completed";
-    case "disputed":
-      return status === "disputed";
-  }
-}
+const LIVE = new Set<string>(LIVE_STATUSES);
 
 function statusTone(status: string): "active" | "success" | "pending" | "error" | "neutral" {
-  if (LIVE_STATUSES.has(status)) return "active";
+  if (LIVE.has(status)) return "active";
   if (status === "completed") return "success";
   if (status === "sourcing_mechanic") return "pending";
   if (status === "disputed") return "error";
@@ -81,54 +64,75 @@ function formatDate(iso: string | null): string {
   });
 }
 
-export function BookingsTable({ bookings, areas }: BookingsTableProps) {
-  const [tab, setTab] = useState<Tab>("all");
-  const [area, setArea] = useState<string>("all");
-  const [query, setQuery] = useState("");
+// Tab, area, search and page all live in the URL — the server filters and pages
+// in SQL, so this component only ever holds one page of rows.
+export function BookingsTable({
+  bookings,
+  areas,
+  total,
+  page,
+  pageSize,
+  tab,
+  area,
+  search,
+}: BookingsTableProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const [query, setQuery] = useState(search);
+  const [pending, startTransition] = useTransition();
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return bookings.filter((b) => {
-      if (!matchesTab(b.status, tab)) return false;
-      if (area !== "all" && b.area !== area) return false;
-      if (
-        q &&
-        !(
-          formatJobNumber(b.jobNumber).includes(q) ||
-          b.id.toLowerCase().includes(q) ||
-          b.customer.toLowerCase().includes(q) ||
-          b.vehicle.toLowerCase().includes(q)
-        )
-      )
-        return false;
-      return true;
-    });
-  }, [bookings, tab, area, query]);
+  function paramsFor(changes: Record<string, string | number | undefined>): URLSearchParams {
+    const next = new URLSearchParams();
+    const merged = { tab, area, q: search, page, ...changes };
+    for (const [key, value] of Object.entries(merged)) {
+      if (value === undefined || value === "" || value === "all") continue;
+      if (key === "page" && Number(value) <= 1) continue;
+      next.set(key, String(value));
+    }
+    return next;
+  }
 
-  // CSV export mirrors the active filters; the route handler re-queries
-  // server-side so PII is never assembled in the browser.
-  const exportHref = useMemo(() => {
-    const params = new URLSearchParams();
-    if (tab !== "all") params.set("tab", tab);
-    if (area !== "all") params.set("area", area);
-    if (query.trim()) params.set("q", query.trim());
-    const qs = params.toString();
-    return `/admin/jobs/export${qs ? `?${qs}` : ""}`;
-  }, [tab, area, query]);
+  function hrefFor(changes: Record<string, string | number | undefined>): string {
+    const qs = paramsFor(changes).toString();
+    return qs ? `${pathname}?${qs}` : pathname;
+  }
+
+  function navigate(changes: Record<string, string | number | undefined>) {
+    startTransition(() => router.push(hrefFor(changes)));
+  }
+
+  // Debounce the search box so typing doesn't fire a query per keystroke.
+  useEffect(() => {
+    if (query === search) return;
+    const t = setTimeout(() => navigate({ q: query, page: 1 }), 350);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query]);
+
+  // The export re-queries server-side with the same filters (minus paging), so
+  // the CSV is the whole matching set, not just this page.
+  const exportParams = paramsFor({ page: undefined });
+  const exportQs = exportParams.toString();
+  const exportHref = `/admin/jobs/export${exportQs ? `?${exportQs}` : ""}`;
 
   const areaOptions = [
     { value: "all", label: "All areas" },
     ...areas.map((a) => ({ value: a, label: a })),
   ];
 
+  const firstRow = total === 0 ? 0 : (page - 1) * pageSize + 1;
+  const lastRow = Math.min(page * pageSize, total);
+  const hasPrev = page > 1;
+  const hasNext = page * pageSize < total;
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
         <div className="flex flex-wrap gap-1 rounded-full bg-surface p-1">
-          {TABS.map((t) => (
+          {JOB_TABS.map((t) => (
             <button
               key={t.value}
-              onClick={() => setTab(t.value)}
+              onClick={() => navigate({ tab: t.value, page: 1 })}
               className={
                 "rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors " +
                 (tab === t.value
@@ -156,7 +160,7 @@ export function BookingsTable({ bookings, areas }: BookingsTableProps) {
           </div>
           <Select<string>
             value={area}
-            onChange={setArea}
+            onChange={(value) => navigate({ area: value, page: 1 })}
             options={areaOptions}
             aria-label="Filter by area"
             className="max-w-[150px]"
@@ -173,10 +177,14 @@ export function BookingsTable({ bookings, areas }: BookingsTableProps) {
       </div>
 
       <p className="text-sm text-text-muted">
-        {filtered.length} of {bookings.length} bookings
+        {pending
+          ? "Loading…"
+          : total === 0
+            ? "No bookings match"
+            : `${firstRow}–${lastRow} of ${total} booking${total === 1 ? "" : "s"}`}
       </p>
 
-      {filtered.length === 0 ? (
+      {bookings.length === 0 ? (
         <Card className="p-10 text-center">
           <p className="text-sm font-semibold text-text-secondary">No bookings match</p>
           <p className="mt-1 text-sm text-text-muted">
@@ -201,7 +209,7 @@ export function BookingsTable({ bookings, areas }: BookingsTableProps) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border-subtle">
-                {filtered.map((b) => (
+                {bookings.map((b) => (
                   <tr key={b.id} className="cursor-pointer hover:bg-surface/50">
                     <td className="px-5 py-3">
                       <Link
@@ -247,6 +255,38 @@ export function BookingsTable({ bookings, areas }: BookingsTableProps) {
             </table>
           </div>
         </Card>
+      )}
+
+      {(hasPrev || hasNext) && (
+        <nav className="flex items-center justify-between" aria-label="Pagination">
+          <Link
+            href={hrefFor({ page: page - 1 })}
+            aria-disabled={!hasPrev}
+            tabIndex={hasPrev ? undefined : -1}
+            className={
+              hasPrev
+                ? "inline-flex items-center gap-1 rounded-button border border-border bg-surface-card px-3 py-2 text-sm font-semibold text-text-secondary hover:border-brand-blue hover:text-brand-blue"
+                : "pointer-events-none inline-flex items-center gap-1 rounded-button border border-border-subtle px-3 py-2 text-sm font-semibold text-text-disabled"
+            }
+          >
+            <ChevronLeft size={14} /> Previous
+          </Link>
+          <span className="text-sm text-text-muted">
+            Page {page} of {Math.max(1, Math.ceil(total / pageSize))}
+          </span>
+          <Link
+            href={hrefFor({ page: page + 1 })}
+            aria-disabled={!hasNext}
+            tabIndex={hasNext ? undefined : -1}
+            className={
+              hasNext
+                ? "inline-flex items-center gap-1 rounded-button border border-border bg-surface-card px-3 py-2 text-sm font-semibold text-text-secondary hover:border-brand-blue hover:text-brand-blue"
+                : "pointer-events-none inline-flex items-center gap-1 rounded-button border border-border-subtle px-3 py-2 text-sm font-semibold text-text-disabled"
+            }
+          >
+            Next <ChevronRight size={14} />
+          </Link>
+        </nav>
       )}
     </div>
   );

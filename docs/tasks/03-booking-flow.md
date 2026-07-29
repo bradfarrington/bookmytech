@@ -2,6 +2,8 @@
 
 **Status:** ✅ Complete (2026-05-26). Guest customer can complete a booking end-to-end (reg → vehicle → service → price → slot → Stripe pre-auth → confirmation). Verified manually with the Stripe test card. Booking rows insert with `status = 'sourcing_mechanic'` (pre-auth held, no mechanic assigned yet) — Task 04 extends the status enum from this baseline. See `docs/HANDOFF.md` → Task 03.
 
+> **Superseded 2026-07-29 — guest checkout is gone.** Every booking now creates (or signs into) a customer account **before** the pre-authorisation is taken, so the customer always lands on a dashboard that owns their job. The name/email/phone block moved from the payment step up to the slot screen and gained a password field; it is not a separate step. Details in `docs/HANDOFF.md` → "Current task". The `customer_id`-nullable path and `linkGuestBookings` remain only for historic guest rows.
+
 Build the four-step mobile-first booking flow at `/book`. By the end of this task, a customer can land on the homepage, enter their reg, walk through service / mechanic / time slot selection, pre-authorise via Stripe, and land on a confirmation screen.
 
 ## Why this task

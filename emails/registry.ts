@@ -235,6 +235,34 @@ export const EMAIL_TEMPLATE_DEFS: readonly EmailTemplateDef[] = [
 
   // ─── Customer lifecycle ─────────────────────────────────────────────────
   {
+    key: "password_reset",
+    label: "Password reset",
+    description:
+      "Sent when a customer asks for a new password — from /login or the booking funnel's sign-in prompt.",
+    category: "customer",
+    subject: "Set a new Book My Tech password",
+    preheader: "Use the link inside to choose a new password.",
+    variables: [
+      { name: "name", description: "Customer's name", example: "Alex" },
+      { name: "action_link", description: "Set-password link", example: "https://bookmytech.co.uk/…" },
+    ],
+    blocks: [
+      { id: "heading", type: "heading", text: "Choose a new password" },
+      { id: "greeting", type: "paragraph", text: "Hi {{name}}," },
+      {
+        id: "intro",
+        type: "paragraph",
+        text: "You asked to reset the password on your Book My Tech account. Click the button below to choose a new one — you'll be signed in straight away.",
+      },
+      { id: "cta", type: "button", text: "Set a new password", hrefVar: "action_link" },
+      {
+        id: "footnote",
+        type: "note",
+        text: "For your security this link expires soon and can only be used once. If you didn't ask for this, you can safely ignore this email — your password won't change.",
+      },
+    ],
+  },
+  {
     key: "booking_confirmed",
     label: "Booking received",
     description: "Sent to the customer when a booking is created, while we find a mechanic.",

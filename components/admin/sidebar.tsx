@@ -23,6 +23,7 @@ import {
   PoundSterling,
   Shield,
   Star,
+  UserRound,
   Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -57,6 +58,7 @@ const NAV_GROUPS: readonly NavGroup[] = [
     title: "Network",
     items: [
       { label: "Mechanics", href: "/admin/mechanics", icon: Users },
+      { label: "Customers", href: "/admin/customers", icon: UserRound },
       { label: "Reviews", href: "/admin/reviews", icon: Star },
       { label: "Approvals", href: "/admin/approvals", icon: Shield },
       { label: "Documents", href: "/admin/documents", icon: FileText },

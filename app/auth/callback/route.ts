@@ -19,7 +19,14 @@ import { createClient } from "@/lib/supabase/server";
 //
 // Whitelist accepted destinations so an attacker can't craft a callback URL
 // that hands them a session and bounces to an external domain.
-const ALLOWED_NEXT = new Set(["/", "/mechanic", "/mechanic/set-password", "/admin"]);
+const ALLOWED_NEXT = new Set([
+  "/",
+  "/mechanic",
+  "/mechanic/set-password",
+  "/dashboard",
+  "/dashboard/set-password",
+  "/admin",
+]);
 const ALLOWED_OTP_TYPES = new Set<EmailOtpType>([
   "magiclink",
   "invite",

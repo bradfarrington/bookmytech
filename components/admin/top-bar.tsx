@@ -16,6 +16,8 @@ const CRUMBS: Record<string, readonly [string, string]> = {
   "/admin/mechanics": ["Network", "Mechanics"],
   "/admin/mechanics/new": ["Mechanics", "Add mechanic"],
   "/admin/mechanics/[id]": ["Mechanics", "Mechanic detail"],
+  "/admin/customers": ["Network", "Customers"],
+  "/admin/customers/[id]": ["Customers", "Customer detail"],
   "/admin/approvals": ["Network", "Approvals"],
   "/admin/documents": ["Network", "Documents"],
   "/admin/pricing": ["Commercial", "Pricing"],

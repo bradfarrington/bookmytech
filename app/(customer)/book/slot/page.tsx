@@ -39,17 +39,37 @@ export default async function SlotPage({ searchParams }: SlotPageProps) {
   const repairName = quote.description;
   const pricePence = quote.breakdown.totalPence;
 
-  // Surface any account credit a signed-in customer has, so the picker can hint
-  // it before checkout (the actual amount applied is decided server-side).
+  // Signed-in customers skip the account block on the picker; guests fill it in
+  // and get an account created before the pre-auth is taken. Surface any account
+  // credit too, so the picker can hint it before checkout (the actual amount
+  // applied is decided server-side).
+  //
+  // Only a role='customer' session counts as "booking as this account". An admin
+  // or mechanic session is treated as `wrongRole`: middleware would bounce them
+  // off /dashboard anyway, so a booking made under their id would be invisible
+  // to them. The picker asks them to sign out instead of silently booking as
+  // themselves — which is also what you want when testing the funnel from an
+  // admin browser.
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   let availableCreditPence = 0;
+  let customerName = "";
+  let customerPhone = "";
+  let sessionRole: string | null = null;
   if (user) {
     const { availableCreditPence: getCredit } = await import("@/lib/credits/credits");
-    availableCreditPence = await getCredit(createAdminClient(), user.id);
+    const [credit, { data: profile }] = await Promise.all([
+      getCredit(createAdminClient(), user.id),
+      supabase.from("profiles").select("full_name, phone, role").eq("id", user.id).maybeSingle(),
+    ]);
+    availableCreditPence = credit;
+    customerName = profile?.full_name ?? "";
+    customerPhone = profile?.phone ?? "";
+    sessionRole = profile?.role ?? "customer";
   }
+  const bookingAsCustomer = Boolean(user) && sessionRole === "customer";
 
   const vehicleParams = [
     params.make ? `make=${encodeURIComponent(params.make)}` : null,
@@ -88,7 +108,12 @@ export default async function SlotPage({ searchParams }: SlotPageProps) {
         repairNodeId={repairNodeId}
         pricePence={pricePence}
         preferredMechanicId={params.pref}
-        availableCreditPence={availableCreditPence}
+        availableCreditPence={bookingAsCustomer ? availableCreditPence : 0}
+        signedIn={bookingAsCustomer}
+        wrongRole={Boolean(user) && !bookingAsCustomer ? (sessionRole ?? "admin") : undefined}
+        customerName={bookingAsCustomer ? customerName : ""}
+        customerEmail={bookingAsCustomer ? (user?.email ?? "") : ""}
+        customerPhone={bookingAsCustomer ? customerPhone : ""}
       />
     </div>
   );

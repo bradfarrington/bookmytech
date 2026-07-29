@@ -41,11 +41,17 @@ test.skip(
 
 const START_URL = `/book/repairs?reg=${encodeURIComponent(E2E_REG)}&postcode=SW1A1AA`;
 
+const GUEST_PASSWORD = "E2eTestPass!123";
+
 /**
  * Drive the funnel: drill the repair tree to the first bookable repair →
- * review price → pick today's morning slot.
+ * review price → pick today's morning slot → fill the address.
+ *
+ * `newAccount` fills the account block a guest now sees on the slot screen —
+ * every booking creates (or signs into) an account BEFORE the pre-auth, so the
+ * customer lands on a dashboard that owns the job. Signed-in runs pass nothing.
  */
-async function funnelToCheckout(page: Page) {
+async function funnelToCheckout(page: Page, newAccount?: { email: string }) {
   await page.goto(START_URL);
   // Drill down group links until a priced "book" link (→ /book/match) appears.
   for (let depth = 0; depth < 8; depth++) {
@@ -59,9 +65,15 @@ async function funnelToCheckout(page: Page) {
   await expect(page).toHaveURL(/\/book\/slot/);
   await page.getByRole("button", { name: /Morning/i }).click();
   await page.getByPlaceholder("House number and street").fill("12 Test Street");
+
+  if (newAccount) {
+    await page.getByPlaceholder("Full name").fill("E2E Guest Customer");
+    await page.getByPlaceholder("Email address").fill(newAccount.email);
+    await page.getByPlaceholder(/Create a password/i).fill(GUEST_PASSWORD);
+  }
 }
 
-test("§1.1 guest checkout prepares an uncaptured full-price hold", async ({ page }) => {
+test("§1.1 new-customer checkout prepares an uncaptured full-price hold", async ({ page }) => {
   // The clientSecret (→ PaymentIntent id) comes back in the prepareCheckout
   // server-action response when "Confirm booking" is clicked.
   let piId: string | null = null;
@@ -74,8 +86,8 @@ test("§1.1 guest checkout prepares an uncaptured full-price hold", async ({ pag
     }
   });
 
-  await funnelToCheckout(page);
-  await page.getByRole("button", { name: /Confirm booking/i }).click();
+  await funnelToCheckout(page, { email: `e2e-guest-${Date.now()}@bookmytech.test` });
+  await page.getByRole("button", { name: /Continue to payment/i }).click();
 
   // The card step renders with the full price to pre-authorise.
   const payBtn = page.getByRole("button", { name: /Pre-authorise/i });
@@ -104,15 +116,16 @@ test.describe("signed-in, credit-covered", () => {
     resetOutbox();
     const customerId = await getUserId(TEST_USERS.customer.email);
     await setTestCredit(customerId, 100_000); // £1,000 — covers any repair total
-    const email = `e2e-credit-${Date.now()}@bookmytech.test`;
+    const email = TEST_USERS.customer.email;
 
+    // Already signed in — the slot screen shows no account block, and the
+    // confirm step no longer asks for name/email.
     await funnelToCheckout(page);
-    await page.getByRole("button", { name: /Confirm booking/i }).click();
+    await expect(page.getByText(new RegExp(`Booking as`, "i")).first()).toBeVisible();
+    await page.getByRole("button", { name: /Continue to payment/i }).click();
 
     // Credit covers the total → the no-card "free" confirm step.
     await expect(page.getByText(/covers this booking in full/i)).toBeVisible();
-    await page.getByPlaceholder("Full name").fill("E2E Credit Customer");
-    await page.getByPlaceholder("Email address").fill(email);
     await page.getByRole("button", { name: /Confirm booking/i }).click();
 
     // Confirmation screen with a booking reference.
