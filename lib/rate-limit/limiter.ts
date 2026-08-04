@@ -18,6 +18,22 @@ export const RATE_LIMIT_DEFAULTS = {
   mobile_lookup_global_daily: 5000,
   mobile_signup_ip_burst: 5,
   mobile_signup_ip_daily: 20,
+  // Repair catalogue (/repairs/tree, /quote). Far looser than lookup: drilling
+  // through the tree is several requests in a row, and almost all of them are
+  // memo hits that cost HaynesPro nothing. The global daily is the ceiling for
+  // the whole catalogue, search included.
+  mobile_catalogue_ip_burst: 60,
+  mobile_catalogue_ip_daily: 1500,
+  mobile_catalogue_user_burst: 40,
+  mobile_catalogue_user_daily: 600,
+  mobile_catalogue_global_daily: 30000,
+  // /repairs/search gets its own tighter bucket on top: HaynesPro has no
+  // keyword search, so one query can cost up to SEARCH_MAX_EXPANSIONS upstream
+  // calls (lib/haynespro/catalogue.ts) where a tree request costs one.
+  mobile_search_ip_burst: 15,
+  mobile_search_ip_daily: 300,
+  mobile_search_user_burst: 10,
+  mobile_search_user_daily: 150,
 } as const;
 
 export type RateLimitKey = keyof typeof RATE_LIMIT_DEFAULTS;

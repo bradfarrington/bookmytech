@@ -2,11 +2,7 @@ import Link from "next/link";
 import { ChevronRight, Wrench } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatPrice } from "@/lib/utils";
-import { billableHours } from "@/lib/pricing/billable";
-import { getHourlyRatePence } from "@/lib/pricing/calculate";
-import { excludedRepairNodeIdsForVehicle } from "@/lib/haynespro/exclusions";
-import { getRepairtimeSubnodes } from "@/lib/haynespro/tree";
-import { resolveVehicle } from "@/lib/haynespro/vehicle";
+import { getRepairCatalogueLevel } from "@/lib/haynespro/catalogue";
 
 // Customer-facing browse of the HaynesPro repair-times tree for THEIR car
 // (Task 16 Stage G). Groups drill down (?node=…) until timed leaf repairs,
@@ -14,6 +10,12 @@ import { resolveVehicle } from "@/lib/haynespro/vehicle";
 // a Book link straight into the existing match → slot → pay funnel.
 //
 // Server component: all HaynesPro traffic stays server-side and memoised.
+//
+// Which repairs exist, which are hidden and what they cost is NOT decided here
+// — it comes from lib/haynespro/catalogue.ts, the same function behind
+// GET /api/mobile/v1/repairs/tree. This file only decides how it looks. That is
+// deliberate: the website and the mobile app must never quote a customer
+// different prices for the same job on the same car.
 
 interface RepairBrowserProps {
   reg: string;
@@ -33,25 +35,21 @@ export async function RepairBrowser({
   nodeId,
   crumbs,
 }: RepairBrowserProps) {
-  const admin = createAdminClient();
-  const vehicle = await resolveVehicle(reg, admin);
+  const result = await getRepairCatalogueLevel(reg, nodeId, createAdminClient());
 
-  if (!vehicle) {
+  if (!result.ok) {
+    // The catalogue's `message` is written for the app, which can't render a
+    // link. Here the same two answers get the /help link inline.
     return (
       <Empty>
-        We couldn&apos;t match your reg to our repair database, so we
-        can&apos;t price repairs for this vehicle online yet. Please{" "}
-        <Link href="/help" className="font-semibold text-brand-blue hover:underline">
-          get in touch
-        </Link>{" "}
-        and we&apos;ll sort it for you.
-      </Empty>
-    );
-  }
-  if (vehicle.repairtimeTypeId == null) {
-    return (
-      <Empty>
-        There&apos;s no repair-time data for this exact vehicle yet. Please{" "}
+        {result.code === "vehicle_not_matched" ? (
+          <>
+            We couldn&apos;t match your reg to our repair database, so we
+            can&apos;t price repairs for this vehicle online yet. Please{" "}
+          </>
+        ) : (
+          <>There&apos;s no repair-time data for this exact vehicle yet. Please </>
+        )}
         <Link href="/help" className="font-semibold text-brand-blue hover:underline">
           get in touch
         </Link>{" "}
@@ -60,15 +58,7 @@ export async function RepairBrowser({
     );
   }
 
-  // Per-model repair availability (admin toggles): excluded groups and
-  // repairs simply don't render — hiding a group hides everything under it
-  // because there's no way to drill in.
-  const [allNodes, hourlyRatePence, excluded] = await Promise.all([
-    getRepairtimeSubnodes(vehicle.repairtimeTypeId, nodeId || "root"),
-    getHourlyRatePence(admin),
-    excludedRepairNodeIdsForVehicle(vehicle.hpModelLabel, admin),
-  ]);
-  const nodes = allNodes.filter((n) => n.id == null || !excluded.has(n.id));
+  const { vehicle, nodes } = result;
 
   const vehicleParams = [
     make ? `make=${encodeURIComponent(make)}` : null,
@@ -102,12 +92,10 @@ export async function RepairBrowser({
 
   return (
     <div className="flex flex-col gap-4">
-      {vehicle.description && (
-        <p className="flex items-center gap-2 rounded-lg bg-blue-50/60 px-3.5 py-2.5 text-[13px] text-text-secondary">
-          <Wrench size={14} className="shrink-0 text-brand-blue" />
-          Repair times matched to your {vehicle.description}
-        </p>
-      )}
+      <p className="flex items-center gap-2 rounded-lg bg-blue-50/60 px-3.5 py-2.5 text-[13px] text-text-secondary">
+        <Wrench size={14} className="shrink-0 text-brand-blue" />
+        Repair times matched to your {vehicle.description}
+      </p>
 
       {/* Breadcrumbs */}
       <nav className="flex flex-wrap items-center gap-1.5 text-sm text-text-secondary">
@@ -136,12 +124,11 @@ export async function RepairBrowser({
         )}
         <ul className="divide-y divide-border-subtle">
           {nodes.map((node) => {
-            if (node.id == null) return null;
-            if (node.hasSubnodes) {
+            if (node.kind === "group") {
               return (
                 <li key={node.id}>
                   <Link
-                    href={groupHref(node.id, node.description ?? node.id)}
+                    href={groupHref(node.id, node.description)}
                     className="flex items-center justify-between gap-3 px-4 py-3.5 text-sm font-semibold text-text-primary transition-colors hover:bg-surface"
                   >
                     {node.description}
@@ -150,10 +137,6 @@ export async function RepairBrowser({
                 </li>
               );
             }
-            const billed = billableHours(
-              typeof node.value === "number" ? node.value / 100 : null,
-            );
-            if (billed == null) return null; // untimed leaf — not bookable
             return (
               <li
                 key={node.id}
@@ -164,14 +147,15 @@ export async function RepairBrowser({
                     {node.description}
                   </p>
                   <p className="mt-0.5 text-xs text-text-muted">
-                    Estimated {billed} hour{billed === 1 ? "" : "s"} on your car
+                    Estimated {node.billedHours} hour
+                    {node.billedHours === 1 ? "" : "s"} on your car
                   </p>
                 </div>
                 <Link
                   href={bookHref(node.id)}
                   className="flex shrink-0 items-center gap-2 rounded-lg bg-brand-blue px-3.5 py-2 text-sm font-bold text-white transition-colors hover:bg-brand-blue/90"
                 >
-                  {formatPrice(Math.round(billed * hourlyRatePence))}
+                  {formatPrice(node.pricePence ?? 0)}
                   <ChevronRight size={14} />
                 </Link>
               </li>

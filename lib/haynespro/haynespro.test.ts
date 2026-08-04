@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { affinityFor, matchRank, toCatalogueNode } from "./catalogue";
 import { extractStatusCode, isAuthFailure } from "./client";
 import { excludedRepairNodeIdsForLabel, normaliseLabel } from "./exclusions";
 import {
@@ -274,5 +275,71 @@ describe("repair node exclusions", () => {
   it("unresolved vehicles and other models match nothing (default ON)", () => {
     expect(excludedRepairNodeIdsForLabel(null, rows).size).toBe(0);
     expect(excludedRepairNodeIdsForLabel("FORD Focus II", rows).size).toBe(0);
+  });
+});
+
+describe("toCatalogueNode", () => {
+  it("prices a timed leaf from its book time (min 1h) × the hourly rate", () => {
+    expect(
+      toCatalogueNode(
+        { id: "1M01534000WV0", description: "Renew the rear brake pads", value: 110 },
+        6000,
+      ),
+    ).toEqual({
+      id: "1M01534000WV0",
+      description: "Renew the rear brake pads",
+      kind: "repair",
+      billedHours: 1.1,
+      pricePence: 6600,
+    });
+  });
+
+  it("carries no price on a group", () => {
+    expect(
+      toCatalogueNode({ id: "0CJ0", description: "Common jobs", hasSubnodes: true }, 6000),
+    ).toEqual({
+      id: "0CJ0",
+      description: "Common jobs",
+      kind: "group",
+      billedHours: null,
+      pricePence: null,
+    });
+  });
+
+  it("drops what can't be presented: no id, and untimed leaves", () => {
+    // An untimed leaf can't be priced, so it can't be booked — showing it
+    // would be a dead end in both the website and the app.
+    expect(toCatalogueNode({ id: "X", description: "Untimed", value: null }, 6000)).toBeNull();
+    expect(toCatalogueNode({ id: "X", description: "Zero", value: 0 }, 6000)).toBeNull();
+    expect(toCatalogueNode({ id: null, description: "No id" }, 6000)).toBeNull();
+  });
+});
+
+describe("repair search ranking", () => {
+  // matchRank takes an already-lowercased query — searchRepairCatalogue does
+  // that once per search rather than once per node.
+  const rank = (description: string, query: string) => {
+    const needle = query.toLowerCase();
+    return matchRank(description, needle, needle.split(/\s+/).filter(Boolean));
+  };
+
+  it("promotes whole-name and prefix matches above scattered tokens", () => {
+    expect(rank("Brake pads", "brake pads")).toBe(0); // starts with
+    expect(rank("Renew the front brake pads", "brake pads")).toBe(1); // contains
+    expect(rank("Renew the brake caliper and pads", "brake pads")).toBe(2); // all tokens
+  });
+
+  it("requires every token, in any order, and ignores case on both sides", () => {
+    expect(rank("Renew the brake caliper and pads", "PADS Brake")).toBe(2);
+    expect(rank("Renew the front brake discs", "brake pads")).toBeNull();
+    expect(rank("Renew the air filter", "brake")).toBeNull();
+  });
+
+  it("scores group affinity by how many tokens the group name carries", () => {
+    // This is what makes the walk best-first rather than breadth-first: the
+    // path to a matching leaf is itself named for the query.
+    expect(affinityFor("Brake pads", ["brake", "pads"])).toBe(2);
+    expect(affinityFor("Brakes (Mechanical)", ["brake", "pads"])).toBe(1);
+    expect(affinityFor("Cooling system", ["brake", "pads"])).toBe(0);
   });
 });

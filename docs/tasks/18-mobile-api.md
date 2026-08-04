@@ -1,6 +1,6 @@
 # Task 18 — Mobile API layer (`app/api/mobile/v1/**`)
 
-**Status:** 🟡 Stage 1 complete (2026-07-29) — auth helper, `/auth/signup` and `/vehicle/lookup` shipped and verified live against the dev Supabase project. Rate limiting is Postgres-backed (migration `0043`). Stages 2–4 (the booking endpoints) are specced below and not built.
+**Status:** 🟡 Stages 1–2 complete. Stage 1 (2026-07-29) — auth helper, `/auth/signup` and `/vehicle/lookup`, Postgres-backed rate limiting (migration `0043`). Stage 2 (2026-08-04) — `/repairs/tree`, `/repairs/search` and `/quote`, on a new shared core (`lib/haynespro/catalogue.ts`) that the website's repair browser was refactored onto; migration `0044` seeds their limits (data only, no schema change). Both verified live against the dev Supabase project. Stages 3–4 (the booking endpoints) are specced below and not built.
 
 ## Why this exists
 
@@ -213,22 +213,169 @@ create real accounts; a broken guard must not become an open one.
 
 ---
 
-## Later stages — not built
+## Stage 2 — browse and quote ✅ (2026-08-04)
 
-Prompted separately, now the scaffolding exists and the auth helper is proven.
-Every one of these is a thin wrapper; if the underlying function isn't callable
-from a route handler, extract the shared core and have both callers use it, as
-`createCustomerAccount` already does.
-
-### Stage 2 — browse and quote (unauthenticated)
+Unauthenticated, because the app lets people price a job before making an
+account. This is what the app's booking step 2 calls; before it existed the
+screen showed "Something went wrong. Please try again." — the app's generic
+fallback for a 404 with no `{error}` body.
 
 | Endpoint | Wraps |
 |---|---|
-| `GET /repairs/tree`, `GET /repairs/search` | `lib/haynespro/tree.ts` |
-| `POST /quote` | `quoteRepair` (`lib/haynespro/repair-booking.ts`) |
+| `GET /repairs/tree?reg=&node=` | `getRepairCatalogueLevel` |
+| `GET /repairs/search?reg=&q=` | `searchRepairCatalogue` |
+| `POST /quote` `{reg, repairNodeId}` | `quoteRepair` (`lib/haynespro/repair-booking.ts`) |
 
-Both hit HaynesPro, whose demo credentials are metered — they need the same
-rate-limit treatment as `/vehicle/lookup`, using the buckets already in place.
+### `lib/haynespro/catalogue.ts` — the shared core
+
+The spec above said to extract a shared core rather than reimplement, and here
+that mattered more than usual: the website's `RepairBrowser` server component
+held the catalogue logic **inline** — resolve the vehicle, read the level, drop
+admin-excluded nodes, drop untimed leaves, price the rest. Wrapping the route
+handlers around a copy would have left two implementations of *what a repair
+costs*, free to drift.
+
+So it moved into `getRepairCatalogueLevel` / `searchRepairCatalogue`, and
+[repair-browser.tsx](../../app/(customer)/book/repairs/_components/repair-browser.tsx)
+was refactored onto it. It now decides only how things look — the two clients
+cannot quote a customer different prices for the same job on the same car.
+
+`toCatalogueNode` is the one place a HaynesPro node becomes a customer-facing
+one: groups carry no price, timed leaves are priced with the same arithmetic
+`quoteRepair` uses, and **untimed leaves are dropped entirely** — they can't be
+priced, so they can't be booked, and showing one is a dead end in both clients.
+
+### The response convention
+
+Same as `/vehicle/lookup`, and the app types against it: a request that ran
+correctly but has a negative answer is **200** with `{ ok: false, code, message
+}` — `vehicle_not_matched` (reg we can't match) or `no_repair_data` (matched,
+but HaynesPro has no repair times for it). Only transport-level problems return
+`{ error }` with a non-2xx: **400** (no reg, or a search query under 3
+characters), **415** (wrong content type on `/quote`), **429**.
+
+`message` is product copy shown to the customer verbatim. The website renders
+the same two answers with a `/help` link inline instead, branching on `code`.
+
+An **empty root level is reported as `no_repair_data`**, not as an empty
+catalogue: `getRepairtimeSubnodes` swallows upstream failures as `[]`, every
+vehicle with a repair-time type has root groups, so at the root the two are
+indistinguishable and the safer reading is "we have nothing for you". Inside a
+group, empty stays a legitimate answer.
+
+### Search is best-first, and that is load-bearing
+
+HaynesPro has no keyword search, so we walk the tree — and the obvious walk
+does not work. **Breadth-first returns nothing.** The tree has ~43 groups at the
+root and the priced repairs sit two levels below them, so a 40-expansion
+breadth-first walk spends its entire budget on the root's children and never
+reaches a leaf. Measured, not theorised: "brake pads" on a live T-Roc returned
+**0 hits**.
+
+Best-first works because **the path to a matching leaf is itself named for the
+query** — "Renew the front brake pads" sits under "Brake pads" under "Brakes".
+Groups are expanded in order of how many query tokens their own name contains
+(`affinityFor`), shallowest first. Groups matching nothing are still expanded if
+budget remains, since a leaf can be named unlike its parents; they just go last.
+Same query, same budget: **14 priced hits in ~1.1s.**
+
+Two more things the live results forced:
+
+- **Dedupe on the name, not the id.** HaynesPro files the same group under
+  several parents — a T-Roc has four distinct "Clutch" nodes. Four identical
+  rows isn't a search result, it's noise.
+- **Bookable repairs sort above _all_ groups**, not merely at equal rank. A
+  group named exactly "Clutch" scores a whole-name match while "Renew the
+  clutch" only has all-tokens-present, so ranking alone buried every priced row
+  under a wall of folders. Groups stay on as the browse-instead fallback.
+
+`truncated` means the queue wasn't drained, which for a tree this size is the
+normal outcome — both clients must render "closest matches", never "all
+matches". The app already does.
+
+A vocabulary gap remains and is not a bug: HaynesPro names nothing "service"
+(it's "Additional maintenance work", "Inspection"), so that query returns
+nothing. The app's empty state already says "try a different word, or browse the
+categories instead".
+
+### Rate limiting (migration `0044` — data only)
+
+`0044` inserts `platform_settings` rows. **No schema change**, so nothing here
+affects the types the app generates from the schema.
+
+| Setting | Limit | Window | Applies to |
+|---|---|---|---|
+| `mobile_catalogue_ip_burst` | 60 | 1 min | IP |
+| `mobile_catalogue_ip_daily` | 1500 | 24 h | IP |
+| `mobile_catalogue_user_burst` | 40 | 1 min | signed-in caller |
+| `mobile_catalogue_user_daily` | 600 | 24 h | signed-in caller |
+| `mobile_catalogue_global_daily` | 30000 | 24 h | everyone |
+| `mobile_search_ip_burst` | 15 | 1 min | IP |
+| `mobile_search_ip_daily` | 300 | 24 h | IP |
+| `mobile_search_user_burst` | 10 | 1 min | signed-in caller |
+| `mobile_search_user_daily` | 150 | 24 h | signed-in caller |
+
+Deliberately **far looser than `/vehicle/lookup`**: drilling through the tree is
+several requests in a row during normal use and almost all are served from the
+memo in `lib/haynespro/tree.ts`, costing HaynesPro nothing. A 10/minute
+lookup-style limit would refuse ordinary browsing. Search carries its own
+tighter bucket **on top** of the catalogue ones, because one query can cost up
+to `SEARCH_MAX_EXPANSIONS` upstream calls where a browse costs one.
+
+A GET isn't protected by our refusal to answer preflights the way a JSON POST
+is — any page can trigger one from a victim's browser, and though it can't read
+the reply it can still spend our metered HaynesPro credit. These limits are the
+cost ceiling, not a nicety. Shared by all three routes via
+`lib/mobile/catalogue-limits.ts`.
+
+### Verified live (2026-08-04, dev Supabase + `npm run dev`)
+
+Against a real reg resolved through the live HaynesPro account:
+
+- Root level → 43 groups with `{description, hourlyRatePence}`; drill-in →
+  subgroups; leaf level → `Renew the air filter`, 1h, `pricePence: 6000`.
+- Search "brake pads" → 14 priced hits, repairs first, no duplicates, ~1.1s.
+  Also checked: battery, clutch, oil filter, exhaust.
+- `/quote` on a node taken from the search → `totalPence` **6000, identical to
+  the browse price**. That equality is the point of the shared core.
+- Negative arms: unmatchable reg → 200 `vehicle_not_matched`; unknown node and
+  a group node → 200 `not_priceable`. Errors: no reg → 400; 2-character query →
+  400; `text/plain` on `/quote` → 415.
+- Hammering search → 429 with "You've made a lot of requests just now…" and a
+  decreasing `Retry-After`, **while `/repairs/tree` and `/quote` kept returning
+  200** — the separate bucket does its job and search abuse doesn't block
+  browsing.
+- The refactored website page renders identically: same vehicle line, same 43
+  groups, same `£60` leaf pricing, same "get in touch" empty state.
+
+### Acceptance criteria
+
+- [x] The app's booking step 2 loads a real, priced repair catalogue instead of
+      "Something went wrong"
+- [x] Browse, search and quote all return the exact shapes `src/lib/repairs.ts`
+      in `bmt-customer-app` is already written against
+- [x] A quote's total equals the price shown while browsing, and is produced by
+      the same `quoteRepair` the web funnel charges from
+- [x] No logic is duplicated between the website and the app — the website's
+      repair browser was refactored onto the shared core, not left alongside it
+- [x] Negative answers are 200 `{ok:false, code, message}`; only transport
+      problems are non-2xx `{error}`; no redirects; no CORS headers
+- [x] Search never presents a capped walk as a complete result set
+- [x] HaynesPro spend is bounded, and browsing isn't collateral damage of the
+      search limit
+- [x] No mobile route reaches cookie-derived auth
+- [x] Admin-hidden repairs stay hidden and unquotable through the mobile routes
+      (the exclusion set is applied in the shared core, and the walk never
+      descends into an excluded group)
+
+---
+
+## Later stages — not built
+
+Prompted separately. Every one of these is a thin wrapper; if the underlying
+function isn't callable from a route handler, extract the shared core and have
+both callers use it, as `createCustomerAccount` and now
+`getRepairCatalogueLevel` already do.
 
 ### Stage 3 — booking (authenticated)
 
@@ -286,10 +433,19 @@ mobile route needs the same gate.
   `monthOfFirstRegistration`. Pre-existing, harmless (the app types against the
   declared subset), and passing it through unchanged is correct here — but worth
   knowing before anyone "tidies" the type.
-- **No mobile endpoint is covered by an automated test yet.** Stage 1 was
-  verified by hand against the dev project. A route-handler test suite (or
-  Playwright API tests) should land before the app ships to real customers,
-  because these responses are contracts that can't be walked back.
+- **No mobile route HANDLER is covered by an automated test yet.** Stages 1 and
+  2 were verified by hand against the dev project. Stage 2 did add unit tests
+  for the pure catalogue helpers (`toCatalogueNode`, `matchRank`, `affinityFor`
+  in `lib/haynespro/haynespro.test.ts`) — the ranking rules are subtle enough
+  that they needed pinning down — but the handlers themselves are untested. A
+  route-handler suite (or Playwright API tests) should land before the app ships
+  to real customers, because these responses are contracts that can't be walked
+  back.
+- **The search walk's caps are guesses tuned on one vehicle.**
+  `SEARCH_MAX_EXPANSIONS = 40` was enough for every query tried on a T-Roc and a
+  Ranger, but a make with a broader tree may truncate sooner. The lever exists
+  (one constant) and the honest signal exists (`truncated`), so this is worth
+  revisiting with real query logs rather than guessing harder now.
 
 ## When complete
 
