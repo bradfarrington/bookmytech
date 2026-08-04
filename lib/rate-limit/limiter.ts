@@ -34,6 +34,24 @@ export const RATE_LIMIT_DEFAULTS = {
   mobile_search_ip_daily: 300,
   mobile_search_user_burst: 10,
   mobile_search_user_daily: 150,
+  // Checkout (/checkout/prepare). Authenticated, but every call re-quotes
+  // through HaynesPro AND opens a Stripe PaymentIntent. An unconfirmed intent
+  // costs nothing and expires on its own, so this is about keeping a loop from
+  // filling the Stripe dashboard and burning metered quote credit, not about a
+  // direct bill. Loose enough that changing your mind at the payment step —
+  // going back, editing the slot, coming forward again — never trips it.
+  mobile_checkout_user_burst: 10,
+  mobile_checkout_user_daily: 60,
+  mobile_checkout_ip_burst: 20,
+  mobile_checkout_ip_daily: 300,
+  // Booking create (/bookings). A real customer books once, occasionally twice.
+  // These are an abuse ceiling, not a quota: every call writes a row, dispatches
+  // to mechanics and sends an email and an SMS, so a loop here is noisy in
+  // people's actual jobs list, not just in a table.
+  mobile_booking_user_burst: 5,
+  mobile_booking_user_daily: 25,
+  mobile_booking_ip_burst: 10,
+  mobile_booking_ip_daily: 100,
 } as const;
 
 export type RateLimitKey = keyof typeof RATE_LIMIT_DEFAULTS;

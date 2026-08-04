@@ -1,6 +1,6 @@
 # Task 18 — Mobile API layer (`app/api/mobile/v1/**`)
 
-**Status:** 🟡 Stages 1–2 complete. Stage 1 (2026-07-29) — auth helper, `/auth/signup` and `/vehicle/lookup`, Postgres-backed rate limiting (migration `0043`). Stage 2 (2026-08-04) — `/repairs/tree`, `/repairs/search` and `/quote`, on a new shared core (`lib/haynespro/catalogue.ts`) that the website's repair browser was refactored onto; migration `0044` seeds their limits (data only, no schema change). Both verified live against the dev Supabase project. Stages 3–4 (the booking endpoints) are specced below and not built.
+**Status:** 🟡 Stages 1–3 complete. Stage 1 (2026-07-29) — auth helper, `/auth/signup` and `/vehicle/lookup`, Postgres-backed rate limiting (migration `0043`). Stage 2 (2026-08-04) — `/repairs/tree`, `/repairs/search` and `/quote`, on a new shared core (`lib/haynespro/catalogue.ts`) that the website's repair browser was refactored onto; migration `0044` seeds their limits (data only, no schema change). Stage 3 (2026-08-04) — `/checkout/prepare` and `/bookings`, on a new shared core (`lib/bookings/create-booking.ts`) that the website's two Server Actions were refactored onto; migration `0045` seeds their limits (data only, no schema change). **Deviation from the spec:** the customer id became a parameter of the extracted core, *not* of `createBookingAction` — see "Why the core moved out of `app/actions/`" below; the web Server Actions keep their exact signatures. All three stages verified live against the dev Supabase project. Stage 4 (manage a booking) is specced below and not built.
 
 ## Why this exists
 
@@ -370,26 +370,172 @@ Against a real reg resolved through the live HaynesPro account:
 
 ---
 
+## Stage 3 — booking ✅ (2026-08-04)
+
+Authenticated. This is what the app's checkout calls; before it existed both
+requests hit a 404 **HTML** page, which the app can only surface as an unknown
+failure, so a customer could not complete a booking at all.
+
+| Endpoint | Wraps |
+|---|---|
+| `POST /checkout/prepare` `{postcode, vehicleReg, repairNodeId}` | `prepareCheckoutFor` |
+| `POST /bookings` | `createBooking` — **the cookie/Bearer trap lands here** |
+
+### `lib/bookings/create-booking.ts` — the shared core
+
+Both endpoints are thin wrappers over the same functions the website books
+through. The price is re-quoted from `(reg, repairNodeId)` server-side in both
+`prepareCheckoutFor` and `createBooking`, so no figure in a request body is
+trusted — none is read.
+
+**Why the core moved out of `app/actions/`.** The spec said to give
+`createBookingAction` an explicit `customerId` argument. That would have been a
+privilege-escalation hole: every export of a `"use server"` file is a public
+endpoint the browser can call **with arguments of its choosing**, so a
+`customerId` parameter on the Server Action would let anyone attach a booking to
+anyone else's account — precisely the client-supplied customer id the rule
+exists to prevent. So the logic moved to `lib/bookings/create-booking.ts`, where
+`customerId` is an ordinary parameter of a function no client can reach, and
+`app/actions/create-booking.ts` became two wrappers that resolve the caller from
+the cookie session themselves. **`createBookingAction(input)` and
+`prepareCheckout(input)` keep their exact signatures, so `slot-picker.tsx` is
+unchanged.** Same shape as `createCustomerAccount` and `getRepairCatalogueLevel`.
+
+The wrappers now use `getUser()` where `createBookingAction` used
+`getSession()` — it verifies the JWT with Supabase rather than trusting the
+cookie's claims, which is what you want before writing a row that owns money.
+
+### The trap, concretely
+
+`createBooking` never derives the customer. Mobile passes the id from the
+verified Bearer token; the website passes the id from its cookie session. Had
+the mobile route reached the cookie client, the booking would have been written
+with `customer_id` null — a guest booking, invisible in the customer's account,
+with credit and preferred-mechanic handling skipped, and **no error anywhere.**
+The live check for this is the `mode: "free"` result below: credit is only ever
+found when the caller was resolved.
+
+### What the body is not allowed to say
+
+- **`customerEmail`** — taken from the token. It is the key the guest-match half
+  of the "Customers can view own bookings" RLS policy compares against
+  (`customer_id is null and auth.email() = customer_email`), so accepting it
+  from the client would let someone attach a booking to another person's
+  dashboard. Verified: a request sending `attacker@evil.test` wrote the token's
+  address.
+- **`customerPhone`** — `createBooking` reads it from the caller's profile.
+- **`creditAppliedPence`** — echoed from prepare as a **cap only**; the redeem
+  clamps it to the ledger balance. Verified: a request claiming `99999` against
+  a zero balance redeemed nothing.
+- **any price, duration or total** — the server re-quotes.
+- **`preferredMechanicId`** — deliberately not accepted yet. The app has no
+  rebook flow, and adding a client-supplied mechanic id is additive later.
+
+Staff accounts are refused with **403** on both endpoints, matching the web
+funnel's `wrongRole` gate. A null role is read as "customer", exactly as
+`book/slot/page.tsx` does, so the two clients can't disagree about who may book.
+
+### The response convention
+
+Same as the rest of v1, and `PrepareCheckoutResult` is returned **unchanged** so
+the app can type against the shared union: an operation that ran with a negative
+answer (repair not priceable, Stripe refused, insert failed) is **200**
+`{ok:false, error}`. Only transport-level problems are non-2xx `{error}`: **401**
+(missing/expired token, or a token with no email), **403** (staff), **400**
+(missing or invalid field), **415** (wrong content type), **429**.
+
+### Rate limiting (migration `0045` — data only)
+
+`0045` inserts `platform_settings` rows. **No schema change**, so nothing here
+affects the types the app generates from the schema.
+
+| Setting | Limit | Window | Applies to |
+|---|---|---|---|
+| `mobile_checkout_user_burst` | 10 | 1 min | signed-in caller |
+| `mobile_checkout_user_daily` | 60 | 24 h | signed-in caller |
+| `mobile_checkout_ip_burst` | 20 | 1 min | IP |
+| `mobile_checkout_ip_daily` | 300 | 24 h | IP |
+| `mobile_booking_user_burst` | 5 | 1 min | signed-in caller |
+| `mobile_booking_user_daily` | 25 | 24 h | signed-in caller |
+| `mobile_booking_ip_burst` | 10 | 1 min | IP |
+| `mobile_booking_ip_daily` | 100 | 24 h | IP |
+
+Separate from the catalogue buckets on purpose: browsing repairs and paying for
+one must not share a budget, or a customer who spent a while looking around would
+be turned away at the payment step — the worst possible moment to show someone
+"please wait". Both endpoints require a token, so the per-user bucket is the real
+limit and per-IP is an abuse ceiling for one attacker cycling accounts; per-IP
+stays generous because carriers put many genuine customers behind one CGNAT
+address. Checkout is looser (an unconfirmed intent costs nothing and expires by
+itself); booking create is tighter because every call writes a row, dispatches to
+mechanics and sends an email and an SMS.
+
+### Verified live (2026-08-04, dev Supabase + `npm run dev`, Stripe test mode)
+
+Against a real reg and a node taken from `/repairs/search` (`Renew the air
+filter`, £60):
+
+- No token → **401** `{"error":"Please sign in to continue."}` on both routes —
+  JSON, not the 404 HTML page the app was getting.
+- `/checkout/prepare` with a valid token → **200** `{ok:true, mode:"preauth",
+  clientSecret:"pi_…_secret_…", totalPence:6000, creditAppliedPence:0,
+  chargePence:6000}`. The total equals the browse and `/quote` price.
+- £60 of credit granted to the caller → the same request returned **200**
+  `{ok:true, mode:"free", creditAppliedPence:6000, chargePence:0}`. **This is
+  the cookie/Bearer proof**: a cookie-authed handler would have found no
+  customer and returned `preauth` with zero credit.
+- `POST /bookings` in `free` mode → `{ok:true, bookingId}`, and the row had
+  `customer_id` set (**not** a guest booking), `customer_email` from the token
+  despite the body sending `attacker@evil.test`, `customer_phone` null (from the
+  profile, not the body's number), `total_pence` 6000 re-quoted server-side,
+  `credit_applied_pence` 6000, `payment_mode` free, and the ledger showed one
+  redemption tagged to the booking.
+- `POST /bookings` in `preauth` mode, against a PaymentIntent confirmed with a
+  test card (status `requires_capture`, £60 capturable, nothing taken) →
+  `{ok:true, bookingId}` with the intent id on the row, and the inflated
+  `creditAppliedPence: 99999` redeemed **0** against a zero balance.
+- Negative arms are 200 JSON: an unknown node returns `{ok:false, error}` from
+  both routes. Error arms: staff session → **403** on both; bad token → **401**;
+  `text/plain` → **415**; unknown parking type, unparseable `scheduledAt`, and
+  `preauth` with no intent id → **400**, each with customer-facing copy.
+- Hammering `/checkout/prepare` → **429** with a decreasing `Retry-After`, while
+  `/quote` kept returning 200 — the separate bucket does its job.
+- The website funnel is unchanged: `/book/slot` renders the same repair and the
+  same £60 total, and `slot-picker.tsx` was not edited.
+- The probe account, its bookings and its credit rows were deleted afterwards,
+  and the test hold was cancelled.
+
+### Acceptance criteria
+
+- [x] The app's checkout gets JSON from both endpoints instead of a 404 HTML page
+- [x] `/checkout/prepare` returns the `PrepareCheckoutResult` union unchanged,
+      including the `free` and `{ok:false}` arms
+- [x] The hold is manual-capture, on the same Stripe account as the app's
+      publishable key, for `total − credit`
+- [x] `POST /bookings` writes a booking owned by the token's customer, never a
+      guest booking
+- [x] Email comes from the token, phone from the profile; neither is accepted
+      from the body
+- [x] Prices are re-quoted server-side; no client figure is trusted
+- [x] Staff accounts can't book, matching the web funnel's gate
+- [x] No logic is duplicated between the website and the app — the two Server
+      Actions were refactored onto the shared core, not left alongside it
+- [x] The web funnel's Server Actions keep their signatures and behaviour, and
+      no client-supplied `customerId` was introduced
+- [x] No mobile route reaches cookie-derived auth
+- [x] Errors are `{"error": "…"}` with a real status code and customer-facing
+      copy; success is JSON; no redirects; no CORS headers
+- [ ] Verify the confirmed PaymentIntent belongs to the booking and covers it —
+      **deliberately deferred**, see "Follow-ups"
+
+---
+
 ## Later stages — not built
 
 Prompted separately. Every one of these is a thin wrapper; if the underlying
 function isn't callable from a route handler, extract the shared core and have
-both callers use it, as `createCustomerAccount` and now
-`getRepairCatalogueLevel` already do.
-
-### Stage 3 — booking (authenticated)
-
-| Endpoint | Wraps |
-|---|---|
-| `POST /checkout/prepare` | `prepareCheckout` |
-| `POST /bookings` | `createBookingAction` — **the cookie/Bearer trap lands here** |
-
-`createBookingAction` currently derives `customer_id` from
-`supabase.auth.getSession()` internally. It must take the caller explicitly
-(an optional `customerId` argument, or a resolved-caller parameter) before a
-mobile route may call it. Do not add a mobile-only copy. Staff sessions must not
-be able to book — the web funnel already enforces `role === 'customer'`, and the
-mobile route needs the same gate.
+both callers use it, as `createCustomerAccount`, `getRepairCatalogueLevel` and
+now `createBooking` already do.
 
 ### Stage 4 — manage a booking (authenticated)
 
@@ -413,6 +559,26 @@ mobile route needs the same gate.
 
 ## Follow-ups
 
+- **`stripePaymentIntentId` is client-supplied and unverified — on the website
+  too.** Both clients confirm the hold on the device and then post the intent id
+  back, and nothing checks that the id names an intent we created for *this*
+  booking, in `requires_capture`, for at least the booking total. A caller could
+  post the id of a cheaper hold of their own, and `job-progress.ts` would later
+  capture that smaller amount. This is **pre-existing** — the web funnel has the
+  identical exposure since Stage 3 of Task 08 — but the mobile route makes it
+  reachable with nothing more than a bearer token and curl, so it is worth
+  closing. The fix belongs in `createBooking` so both clients get it at once:
+  retrieve the intent, and reject unless `status === 'requires_capture'`,
+  `currency === 'gbp'` and `amount >= totalPence − creditApplied`. It was left
+  out of this stage deliberately, because it changes the website's money path and
+  wants its own testing rather than riding along with the mobile endpoints.
+- **Mobile bookings record a funnel event with a null `user_id`.**
+  `createBooking` calls `trackEvent`, which resolves the visitor from the session
+  cookie and mints a fresh `bmt_sid` per request. From a mobile route there are
+  no cookies, so every app booking lands in `funnel_events` as a brand-new
+  anonymous session. Harmless (tracking is best-effort and swallowed) but it
+  quietly understates app conversion in `/admin/analytics`. The fix is to let
+  `trackEvent` take an optional caller instead of always deriving one.
 - **A shared cache in front of DVLA is worth adding — but as its own change, not
   bolted onto this one.** The same reg genuinely does get looked up repeatedly:
   by the same customer across funnel steps and sessions, by the app and the
@@ -433,14 +599,17 @@ mobile route needs the same gate.
   `monthOfFirstRegistration`. Pre-existing, harmless (the app types against the
   declared subset), and passing it through unchanged is correct here — but worth
   knowing before anyone "tidies" the type.
-- **No mobile route HANDLER is covered by an automated test yet.** Stages 1 and
-  2 were verified by hand against the dev project. Stage 2 did add unit tests
+- **No mobile route HANDLER is covered by an automated test yet.** Stages 1–3
+  were verified by hand against the dev project. Stage 2 did add unit tests
   for the pure catalogue helpers (`toCatalogueNode`, `matchRank`, `affinityFor`
   in `lib/haynespro/haynespro.test.ts`) — the ranking rules are subtle enough
   that they needed pinning down — but the handlers themselves are untested. A
   route-handler suite (or Playwright API tests) should land before the app ships
   to real customers, because these responses are contracts that can't be walked
-  back.
+  back. **Stage 3 raises the stakes:** the booking endpoints take money and write
+  the row that owns it, and the checks that keep a caller from booking as someone
+  else (email from the token, credit clamped, staff refused) are exactly the kind
+  that a later refactor can silently drop.
 - **The search walk's caps are guesses tuned on one vehicle.**
   `SEARCH_MAX_EXPANSIONS = 40` was enough for every query tried on a T-Roc and a
   Ranger, but a make with a broader tree may truncate sooner. The lever exists

@@ -7,10 +7,15 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 // `Authorization: Bearer <supabase access token>` and no cookies at all, so a
 // route handler that reached for the cookie client would get a null session —
 // silently, with no error. That is not a 401 you'd notice in testing, it is a
-// wrong answer: `createBookingAction` derives `customer_id` from the session, so
-// a cookie-authed mobile booking would be written as a GUEST booking. The job
-// would never appear in the customer's account, and account credit and
-// preferred-mechanic handling would be skipped. It would pass a smoke test.
+// wrong answer: a booking's `customer_id` is the caller, so a cookie-authed
+// mobile booking would be written as a GUEST booking. The job would never appear
+// in the customer's account, and account credit and preferred-mechanic handling
+// would be skipped. It would pass a smoke test.
+//
+// This is why the booking core lives in `lib/bookings/create-booking.ts` and
+// takes `customerId` as a parameter: the website's Server Actions resolve it
+// from the cookie session, the mobile route handlers from a verified token, and
+// neither client can supply it.
 //
 // So: every authenticated mobile route resolves its caller through
 // `requireMobileUser()` and threads the id through explicitly. No mobile request
