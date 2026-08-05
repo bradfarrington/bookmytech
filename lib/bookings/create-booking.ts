@@ -318,6 +318,12 @@ export async function prepareCheckoutFor(
       amount: chargePence,
       currency: "gbp",
       capture_method: "manual",
+      // Pinned to cards deliberately. Left unset, the intent offers whatever the
+      // Stripe dashboard has enabled, which can include redirect-only methods —
+      // and a redirect-only method has no business on a manual-capture hold that
+      // is captured days later. Both funnels collect a card and nothing else:
+      // the website's PaymentElement and the app's PaymentSheet.
+      payment_method_types: ["card"],
       description: "Book My Tech — repair pre-authorisation",
     });
     if (!intent.client_secret) return { ok: false, error: "Couldn't start the payment. Please try again." };

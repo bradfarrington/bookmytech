@@ -1,8 +1,13 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect } from "@playwright/test";
 import { getBooking, getUserId, setTestCredit } from "./helpers/supabase";
 import { getPaymentIntent, confirmHold } from "./helpers/stripe";
 import { resetOutbox, waitForOutbox } from "./helpers/outbox";
 import { TEST_USERS, storageStateFor } from "./helpers/users";
+import {
+  E2E_REG,
+  HAYNESPRO_CONFIGURED,
+  funnelToCheckout,
+} from "./helpers/funnel";
 
 // === Manual test guide §1.1 — "Make a booking (the core flow)" ===============
 //
@@ -28,50 +33,10 @@ import { TEST_USERS, storageStateFor } from "./helpers/users";
 // Without HaynesPro credentials the whole spec skips: there is no bookable
 // path that avoids the repair pricing chain any more.
 
-const HAYNESPRO_CONFIGURED = Boolean(
-  process.env.HAYNESPRO_DISTRIBUTOR_USERNAME &&
-    process.env.HAYNESPRO_DISTRIBUTOR_PASSWORD,
-);
-const E2E_REG = process.env.E2E_REG ?? "";
-
 test.skip(
   !HAYNESPRO_CONFIGURED || !E2E_REG,
   "Repairs funnel needs HAYNESPRO_* env + E2E_REG (a reg that resolves live)",
 );
-
-const START_URL = `/book/repairs?reg=${encodeURIComponent(E2E_REG)}&postcode=SW1A1AA`;
-
-const GUEST_PASSWORD = "E2eTestPass!123";
-
-/**
- * Drive the funnel: drill the repair tree to the first bookable repair →
- * review price → pick today's morning slot → fill the address.
- *
- * `newAccount` fills the account block a guest now sees on the slot screen —
- * every booking creates (or signs into) an account BEFORE the pre-auth, so the
- * customer lands on a dashboard that owns the job. Signed-in runs pass nothing.
- */
-async function funnelToCheckout(page: Page, newAccount?: { email: string }) {
-  await page.goto(START_URL);
-  // Drill down group links until a priced "book" link (→ /book/match) appears.
-  for (let depth = 0; depth < 8; depth++) {
-    const bookLink = page.locator('a[href*="/book/match"]').first();
-    if ((await bookLink.count()) > 0) break;
-    await page.locator('a[href*="/book/repairs"][href*="node="]').first().click();
-  }
-  await page.locator('a[href*="/book/match"]').first().click();
-  await expect(page).toHaveURL(/\/book\/match/);
-  await page.getByRole("button", { name: /Pick a time/i }).click();
-  await expect(page).toHaveURL(/\/book\/slot/);
-  await page.getByRole("button", { name: /Morning/i }).click();
-  await page.getByPlaceholder("House number and street").fill("12 Test Street");
-
-  if (newAccount) {
-    await page.getByPlaceholder("Full name").fill("E2E Guest Customer");
-    await page.getByPlaceholder("Email address").fill(newAccount.email);
-    await page.getByPlaceholder(/Create a password/i).fill(GUEST_PASSWORD);
-  }
-}
 
 test("§1.1 new-customer checkout prepares an uncaptured full-price hold", async ({ page }) => {
   // The clientSecret (→ PaymentIntent id) comes back in the prepareCheckout

@@ -17,6 +17,9 @@ interface SlotPageProps {
     model?: string;
     postcode?: string;
     pref?: string;
+    /** Set by Stripe when it returns a customer from a 3-D Secure challenge —
+     *  the picker completes the booking from it. See slot-picker.tsx. */
+    payment_intent_client_secret?: string;
   }>;
 }
 
@@ -114,6 +117,7 @@ export default async function SlotPage({ searchParams }: SlotPageProps) {
         customerName={bookingAsCustomer ? customerName : ""}
         customerEmail={bookingAsCustomer ? (user?.email ?? "") : ""}
         customerPhone={bookingAsCustomer ? customerPhone : ""}
+        returnedIntentSecret={params.payment_intent_client_secret}
       />
     </div>
   );

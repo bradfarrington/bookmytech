@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { loadStripe } from "@stripe/stripe-js";
 import {
@@ -17,6 +17,7 @@ import { createClient } from "@/lib/supabase/client";
 import { cn, formatPrice, vehicleLabel } from "@/lib/utils";
 import { prepareCheckout, createBookingAction } from "@/app/actions/create-booking";
 import type { CreateBookingInput, PrepareCheckoutResult } from "@/app/actions/create-booking";
+import { reportOrphanedHold } from "@/app/actions/orphaned-hold";
 import { ensureCustomerAccount, requestPasswordReset } from "@/app/actions/booking-account";
 import { TWO_HOUR_SLOTS, ALL_DAY_SLOT, slotIso, formatBookingSlot } from "@/lib/slots";
 import { track, FUNNEL_EVENTS } from "@/lib/analytics/track";
@@ -48,6 +49,98 @@ function dayName(date: Date) {
 // Narrow the prepareCheckout result to its success shapes once we've handled !ok.
 type ReadyCheckout = Extract<PrepareCheckoutResult, { ok: true }>;
 
+// --- Surviving a 3-D Secure redirect ---------------------------------------
+//
+// `redirect: "if_required"` does not mean "no redirect". When the issuer won't
+// run its challenge in Stripe's iframe, Stripe navigates the whole page away and
+// later returns the customer to `return_url` — to a FRESHLY MOUNTED SlotPicker.
+// Every answer they gave (slot, address, parking, instructions, name, email) and
+// the `checkout` result itself are component state, and are gone. The hold,
+// meanwhile, is live on their card.
+//
+// So the draft is parked before confirming and replayed on the way back.
+// sessionStorage, not the URL: it holds the customer's address. Same tab, dies
+// with it — the right lifetime for a half-finished checkout.
+//
+// Keyed by PaymentIntent id so a customer who abandons one attempt and starts
+// another can't have the first attempt's answers replayed against the second
+// attempt's hold.
+
+const DRAFT_PREFIX = "bmt.checkout-draft.";
+
+interface CheckoutDraft {
+  common: ConfirmCommon;
+  /** What the hold was reduced by — createBooking redeems against it. */
+  creditAppliedPence: number;
+}
+
+/** `pi_3abc..._secret_xyz` → `pi_3abc...` */
+function intentIdFrom(clientSecret: string): string {
+  return clientSecret.split("_secret_")[0];
+}
+
+function saveDraft(intentId: string, draft: CheckoutDraft): void {
+  try {
+    sessionStorage.setItem(DRAFT_PREFIX + intentId, JSON.stringify(draft));
+  } catch {
+    // Private mode, or storage full. The common path never redirects and so
+    // never reads this back — failing to save must not block the payment.
+  }
+}
+
+function readDraft(intentId: string): CheckoutDraft | null {
+  try {
+    const raw = sessionStorage.getItem(DRAFT_PREFIX + intentId);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as CheckoutDraft;
+    // A draft missing either of these can't produce a bookable row.
+    if (!parsed?.common?.selectedSlot || !parsed.common.addressLine1) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function clearDraft(intentId: string): void {
+  try {
+    sessionStorage.removeItem(DRAFT_PREFIX + intentId);
+  } catch {
+    // Nothing to do — it dies with the tab regardless.
+  }
+}
+
+/**
+ * Query for the return URL. It must land on a page that RENDERS: /book/slot
+ * bounces to /book without `reg` and `repair`. The rest is carried so the header
+ * and the form still describe the right vehicle if we have to put the customer
+ * back on it. The address is deliberately absent — that's what the draft is for.
+ */
+type ResumeState =
+  | { phase: "idle" }
+  /** Back from the challenge, finishing the booking. Do not close the page. */
+  | { phase: "completing" }
+  /** The hold is live and we can't turn it into a booking. Ops has been told. */
+  | { phase: "stranded"; detail?: string };
+
+/** Statuses that mean the customer's money IS committed. */
+const MONEY_HELD = new Set(["requires_capture", "succeeded"]);
+
+/** Statuses that mean nothing was taken — safe to put them back on the form. */
+const NOTHING_HELD = new Set([
+  "requires_payment_method",
+  "requires_confirmation",
+  "requires_action",
+  "canceled",
+]);
+
+function returnParams(c: ConfirmCommon): Record<string, string> {
+  const params: Record<string, string> = { reg: c.reg, repair: c.repairNodeId };
+  if (c.make) params.make = c.make;
+  if (c.model) params.model = c.model;
+  if (c.preferredMechanicId) params.pref = c.preferredMechanicId;
+  return params;
+}
+
 interface SlotPickerProps {
   reg: string;
   make: string;
@@ -74,6 +167,13 @@ interface SlotPickerProps {
   customerName?: string;
   customerEmail?: string;
   customerPhone?: string;
+  /**
+   * `payment_intent_client_secret` off the URL, present only when Stripe has
+   * just returned the customer from a 3-D Secure challenge. Threaded down from
+   * the page rather than read from `window` so the first render agrees with the
+   * server's — this decides whether the picker renders the form at all.
+   */
+  returnedIntentSecret?: string;
 }
 
 export function SlotPicker({
@@ -91,6 +191,7 @@ export function SlotPicker({
   customerName = "",
   customerEmail = "",
   customerPhone = "",
+  returnedIntentSecret,
 }: SlotPickerProps) {
   const router = useRouter();
   const days = Array.from({ length: 7 }, (_, i) => addDays(new Date(), i));
@@ -128,6 +229,15 @@ export function SlotPicker({
   const [stripeError, setStripeError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
+  // Where we are in the return-from-redirect path (see the draft helpers above).
+  // "idle" is every ordinary render — the customer arriving at this page normally.
+  // Seeded from the prop, not from an effect: a customer coming back from their
+  // bank must never be shown the empty "Pick a time" form, not even for a frame.
+  const [resume, setResume] = useState<ResumeState>(
+    returnedIntentSecret ? { phase: "completing" } : { phase: "idle" },
+  );
+  const resumeStarted = useRef(false);
+
   const hasAccount = signedIn || accountReady;
   const accountFilled =
     name.trim().length > 1 &&
@@ -140,6 +250,117 @@ export function SlotPicker({
     addressLine1.trim().length > 3 &&
     postcode.trim().length >= 5 &&
     (hasAccount || accountFilled);
+
+  // Put a parked draft back on the form, for when the customer failed the
+  // challenge and has to try again. Nothing was taken in that case.
+  function restoreDraft(c: ConfirmCommon) {
+    setSelectedSlot(c.selectedSlot || null);
+    setSelectedWindow(c.selectedWindow || null);
+    const when = new Date(c.selectedSlot);
+    if (c.selectedSlot && !Number.isNaN(when.getTime())) setSelectedDay(when);
+    setAddressLine1(c.addressLine1);
+    setPostcode(c.postcode);
+    if (PARKING_OPTIONS.some((o) => o.value === c.parkingType)) {
+      setParkingType(c.parkingType as ParkingType);
+    }
+    setInstructions(c.instructions);
+    // The account block is hidden once they're signed in (which they are by
+    // now — the account is created before the pre-auth), but a guest whose
+    // session didn't survive the round trip still gets their details back.
+    if (!signedIn) {
+      setName(c.customerName);
+      setEmail(c.customerEmail);
+      setPhone(c.customerPhone);
+    }
+  }
+
+  // Coming back from a 3-D Secure redirect. Stripe returns the customer to
+  // `return_url` with the intent's client secret on the query string; by then
+  // the hold is already placed and this component has been remounted from
+  // scratch, so finishing the booking is entirely on us.
+  useEffect(() => {
+    // Runs once — React StrictMode mounts effects twice in dev, and writing the
+    // booking twice would mean two rows against one hold.
+    if (resumeStarted.current) return;
+    const secret = returnedIntentSecret;
+    if (!secret) return;
+    resumeStarted.current = true;
+
+    // Strip Stripe's params straight away, so a reload can't replay this.
+    // history.replaceState, not the router: a router navigation would re-render
+    // the server component and wipe the state we're about to restore.
+    const url = new URL(window.location.href);
+    for (const key of ["payment_intent", "payment_intent_client_secret", "redirect_status"]) {
+      url.searchParams.delete(key);
+    }
+    window.history.replaceState({}, "", url.toString());
+
+    const intentId = intentIdFrom(secret);
+
+    void (async () => {
+      const stripe = await stripePromise;
+      const retrieved = await stripe?.retrievePaymentIntent(secret);
+      const paymentIntent = retrieved?.paymentIntent;
+
+      if (!paymentIntent) {
+        // We can't tell whether the hold landed, so we can't safely offer a
+        // retry that might place a second one. The report re-reads the real
+        // status server-side and only alerts if funds are genuinely held.
+        void reportOrphanedHold(intentId, "client could not retrieve the intent");
+        setResume({ phase: "stranded" });
+        return;
+      }
+
+      const draft = readDraft(paymentIntent.id);
+
+      // NOT `succeeded` — a confirmed manual-capture hold sits at
+      // `requires_capture`, and nothing is captured until the job is done.
+      // Testing for `succeeded` would reject every good payment.
+      if (MONEY_HELD.has(paymentIntent.status)) {
+        if (!draft) {
+          void reportOrphanedHold(paymentIntent.id, "checkout draft missing on return");
+          setResume({ phase: "stranded" });
+          return;
+        }
+        // Same call the non-redirect path makes, with the same draft.
+        const result = await createBookingAction(
+          bookingInputFrom(draft.common, {
+            paymentMode: "preauth",
+            creditAppliedPence: draft.creditAppliedPence,
+            stripePaymentIntentId: paymentIntent.id,
+          }),
+        );
+        if (!result.ok) {
+          void reportOrphanedHold(paymentIntent.id, `booking write failed: ${result.error}`);
+          setResume({ phase: "stranded", detail: result.error });
+          return;
+        }
+        clearDraft(paymentIntent.id);
+        window.location.href = `/book/confirmed/${result.bookingId}`;
+        return;
+      }
+
+      if (NOTHING_HELD.has(paymentIntent.status)) {
+        // They failed or dismissed the challenge. Their card is untouched, so
+        // put them back where they were rather than at step one.
+        if (draft) restoreDraft(draft.common);
+        clearDraft(paymentIntent.id);
+        setStripeError(
+          "Your bank didn't authorise that payment, so nothing has been taken. Check your card details and try again.",
+        );
+        setResume({ phase: "idle" });
+        return;
+      }
+
+      // `processing`, or something Stripe adds later. Unknown, so treat it as
+      // money we might be holding.
+      void reportOrphanedHold(paymentIntent.id, `unexpected status: ${paymentIntent.status}`);
+      setResume({ phase: "stranded" });
+    })();
+    // Mount-only: this reads the URL Stripe returned us to, which never changes
+    // after the first render (we strip it above).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Clear the staff session in the browser and re-render the page as a guest —
   // a server sign-out would redirect away and lose the funnel.
@@ -214,6 +435,56 @@ export function SlotPicker({
     customerEmail: signedIn ? customerEmail : email.trim(),
     customerPhone: signedIn ? customerPhone : phone.trim(),
   };
+
+  // Back from a 3-D Secure challenge — finishing the booking they've paid for.
+  if (resume.phase === "completing") {
+    return (
+      <div className="flex flex-col items-center gap-3 rounded-2xl border border-border bg-surface-card p-8 text-center">
+        <Loader2 size={28} className="animate-spin text-brand-blue" />
+        <p className="text-base font-semibold text-text-primary">Confirming your booking…</p>
+        <p className="text-sm text-text-secondary">
+          Your bank has approved the payment. Please don&apos;t close this page — we&apos;re
+          finishing your booking now.
+        </p>
+      </div>
+    );
+  }
+
+  // The hold is live and we couldn't write the booking. Say so plainly: they
+  // have a pending amount on their card and no job in the system.
+  if (resume.phase === "stranded") {
+    return (
+      <div className="flex flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-6">
+        <div className="flex items-start gap-2.5">
+          <ShieldAlert size={20} className="mt-0.5 shrink-0 text-amber-700" />
+          <div>
+            <p className="text-base font-semibold text-amber-900">
+              We&apos;ve held the funds but couldn&apos;t finish your booking
+            </p>
+            <p className="mt-1 text-sm text-amber-800">
+              Your bank approved the payment, but something went wrong saving your job.
+              Please don&apos;t book again — get in touch and we&apos;ll sort it out and
+              release the hold if you&apos;d rather start over. Nothing has actually been
+              charged, and the hold releases itself within 7 days.
+            </p>
+            {resume.detail && (
+              <p className="mt-2 text-[13px] text-amber-800">Details: {resume.detail}</p>
+            )}
+            <p className="mt-3 text-sm text-amber-900">
+              Email{" "}
+              <a
+                href="mailto:help@bookmytech.co.uk"
+                className="font-semibold underline"
+              >
+                help@bookmytech.co.uk
+              </a>{" "}
+              — we already know about this one and are looking at it.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (checkout && selectedSlot) {
     // Fully credit-covered — no card needed.
@@ -619,6 +890,13 @@ function CheckoutForm({
     setSubmitting(true);
     setError(null);
 
+    const piId = intentIdFrom(checkout.clientSecret);
+
+    // Park the draft BEFORE confirming. If the issuer wants a 3-D Secure
+    // challenge Stripe can't run inline, the next thing that happens is the page
+    // navigating away — this component won't be here to save anything later.
+    saveDraft(piId, { common: c, creditAppliedPence: checkout.creditAppliedPence });
+
     // Place the manual-capture hold now (captured on completion). The hold is
     // always taken — credit only reduces its amount.
     const { error: confirmError, paymentIntent } = await stripe.confirmPayment({
@@ -627,9 +905,18 @@ function CheckoutForm({
         payment_method_data: {
           billing_details: { name: c.customerName, email: c.customerEmail },
         },
+        // Required even with `redirect: "if_required"`, which only means "don't
+        // redirect unless you have to". When Stripe decides it does have to and
+        // finds no return_url, it rejects the confirmation outright and the
+        // customer sees a payment failure that retrying can't fix. Must be
+        // absolute, and must point somewhere that renders.
+        return_url: `${window.location.origin}/book/slot?${new URLSearchParams(returnParams(c))}`,
       },
       redirect: "if_required",
     });
+    // Past this point we did NOT redirect — this component still holds every
+    // answer, so the parked draft has no further use either way.
+    clearDraft(piId);
     if (confirmError) {
       setError(confirmError.message ?? "Payment failed. Please try again.");
       setSubmitting(false);
@@ -640,7 +927,6 @@ function CheckoutForm({
       setSubmitting(false);
       return;
     }
-    const piId = checkout.clientSecret.split("_secret_")[0];
 
     const result = await createBookingAction(
       bookingInputFrom(c, {
@@ -650,6 +936,10 @@ function CheckoutForm({
       }),
     );
     if (!result.ok) {
+      // The hold is already live here, so this is the same orphaned hold the
+      // redirect path can produce — tell ops either way. The customer keeps
+      // their filled-in form and sees the real error.
+      void reportOrphanedHold(piId, `booking write failed: ${result.error}`);
       setError(result.error);
       setSubmitting(false);
       return;

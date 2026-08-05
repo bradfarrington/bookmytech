@@ -2,6 +2,40 @@
 
 **Status:** ✅ Complete (2026-05-26). Guest customer can complete a booking end-to-end (reg → vehicle → service → price → slot → Stripe pre-auth → confirmation). Verified manually with the Stripe test card. Booking rows insert with `status = 'sourcing_mechanic'` (pre-auth held, no mechanic assigned yet) — Task 04 extends the status enum from this baseline. See `docs/HANDOFF.md` → Task 03.
 
+> **Amended 2026-08-05 — Stripe `return_url` and the redirect return path.** The
+> Stage 4 pre-auth confirm was calling `stripe.confirmPayment` with **no
+> `return_url`**. `redirect: "if_required"` does not make it optional — it means
+> "don't redirect unless you have to", and when Stripe decided it had to (a 3-D
+> Secure challenge the issuer wouldn't run in an iframe) it rejected the
+> confirmation outright. No hold, no booking, "Payment failed. Please try again."
+> on every retry with that card. Intermittent, which is why it survived testing:
+> only cards that escalate to a challenge hit it. Reported by Stripe's monitoring.
+>
+> Three changes, in [slot-picker.tsx](../../app/(customer)/book/slot/_components/slot-picker.tsx)
+> and [lib/bookings/create-booking.ts](../../lib/bookings/create-booking.ts):
+>
+> 1. `prepareCheckoutFor` pins the intent to `payment_method_types: ["card"]` —
+>    it previously offered whatever the dashboard had enabled, including
+>    redirect-only methods that don't belong on a manual-capture hold. **Shared
+>    with the mobile app's PaymentSheet.**
+> 2. `confirmParams.return_url` points at `/book/slot` carrying `reg` and
+>    `repair`, because that page redirects to `/book` without them.
+> 3. **The return path** — the actual work. A redirect remounts `SlotPicker` with
+>    every answer gone and the hold live, so the draft is parked in
+>    `sessionStorage` keyed by PaymentIntent id before confirming and replayed on
+>    return. A confirmed manual-capture hold is **`requires_capture`**, never
+>    `succeeded`; on that status the booking is written and the customer goes to
+>    `/book/confirmed/[id]` as normal. Statuses holding nothing restore the form
+>    and show the error. A hold with no draft (or a failed write) is surfaced to
+>    the customer honestly and reported to ops by
+>    [app/actions/orphaned-hold.ts](../../app/actions/orphaned-hold.ts).
+>
+> Ordering is unchanged — hold first, then the row — so Stage 4's "payment
+> failure leaves no orphaned booking row" invariant is intact. Coverage:
+> `tests/e2e/stripe-redirect-return.spec.ts` (needs `E2E_REG`; the in-browser
+> challenge itself can't be automated — hCaptcha — so one manual pass with
+> `4000 0027 6000 3184` is still owed).
+
 > **Superseded 2026-07-29 — guest checkout is gone.** Every booking now creates (or signs into) a customer account **before** the pre-authorisation is taken, so the customer always lands on a dashboard that owns their job. The name/email/phone block moved from the payment step up to the slot screen and gained a password field; it is not a separate step. Details in `docs/HANDOFF.md` → "Current task". The `customer_id`-nullable path and `linkGuestBookings` remain only for historic guest rows.
 
 Build the four-step mobile-first booking flow at `/book`. By the end of this task, a customer can land on the homepage, enter their reg, walk through service / mechanic / time slot selection, pre-authorise via Stripe, and land on a confirmation screen.

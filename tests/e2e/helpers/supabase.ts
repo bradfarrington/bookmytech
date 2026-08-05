@@ -22,7 +22,16 @@ export interface BookingRow {
   stripe_payment_intent_id: string | null;
   customer_email: string | null;
   payment_mode: string | null;
+  scheduled_at: string | null;
+  slot_window: string | null;
+  address_line_1: string | null;
+  postcode: string | null;
+  credit_applied_pence: number | null;
 }
+
+const BOOKING_COLUMNS =
+  "id, status, total_pence, stripe_payment_intent_id, customer_email, payment_mode, " +
+  "scheduled_at, slot_window, address_line_1, postcode, credit_applied_pence";
 
 /** Look up an auth user's id by email (paginated; the test project is small). */
 export async function getUserId(email: string): Promise<string> {
@@ -64,11 +73,32 @@ export async function setTestCredit(customerId: string, pence: number): Promise<
 export async function getBooking(id: string): Promise<BookingRow> {
   const { data, error } = await adminClient()
     .from("bookings")
-    .select("id, status, total_pence, stripe_payment_intent_id, customer_email, payment_mode")
+    .select(BOOKING_COLUMNS)
     .eq("id", id)
     .single();
   if (error || !data) {
     throw new Error(`Booking ${id} not found: ${error?.message ?? "no row"}`);
   }
-  return data as BookingRow;
+  return data as unknown as BookingRow;
+}
+
+/**
+ * Find the booking written against a PaymentIntent, or null.
+ *
+ * The invariant both ways round: a hold that succeeded must end up with exactly
+ * one row, and a payment that failed must leave none.
+ */
+export async function getBookingByIntent(
+  paymentIntentId: string,
+): Promise<BookingRow | null> {
+  const { data, error } = await adminClient()
+    .from("bookings")
+    .select(BOOKING_COLUMNS)
+    .eq("stripe_payment_intent_id", paymentIntentId);
+  if (error) throw new Error(`booking lookup failed: ${error.message}`);
+  if (!data || data.length === 0) return null;
+  if (data.length > 1) {
+    throw new Error(`${data.length} bookings share intent ${paymentIntentId}`);
+  }
+  return data[0] as unknown as BookingRow;
 }
