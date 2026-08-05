@@ -1,119 +1,57 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { sendEmail } from "@/lib/email/send";
-import { renderTemplateEmail } from "@/emails/resolve";
-import { sendSms } from "@/lib/sms/send-sms";
-import { renderSmsTemplate } from "@/lib/sms/render-template";
-import { formatPrice } from "@/lib/utils";
+import {
+  cancelBookingFor,
+  quoteCancellationFor,
+  rescheduleBookingFor,
+  respondToRescheduleFor,
+  type BookingCaller,
+} from "@/lib/bookings/manage-booking";
 
-export type CustomerBookingResult = { ok: true } | { ok: false; error: string };
-
-// Customer-side booking actions for the confirmation tracker + dashboard.
+// The WEBSITE's entry points into the booking-management core. Every one is a
+// thin wrapper whose only job is to answer "who is asking?" from the session
+// COOKIE and hand that to lib/bookings/manage-booking.ts, which holds the logic
+// and is shared with the mobile route handlers
+// (app/api/mobile/v1/bookings/[id]/**).
 //
-// Trust model mirrors the guest confirmation page (book/confirmed/[id]): a
-// customer is identified by possession of the booking's full UUID, so these run
-// through the service-role client keyed by id. Each action re-reads the booking
-// and gates hard on its current state (e.g. a reschedule can only be answered
-// while it's actually 'proposed'), so a stale page can't drive a bad write.
+// The caller is deliberately NOT a parameter of these functions. Every export of
+// a "use server" file is a public endpoint the browser can call with arguments
+// of its choosing, so `cancelBooking(id, reason, userId)` would let anyone
+// cancel anyone else's booking by knowing its id. Mobile threads its caller
+// through explicitly because it resolves that caller from a verified Bearer
+// token in a route handler, where nothing is client-supplied either.
+//
+// `getUser()` rather than `getSession()`: it verifies the JWT with Supabase
+// instead of trusting the cookie's claims, which is what you want before
+// cancelling a job and capturing a fee off someone's card.
 
-function fmt(iso: string): string {
-  return new Date(iso).toLocaleString("en-GB", {
-    dateStyle: "full",
-    timeStyle: "short",
-  });
-}
+export type { CustomerBookingResult, CancellationQuote } from "@/lib/bookings/manage-booking";
 
-// Look up the assigned mechanic's email so we can tell them the outcome. The
-// email lives on the auth user, not the profile, so go through the admin API.
-async function mechanicEmail(
-  admin: ReturnType<typeof createAdminClient>,
-  mechanicId: string | null,
-): Promise<string | null> {
-  if (!mechanicId) return null;
-  const { data } = await admin.auth.admin.getUserById(mechanicId);
-  return data.user?.email ?? null;
+async function cookieCaller(): Promise<BookingCaller | null> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  return user ? { userId: user.id, email: user.email ?? null } : null;
 }
 
 /**
- * Customer responds to a mechanic-proposed reschedule (the other half of
- * proposeReschedule in mechanic-jobs.ts). On accept the booking moves to the
- * proposed slot; on decline it keeps its original slot. Either way the proposal
- * is consumed (reschedule_* cleared) and the mechanic is emailed the outcome.
+ * Customer responds to a mechanic-proposed reschedule.
+ *
+ * Passes a NULL caller, deliberately, keeping this path's trust model exactly as
+ * it was: it is reached from the guest confirmation page (/book/confirmed/[id]),
+ * where the customer may have no account at all and is identified by possession
+ * of the booking's full UUID. Resolving a cookie caller and enforcing ownership
+ * here would refuse a real case — someone who booked as a guest on one email and
+ * later signed up on another, following their own confirmation link.
+ *
+ * The mobile route passes a verified caller instead, because it always has one
+ * and a bare booking id must not be enough to answer someone else's reschedule.
+ * The "must currently be 'proposed'" gate applies on both paths.
  */
-export async function respondToReschedule(
-  bookingId: string,
-  decision: "accept" | "decline",
-): Promise<CustomerBookingResult> {
-  const admin = createAdminClient();
-
-  const { data: booking } = await admin
-    .from("bookings")
-    .select(
-      "id, status, mechanic_id, scheduled_at, reschedule_status, reschedule_proposed_at, reschedule_note",
-    )
-    .eq("id", bookingId)
-    .single();
-
-  if (!booking) return { ok: false, error: "That booking no longer exists." };
-  if (booking.reschedule_status !== "proposed" || !booking.reschedule_proposed_at)
-    return {
-      ok: false,
-      error: "There's no reschedule waiting on a response — refresh the page.",
-    };
-
-  const proposed = booking.reschedule_proposed_at;
-  const original = booking.scheduled_at;
-  const accepted = decision === "accept";
-
-  const { error } = await admin
-    .from("bookings")
-    .update({
-      // On accept, move to the proposed slot; on decline keep the original.
-      scheduled_at: accepted ? proposed : original,
-      // Accepting sets a specific time, so the original arrival window no longer
-      // applies — clear it and let displays fall back to the exact time.
-      ...(accepted ? { slot_window: null } : {}),
-      // Proposal consumed either way — returns both sides to the normal
-      // confirmed state (no lingering banners).
-      reschedule_proposed_at: null,
-      reschedule_note: null,
-      reschedule_status: null,
-    })
-    .eq("id", bookingId)
-    .eq("reschedule_status", "proposed");
-  if (error) return { ok: false, error: error.message };
-
-  await admin.from("booking_events").insert({
-    booking_id: bookingId,
-    event_type: accepted ? "reschedule_accepted" : "reschedule_declined",
-    // actor_id left null: a guest responding from their confirmation link has no
-    // profile row. The role records that the customer made the call.
-    actor_id: null,
-    actor_role: "customer",
-    payload: { from: original, proposed, decision },
-  });
-
-  // Tell the mechanic the outcome so they don't have to keep checking.
-  const outcomeTo = await mechanicEmail(admin, booking.mechanic_id);
-  if (outcomeTo) {
-    const email = accepted
-      ? renderTemplateEmail("mechanic_reschedule_accepted", { proposed: fmt(proposed) })
-      : renderTemplateEmail("mechanic_reschedule_declined", { original: fmt(original ?? proposed) });
-    email
-      .then(({ subject, html }) => sendEmail({ to: outcomeTo, subject, html }))
-      .catch(console.error);
-  }
-
-  revalidatePath(`/book/confirmed/${bookingId}`);
-  revalidatePath("/dashboard");
-  if (booking.mechanic_id) {
-    revalidatePath("/mechanic/jobs");
-    revalidatePath(`/mechanic/jobs/${bookingId}`);
-  }
-  return { ok: true };
+export async function respondToReschedule(bookingId: string, decision: "accept" | "decline") {
+  return respondToRescheduleFor(bookingId, decision, null);
 }
 
 // ---------------------------------------------------------------------------
@@ -122,296 +60,23 @@ export async function respondToReschedule(
 // *response* above, which a guest can reach from their confirmation link).
 // ---------------------------------------------------------------------------
 
-async function requireBookingCustomer(bookingId: string) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { ok: false as const, error: "Please sign in." };
-
-  const admin = createAdminClient();
-  const { data: booking } = await admin
-    .from("bookings")
-    .select(
-      `id, status, scheduled_at, customer_id, customer_email, customer_name, customer_phone,
-       mechanic_id, total_pence, stripe_payment_intent_id`,
-    )
-    .eq("id", bookingId)
-    .single();
-  if (!booking) return { ok: false as const, error: "That booking no longer exists." };
-
-  const owns =
-    booking.customer_id === user.id ||
-    (!booking.customer_id && booking.customer_email === user.email);
-  if (!owns) return { ok: false as const, error: "This isn't your booking." };
-
-  return { ok: true as const, admin, booking, userId: user.id };
-}
-
-// Cancellation fee tiers live in platform_settings (pence), tuned on /admin/pricing.
-async function cancelFeeTiers(admin: ReturnType<typeof createAdminClient>) {
-  const { data } = await admin
-    .from("platform_settings")
-    .select("key, value")
-    .in("key", [
-      "cancel_fee_before_24h",
-      "cancel_fee_within_24h",
-      "cancel_fee_mechanic_en_route",
-    ]);
-  const map = new Map((data ?? []).map((r) => [r.key, Number(r.value)]));
-  return {
-    before24h: map.get("cancel_fee_before_24h") ?? 0,
-    within24h: map.get("cancel_fee_within_24h") ?? 3000,
-    enRoute: map.get("cancel_fee_mechanic_en_route") ?? 5000,
-  };
-}
-
-// Which tier applies, given the booking's status + how close the slot is.
-function feeFor(
-  status: string,
-  scheduledAt: string | null,
-  tiers: { before24h: number; within24h: number; enRoute: number },
-): { feePence: number; tier: "before_24h" | "within_24h" | "en_route" } {
-  if (status === "en_route") return { feePence: tiers.enRoute, tier: "en_route" };
-  const slotMs = scheduledAt ? new Date(scheduledAt).getTime() : null;
-  const within24h = slotMs != null && slotMs - Date.now() < 24 * 60 * 60 * 1000;
-  return within24h
-    ? { feePence: tiers.within24h, tier: "within_24h" }
-    : { feePence: tiers.before24h, tier: "before_24h" };
-}
-
-const FEE_LABELS: Record<string, string> = {
-  before_24h: "Cancelled more than 24 hours before your slot",
-  within_24h: "Cancelled within 24 hours of your slot",
-  en_route: "Cancelled while your mechanic was on the way",
-};
-
-const CANCELLABLE = ["sourcing_mechanic", "confirmed", "en_route"];
-
-export type CancellationQuote =
-  | { ok: true; feePence: number; tier: string; label: string; totalPence: number }
-  | { ok: false; error: string };
-
 /** Fee preview shown before the customer confirms a cancellation. */
-export async function quoteCancellation(bookingId: string): Promise<CancellationQuote> {
-  const guard = await requireBookingCustomer(bookingId);
-  if (!guard.ok) return guard;
-  const { admin, booking } = guard;
-  if (!CANCELLABLE.includes(booking.status))
-    return { ok: false, error: "This booking can no longer be cancelled." };
-
-  const tiers = await cancelFeeTiers(admin);
-  const { feePence, tier } = feeFor(booking.status, booking.scheduled_at, tiers);
-  return {
-    ok: true,
-    feePence,
-    tier,
-    label: FEE_LABELS[tier],
-    totalPence: booking.total_pence ?? 0,
-  };
+export async function quoteCancellation(bookingId: string) {
+  const caller = await cookieCaller();
+  if (!caller) return { ok: false as const, error: "Please sign in." };
+  return quoteCancellationFor(bookingId, caller);
 }
 
-/**
- * Cancel a booking. The cancellation fee (if any) is captured from the
- * pre-authorised hold and the remainder released; a £0 fee releases the whole
- * hold. Fee is recomputed server-side at cancel time — never trusted from the
- * client preview.
- */
-export async function cancelBooking(
-  bookingId: string,
-  reason: string,
-): Promise<CustomerBookingResult> {
-  const trimmed = reason.trim();
-  if (!trimmed) return { ok: false, error: "Please tell us why you're cancelling." };
-
-  const guard = await requireBookingCustomer(bookingId);
-  if (!guard.ok) return guard;
-  const { admin, booking, userId } = guard;
-  if (!CANCELLABLE.includes(booking.status))
-    return { ok: false, error: "This booking can no longer be cancelled." };
-
-  const tiers = await cancelFeeTiers(admin);
-  const { feePence, tier } = feeFor(booking.status, booking.scheduled_at, tiers);
-
-  // Settle the pre-authorisation: capture the fee (releases the remainder) or
-  // cancel the hold outright when there's no fee. Stripe-less dev just skips it.
-  let charged = 0;
-  if (booking.stripe_payment_intent_id) {
-    let stripe: typeof import("@/lib/stripe/server").stripe | null = null;
-    try {
-      stripe = (await import("@/lib/stripe/server")).stripe;
-    } catch {
-      stripe = null;
-    }
-    if (stripe) {
-      try {
-        if (feePence > 0) {
-          await stripe.paymentIntents.capture(booking.stripe_payment_intent_id, {
-            amount_to_capture: feePence,
-          });
-          charged = feePence;
-        } else {
-          await stripe.paymentIntents.cancel(booking.stripe_payment_intent_id);
-        }
-      } catch (err) {
-        const message = err instanceof Error ? err.message : "Payment error";
-        return {
-          ok: false,
-          error: `Couldn't settle your payment hold: ${message}. Nothing was changed — try again.`,
-        };
-      }
-    }
-  }
-
-  const { error } = await admin
-    .from("bookings")
-    .update({
-      status: "cancelled",
-      cancellation_reason: trimmed,
-      reschedule_proposed_at: null,
-      reschedule_note: null,
-      reschedule_status: null,
-    })
-    .eq("id", bookingId);
-  if (error) return { ok: false, error: error.message };
-
-  await admin.from("booking_events").insert({
-    booking_id: bookingId,
-    event_type: "cancelled",
-    actor_id: userId,
-    actor_role: "customer",
-    reason: trimmed,
-    payload: {
-      status_from: booking.status,
-      status_to: "cancelled",
-      cancelled_by: "customer",
-      fee_tier: tier,
-      fee_pence: charged,
-    },
-  });
-  if (charged > 0) {
-    await admin.from("booking_events").insert({
-      booking_id: bookingId,
-      event_type: "payment_captured",
-      actor_id: userId,
-      actor_role: "customer",
-      payload: { amount_pence: charged, kind: "cancellation_fee" },
-    });
-  }
-
-  // Tell the assigned mechanic their job is off.
-  const cancelMechTo = await mechanicEmail(admin, booking.mechanic_id);
-  if (cancelMechTo) {
-    renderTemplateEmail("mechanic_job_cancelled", {})
-      .then(({ subject, html }) => sendEmail({ to: cancelMechTo, subject, html }))
-      .catch(console.error);
-  }
-
-  // Confirm to the customer.
-  const cancelEmail = booking.customer_email;
-  if (cancelEmail) {
-    const feeLine =
-      charged > 0
-        ? `A cancellation fee of ${formatPrice(charged)} was charged (${FEE_LABELS[tier].toLowerCase()}). The rest of your pre-authorisation has been released.`
-        : "No cancellation fee applied — your full pre-authorisation has been released.";
-    renderTemplateEmail("booking_cancelled", {
-      name: booking.customer_name ?? "there",
-      fee_line: feeLine,
-    })
-      .then(({ subject, html }) => sendEmail({ to: cancelEmail, subject, html }))
-      .catch(console.error);
-  }
-
-  if (booking.customer_phone) {
-    const body =
-      charged > 0
-        ? await renderSmsTemplate("booking_cancelled_fee", { fee: formatPrice(charged) })
-        : await renderSmsTemplate("booking_cancelled_nofee");
-    sendSms({ to: booking.customer_phone, body }).catch(() => {});
-  }
-
-  revalidatePath("/dashboard");
-  revalidatePath(`/book/confirmed/${bookingId}`);
-  if (booking.mechanic_id) {
-    revalidatePath("/mechanic/jobs");
-    revalidatePath(`/mechanic/jobs/${bookingId}`);
-  }
-  return { ok: true };
+/** Cancel a booking, settling the pre-authorisation against the fee tier. */
+export async function cancelBooking(bookingId: string, reason: string) {
+  const caller = await cookieCaller();
+  if (!caller) return { ok: false as const, error: "Please sign in." };
+  return cancelBookingFor(bookingId, reason, caller);
 }
 
-const RESCHEDULABLE = ["sourcing_mechanic", "confirmed"];
-
-/**
- * Customer reschedules to a new slot, keeping the same mechanic. Applied
- * directly (not a proposal) — the mechanic is notified and can re-propose or
- * cancel from their own tools if the new time doesn't work for them.
- */
-export async function rescheduleBooking(
-  bookingId: string,
-  newIso: string,
-  reason: string,
-): Promise<CustomerBookingResult> {
-  const when = new Date(newIso);
-  if (!newIso || Number.isNaN(when.getTime()))
-    return { ok: false, error: "Pick a valid new date and time." };
-  if (when.getTime() < Date.now())
-    return { ok: false, error: "The new time must be in the future." };
-
-  const guard = await requireBookingCustomer(bookingId);
-  if (!guard.ok) return guard;
-  const { admin, booking, userId } = guard;
-  if (!RESCHEDULABLE.includes(booking.status))
-    return { ok: false, error: "This booking can no longer be rescheduled." };
-
-  const trimmed = reason.trim() || null;
-  const { error } = await admin
-    .from("bookings")
-    .update({
-      scheduled_at: when.toISOString(),
-      // The customer picked a specific time, so the arrival window no longer
-      // applies — clear it so displays show the exact rescheduled time.
-      slot_window: null,
-      // Supersede any pending mechanic proposal — the customer just set the time.
-      reschedule_proposed_at: null,
-      reschedule_note: null,
-      reschedule_status: null,
-    })
-    .eq("id", bookingId);
-  if (error) return { ok: false, error: error.message };
-
-  await admin.from("booking_events").insert({
-    booking_id: bookingId,
-    event_type: "reschedule_accepted",
-    actor_id: userId,
-    actor_role: "customer",
-    reason: trimmed,
-    payload: { from: booking.scheduled_at, to: when.toISOString(), by: "customer" },
-  });
-
-  const slotLabel = fmt(when.toISOString());
-
-  const moveMechTo = await mechanicEmail(admin, booking.mechanic_id);
-  if (moveMechTo) {
-    renderTemplateEmail("mechanic_booking_rescheduled", { slot: slotLabel })
-      .then(({ subject, html }) => sendEmail({ to: moveMechTo, subject, html }))
-      .catch(console.error);
-  }
-
-  const rescheduleEmail = booking.customer_email;
-  if (rescheduleEmail) {
-    renderTemplateEmail("booking_rescheduled", {
-      name: booking.customer_name ?? "there",
-      slot: slotLabel,
-    })
-      .then(({ subject, html }) => sendEmail({ to: rescheduleEmail, subject, html }))
-      .catch(console.error);
-  }
-
-  revalidatePath("/dashboard");
-  revalidatePath(`/book/confirmed/${bookingId}`);
-  if (booking.mechanic_id) {
-    revalidatePath("/mechanic/jobs");
-    revalidatePath(`/mechanic/jobs/${bookingId}`);
-  }
-  return { ok: true };
+/** Move a booking to a new slot, keeping the same mechanic. */
+export async function rescheduleBooking(bookingId: string, newIso: string, reason: string) {
+  const caller = await cookieCaller();
+  if (!caller) return { ok: false as const, error: "Please sign in." };
+  return rescheduleBookingFor(bookingId, newIso, reason, caller);
 }

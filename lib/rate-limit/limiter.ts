@@ -52,6 +52,31 @@ export const RATE_LIMIT_DEFAULTS = {
   mobile_booking_user_daily: 25,
   mobile_booking_ip_burst: 10,
   mobile_booking_ip_daily: 100,
+  // Managing a booking after it exists: cancel, reschedule, answer a proposed
+  // move, leave a review, open or withdraw a dispute, release a stranded hold.
+  // Every one of these settles money, emails people or changes a job a mechanic
+  // is holding time for, so a loop is felt by humans and not just by a table.
+  // A real customer does a handful of these across a whole booking, so this is
+  // deliberately tight — but not so tight that a mistyped cancellation reason
+  // and a retry trips it.
+  mobile_action_user_burst: 8,
+  mobile_action_user_daily: 40,
+  mobile_action_ip_burst: 20,
+  mobile_action_ip_daily: 200,
+  // Dispute thread messages. Chatty by nature — a real argument is a dozen
+  // messages back and forth — so much looser than the actions above. It writes
+  // a row and emails the mechanic, which is what stops this being unlimited.
+  mobile_message_user_burst: 20,
+  mobile_message_user_daily: 200,
+  mobile_message_ip_burst: 40,
+  mobile_message_ip_daily: 600,
+  // Dispute photo uploads. Each one puts up to 10 MB into the job-media bucket
+  // that we then store forever, so the bucket — not CPU — is what's being
+  // protected. A dispute takes at most MAX_DISPUTE_PHOTOS (6) images.
+  mobile_upload_user_burst: 10,
+  mobile_upload_user_daily: 60,
+  mobile_upload_ip_burst: 20,
+  mobile_upload_ip_daily: 200,
 } as const;
 
 export type RateLimitKey = keyof typeof RATE_LIMIT_DEFAULTS;

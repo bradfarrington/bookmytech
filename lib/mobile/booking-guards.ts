@@ -38,13 +38,29 @@ export function staffRefusal(caller: MobileCaller): Response | null {
 }
 
 /**
- * Count this request against the checkout or booking buckets. Returns a
- * ready-to-return 429 when it should be refused, or null to carry on.
+ * Which bucket family a request counts against. Each has four keys in
+ * RATE_LIMIT_DEFAULTS named `mobile_<family>_{user,ip}_{burst,daily}` — the
+ * template literal below is checked against `RateLimitKey`, so adding a family
+ * here without seeding its four limits is a type error, not a runtime surprise.
  *
- * These are separate from the catalogue buckets on purpose: browsing repairs and
- * paying for one shouldn't share a budget, or a customer who spent a while
- * looking around would be turned away at the payment step — the single worst
- * moment to show someone "please wait a moment".
+ *   checkout — pricing + opening the pre-auth hold
+ *   booking  — writing the booking row
+ *   action   — managing a booking afterwards (cancel, reschedule, review,
+ *              dispute open/withdraw, releasing a stranded hold)
+ *   message  — dispute thread messages
+ *   upload   — dispute photos
+ */
+export type MobileLimitFamily = "checkout" | "booking" | "action" | "message" | "upload";
+
+/**
+ * Count this request against its bucket family. Returns a ready-to-return 429
+ * when it should be refused, or null to carry on.
+ *
+ * The families are separate on purpose: browsing repairs and paying for one
+ * shouldn't share a budget, or a customer who spent a while looking around would
+ * be turned away at the payment step — the single worst moment to show someone
+ * "please wait a moment". Same reasoning splits arguing in a dispute thread from
+ * cancelling a job.
  *
  * Per-user first so the refusal we report is the one that actually applies to
  * this caller. The per-IP buckets stay deliberately generous: mobile carriers put
@@ -54,39 +70,16 @@ export function staffRefusal(caller: MobileCaller): Response | null {
 export async function enforceBookingLimits(
   request: Request,
   caller: MobileCaller,
-  kind: "checkout" | "booking",
+  kind: MobileLimitFamily,
 ): Promise<Response | null> {
   const ip = clientIp(request);
-  const rules: RateLimitRule[] =
-    kind === "checkout"
-      ? [
-          {
-            key: "mobile_checkout_user_burst",
-            subject: `user:${caller.userId}`,
-            windowSeconds: MINUTE_SECONDS,
-          },
-          {
-            key: "mobile_checkout_user_daily",
-            subject: `user:${caller.userId}`,
-            windowSeconds: DAY_SECONDS,
-          },
-          { key: "mobile_checkout_ip_burst", subject: `ip:${ip}`, windowSeconds: MINUTE_SECONDS },
-          { key: "mobile_checkout_ip_daily", subject: `ip:${ip}`, windowSeconds: DAY_SECONDS },
-        ]
-      : [
-          {
-            key: "mobile_booking_user_burst",
-            subject: `user:${caller.userId}`,
-            windowSeconds: MINUTE_SECONDS,
-          },
-          {
-            key: "mobile_booking_user_daily",
-            subject: `user:${caller.userId}`,
-            windowSeconds: DAY_SECONDS,
-          },
-          { key: "mobile_booking_ip_burst", subject: `ip:${ip}`, windowSeconds: MINUTE_SECONDS },
-          { key: "mobile_booking_ip_daily", subject: `ip:${ip}`, windowSeconds: DAY_SECONDS },
-        ];
+  const user = `user:${caller.userId}`;
+  const rules: RateLimitRule[] = [
+    { key: `mobile_${kind}_user_burst`, subject: user, windowSeconds: MINUTE_SECONDS },
+    { key: `mobile_${kind}_user_daily`, subject: user, windowSeconds: DAY_SECONDS },
+    { key: `mobile_${kind}_ip_burst`, subject: `ip:${ip}`, windowSeconds: MINUTE_SECONDS },
+    { key: `mobile_${kind}_ip_daily`, subject: `ip:${ip}`, windowSeconds: DAY_SECONDS },
+  ];
 
   const verdict = await enforceRateLimits(rules);
   if (verdict.allowed) return null;

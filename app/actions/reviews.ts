@@ -3,77 +3,30 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { REVIEW_TAGS } from "@/lib/reviews/tags";
+import { submitReviewFor } from "@/lib/reviews/submit-review";
 
 export type ReviewResult = { ok: true } | { ok: false; error: string };
 
 /**
- * Customer submits a review for a completed booking. Called from the public
- * (guest) review page, so there's no auth session — we verify everything via
- * the service-role client: the booking exists, it's completed, and it hasn't
- * been reviewed yet. On success we recompute the mechanic's average rating.
+ * Customer submits a review for a completed booking. The WEBSITE's entry point
+ * into the review core — a thin wrapper over `submitReviewFor`, which the mobile
+ * route (app/api/mobile/v1/bookings/[id]/review) also calls.
+ *
+ * Passes a NULL caller. This is reached from the PUBLIC review page
+ * (/review/[bookingId]), opened from an email link by someone who may have no
+ * account at all, so there is no session to resolve and the trust model is
+ * possession of the booking's full UUID — unchanged. The core still verifies
+ * everything else via the service-role client: the booking exists, it's
+ * completed, and it hasn't been reviewed yet.
+ *
+ * The mobile route passes its verified caller instead and gets an ownership
+ * check, because it always knows who is asking.
  */
 export async function submitReview(
   bookingId: string,
   input: { rating: number; tags: string[]; comment: string },
 ): Promise<ReviewResult> {
-  const rating = Math.round(input.rating);
-  if (!Number.isInteger(rating) || rating < 1 || rating > 5)
-    return { ok: false, error: "Please pick a rating from 1 to 5 stars." };
-
-  // Only keep tags we actually offer.
-  const tags = input.tags.filter((t) =>
-    (REVIEW_TAGS as readonly string[]).includes(t),
-  );
-  const comment = input.comment.trim() || null;
-
-  const admin = createAdminClient();
-
-  const { data: booking } = await admin
-    .from("bookings")
-    .select("id, status, mechanic_id, customer_id")
-    .eq("id", bookingId)
-    .single();
-
-  if (!booking) return { ok: false, error: "That booking no longer exists." };
-  if (booking.status !== "completed")
-    return { ok: false, error: "You can only review a completed job." };
-  if (!booking.mechanic_id)
-    return { ok: false, error: "This booking has no mechanic to review." };
-
-  const { data: existing } = await admin
-    .from("reviews")
-    .select("id")
-    .eq("booking_id", bookingId)
-    .maybeSingle();
-  if (existing) return { ok: false, error: "You've already reviewed this job." };
-
-  const { error: insErr } = await admin.from("reviews").insert({
-    booking_id: bookingId,
-    customer_id: booking.customer_id,
-    mechanic_id: booking.mechanic_id,
-    rating,
-    tags,
-    comment,
-  });
-  if (insErr) return { ok: false, error: insErr.message };
-
-  // Recompute the mechanic's headline rating from all their reviews.
-  const { data: all } = await admin
-    .from("reviews")
-    .select("rating")
-    .eq("mechanic_id", booking.mechanic_id);
-  if (all && all.length > 0) {
-    const avg = all.reduce((sum, r) => sum + r.rating, 0) / all.length;
-    await admin
-      .from("mechanics")
-      .update({ rating: Math.round(avg * 100) / 100 })
-      .eq("id", booking.mechanic_id);
-  }
-
-  revalidatePath("/mechanic/reviews");
-  revalidatePath(`/review/${bookingId}`);
-  return { ok: true };
+  return submitReviewFor(bookingId, input, null);
 }
 
 /**

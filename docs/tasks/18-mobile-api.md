@@ -1,6 +1,6 @@
 # Task 18 — Mobile API layer (`app/api/mobile/v1/**`)
 
-**Status:** 🟡 Stages 1–3 complete. Stage 1 (2026-07-29) — auth helper, `/auth/signup` and `/vehicle/lookup`, Postgres-backed rate limiting (migration `0043`). Stage 2 (2026-08-04) — `/repairs/tree`, `/repairs/search` and `/quote`, on a new shared core (`lib/haynespro/catalogue.ts`) that the website's repair browser was refactored onto; migration `0044` seeds their limits (data only, no schema change). Stage 3 (2026-08-04) — `/checkout/prepare` and `/bookings`, on a new shared core (`lib/bookings/create-booking.ts`) that the website's two Server Actions were refactored onto; migration `0045` seeds their limits (data only, no schema change). **Deviation from the spec:** the customer id became a parameter of the extracted core, *not* of `createBookingAction` — see "Why the core moved out of `app/actions/`" below; the web Server Actions keep their exact signatures. All three stages verified live against the dev Supabase project. Stage 4 (manage a booking) is specced below and not built.
+**Status:** ✅ Complete (2026-08-05) — Stages 1–3 and 5. Stage 5 (customer actions: cancel, reschedule, review, disputes, stranded-hold release) shipped ten endpoints on three new shared cores (`lib/bookings/manage-booking.ts`, `lib/reviews/submit-review.ts`, `lib/disputes/core.ts`), with the website's Server Actions refactored onto them and their signatures unchanged. **Deviations from the old "Stage 4 — manage a booking" spec, which this replaces:** it shipped as **Stage 5** and covers far more than that two-row table did; the cancel *quote* is its own `GET /bookings/:id/cancel-quote` rather than sharing the cancel route, because the app must show the fee before the customer commits; and `respondToReschedule` got its own route (`/reschedule-response`) rather than sharing `/reschedule`, because they are opposite directions of the same conversation. Two migrations to apply: **`0046`** (records a `reviews` customer-read policy that exists on live but in no migration) and **`0047`** (rate-limit seeds, data only). Verified live against the dev Supabase project, including an ownership probe from a second customer account against every endpoint. Earlier stages: Stage 1 (2026-07-29) — auth helper, `/auth/signup` and `/vehicle/lookup`, Postgres-backed rate limiting (migration `0043`). Stage 2 (2026-08-04) — `/repairs/tree`, `/repairs/search` and `/quote`, on a new shared core (`lib/haynespro/catalogue.ts`) that the website's repair browser was refactored onto; migration `0044` seeds their limits (data only, no schema change). Stage 3 (2026-08-04) — `/checkout/prepare` and `/bookings`, on a new shared core (`lib/bookings/create-booking.ts`) that the website's two Server Actions were refactored onto; migration `0045` seeds their limits (data only, no schema change). **Deviation from the spec:** the customer id became a parameter of the extracted core, *not* of `createBookingAction` — see "Why the core moved out of `app/actions/`" below; the web Server Actions keep their exact signatures. All three stages verified live against the dev Supabase project.
 
 ## Why this exists
 
@@ -530,19 +530,251 @@ filter`, £60):
 
 ---
 
-## Later stages — not built
+## Stage 5 — customer actions ✅ (2026-08-05)
 
-Prompted separately. Every one of these is a thin wrapper; if the underlying
-function isn't callable from a route handler, extract the shared core and have
-both callers use it, as `createCustomerAccount`, `getRepairCatalogueLevel` and
-now `createBooking` already do.
+Everything a customer does to a booking *after* it exists. All authenticated,
+all thin wrappers, all following the same rule as Stage 3: the caller is
+resolved from the verified Bearer token in the route handler and threaded into a
+shared core in `lib/`, and ownership is decided there from that caller — never
+from the path or the body.
 
-### Stage 4 — manage a booking (authenticated)
+Numbered Stage **5** rather than 4 because it is a superset of what the old
+"Stage 4 — manage a booking" section specced, and shipping it as a new stage
+keeps that spec's history readable rather than rewriting it.
 
-| Endpoint | Wraps |
-|---|---|
-| `POST /bookings/:id/cancel` | `quoteCancellation`, `cancelBooking` |
-| `POST /bookings/:id/reschedule` | `rescheduleBooking`, `respondToReschedule` |
+| Endpoint | Wraps | Core |
+|---|---|---|
+| `GET /bookings/:id/cancel-quote` | `quoteCancellation` | `lib/bookings/manage-booking.ts` |
+| `POST /bookings/:id/cancel` `{reason}` | `cancelBooking` | ″ |
+| `POST /bookings/:id/reschedule` `{scheduledAt, reason}` | `rescheduleBooking` | ″ |
+| `POST /bookings/:id/reschedule-response` `{decision}` | `respondToReschedule` | ″ |
+| `POST /bookings/:id/review` `{rating, tags?, comment?}` | `submitReview` | `lib/reviews/submit-review.ts` |
+| `POST /bookings/:id/disputes` | `openDispute` | `lib/disputes/core.ts` |
+| `POST /disputes/:id/messages` `{body}` | `sendDisputeMessage` | ″ |
+| `POST /disputes/:id/withdraw` | `withdrawDispute` | ″ |
+| `POST /disputes/photos` (multipart) | `uploadDisputePhoto` | ″ |
+| `POST /checkout/cancel` `{paymentIntentId}` | *(new)* | `lib/stripe/release-hold.ts` |
+
+### Three cores extracted, three `app/actions/` files thinned
+
+Same move as Stage 3, for the same reason: `quoteCancellation`, `cancelBooking`,
+`rescheduleBooking`, `openDispute`, `sendDisputeMessage` and `withdrawDispute`
+all resolved their caller through `requireBookingCustomer` / `requireUser`,
+which read the **cookie** session. Called from a route handler they resolve to
+null and refuse every mobile request with "Please sign in." no matter how good
+the token is.
+
+- **`lib/bookings/manage-booking.ts`** — cancel, cancel-quote, reschedule,
+  reschedule-response. `app/actions/customer-bookings.ts` is now four wrappers.
+- **`lib/reviews/submit-review.ts`** — `app/actions/reviews.ts` keeps
+  `submitReview` as a one-line wrapper and `respondToReview` unchanged.
+- **`lib/disputes/core.ts`** — the whole party-facing lifecycle plus the shared
+  helpers (`partyForDispute`, `releaseMechanicPayout`, `revalidateDispute`,
+  `mechanicEmail`, `serviceName`). `app/actions/disputes.ts` keeps
+  `escalateDispute` and `resolveDispute` whole — they're staff/cron paths the
+  app deliberately can't reach — and both now call `partyForDispute` with a
+  cookie-resolved caller.
+
+**No `"use server"` export gained a caller argument.** Every export of such a
+file is browser-reachable with arguments of the caller's choosing, so
+`cancelBooking(id, reason, userId)` would let anyone cancel anyone's booking.
+Every web action keeps its exact signature; no calling component was edited.
+
+### `lib/bookings/ownership.ts` — one predicate, tested exhaustively
+
+The rule that keeps a customer out of someone else's job is now a pure function
+shared by the cancel/reschedule and review paths, with its own unit tests
+(`ownership.test.ts`, 10 cases). It mirrors the "Customers can view own
+bookings" RLS policy, **with one hardening the SQL doesn't need**: in Postgres
+`null = null` is null and the policy fails closed, but in TypeScript
+`null === null` is *true*, so a caller whose token carries no email would have
+matched every guest booking that also has no email. Both sides are required
+non-null. The email compare is case-sensitive, matching `auth.email()` — looser
+would let an action reach a booking the same caller cannot *read*.
+
+### Two paths pass a NULL caller, deliberately
+
+`respondToReschedule` and `submitReview` are reachable on the website from pages
+where the customer may have **no account at all** — the guest confirmation page
+and the emailed review link — and are trusted on possession of the booking's
+full UUID. Those wrappers pass `null` and the ownership check is skipped, exactly
+as before. Tightening them would refuse a real case: someone who booked as a
+guest on one email, signed up on another, and followed their own link.
+
+The mobile routes always pass a verified caller, so ownership **is** enforced
+there. A bare booking id must not be enough to answer someone else's reschedule
+or post a review under their name.
+
+### Statuses each action accepts
+
+Exported from the core as `CANCELLABLE` and `RESCHEDULABLE` so both clients can
+hide a button rather than offer one that always errors:
+
+- **`CANCELLABLE`** — `sourcing_mechanic`, `confirmed`, `en_route`
+- **`RESCHEDULABLE`** — `sourcing_mechanic`, `confirmed` (not `en_route`: the
+  mechanic is already driving)
+- **reschedule-response** — no status gate; it gates on
+  `reschedule_status === 'proposed'`
+- **review** — `completed` only, and one per booking, **refused** on a second
+  attempt rather than updated
+- **dispute (customer)** — `completed`, within 48 hours of `completed_at`
+
+### The quote is a separate call, and a preview only
+
+`/cancel-quote` exists so the app can put a number next to "Cancel this
+booking?". `cancelBooking` recomputes the fee at cancel time and never reads it —
+the tier genuinely moves between the two calls (the 24-hour boundary passes, the
+mechanic sets off), and what is charged must be what was true when the money
+moved.
+
+### Reviews — the first write path there has ever been
+
+`reviews` has no INSERT policy and can't have one: submitting recomputes
+`mechanics.rating`, which no customer may write. So the checks in the core are
+the whole of the protection, with no RLS backstop underneath.
+
+Two things changed beyond wrapping:
+
+- **`job_count` is now recomputed** alongside `rating`, from the mechanic's
+  **completed bookings** (not their review count — most jobs are never reviewed).
+  Nothing in the codebase had ever written this column; it sat at 0 while
+  `/admin/mechanics`, `/mechanic/profile` and the analytics page all displayed
+  it. Recompute rather than increment, so it is idempotent and repairs whatever
+  was there. **This is the wrong place for it long-term** — see Follow-ups.
+- **A 2000-character cap on the comment.** It was uncapped, which is defensible
+  for a form and not for an endpoint.
+
+Tag vocabulary is unchanged (`lib/reviews/tags.ts`): Punctual · Friendly · Great
+value · Knowledgeable · Tidy & clean · Went the extra mile. Unrecognised tags are
+**dropped, not refused**, so an old build offering a retired tag can still leave
+a review.
+
+### Disputes — photos go through us, reads go direct
+
+`uploadDisputePhoto` takes a `File`. The mobile route takes
+`multipart/form-data` with a single `file` part (RN's `FormData` appends
+`{uri, name, type}` directly) and returns `{ok: true, url}`; that URL then goes
+in the `photos` array when opening the dispute.
+
+**Not** a direct client upload under Storage RLS: `job-media` is a public bucket
+whose writes are service-role only (0011) and it holds every job's media, so a
+policy letting customers write to it would open all of that, not a `disputes/`
+prefix. Object paths are keyed by the verified caller's id.
+
+That route can't do the `application/json` CSRF check the JSON routes do
+(`multipart/form-data` is CORS-simple, so it can't be preflighted into). The
+Bearer requirement covers it: the route reads no cookies, so a cross-origin page
+has no ambient credential to replay.
+
+**Reads need no endpoints.** `disputes` and `dispute_messages` already carry
+"parties read" SELECT policies (0025) — verified live below.
+
+### `POST /checkout/cancel` — releasing a stranded hold
+
+The mirror of `reportOrphanedHold`: that one tells ops, this one gives the money
+back. Same "re-read the truth from Stripe rather than trusting the caller"
+reasoning, plus two gates it doesn't need, because this **cancels** rather than
+emails:
+
+1. **Ownership is proved from Stripe.** `prepareCheckoutFor` now stamps
+   `metadata.customer_id` on every hold it opens for a signed-in customer, and
+   the release refuses unless it matches the caller. Without that, anyone who
+   came by an intent id could release a stranger's authorisation. Holds opened
+   before this metadata existed, and guest holds, carry no stamp and so can only
+   be released by ops or Stripe's own 7-day expiry — the safe direction to fail.
+2. **A hold with a booking row against it is not stranded.** Cancelling it would
+   leave a confirmed job with nothing to capture on completion.
+
+Idempotent: an already-cancelled intent returns `{ok: true, released: false}`
+without calling Stripe again. A **captured** intent is refused with a
+contact-us message rather than guessed at.
+
+The metadata addition is the only change to the website's money path, and it is
+additive — nothing reads it during checkout.
+
+### Rate limiting (migration `0047` — data only)
+
+Three new bucket families on the same Postgres limiter, seeded in
+`platform_settings` with identical code defaults in `lib/rate-limit/limiter.ts`.
+`enforceBookingLimits` became table-driven over a `MobileLimitFamily` union, and
+the key names are built with a template literal type checked against
+`RateLimitKey` — adding a family without seeding its four limits is a type
+error, not a runtime surprise.
+
+| Family | Endpoints | user burst / daily | ip burst / daily |
+|---|---|---|---|
+| `action` | cancel, reschedule, review, dispute open/withdraw, hold release | 8 / 40 | 20 / 200 |
+| `message` | dispute thread messages | 20 / 200 | 40 / 600 |
+| `upload` | dispute photos | 10 / 60 | 20 / 200 |
+
+### Verified live (2026-08-05, dev Supabase + `npm run dev`, Stripe test mode)
+
+Three throwaway-account probes, all data deleted afterwards.
+
+**Ownership — 19/19.** An INTRUDER account with a valid token, against an OWNER's
+booking, dispute and PaymentIntent. Every one of the nine endpoints refused:
+cancel-quote, cancel, reschedule, reschedule-response (against a **live**
+`reschedule_status = 'proposed'`, so a pass would have been a real breach),
+review, dispute open, dispute message, dispute withdraw, and `checkout/cancel`
+against the owner's live hold. State was then re-read: booking still `confirmed`,
+proposal still live, no review row, no dispute message, dispute still `opened`,
+hold still uncaptured. Positive controls prove the refusals aren't blanket — the
+owner's own `cancel-quote` returned `{ok:true, feePence:0, tier:"before_24h",
+totalPence:12000}`, their own `checkout/cancel` returned `released: true`, and a
+second call returned `released: false`. No token → **401**.
+
+*(The first run failed one probe with a **429** — nine `action`-family calls in a
+minute against an 8/min burst. The limiter working, not a defect; the probe was
+split across two intruder identities.)*
+
+**Reviews — 11/11.** Valid review accepted; comment trimmed; unrecognised tags
+dropped and offered ones kept; `customer_id` and `mechanic_id` stamped; a second
+review on the same booking **refused**; a review on a different booking accepted;
+`mechanics.rating` recomputed to the mean (5, 2 → **3.50**) and `job_count` to
+**3** completed bookings (not 2 reviews); rating outside 1–5 refused; missing
+rating → 400; an unfinished job refused.
+
+**Customer RLS reads — 8/8.** `reschedule_status`, `reschedule_proposed_at` and
+`reschedule_note` all read back by the owning customer with the anon key and a
+real token — **confirmed readable**, no policy needed. `disputes` and
+`dispute_messages` likewise. A second customer read zero rows from every one.
+
+`npm run build` compiles all ten routes; `npx tsc --noEmit` clean; 109 unit tests
+pass (10 of them new).
+
+### The `reviews` policy that isn't in any migration
+
+The live dev project **does** let a customer read their own reviews — both
+account-owned and guest (verified above) — but **no migration in this repo
+creates that policy**; 0012 only grants SELECT to mechanics and admins. It was
+added by hand and never written down.
+
+`0046_customer_review_reads.sql` records it. Expect it to be a **no-op on dev**
+and load-bearing on any environment that never got the manual edit — including,
+possibly, production. Left undone it fails silently: RLS returns zero rows rather
+than an error, so the app would read "you haven't reviewed this yet" and put a
+customer through leaving the same review twice.
+
+### Acceptance criteria
+
+- [x] A customer can cancel, reschedule and answer a proposed reschedule from the app
+- [x] The cancellation fee is previewable before confirming, and recomputed at cancel time
+- [x] `CANCELLABLE` and `RESCHEDULABLE` are exported so both clients can hide buttons
+- [x] A customer can review a completed job, once, and the mechanic's aggregates update
+- [x] A customer can open, discuss and withdraw a dispute, and attach photos
+- [x] A customer can release a hold that was left stranded by a failed booking write
+- [x] Ownership comes from the verified caller on every endpoint, and is **proved**
+      against another customer's booking, dispute and PaymentIntent
+- [x] No logic is duplicated — three cores extracted, the web actions refactored
+      onto them, signatures unchanged, no calling component edited
+- [x] No `"use server"` export gained a caller argument
+- [x] No mobile route reaches cookie-derived auth
+- [x] Errors are `{"error": "…"}` with a real status code and customer-facing
+      copy; success is JSON; no redirects; no CORS headers
+- [x] Customer RLS reads confirmed live for `reschedule_*`, `disputes` and
+      `dispute_messages`
+- [ ] `escalateDispute` / `resolveDispute` exposed to the app — **deliberately
+      not**, both are staff actions
 
 ---
 
@@ -559,6 +791,49 @@ now `createBooking` already do.
 
 ## Follow-ups
 
+- **`mechanics.job_count` is recomputed in the wrong place.** Stage 5 made
+  submitting a review recompute it, because the prompt asked for it and because
+  the column had never been written by anything — it sat at 0 while
+  `/admin/mechanics`, `/mechanic/profile`, `/admin/analytics` and the disputes
+  detail page all displayed it as "jobs done". That's a real fix, but it means
+  the figure only refreshes when a customer happens to leave a review, so a
+  mechanic with fifty completed jobs and no reviews still reads 0. **It belongs
+  at job completion** — `completeJob` in `app/actions/job-progress.ts`, which
+  already stamps `completed_at`. The recompute is a single query
+  (`recomputeMechanicAggregates` in `lib/reviews/submit-review.ts`) and is
+  idempotent, so calling it from there as well is safe and the two can't
+  disagree. Left out of Stage 5 deliberately: it touches the mechanic's job flow,
+  which wants its own testing rather than riding along with the customer
+  endpoints.
+- **A `reviews` RLS policy exists on the live database that no migration
+  creates.** See "The `reviews` policy that isn't in any migration" above.
+  `0046` records it. Worth checking whether anything else has drifted the same
+  way — the whole `supabase/migrations/` directory is only trustworthy as a
+  description of a fresh environment, not of the live one, until someone diffs
+  the two.
+- **`escalateDispute` is not reachable from the app.** Deliberate for Stage 5 —
+  it's a party action, not a staff one, so unlike `resolveDispute` there's no
+  reason of principle to withhold it. The 48-hour cron escalates automatically,
+  so a customer whose mechanic goes quiet is not stuck; they just can't *ask* for
+  a mediator early. One more thin wrapper if the app wants it.
+- **Withdrawing a dispute is final and the app should say so.** `disputes` has
+  `unique(booking_id)`, so a withdrawn case cannot be reopened and the booking
+  has used up its one dispute. The endpoint refuses a second open with "There's
+  already an open dispute for this booking", which is accurate but reads oddly
+  when the dispute is closed.
+- **Holds opened before Stage 5 can't be released by their owner.**
+  `POST /checkout/cancel` proves ownership from `metadata.customer_id`, which
+  `prepareCheckoutFor` only started stamping now. Any hold opened before this
+  deploy, and every guest hold, has no stamp and is refused — released only by
+  ops or Stripe's 7-day expiry. Self-clearing within a week of deploying, and the
+  safe direction to fail, but worth knowing if someone reports it in the first
+  few days.
+- **`releaseStrandedHold` races a concurrent retry, narrowly.** It checks for a
+  booking row and then cancels; a retry that writes the row and captures in
+  between would make the cancel fail, and the customer is told the money is still
+  held and to contact us. That's the correct outcome, but it is a message rather
+  than a lock. Closing it properly needs the booking write and the intent to move
+  together, which is a bigger change than this endpoint.
 - **`stripePaymentIntentId` is client-supplied and unverified — on the website
   too.** Both clients confirm the hold on the device and then post the intent id
   back, and nothing checks that the id names an intent we created for *this*
@@ -599,7 +874,17 @@ now `createBooking` already do.
   `monthOfFirstRegistration`. Pre-existing, harmless (the app types against the
   declared subset), and passing it through unchanged is correct here — but worth
   knowing before anyone "tidies" the type.
-- **No mobile route HANDLER is covered by an automated test yet.** Stages 1–3
+- **No mobile route HANDLER is covered by a REPEATABLE automated test yet.**
+  Stage 5 changes the picture but doesn't close it: its ownership, review and
+  RLS-read probes were real scripts hitting real routes against the dev project
+  (19 + 11 + 8 assertions, all green), and `lib/bookings/ownership.test.ts` pins
+  the ownership predicate in the permanent suite. But the probes themselves were
+  throwaway — they lived in a scratch directory and are gone. They should be
+  Playwright API specs alongside `tests/e2e/`, because the checks they make are
+  exactly the kind a later refactor drops silently. Note when porting them: the
+  `action` bucket is 8/min per user, so a probe that hits nine endpoints in a row
+  on one account gets a 429 rather than the answer it was testing for.
+- **The rest of the paragraph below still applies.** Stages 1–3
   were verified by hand against the dev project. Stage 2 did add unit tests
   for the pure catalogue helpers (`toCatalogueNode`, `matchRank`, `affinityFor`
   in `lib/haynespro/haynespro.test.ts`) — the ranking rules are subtle enough

@@ -325,6 +325,14 @@ export async function prepareCheckoutFor(
       // the website's PaymentElement and the app's PaymentSheet.
       payment_method_types: ["card"],
       description: "Book My Tech — repair pre-authorisation",
+      // Who this hold belongs to, so it can be proved later. Nothing reads it
+      // during checkout — it exists for lib/stripe/release-hold.ts, which
+      // cancels a hold the customer abandoned and must confirm the intent is
+      // theirs before touching it. The intent id alone can't prove that: it
+      // arrives in the request body, so anyone holding someone else's id could
+      // release their funds. Absent for guests (no id to record), which is why
+      // releasing is an authenticated-only action.
+      ...(customerId ? { metadata: { customer_id: customerId } } : {}),
     });
     if (!intent.client_secret) return { ok: false, error: "Couldn't start the payment. Please try again." };
     return {
