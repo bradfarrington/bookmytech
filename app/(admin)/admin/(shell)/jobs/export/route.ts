@@ -42,7 +42,7 @@ const HEADER = [
 export async function GET(request: NextRequest) {
   const supabase = await createClient();
 
-  // Defence in depth — middleware already gates /admin/*, but re-check here.
+  // Defence in depth — proxy already gates /admin/*, but re-check here.
   const {
     data: { user },
   } = await supabase.auth.getUser();

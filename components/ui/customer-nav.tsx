@@ -3,10 +3,11 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Menu, X } from "lucide-react";
+import { LayoutDashboard, Menu, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
+import { useCustomerSession } from "@/components/ui/use-customer-session";
 
 // Navigation labels shown across customer surfaces.
 const NAV_ITEMS = [
@@ -27,6 +28,7 @@ export interface CustomerNavProps {
 
 export function CustomerNav({ active = "Book", dark = false }: CustomerNavProps) {
   const [open, setOpen] = useState(false);
+  const signedIn = useCustomerSession();
 
   useEffect(() => {
     if (!open) return;
@@ -89,15 +91,22 @@ export function CustomerNav({ active = "Book", dark = false }: CustomerNavProps)
       <div className="flex-1" />
 
       <div className="hidden items-center gap-2.5 lg:flex">
-        <Link
-          href="/login"
-          className={cn(
-            "text-[13px] font-medium",
-            dark ? "text-white/70 hover:text-white" : "text-slate-700 hover:text-text-primary",
+        {/* Fixed min-width so resolving the session doesn't shift the nav.
+            While `signedIn` is undefined this renders nothing but keeps its
+            space — better than flashing "Sign in" at a signed-in customer. */}
+        <span className="flex min-w-[76px] justify-end">
+          {signedIn !== undefined && (
+            <Link
+              href={signedIn ? "/dashboard" : "/login"}
+              className={cn(
+                "text-[13px] font-medium",
+                dark ? "text-white/70 hover:text-white" : "text-slate-700 hover:text-text-primary",
+              )}
+            >
+              {signedIn ? "My account" : "Sign in"}
+            </Link>
           )}
-        >
-          Sign in
-        </Link>
+        </span>
         <Link href="/book">
           <Button
             variant={dark ? "secondary" : "primary"}
@@ -133,6 +142,7 @@ export function CustomerNav({ active = "Book", dark = false }: CustomerNavProps)
         open={open}
         onClose={() => setOpen(false)}
         active={active}
+        signedIn={signedIn}
       />
     </header>
   );
@@ -142,9 +152,11 @@ interface NavDrawerProps {
   open: boolean;
   onClose: () => void;
   active: CustomerNavActive;
+  /** undefined while the session is still resolving — see useCustomerSession. */
+  signedIn: boolean | undefined;
 }
 
-function NavDrawer({ open, onClose, active }: NavDrawerProps) {
+function NavDrawer({ open, onClose, active, signedIn }: NavDrawerProps) {
   return (
     <div
       id="customer-nav-drawer"
@@ -209,13 +221,26 @@ function NavDrawer({ open, onClose, active }: NavDrawerProps) {
         </nav>
 
         <div className="flex flex-col gap-3 border-t border-border p-4">
-          <Link
-            href="/login"
-            onClick={onClose}
-            className="text-center text-sm font-medium text-text-secondary hover:text-text-primary"
-          >
-            Sign in
-          </Link>
+          {signedIn === undefined ? (
+            <span className="h-5" aria-hidden />
+          ) : signedIn ? (
+            <Link
+              href="/dashboard"
+              onClick={onClose}
+              className="inline-flex items-center justify-center gap-1.5 text-sm font-semibold text-brand-blue hover:underline"
+            >
+              <Icon icon={LayoutDashboard} size={16} />
+              My account
+            </Link>
+          ) : (
+            <Link
+              href="/login"
+              onClick={onClose}
+              className="text-center text-sm font-medium text-text-secondary hover:text-text-primary"
+            >
+              Sign in
+            </Link>
+          )}
           <Link href="/book" onClick={onClose} className="block">
             <Button variant="primary" size="md" fullWidth>
               Book a mechanic

@@ -14,7 +14,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { billableHours } from "@/lib/pricing/billable";
 import { getHourlyRatePence } from "@/lib/pricing/calculate";
+import { isHaynesProConfigured } from "./client";
 import { excludedRepairNodeIdsForVehicle } from "./exclusions";
+import { isCatalogueOutage, readHaynesProHealth } from "./health";
 import { getRepairtimeSubnodes } from "./tree";
 import { resolveVehicle } from "./vehicle";
 import type { HpRepairtimeNode } from "./types";
@@ -52,6 +54,17 @@ export type CatalogueFailure = {
   ok: false;
   code: "vehicle_not_matched" | "no_repair_data";
   message: string;
+  /**
+   * True when the cause is an outage on OUR side (HaynesPro is unconfigured or
+   * refusing our credentials) rather than anything about this registration —
+   * the same reg will work once the integration is back.
+   *
+   * ADDITIVE AND OPTIONAL ON PURPOSE. `code` is the contract old app builds
+   * branch on, so a new code would break them (see the note above); an unknown
+   * extra field is ignored by any build that doesn't know it. Only `message`
+   * changes for existing clients, and that is already shown verbatim.
+   */
+  retryable?: true;
 };
 
 export type CatalogueLevel =
@@ -75,6 +88,22 @@ const NOT_MATCHED: CatalogueFailure = {
     "We couldn't match your registration to our repair database, so we can't " +
     "price repairs for this vehicle online yet. Please get in touch and we'll " +
     "sort it for you.",
+};
+
+// The catalogue is down on our side. Deliberately reuses the `vehicle_not_matched`
+// code rather than introducing a new one, because a phone running last month's
+// build branches on that field and has never heard of any other value. What it
+// does change is the sentence the customer reads: telling someone we couldn't
+// match their registration, when in fact our supplier licence has lapsed, blames
+// them for our problem and invites them to retype a perfectly good reg.
+const CATALOGUE_UNAVAILABLE: CatalogueFailure = {
+  ok: false,
+  code: "vehicle_not_matched",
+  retryable: true,
+  message:
+    "We can't price repairs online at the moment — that's a problem on our " +
+    "side, not with your registration. Please get in touch and we'll sort it " +
+    "for you, or try again a little later.",
 };
 
 const NO_REPAIR_DATA: CatalogueFailure = {
@@ -101,7 +130,16 @@ async function loadContext(
   db: SupabaseClient,
 ): Promise<{ ok: true; context: CatalogueContext } | CatalogueFailure> {
   const resolved = await resolveVehicle(reg, db);
-  if (!resolved) return NOT_MATCHED;
+  if (!resolved) {
+    // Nothing came back. That is either "we don't know this car" or "HaynesPro
+    // isn't answering us" — indistinguishable here, so ask the recorded health
+    // state which it was. Only checked on the failure path, so the normal path
+    // costs nothing.
+    if (!isHaynesProConfigured()) return CATALOGUE_UNAVAILABLE;
+    const health = await readHaynesProHealth(db);
+    if (isCatalogueOutage(health)) return CATALOGUE_UNAVAILABLE;
+    return NOT_MATCHED;
+  }
   if (resolved.repairtimeTypeId == null) return NO_REPAIR_DATA;
 
   const [hourlyRatePence, excluded] = await Promise.all([

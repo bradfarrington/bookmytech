@@ -18,7 +18,7 @@ import {
  *
  * Same rule the web funnel enforces (app/(customer)/book/slot/page.tsx treats an
  * admin or mechanic session as `wrongRole` and asks them to sign out): a booking
- * made under a staff id would be invisible to them, because middleware keeps
+ * made under a staff id would be invisible to them, because proxy keeps
  * them out of the customer dashboard. Silently writing it would be worse than
  * refusing.
  *

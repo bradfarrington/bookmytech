@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { loadStripe } from "@stripe/stripe-js";
 import {
@@ -158,7 +159,7 @@ interface SlotPickerProps {
   signedIn?: boolean;
   /**
    * Set when the session belongs to an admin or mechanic. They can't book as
-   * themselves (middleware keeps them out of /dashboard, so the job would be
+   * themselves (proxy keeps them out of /dashboard, so the job would be
    * invisible to them), so we ask them to sign out rather than silently
    * attaching the booking to a staff account.
    */
@@ -980,6 +981,15 @@ function CheckoutForm({
       </Button>
       <p className="text-center text-[11px] text-text-muted">
         No money is taken now. Your card is pre-authorised only — charged when the job is complete.
+        {" "}Free to cancel more than 24 hours before your slot — see our{" "}
+        <Link
+          href="/cancellation-policy"
+          target="_blank"
+          className="font-semibold text-brand-blue hover:underline"
+        >
+          cancellation policy
+        </Link>
+        .
       </p>
     </form>
   );

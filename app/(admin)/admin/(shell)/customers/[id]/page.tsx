@@ -21,7 +21,7 @@ import { availableCreditPence } from "@/lib/credits/credits";
 
 // A single customer: contact, spend, every job they've booked, every dispute
 // they're party to, and their credit ledger. Service-role reads throughout —
-// the page is behind the middleware admin gate and needs auth.users + rows no
+// the page is behind the proxy admin gate and needs auth.users + rows no
 // single RLS grant covers.
 export const dynamic = "force-dynamic";
 

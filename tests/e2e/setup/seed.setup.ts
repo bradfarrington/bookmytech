@@ -40,7 +40,7 @@ async function ensureUser(email: string, password: string, role: Role) {
   }
 
   // The handle_new_user trigger creates the profile row with role='customer'.
-  // Promote mechanic/admin so role-gated login + middleware let them through.
+  // Promote mechanic/admin so role-gated login + proxy let them through.
   if (role !== "customer") {
     const { error } = await admin.from("profiles").update({ role }).eq("id", user.id);
     if (error) throw new Error(`set role ${role} for ${email} failed: ${error.message}`);

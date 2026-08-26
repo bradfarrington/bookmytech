@@ -92,7 +92,11 @@ async function requireBookingCustomer(bookingId: string, caller: BookingCaller) 
 }
 
 // Cancellation fee tiers live in platform_settings (pence), tuned on /admin/pricing.
-async function cancelFeeTiers(admin: ReturnType<typeof createAdminClient>) {
+//
+// Exported because the public /cancellation-policy page reads the SAME figures.
+// A published policy that disagrees with what the code actually charges is worse
+// than having no policy page at all, so there is exactly one source for them.
+export async function cancelFeeTiers(admin: ReturnType<typeof createAdminClient>) {
   const { data } = await admin
     .from("platform_settings")
     .select("key, value")

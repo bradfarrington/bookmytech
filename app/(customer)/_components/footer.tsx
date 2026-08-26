@@ -43,6 +43,7 @@ const COLUMNS: FooterColumn[] = [
       { label: "Repairs", href: "/#repairs" },
       { label: "Reviews", href: "/#reviews" },
       { label: "Pricing", href: "/book" },
+      { label: "Your bookings", href: "/dashboard" },
     ],
   },
   {
@@ -50,6 +51,7 @@ const COLUMNS: FooterColumn[] = [
     links: [
       { label: "Become a mechanic", href: "/mechanics" },
       { label: "Apply now", href: "/mechanics/apply" },
+      { label: "Mechanic agreement", href: "/mechanic-agreement" },
       { label: "Help centre", href: "/help" },
       { label: "Mechanic login", href: "/mechanic/login" },
     ],
@@ -142,6 +144,11 @@ export function Footer() {
             <li>
               <Link href="/cookies" className="hover:text-white">
                 Cookies
+              </Link>
+            </li>
+            <li>
+              <Link href="/cancellation-policy" className="hover:text-white">
+                Cancellations
               </Link>
             </li>
           </ul>

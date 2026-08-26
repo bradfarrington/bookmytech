@@ -1,7 +1,10 @@
 import { Overline } from "@/components/ui/overline";
 import { isHaynesProConfigured } from "@/lib/haynespro/client";
+import { readHaynesProHealth } from "@/lib/haynespro/health";
 import { brandLogoSlug, getMakes } from "@/lib/haynespro/tree";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { BrandTile } from "./_components/brand-tile";
+import { HaynesProStatus } from "./_components/haynespro-status";
 
 // Admin Vehicles area (Task 16 Stage E): browse every car make HaynesPro
 // covers, drill into models and engine variants, and manage per-model service
@@ -11,6 +14,10 @@ export const dynamic = "force-dynamic";
 
 export default async function AdminVehiclesPage() {
   const configured = isHaynesProConfigured();
+  // Read health BEFORE the make list: getMakes() is itself a HaynesPro call, so
+  // reading after it would show the state this page's own request just wrote —
+  // fine, but it means a first load after an outage started reports "ok".
+  const health = configured ? await readHaynesProHealth(createAdminClient()) : null;
   const makes = configured ? await getMakes() : [];
 
   return (
@@ -27,14 +34,9 @@ export default async function AdminVehiclesPage() {
         </p>
       </header>
 
-      {!configured && (
-        <div className="rounded-button border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          HaynesPro isn&apos;t configured — add the <code>HAYNESPRO_*</code>{" "}
-          values to the environment to enable this area.
-        </div>
-      )}
+      <HaynesProStatus configured={configured} health={health} />
 
-      {configured && makes.length === 0 && (
+      {configured && makes.length === 0 && health?.state !== "auth_failed" && (
         <div className="rounded-button border border-border bg-surface-card px-4 py-8 text-center text-sm text-text-muted">
           Couldn&apos;t load the make list from HaynesPro. Try again shortly.
         </div>

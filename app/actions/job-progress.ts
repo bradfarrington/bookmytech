@@ -11,6 +11,7 @@ import { formatPrice, siteUrl, formatJobNumber } from "@/lib/utils";
 import { completedBookingCount, grantCredit } from "@/lib/credits/credits";
 import { REFERRAL_BONUS_PENCE } from "@/lib/credits/constants";
 import { mechanicBalancePence, recordEarning, recordPayout } from "@/lib/mechanics/balance";
+import { recomputeMechanicAggregates } from "@/lib/mechanics/aggregates";
 import { nettedPayout } from "@/lib/earnings";
 
 export type JobProgressResult = { ok: true } | { ok: false; error: string };
@@ -219,6 +220,20 @@ export async function completeAndCharge(bookingId: string): Promise<JobProgressR
       actor_role: "mechanic",
       payload: { amount_pence: chargePence, credit_applied_pence: booking.credit_applied_pence ?? 0 },
     });
+  }
+
+  // --- Mechanic aggregates --------------------------------------------------
+  // `job_count` counts completed jobs, so THIS is where it has to move — until
+  // now it was only ever written when someone left a review, which most jobs
+  // never get, so it read 0 on four surfaces that display it as fact.
+  // Non-fatal: the money has already moved and the job is complete, so a failed
+  // recount must not fail sign-off. It self-repairs on the next completion.
+  if (booking.mechanic_id) {
+    try {
+      await recomputeMechanicAggregates(admin, booking.mechanic_id);
+    } catch (err) {
+      console.error("Mechanic aggregate recount failed for booking", bookingId, err);
+    }
   }
 
   // --- Referral bonus -------------------------------------------------------

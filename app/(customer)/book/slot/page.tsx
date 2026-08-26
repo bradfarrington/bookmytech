@@ -48,7 +48,7 @@ export default async function SlotPage({ searchParams }: SlotPageProps) {
   // applied is decided server-side).
   //
   // Only a role='customer' session counts as "booking as this account". An admin
-  // or mechanic session is treated as `wrongRole`: middleware would bounce them
+  // or mechanic session is treated as `wrongRole`: proxy would bounce them
   // off /dashboard anyway, so a booking made under their id would be invisible
   // to them. The picker asks them to sign out instead of silently booking as
   // themselves — which is also what you want when testing the funnel from an

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { REVIEW_TAGS } from "@/lib/reviews/tags";
 import { ownsBooking, type BookingCaller } from "@/lib/bookings/ownership";
+import { recomputeMechanicAggregates } from "@/lib/mechanics/aggregates";
 
 // The one implementation of "review this job".
 //
@@ -123,41 +124,4 @@ export async function submitReviewFor(
   revalidatePath("/mechanic/reviews");
   revalidatePath(`/review/${bookingId}`);
   return { ok: true };
-}
-
-/**
- * Recompute the mechanic's headline `rating` and `job_count` from the rows that
- * define them. Deliberately a recount rather than an increment: it is idempotent,
- * so a retry or a hand-fixed row can't drift the figure, and it repairs whatever
- * the previous value was.
- *
- * `job_count` is counted from COMPLETED bookings, not from reviews — it means
- * "jobs done", and most jobs are never reviewed. A booking sitting in `disputed`
- * is not counted while the dispute is open and comes back when it resolves to
- * `completed`, which is the honest reading of both states.
- */
-async function recomputeMechanicAggregates(
-  admin: ReturnType<typeof createAdminClient>,
-  mechanicId: string,
-): Promise<void> {
-  const { data: all } = await admin
-    .from("reviews")
-    .select("rating")
-    .eq("mechanic_id", mechanicId);
-
-  const { count: jobCount } = await admin
-    .from("bookings")
-    .select("id", { count: "exact", head: true })
-    .eq("mechanic_id", mechanicId)
-    .eq("status", "completed");
-
-  const update: { rating?: number; job_count?: number } = {};
-  if (all && all.length > 0) {
-    const avg = all.reduce((sum, r) => sum + r.rating, 0) / all.length;
-    update.rating = Math.round(avg * 100) / 100;
-  }
-  if (typeof jobCount === "number") update.job_count = jobCount;
-  if (Object.keys(update).length === 0) return;
-
-  await admin.from("mechanics").update(update).eq("id", mechanicId);
 }

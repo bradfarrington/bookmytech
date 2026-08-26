@@ -24,6 +24,8 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { describeAuthStatus, recordHaynesProHealth } from "./health";
+
 const REST_BASE =
   "https://www.haynespro-services.com/workshopServices3/rest/jsonendpoint";
 
@@ -131,7 +133,10 @@ async function storeVrid(db: DbClient, vrid: string): Promise<void> {
   }
 }
 
-async function mintVrid(config: HaynesProConfig): Promise<string | null> {
+async function mintVrid(
+  config: HaynesProConfig,
+  db: DbClient,
+): Promise<string | null> {
   try {
     const url = buildUrl("getAuthenticationVrid", {
       distributorUsername: config.distributorUsername,
@@ -139,13 +144,41 @@ async function mintVrid(config: HaynesProConfig): Promise<string | null> {
       username: config.username,
     });
     const res = await fetch(url, { signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      await recordHaynesProHealth(db, {
+        state: "unreachable",
+        statusCode: null,
+        detail: `HaynesPro's auth endpoint responded ${res.status}.`,
+      });
+      return null;
+    }
     const body = (await res.json()) as { vrid?: string; statusCode?: number };
-    if (body.statusCode === 0 && body.vrid) return body.vrid;
-    console.error("[haynespro] auth failed, statusCode:", body.statusCode);
+    if (body.statusCode === 0 && body.vrid) {
+      await recordHaynesProHealth(db, {
+        state: "ok",
+        statusCode: 0,
+        detail: "Authenticated successfully.",
+      });
+      return body.vrid;
+    }
+    // A rejection here is an account problem, not a vehicle problem — the whole
+    // catalogue is down for every customer until someone acts on it. Record it
+    // so /admin/vehicles can say so, instead of it living only in a server log.
+    const statusCode = body.statusCode ?? null;
+    console.error("[haynespro] auth failed, statusCode:", statusCode);
+    await recordHaynesProHealth(db, {
+      state: "auth_failed",
+      statusCode,
+      detail: describeAuthStatus(statusCode),
+    });
     return null;
   } catch (err) {
     console.error("[haynespro] auth request failed:", err);
+    await recordHaynesProHealth(db, {
+      state: "unreachable",
+      statusCode: null,
+      detail: "We couldn't reach HaynesPro at all (network error or timeout).",
+    });
     return null;
   }
 }
@@ -199,7 +232,7 @@ export async function haynesProCall<T>(
 
     let vrid = await readStoredVrid(db);
     if (!vrid) {
-      vrid = await mintVrid(config);
+      vrid = await mintVrid(config, db);
       if (!vrid) return null;
       await storeVrid(db, vrid);
     }
@@ -212,7 +245,7 @@ export async function haynesProCall<T>(
     const latest = await readStoredVrid(db);
     let retryVrid = latest && latest !== vrid ? latest : null;
     if (!retryVrid) {
-      retryVrid = await mintVrid(config);
+      retryVrid = await mintVrid(config, db);
       if (!retryVrid) return null;
       await storeVrid(db, retryVrid);
     }

@@ -63,7 +63,7 @@ export async function signInUnified(
 }
 
 // Admin-only sign-in for the dedicated /admin/login page. Rejects non-admins at
-// submission with a friendlier message; middleware re-checks on every /admin/*.
+// submission with a friendlier message; proxy re-checks on every /admin/*.
 export async function signIn(
   _prevState: SignInState,
   formData: FormData,
@@ -79,7 +79,7 @@ export async function signIn(
 
 // Mechanic-only sign-in for the dedicated /mechanic/login page. Mechanic
 // access = having a mechanics row (an admin can also be a mechanic while
-// keeping role='admin'); middleware re-checks on every /mechanic/* request.
+// keeping role='admin'); proxy re-checks on every /mechanic/* request.
 export async function signInMechanic(
   _prevState: SignInState,
   formData: FormData,

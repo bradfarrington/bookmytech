@@ -1,6 +1,6 @@
 # Task 12 — Disputes, refunds, polish, launch prep
 
-**Status:** 🟡 In progress — **Stage 1 (disputes) ✅ complete (2026-06-05)**, migration `0025`. Stages 2–4 (polish / operational readiness / launch checklist) not started — much of 3–4 is third-party accounts + founder ops rather than code (owner chose to do Stage 1 only for now). ⚠️ Apply migration `0025`; the Stripe refund / payout-reversal paths weren't live-fired (see Stage 1 notes).
+**Status:** 🟡 In progress — **Stage 1 (disputes) ✅ complete (2026-06-05)**, migration `0025`. **Stage 2 (polish) 🟡 partially complete (2026-08-26)**: error boundaries, loading skeletons, the branded 404 and both missing legal pages shipped; **mechanic no-show auto-detection and the empty-state / a11y / Lighthouse sweeps are still outstanding** (no-show deferred by owner decision). Stages 3–4 (operational readiness / launch checklist) not started — much of 3–4 is third-party accounts + founder ops rather than code. ⚠️ Apply migration `0025`; the Stripe refund / payout-reversal paths weren't live-fired (see Stage 1 notes).
 
 The final task before public launch. Build dispute resolution end-to-end, polish the rough edges across the platform, and complete launch-readiness items.
 
@@ -173,25 +173,25 @@ A pass across the whole app fixing the rough edges.
 
 **Areas to cover:**
 
-- [ ] **Every async fetch** has a loading skeleton (use Suspense boundaries)
+- [x] **Every async fetch** has a loading skeleton — `loading.tsx` at the customer dashboard, the admin shell and the mechanic shell, built on a shared `Skeleton` primitive (`components/ui/skeleton.tsx`). These are the three dynamic areas; per-page skeletons below them are still open.
 - [ ] **Every list** has a meaningful empty state ("No bookings yet — book your first" with CTA)
 - [ ] **Every form** has clear error messages, both field-level and form-level
-- [ ] **Every error boundary** — global error boundary at root, per-section error boundaries for admin/mechanic/customer
-- [ ] **404 page** — branded, with search and home link
+- [x] **Every error boundary** — `app/global-error.tsx` (root; it REPLACES the root layout, so it carries its own `<html>`/`<body>` and inline styles rather than relying on Inter or the design tokens) plus five per-section boundaries: `(customer)`, `(customer)/book`, `(customer)/dashboard`, admin shell, mechanic shell. All share `components/ui/error-state.tsx` and surface `error.digest` so a support call can be matched to a server log. **Next 16 renamed the reset prop to `unstable_retry`** — `reset` silently does nothing.
+- [x] **404 page** — `app/not-found.tsx`, branded, returns a real 404, with a primary "Book a repair" CTA and four suggested destinations. **Deliberately does NOT embed the hero's reg lookup**: submitting it spends money (DVLA VES + DVSA MOT bill per call) and 404s are exactly what crawlers and scanners hit.
 - [ ] **Network failure handling** — retry buttons where appropriate, queued actions where offline (already done for mobile PWA in task 06)
 - [ ] **Stripe failures** — clear customer-facing messages, support contact info
 - [ ] **DVLA failures** — fallback to manual vehicle entry, no dead-ends
 - [ ] **Cancel flows** — customer cancellation fees are sourced from `platform_settings` at cancellation time: more than 24 h before slot → £0; within 24 h → £30 (configurable); mechanic already en route → £50 (configurable). The fee is charged from the pre-authorised deposit; the remainder is released. The cancel/reschedule UI is built in task 09.
-- [ ] **Mechanic no-show** — automatic if mechanic hasn't updated status to 'en_route' within 30 min of slot. Re-dispatches to backup mechanic, customer notified, original mechanic flagged.
-- [ ] **Cancellation policy** — public page at `/cancellation-policy`, linked from booking flow, showing the three fee tiers
+- [ ] **Mechanic no-show** — automatic if mechanic hasn't updated status to 'en_route' within 30 min of slot. Re-dispatches to backup mechanic, customer notified, original mechanic flagged. **Explicitly deferred by owner 2026-08-26** — still to build.
+- [x] **Cancellation policy** — `/cancellation-policy`, linked from the footer and from the checkout step of the booking funnel. The three tiers are read **live** from `platform_settings` via the now-exported `cancelFeeTiers()`, the same function `cancelBooking` charges from, so the published policy cannot drift from what a customer is actually charged. The page is `force-dynamic` for that reason.
 
 **Acceptance criteria:**
 
-- [ ] All async boundaries have suspense / skeleton
+- [x] All async boundaries have suspense / skeleton — at AREA level (dashboard, admin shell, mechanic shell). Per-page skeletons beneath those are deferred.
 - [ ] No screen renders empty without a meaningful empty state
 - [ ] Cancellation flow built per the rules above
 - [ ] Mechanic no-show auto-detection edge function
-- [ ] Public legal / policy pages: Terms of Service, Privacy Policy, Cancellation Policy, Mechanic Agreement
+- [x] Public legal / policy pages: Terms of Service, Privacy Policy, Cancellation Policy, Mechanic Agreement — the last two shipped 2026-08-26 (`/cancellation-policy`, `/mechanic-agreement`), both on the shared `LegalPage` chrome.
 - [ ] Accessibility audit: keyboard-navigable, proper ARIA labels, colour contrast ≥ AA, all forms have associated labels
 - [ ] Lighthouse: Performance ≥ 85, Accessibility ≥ 95, Best Practices ≥ 95, SEO ≥ 95 on key pages
 

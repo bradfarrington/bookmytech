@@ -16,7 +16,7 @@ import {
 // bookings table: an unbounded `.select()` would be silently capped at the
 // project's max-rows setting and quietly produce wrong totals.
 //
-// Service-role read: the page is behind the middleware admin gate, and the view
+// Service-role read: the page is behind the proxy admin gate, and the view
 // exposes auth.users columns that no RLS grant reaches.
 export const dynamic = "force-dynamic";
 
