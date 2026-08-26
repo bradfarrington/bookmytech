@@ -810,7 +810,9 @@ customer through leaving the same review twice.
   `0046` records it. Worth checking whether anything else has drifted the same
   way — the whole `supabase/migrations/` directory is only trustworthy as a
   description of a fresh environment, not of the live one, until someone diffs
-  the two.
+  the two. **Diffed 2026-08-26 (Task 19):** three tables/views and six functions
+  had drifted the same way; `0048` records them all. See
+  [19-mobile-phase-5.md](19-mobile-phase-5.md) → P2.
 - **`escalateDispute` is not reachable from the app.** Deliberate for Stage 5 —
   it's a party action, not a staff one, so unlike `resolveDispute` there's no
   reason of principle to withhold it. The 48-hour cron escalates automatically,
@@ -867,7 +869,10 @@ customer through leaving the same review twice.
   likely to have moved and which customers act on, so the TTL is a product
   decision; and it should sit inside `lookupVehicleAction` so the website benefits
   too, which puts it on the funnel's critical path and wants its own testing.
-  Until then the rate limits are the cost ceiling.
+  Until then the rate limits are the cost ceiling. **Update 2026-08-26:** a
+  `dvla_vehicle_cache` table (plus `purge_stale_dvla_cache`) turned out to
+  already exist on the live database — recorded in `0048` — but nothing in
+  `lib/dvla/` reads or writes it. The wiring is still the job described here.
 - **`LookupResult` carries more fields than `VehicleDetails` declares.** The DVLA
   client spreads the raw VES response, so live results also include
   `markedForExport`, `typeApproval`, `wheelplan`, `dateOfLastV5CIssued` and

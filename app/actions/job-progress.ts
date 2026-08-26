@@ -13,6 +13,8 @@ import { REFERRAL_BONUS_PENCE } from "@/lib/credits/constants";
 import { mechanicBalancePence, recordEarning, recordPayout } from "@/lib/mechanics/balance";
 import { recomputeMechanicAggregates } from "@/lib/mechanics/aggregates";
 import { nettedPayout } from "@/lib/earnings";
+import { sendPushToCustomer } from "@/lib/push/send";
+import { shortPersonName } from "@/lib/utils";
 
 export type JobProgressResult = { ok: true } | { ok: false; error: string };
 
@@ -46,7 +48,7 @@ async function transition(
   const admin = createAdminClient();
   const { data: booking } = await admin
     .from("bookings")
-    .select("id, status, mechanic_id, customer_email, customer_name, customer_phone")
+    .select("id, status, mechanic_id, customer_id, customer_email, customer_name, customer_phone")
     .eq("id", bookingId)
     .single();
 
@@ -107,6 +109,19 @@ export async function startJourney(bookingId: string): Promise<JobProgressResult
     const body = await renderSmsTemplate("mechanic_en_route");
     sendSms({ to: booking.customer_phone, body }).catch(() => {});
   }
+
+  // …and the same moment on their phone, if they have the app. Tapping it opens
+  // the booking, where the live map is.
+  const { data: profile } = await res.admin
+    .from("profiles")
+    .select("full_name")
+    .eq("id", res.mechanicId)
+    .maybeSingle();
+  sendPushToCustomer(booking.customer_id, {
+    title: "Your mechanic is on the way",
+    body: `${shortPersonName(profile?.full_name)} is on the way.`,
+    bookingId,
+  }).catch(() => {});
 
   revalidate(bookingId);
   return { ok: true };

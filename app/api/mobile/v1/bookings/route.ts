@@ -2,6 +2,7 @@ import { createBooking, type CreateBookingInput } from "@/lib/bookings/create-bo
 import { enforceBookingLimits, staffRefusal } from "@/lib/mobile/booking-guards";
 import { apiError, apiOk, readJsonBody } from "@/lib/mobile/respond";
 import { requireMobileUser } from "@/lib/supabase/mobile";
+import { isUuid } from "@/lib/mobile/customer-actions";
 
 // POST /api/mobile/v1/bookings — create the booking. AUTHENTICATED.
 //
@@ -55,6 +56,8 @@ interface BookingBody {
   stripePaymentIntentId?: unknown;
   paymentMode?: unknown;
   creditAppliedPence?: unknown;
+  /** Rebook "same mechanic if available" — optional, a mechanic id. */
+  preferredMechanicId?: unknown;
 }
 
 const asString = (value: unknown): string => (typeof value === "string" ? value.trim() : "");
@@ -91,6 +94,7 @@ export async function POST(request: Request): Promise<Response> {
   const specialInstructions = asString(body.specialInstructions);
   const paymentMode = asString(body.paymentMode);
   const stripePaymentIntentId = asString(body.stripePaymentIntentId);
+  const preferredMechanicId = asString(body.preferredMechanicId);
 
   if (!vehicleReg) return apiError("We need your registration number to book this repair.", 400);
   if (!vehicleMake) return apiError("We need your vehicle's make to book this repair.", 400);
@@ -147,6 +151,14 @@ export async function POST(request: Request): Promise<Response> {
       paymentMode === "preauth" ? stripePaymentIntentId : undefined,
     paymentMode,
     creditAppliedPence,
+    // "Book again with the same mechanic". Lands as bookings.preferred_mechanic_id,
+    // which makes dispatch offer the job to that mechanic FIRST (exclusively,
+    // while they're online and eligible) — same as the website's `?pref=`.
+    // A malformed id is IGNORED rather than refused: by the time this is called
+    // the pre-auth hold is already confirmed on the device, and failing a paid
+    // booking over an optional hint would strand that hold. Dispatch itself
+    // falls through to a normal broadcast if the mechanic doesn't exist.
+    preferredMechanicId: isUuid(preferredMechanicId) ? preferredMechanicId : undefined,
   };
 
   const result = await createBooking(input, caller.userId);

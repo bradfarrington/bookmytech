@@ -7,15 +7,15 @@ import { interpolateTemplate } from "@/lib/sms/templates";
 import { siteUrl } from "@/lib/utils";
 import { renderReminderEmail } from "@/emails/reminder";
 import { REMINDER_META, type ReminderType } from "@/lib/reminders/types";
+import { sendPushToCustomer } from "@/lib/push/send";
 
 // Hourly reminder sender (Task 11 Stage 1).
 //
 // Sends every reminder whose scheduled_for has arrived and that hasn't been sent
 // yet, on the channels the customer has chosen (email by default; SMS when
-// reminder_via_sms is on — the SMS sender is a stub until Task 13, so it no-ops
-// today but the wiring is live). Opted-out customers have their due reminders
-// stamped sent (so we stop scanning them) without a send. Push is deferred to
-// the native app, so there's no push channel.
+// reminder_via_sms is on; push to the customer app's registered devices when
+// reminder_via_push is on — Task 19). Opted-out customers have their due
+// reminders stamped sent (so we stop scanning them) without a send.
 //
 // Each reminder carries a unique token; the email/SMS CTA points at /r/<token>,
 // which stamps acted_on_at (click-through tracking) and deep-links into booking.
@@ -32,6 +32,8 @@ interface ReminderRow {
   vehicle_reg: string;
   reminder_type: ReminderType;
   token: string;
+  /** The completed job the reminder was derived from — where "Book again" lives in the app. */
+  source_booking_id: string | null;
 }
 
 interface Prefs {
@@ -39,6 +41,7 @@ interface Prefs {
   enabled: boolean;
   viaEmail: boolean;
   viaSms: boolean;
+  viaPush: boolean;
   phone: string | null;
 }
 
@@ -48,7 +51,7 @@ async function runSender() {
 
   const { data: due } = await admin
     .from("reminder_schedules")
-    .select("id, customer_id, customer_email, vehicle_reg, reminder_type, token")
+    .select("id, customer_id, customer_email, vehicle_reg, reminder_type, token, source_booking_id")
     .is("sent_at", null)
     .lte("scheduled_for", nowIso)
     .order("scheduled_for", { ascending: true })
@@ -62,7 +65,7 @@ async function runSender() {
   if (customerIds.length) {
     const { data: profiles } = await admin
       .from("profiles")
-      .select("id, full_name, phone, reminders_enabled, reminder_via_email, reminder_via_sms")
+      .select("id, full_name, phone, reminders_enabled, reminder_via_email, reminder_via_sms, reminder_via_push")
       .in("id", customerIds);
     for (const p of profiles ?? []) {
       prefsById.set(p.id, {
@@ -70,6 +73,7 @@ async function runSender() {
         enabled: p.reminders_enabled ?? true,
         viaEmail: p.reminder_via_email ?? true,
         viaSms: p.reminder_via_sms ?? false,
+        viaPush: p.reminder_via_push ?? true,
         phone: p.phone ?? null,
       });
     }
@@ -89,6 +93,7 @@ async function runSender() {
       enabled: true,
       viaEmail: true,
       viaSms: false,
+      viaPush: false, // guests have no account, so no device can be registered
       phone: null,
     };
 
@@ -128,6 +133,20 @@ async function runSender() {
       });
       const ok = await sendSms({ to: prefs.phone, body }).catch(() => false);
       delivered = delivered || ok;
+    }
+
+    // Push to the app, alongside the other channels. Deep-links to the job the
+    // reminder came from (that's where "Book again" is); the tracked CTA link
+    // rides along in `data.url` for a future build that can open it.
+    if (prefs.viaPush && r.customer_id) {
+      const meta = REMINDER_META[r.reminder_type];
+      const pushed = await sendPushToCustomer(r.customer_id, {
+        title: `${meta.label} · ${r.vehicle_reg}`,
+        body: meta.blurb,
+        bookingId: r.source_booking_id ?? undefined,
+        data: { url: ctaUrl, reminderType: r.reminder_type },
+      });
+      delivered = delivered || pushed > 0;
     }
 
     // Stamp sent regardless of channel outcome so a hard-bouncing address can't

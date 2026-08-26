@@ -31,6 +31,10 @@
     {
       "path": "/api/cron/message-sms-sweep",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/push-receipts",
+      "schedule": "*/15 * * * *"
     }
   ]
 }

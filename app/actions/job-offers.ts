@@ -5,6 +5,8 @@ import { requireMechanic } from "@/lib/mechanics/require-mechanic";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendEmail } from "@/lib/email/send";
 import { renderTemplateEmail } from "@/emails/resolve";
+import { sendPushToCustomer } from "@/lib/push/send";
+import { shortPersonName } from "@/lib/utils";
 
 export type OfferActionResult =
   | { ok: true; bookingId?: string }
@@ -104,16 +106,16 @@ export async function acceptOffer(offerId: string): Promise<OfferActionResult> {
   // replacement has accepted and nothing else changes.
   const { data: booking } = await admin
     .from("bookings")
-    .select("customer_email, customer_name, scheduled_at, repair_description")
+    .select("customer_id, customer_email, customer_name, scheduled_at, repair_description")
     .eq("id", offer.booking_id)
     .single();
+  const { data: profile } = await admin
+    .from("profiles")
+    .select("full_name")
+    .eq("id", guard.mechanicId)
+    .single();
+  const mechanicName = profile?.full_name ?? "Your mechanic";
   if (booking?.customer_email) {
-    const { data: profile } = await admin
-      .from("profiles")
-      .select("full_name")
-      .eq("id", guard.mechanicId)
-      .single();
-    const mechanicName = profile?.full_name ?? "Your mechanic";
     const serviceName = booking.repair_description ?? "Vehicle repair";
     const slotLabel = booking.scheduled_at
       ? new Date(booking.scheduled_at).toLocaleString("en-GB", {
@@ -131,6 +133,14 @@ export async function acceptOffer(offerId: string): Promise<OfferActionResult> {
       .then(({ subject, html }) => sendEmail({ to, subject, html }))
       .catch(console.error);
   }
+
+  // Push to the customer's phone alongside the email (push runs alongside
+  // SMS/email, never instead). Best-effort; `bookingId` is what the app opens.
+  sendPushToCustomer(booking?.customer_id, {
+    title: isReplacement ? "Your replacement mechanic is confirmed" : "Your mechanic is confirmed",
+    body: `${shortPersonName(profile?.full_name)} has taken your job.`,
+    bookingId: offer.booking_id,
+  }).catch(() => {});
 
   revalidatePath("/mechanic/jobs");
   // The customer's tracker + dashboard reflect the new assignment.

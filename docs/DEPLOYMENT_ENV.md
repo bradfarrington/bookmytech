@@ -76,9 +76,9 @@ browser — prefixed `NEXT_PUBLIC_`) · **Required** = app breaks without it.
 | `XERO_CONTACT_NAME` | ⬜ | plain | Invoice contact name. |
 | `XERO_SALES_ACCOUNT_CODE` | ⬜ | plain | Xero sales account code. |
 
-## Mobile API (`app/api/mobile/v1/**`) — no new variables
+## Mobile API (`app/api/mobile/v1/**`) — one optional variable
 
-The mobile app's endpoints introduce **no environment variables of their own**.
+The mobile app's endpoints introduce **one** environment variable of their own, `EXPO_ACCESS_TOKEN` (below).
 They reuse `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` (the
 Bearer-authenticated client in `lib/supabase/mobile.ts`),
 `SUPABASE_SERVICE_ROLE_KEY` (account creation and the rate-limit counters) and
@@ -97,6 +97,14 @@ Until it is, every mobile endpoint returns 429 — the limiter fails closed on
 purpose, so a missing guard can never become an open one on endpoints that spend
 money and create accounts.
 
+## Push notifications (Expo) — Task 19
+
+| Variable | Required | Kind | Where to get it / notes |
+|---|---|---|---|
+| `EXPO_ACCESS_TOKEN` | ⬜ (recommended) | 🔑 | expo.dev → account → Access tokens. Expo's push service accepts **unauthenticated** sends, so pushes work without it — but with it set, Expo attributes and rate-limits sends per **project** rather than per IP, which matters on Vercel where the egress IP is shared. Used by `lib/push/send.ts`. |
+
+⚠️ Migrations `0048`–`0050` **must be applied** for phase 5 of the app: `0050` creates the token tables (until then `POST /devices` returns 500 and every push is a logged no-op), `0049` turns on the Realtime events the app's dashboard and map subscribe to, and `0048` writes down the live-tracking schema that already exists on dev. Run `node scripts/verify-mechanic-visibility.mjs` afterwards.
+
 ## Provided automatically — do NOT set
 
 | Var | Notes |
@@ -113,7 +121,7 @@ money and create accounts.
    var above for the **Production** environment (and Preview if you want working
    previews). Values come from `.env.local` / the provider dashboards.
 2. Set `NEXT_PUBLIC_SITE_URL` to the real domain (not localhost).
-3. Set a strong `CRON_SECRET` — otherwise the 8 cron endpoints are open.
+3. Set a strong `CRON_SECRET` — otherwise the 9 cron endpoints are open.
 4. Swap Stripe test keys → live keys, and create the prod Stripe webhook to get
    `STRIPE_WEBHOOK_SECRET`.
 5. Confirm `APP_ENCRYPTION_KEY` matches whatever encrypted the existing DB rows.

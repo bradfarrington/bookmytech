@@ -139,6 +139,39 @@ Key columns: contact (`email` UNIQUE, `full_name`, `phone`, `postcode`, `years_e
 
 Active-mechanic document store for renewals (Task 07 Stage 3, `0015_mechanic_documents.sql`). One row per uploaded artifact: `mechanic_id` FK (→ `mechanics`, cascade), `doc_type` (`public_liability_insurance` | `trade_insurance` | `qualification` | `id` | `vat`), `file_url` (object key in the private `mechanic-docs` bucket, under `documents/{mechanic_id}/`), `expires_at date`, `status` (`pending_review` | `verified` | `rejected` | `expired`), `uploaded_at`, `reviewed_at`, `reviewed_by`, `created_at`, `updated_at`. On approval, the mechanic's application docs are seeded here as `verified`. Mechanic replacement uploads enter `pending_review`; admin approves/rejects. The daily `/api/cron/document-expiry` sweep emails the mechanic at 30/7/0 days, marks expired docs `expired`, and sets the mechanic **offline** when a dispatch-gating doc (insurance) expires.
 
+### `mechanic_locations` — recorded in `0048` (live since 2026-07-30, migration written 2026-08-26)
+
+One row per mechanic holding the **latest** fix, not a trail. Written by the mechanic's own app (separate repo); read by the customer app's map card over Realtime (`0049`).
+
+| column | type | notes |
+|---|---|---|
+| `mechanic_id` | uuid PK → `mechanics.id` | |
+| `lat`, `lng` | double precision, not null | |
+| `accuracy_m`, `heading_deg`, `speed_mps` | real | nullable |
+| `sharing_enabled` | boolean, default true | mechanic's switch |
+| `updated_at` | timestamptz | **trigger-stamped on every write** — the five-minute read window is measured from it, so a client must not be able to set it |
+| `created_at` | timestamptz | |
+
+Purged after six hours by `purge_stale_mechanic_locations()` (pg_cron, hourly).
+
+### `mechanic_cards` (view) — recorded in `0048`
+
+What a customer may know about a mechanic: `id · full_name · avatar_url · rating · job_count · is_pro · bio · phone`. Filtered to mechanics on the caller's own bookings; `phone` is non-null only while that booking is `en_route`/`in_progress`. See RLS pattern #3.
+
+### `dvla_vehicle_cache` — recorded in `0048`
+
+Shared cache in front of DVLA VES + DVSA MOT, keyed on the normalised `reg` (`ves_details` jsonb, `ves_fetched_at`, `mot_model`, `mot_fetched_at`, timestamps). Service-role only. **Live and unused** as of 2026-08-26 — see Task 18 follow-ups.
+
+### `customer_push_tokens` — `0050`
+
+Expo push tokens for the customer app. `token` text PK, `customer_id` → `profiles`, `platform` (`ios`|`android`), `created_at`, `last_seen_at`. Keyed on the token so a phone that changes hands moves to its new owner on re-registration. Service-role only: written by `POST /api/mobile/v1/devices`, read by `lib/push/send.ts`.
+
+### `push_receipts` — `0050`
+
+Expo ticket ids awaiting a delivery receipt (`ticket_id` PK, `token`, `created_at`). `/api/cron/push-receipts` collects them and deletes tokens Expo reports as `DeviceNotRegistered`. Service-role only.
+
+`profiles` also gained `reminder_via_push boolean not null default true` (`0050`), alongside the email/SMS flags from `0023`.
+
 ## RLS policies in effect
 
 A `public.is_admin()` `SECURITY DEFINER` function is the single source of truth for "is the current user an admin?" used by every admin policy. Definition lives in `supabase/migrations/0002_service_categories.sql` for fresh-environment safety.
@@ -182,6 +215,14 @@ A `public.is_admin()` `SECURITY DEFINER` function is the single source of truth 
 - `SELECT`: `Admins view all documents` — `using (public.is_admin())`
 - `UPDATE`: `Admins update documents` — `using (public.is_admin()) with check (public.is_admin())` (approve/reject + expiry sweep)
 - `DELETE`: `Admins delete documents` — `using (public.is_admin())`
+
+**`mechanic_locations`** — defined in `0048_record_live_drift.sql`.
+- `SELECT`: `Customers track their en-route mechanic` — `using (sharing_enabled and updated_at > now() - interval '5 minutes' and public.can_track_mechanic(mechanic_id))` — all three, always. `can_track_mechanic` is `SECURITY DEFINER` and true only for a booking of the caller's with this mechanic in status `en_route` (not `in_progress` — purpose limitation: once the mechanic is on site the position is no longer the customer's business). ⚠️ An UPDATE that takes the row *out* of this policy (sharing off, status moved on) emits **no** Realtime event; the app hides the marker after 60 s of silence for that reason.
+- `SELECT`/`INSERT`/`UPDATE`/`DELETE`: `Mechanics … own location` — `auth.uid() = mechanic_id`
+- `SELECT`: `Admins read all locations` — `using (public.is_admin())`
+- Proved live by `scripts/verify-mechanic-visibility.mjs` — run it after touching any of this.
+
+**`customer_push_tokens`, `push_receipts`, `dvla_vehicle_cache`** — RLS enabled, **no policies**. Service-role only by design; a push token is an address that must not be readable by anyone but us.
 
 ## RLS patterns to follow
 
@@ -250,6 +291,23 @@ create policy "Admins can delete my_table" on my_table
 ```
 
 If a table doesn't have `is_active` (e.g. `bookings` will gate by `customer_id = auth.uid()` etc.), this trap doesn't apply — but think through the "new row state must remain visible" rule when designing any policy.
+
+### Pattern #3 — A column allow-list via a view, when a policy would leak the row
+
+RLS is **row-level**: a SELECT policy on `profiles` or `mechanics` that lets a customer see "their" mechanic grants every column on that row — `referral_code` (sign up against it and mint credit), `base_postcode`, `is_suspended`, the four `stripe_*` columns. Column-level RLS doesn't exist, and column `GRANT`s are per-role not per-row, so revoking `phone` from `authenticated` would stop every user reading their own number.
+
+The answer is a **view** with an explicit column list, filtered by a `SECURITY DEFINER` predicate about the *caller*, running with its owner's privileges (the default — deliberately **not** `security_invoker`) so it can read the underlying tables past their policies:
+
+```sql
+create or replace view public.mechanic_cards as
+select m.id, p.full_name, p.avatar_url, m.rating, m.job_count, m.is_pro, m.bio,
+       case when public.has_live_booking_with_mechanic(m.id) then p.phone end as phone
+from public.mechanics m
+join public.profiles p on p.id = m.id
+where public.has_booking_with_mechanic(m.id);
+```
+
+The underlying tables keep their self/admin-only policies. Add columns to the view only when a customer genuinely needs them — everything on it is readable by anyone who has ever booked that mechanic.
 
 ## Conventions
 

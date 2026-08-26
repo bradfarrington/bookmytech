@@ -5,7 +5,8 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { refundPayment } from "@/lib/stripe/refund";
 import { recordRefundClawback } from "@/lib/mechanics/balance";
-import { formatPrice, formatJobNumber } from "@/lib/utils";
+import { formatPrice, formatJobNumber, shortPersonName } from "@/lib/utils";
+import { sendPushToCustomer } from "@/lib/push/send";
 
 export type BookingActionResult = { ok: true } | { ok: false; error: string };
 
@@ -227,7 +228,7 @@ export async function reassignMechanic(
 
   const { data: booking } = await supabase
     .from("bookings")
-    .select("status, mechanic_id")
+    .select("status, mechanic_id, customer_id")
     .eq("id", id)
     .single();
   if (!booking) return { ok: false, error: "Booking not found." };
@@ -257,6 +258,19 @@ export async function reassignMechanic(
       status_to: statusTo,
     },
   });
+
+  // Same push the customer gets when a mechanic accepts an offer — an admin
+  // assignment is the same news to them. Best-effort.
+  const { data: profile } = await createAdminClient()
+    .from("profiles")
+    .select("full_name")
+    .eq("id", mechanicId)
+    .maybeSingle();
+  sendPushToCustomer(booking.customer_id, {
+    title: booking.mechanic_id ? "Your replacement mechanic is confirmed" : "Your mechanic is confirmed",
+    body: `${shortPersonName(profile?.full_name)} has taken your job.`,
+    bookingId: id,
+  }).catch(() => {});
 
   revalidate(id);
   return { ok: true };

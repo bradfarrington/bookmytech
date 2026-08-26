@@ -83,3 +83,18 @@ export function siteUrl(): string {
   if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
   return "http://localhost:3000";
 }
+
+/**
+ * "James Miller" → "James M". How a mechanic is named in a push notification:
+ * enough to recognise them from the booking, not their full name on a lock
+ * screen. A single name is left alone; nothing at all becomes the fallback.
+ */
+export function shortPersonName(
+  fullName: string | null | undefined,
+  fallback = "Your mechanic",
+): string {
+  const parts = (fullName ?? "").trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return fallback;
+  if (parts.length === 1) return parts[0];
+  return `${parts[0]} ${parts[parts.length - 1][0].toUpperCase()}`;
+}

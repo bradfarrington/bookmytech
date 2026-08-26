@@ -117,6 +117,13 @@ create table messages (
 );
 ```
 
+> **2026-08-26:** the `mechanic_locations` table that actually exists on the live
+> database differs from the sketch above (`lat`/`lng` double precision,
+> `accuracy_m`/`heading_deg`/`speed_mps` real, `sharing_enabled`, `created_at`),
+> is read by the **customer app** under an en-route-only policy, and is written
+> by the (future) mechanic app. It is recorded in migration `0048` — see
+> [19-mobile-phase-5.md](19-mobile-phase-5.md).
+
 **Acceptance criteria:**
 
 - [ ] ~~Mechanic location updates start when status='en_route'~~ — **DEFERRED to the native app** (GPS out of the web build, owner decision)
