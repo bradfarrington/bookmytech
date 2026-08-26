@@ -39,6 +39,12 @@ const admin = createClient(
 const ref = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).hostname.split(".")[0];
 const hours = (n) => new Date(Date.now() + n * 3600_000).toISOString();
 const days = (n) => hours(n * 24);
+/** n days from now, snapped to a clean hour — seeded times are read by a human. */
+const dayAt = (n, hour) => {
+  const d = new Date(Date.now() + n * 86_400_000);
+  d.setHours(hour, 0, 0, 0);
+  return d.toISOString();
+};
 
 async function findUser(email) {
   for (let page = 1; page <= 10; page++) {
@@ -106,9 +112,9 @@ function plan(customerId, mechanicId) {
       repair_description: "Cambelt inspection", repair_node_id: "seed-cambelt",
       vehicle_reg: "YT19 PLM", vehicle_make: "Ford", vehicle_model: "Focus",
       status: "confirmed", mechanic_id: mechanicId,
-      scheduled_at: days(5), slot_window: "08:00–10:00",
-      reschedule_status: "proposed", reschedule_proposed_at: days(6),
-      reschedule_note: "Running a parts delay — could we move to Thursday morning?" } },
+      scheduled_at: dayAt(5, 8), slot_window: "08:00–10:00",
+      reschedule_status: "proposed", reschedule_proposed_at: dayAt(6, 14),
+      reschedule_note: "Waiting on a part — could we push it back a day, early afternoon?" } },
 
     { label: "UPCOMING · still sourcing a mechanic", row: { ...base, ...priced(13500, 1.5),
       repair_description: "Rear brake pads", repair_node_id: "seed-rear-pads",
@@ -213,7 +219,7 @@ const { data: inserted, error } = await admin
 if (error) { console.error("Insert failed:", error.message); process.exit(1); }
 
 console.log(`\nCreated ${inserted.length} bookings:`);
-inserted.forEach((b, i) => console.log(`  ${String(b.job_number ?? "—").padStart(5)}  ${b.status.padEnd(18)} ${b.repair_description}`));
+inserted.forEach((b) => console.log(`  ${String(b.job_number ?? "—").padStart(5)}  ${b.status.padEnd(18)} ${b.repair_description}`));
 
 // A review on the older completed job, and an open dispute on the disputed one.
 const reviewed = inserted.find((b) => b.repair_description === "Clutch replacement");

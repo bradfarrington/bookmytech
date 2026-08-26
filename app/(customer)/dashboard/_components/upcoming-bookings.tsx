@@ -10,6 +10,7 @@ import {
   rescheduleBooking,
   type CancellationQuote,
 } from "@/app/actions/customer-bookings";
+import { RescheduleProposal } from "@/components/customer/reschedule-proposal";
 import { formatPrice } from "@/lib/utils";
 import {
   STATUS_LABELS,
@@ -117,6 +118,10 @@ function UpcomingRow({
   }
 
   const open = panel?.id === booking.id ? panel.mode : null;
+  // Narrowed to a string (not a boolean flag) so the JSX below needs no
+  // non-null assertion — the guard and the value are the same expression.
+  const proposedAt =
+    booking.rescheduleStatus === "proposed" ? booking.rescheduleProposedAt : null;
 
   return (
     <div className="rounded-2xl border border-border bg-surface-card p-4">
@@ -131,11 +136,32 @@ function UpcomingRow({
           </p>
         </div>
         <span
-          className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${STATUS_TONES[booking.status] ?? "bg-surface text-text-secondary"}`}
+          className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${
+            proposedAt
+              ? "bg-amber-100 text-amber-800"
+              : STATUS_TONES[booking.status] ?? "bg-surface text-text-secondary"
+          }`}
         >
-          {STATUS_LABELS[booking.status] ?? booking.status}
+          {proposedAt
+            ? "Change requested"
+            : STATUS_LABELS[booking.status] ?? booking.status}
         </span>
       </div>
+
+      {/* A time the MECHANIC proposed. Needs answering before the buttons below
+          are much use, so it sits above them. Without this the request was
+          invisible whenever another job held the single active-booking card. */}
+      {proposedAt && !open && (
+        <div className="mt-3">
+          <RescheduleProposal
+            compact
+            bookingId={booking.id}
+            proposedAt={proposedAt}
+            currentAt={booking.scheduledAt}
+            note={booking.rescheduleNote}
+          />
+        </div>
+      )}
 
       {!open && (
         <div className="mt-3 flex gap-2">
