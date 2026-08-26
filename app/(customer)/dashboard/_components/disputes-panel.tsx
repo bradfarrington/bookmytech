@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Scale, ArrowRight } from "lucide-react";
 import { DISPUTE_STATUS_LABELS, REASON_LABELS, type DisputeStatus } from "@/lib/disputes/constants";
 import { formatJobNumber } from "@/lib/utils";
+import { SectionHeading } from "./section-heading";
 
 export interface DisputeSummary {
   id: string;
@@ -24,9 +25,9 @@ export function DisputesPanel({ disputes }: { disputes: DisputeSummary[] }) {
 
   return (
     <section>
-      <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-text-muted">
+      <SectionHeading>
         {disputes.length === 1 ? "Your open dispute" : "Your open disputes"}
-      </h2>
+      </SectionHeading>
 
       <div className="flex flex-col gap-3">
         {disputes.map((d) => (

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Car } from "lucide-react";
+import { SectionHeading } from "./section-heading";
 
 interface SavedVehicle {
   reg: string;
@@ -16,9 +17,7 @@ export function SavedVehicles({ vehicles }: { vehicles: SavedVehicle[] }) {
 
   return (
     <section>
-      <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-text-muted">
-        Your vehicles
-      </h2>
+      <SectionHeading>Your vehicles</SectionHeading>
       {/* One column, always. This renders in the dashboard's 320px sidebar on
           desktop, where a viewport-width `sm:grid-cols-2` produced two ~140px
           cards and truncated every make to "F…". */}

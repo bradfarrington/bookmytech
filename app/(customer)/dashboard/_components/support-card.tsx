@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { LifeBuoy, Scale, MessageSquare } from "lucide-react";
+import { SectionHeading } from "./section-heading";
 
 // Permanent route to help and to the dispute history.
 //
@@ -9,9 +10,7 @@ import { LifeBuoy, Scale, MessageSquare } from "lucide-react";
 export function SupportCard({ hasDisputes }: { hasDisputes: boolean }) {
   return (
     <section>
-      <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-text-muted">
-        Help
-      </h2>
+      <SectionHeading>Help</SectionHeading>
       <div className="overflow-hidden rounded-2xl border border-border bg-surface-card">
         <Link
           href="/help"

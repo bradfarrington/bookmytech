@@ -11,6 +11,7 @@ import {
   type CancellationQuote,
 } from "@/app/actions/customer-bookings";
 import { RescheduleProposal } from "@/components/customer/reschedule-proposal";
+import { SectionHeading } from "./section-heading";
 import { formatPrice } from "@/lib/utils";
 import {
   STATUS_LABELS,
@@ -38,9 +39,7 @@ function toLocalInput(iso: string | null): string {
 export function UpcomingBookings({ bookings, mechanics }: UpcomingBookingsProps) {
   return (
     <section>
-      <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-text-muted">
-        Upcoming bookings
-      </h2>
+      <SectionHeading count={bookings.length}>Upcoming bookings</SectionHeading>
       <div className="flex flex-col gap-3">
         {bookings.map((b) => (
           <UpcomingRow

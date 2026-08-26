@@ -19,6 +19,7 @@ export function RebookControl({
   model,
   mechanicId,
   mechanicName,
+  children,
 }: {
   reg: string;
   postcode: string | null;
@@ -27,6 +28,15 @@ export function RebookControl({
   model: string | null;
   mechanicId: string | null;
   mechanicName: string | null;
+  /**
+   * The card's other actions (raise / view dispute). They render on the SAME
+   * row as "Book again", with the preference tickbox on its own line beneath
+   * both. Previously the caller laid them out as siblings of this whole stack
+   * with `items-end`, which aligned the dispute button to the bottom of the
+   * stack — so it sat next to the tickbox rather than next to the button, and
+   * read as though the tickbox belonged to it.
+   */
+  children?: React.ReactNode;
 }) {
   const [sameMechanic, setSameMechanic] = useState(true);
 
@@ -45,16 +55,19 @@ export function RebookControl({
   const canPreferMechanic = Boolean(mechanicId && repairNodeId);
 
   return (
-    <div className="flex flex-col gap-1.5">
-      <Link
-        href={href}
-        className="inline-flex h-9 w-fit items-center gap-1.5 rounded-button border border-brand-blue px-3 text-sm font-medium text-brand-blue transition-colors hover:bg-blue-50"
-      >
-        <RotateCcw size={15} />
-        Book again
-      </Link>
+    <div className="flex w-full flex-col gap-2.5">
+      <div className="flex flex-wrap items-center gap-2">
+        <Link
+          href={href}
+          className="inline-flex h-9 items-center gap-1.5 rounded-button border border-brand-blue px-3.5 text-sm font-semibold text-brand-blue transition-colors hover:bg-blue-50"
+        >
+          <RotateCcw size={15} />
+          Book again
+        </Link>
+        {children}
+      </div>
       {canPreferMechanic && (
-        <label className="flex cursor-pointer items-center gap-2 text-xs text-text-secondary">
+        <label className="flex w-fit cursor-pointer items-center gap-2 text-xs text-text-secondary">
           <input
             type="checkbox"
             checked={sameMechanic}
