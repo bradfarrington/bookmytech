@@ -5,6 +5,8 @@ import { formatBookingSlot } from "@/lib/slots";
 
 export interface DashboardBooking {
   id: string;
+  /** Sequential customer-facing job ref (formatJobNumber). Null until 0035 backfills. */
+  jobNumber: number | null;
   status: string;
   scheduledAt: string | null;
   slotWindow: string | null;

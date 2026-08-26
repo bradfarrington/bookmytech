@@ -34,12 +34,14 @@ export default async function CustomerDisputePage({
   return (
     <div className="min-h-dvh bg-surface">
       <DashboardHeader name={profile?.full_name ?? user.email ?? ""} avatarUrl={profile?.avatar_url ?? null} />
-      <main className="mx-auto flex max-w-xl flex-col gap-6 px-4 py-8">
+      <main className="mx-auto w-full max-w-content px-4 py-8 sm:px-6">
+        <div className="flex max-w-xl flex-col gap-6">
         <Link href="/dashboard" className="inline-flex items-center gap-1.5 text-sm font-medium text-text-secondary hover:text-text-primary">
           <ArrowLeft size={15} />
           Back to dashboard
         </Link>
         <DisputeDetail data={loaded.data} viewerRole="customer" isOpener={loaded.isOpener} />
+        </div>
       </main>
     </div>
   );

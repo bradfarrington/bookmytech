@@ -14,7 +14,9 @@ export function DashboardHeader({
 }) {
   return (
     <header className="border-b border-border bg-surface-card">
-      <div className="mx-auto flex max-w-3xl items-center justify-between gap-4 px-4 py-3">
+      {/* Matches the dashboard's own container so the logo and the content
+          below it share one left edge at every width. */}
+      <div className="mx-auto flex max-w-content items-center justify-between gap-4 px-4 py-3 sm:px-6">
         <Link href="/" aria-label="Book My Tech — home">
           <Image src="/logo-no-bg.png" alt="Book My Tech" width={120} height={32} className="h-8 w-auto" />
         </Link>

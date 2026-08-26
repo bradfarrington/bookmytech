@@ -11,6 +11,8 @@ import { UpcomingBookings } from "./_components/upcoming-bookings";
 import { PastJobs } from "./_components/past-jobs";
 import { SavedVehicles } from "./_components/saved-vehicles";
 import { ReferralCard } from "./_components/referral-card";
+import { DisputesPanel, type DisputeSummary } from "./_components/disputes-panel";
+import { SupportCard } from "./_components/support-card";
 import type { DashboardBooking, MechanicLite } from "./_components/types";
 
 // The customer's post-booking home. Middleware guarantees a signed-in customer
@@ -44,7 +46,7 @@ export default async function DashboardPage() {
   const { data: rows } = await admin
     .from("bookings")
     .select(
-      `id, status, scheduled_at, slot_window, created_at, completed_at, total_pence,
+      `id, job_number, status, scheduled_at, slot_window, created_at, completed_at, total_pence,
        vehicle_reg, vehicle_make, vehicle_model, address_line_1, postcode,
        mechanic_id, reschedule_status, reschedule_proposed_at, reschedule_note,
        repair_description, repair_node_id`,
@@ -54,6 +56,7 @@ export default async function DashboardPage() {
 
   const bookings: DashboardBooking[] = (rows ?? []).map((b) => ({
     id: b.id,
+    jobNumber: b.job_number ?? null,
     status: b.status,
     scheduledAt: b.scheduled_at,
     slotWindow: b.slot_window,
@@ -107,13 +110,34 @@ export default async function DashboardPage() {
   // Disputes raised on any of these bookings (so a disputed job stays visible
   // and links to its case instead of vanishing from the list).
   const disputesByBooking: Record<string, { id: string; status: string }> = {};
+  // Open cases are also surfaced in their own panel at the top of the page, so
+  // fetch what that needs here rather than making a second round-trip for it.
+  const openDisputes: DisputeSummary[] = [];
   if (bookings.length) {
+    const byId = new Map(bookings.map((b) => [b.id, b]));
     const { data: disputeRows } = await admin
       .from("disputes")
-      .select("id, booking_id, status")
-      .in("booking_id", bookings.map((b) => b.id));
-    for (const d of disputeRows ?? []) disputesByBooking[d.booking_id] = { id: d.id, status: d.status };
+      .select("id, booking_id, status, reason_category, created_at")
+      .in("booking_id", bookings.map((b) => b.id))
+      .order("created_at", { ascending: false });
+    for (const d of disputeRows ?? []) {
+      disputesByBooking[d.booking_id] = { id: d.id, status: d.status };
+      // "Open" = still waiting on somebody. Resolved and withdrawn cases live on
+      // /dashboard/disputes so they don't crowd the jobs that need attention.
+      if (["opened", "responded", "escalated"].includes(d.status)) {
+        const b = byId.get(d.booking_id);
+        openDisputes.push({
+          id: d.id,
+          status: d.status as DisputeSummary["status"],
+          reasonCategory: d.reason_category,
+          createdAt: d.created_at,
+          jobNumber: b?.jobNumber ?? null,
+          repairDescription: b?.repairDescription ?? "Vehicle repair",
+        });
+      }
+    }
   }
+  const hasAnyDispute = Object.keys(disputesByBooking).length > 0;
 
   // Active card: the single most "live" booking — anything en_route/in_progress
   // first, otherwise the soonest still-open (sourcing/confirmed) job.
@@ -156,8 +180,8 @@ export default async function DashboardPage() {
     <div className="min-h-dvh bg-surface">
       <DashboardHeader name={profile?.full_name ?? email} avatarUrl={profile?.avatar_url ?? null} />
 
-      <main className="mx-auto flex max-w-3xl flex-col gap-8 px-4 py-8">
-        <div className="flex items-center justify-between gap-4">
+      <main className="mx-auto w-full max-w-content px-4 py-8 sm:px-6">
+        <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold text-text-primary">Hi {firstName} 👋</h1>
             <p className="text-text-secondary">Here&apos;s everything happening with your bookings.</p>
@@ -171,44 +195,65 @@ export default async function DashboardPage() {
           </Link>
         </div>
 
-        {profile?.referral_code && (
-          <ReferralCard
-            code={profile.referral_code}
-            shareUrl={`${siteUrl()}/signup?ref=${profile.referral_code}`}
-            creditPence={creditPence}
-          />
-        )}
+        {/* Two columns from lg up, one below.
+            The single stacked column was fine on a phone and poor on a desktop:
+            everything — live job, upcoming, vehicles, history — ran down one
+            narrow ribbon, so the thing happening RIGHT NOW sat in the same
+            visual rank as a repair from last year.
+            Left is what needs attention, in order of urgency. Right is reference
+            material that should be reachable without scrolling past the history.
+            On mobile the aside falls below the main column, which puts vehicles
+            and referral last — exactly where they belong on a small screen. */}
+        <div className="mt-8 grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_320px] xl:gap-10">
+          <div className="flex min-w-0 flex-col gap-8">
+            {active ? (
+              <ActiveBookingCard
+                booking={active}
+                mechanic={active.mechanicId ? mechanics.get(active.mechanicId) ?? null : null}
+              />
+            ) : (
+              <div className="rounded-2xl border border-dashed border-border bg-surface-card p-8 text-center">
+                <p className="font-semibold text-text-primary">No active bookings</p>
+                <p className="mt-1 text-sm text-text-secondary">
+                  When you book a mechanic, you&apos;ll be able to track them here live.
+                </p>
+                <Link
+                  href="/"
+                  className="mt-4 inline-flex h-10 items-center gap-1.5 rounded-button bg-brand-blue px-4 text-sm font-semibold text-white transition-colors hover:bg-brand-blue-dark"
+                >
+                  Book a mechanic
+                </Link>
+              </div>
+            )}
 
-        {active ? (
-          <ActiveBookingCard
-            booking={active}
-            mechanic={active.mechanicId ? mechanics.get(active.mechanicId) ?? null : null}
-          />
-        ) : (
-          <div className="rounded-2xl border border-dashed border-border bg-surface-card p-8 text-center">
-            <p className="font-semibold text-text-primary">No active bookings</p>
-            <p className="mt-1 text-sm text-text-secondary">
-              When you book a mechanic, you&apos;ll be able to track them here live.
-            </p>
-            <Link
-              href="/"
-              className="mt-4 inline-flex h-10 items-center gap-1.5 rounded-button bg-brand-blue px-4 text-sm font-semibold text-white transition-colors hover:bg-brand-blue-dark"
-            >
-              Book a mechanic
-            </Link>
+            <DisputesPanel disputes={openDisputes} />
+
+            {upcoming.length > 0 && (
+              <UpcomingBookings bookings={upcoming} mechanics={serialiseMechanics(mechanics)} />
+            )}
+
+            <PastJobs
+              jobs={past}
+              mechanics={serialiseMechanics(mechanics)}
+              ratedByBooking={Object.fromEntries(ratedByBooking)}
+              disputes={disputesByBooking}
+            />
           </div>
-        )}
 
-        {upcoming.length > 0 && <UpcomingBookings bookings={upcoming} mechanics={serialiseMechanics(mechanics)} />}
+          <aside className="flex min-w-0 flex-col gap-6 lg:sticky lg:top-6">
+            <SavedVehicles vehicles={vehicles} />
 
-        <SavedVehicles vehicles={vehicles} />
+            {profile?.referral_code && (
+              <ReferralCard
+                code={profile.referral_code}
+                shareUrl={`${siteUrl()}/signup?ref=${profile.referral_code}`}
+                creditPence={creditPence}
+              />
+            )}
 
-        <PastJobs
-          jobs={past}
-          mechanics={serialiseMechanics(mechanics)}
-          ratedByBooking={Object.fromEntries(ratedByBooking)}
-          disputes={disputesByBooking}
-        />
+            <SupportCard hasDisputes={hasAnyDispute} />
+          </aside>
+        </div>
       </main>
     </div>
   );

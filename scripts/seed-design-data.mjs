@@ -236,7 +236,7 @@ if (reviewed) {
 if (disputed) {
   await admin.from("disputes").insert({
     booking_id: disputed.id, opened_by: customerId, opened_by_role: "customer",
-    reason_category: "quality_of_work", photos: [],
+    reason_category: "workmanship", photos: [],
     description: "There's still a knocking noise over bumps — I don't think the arm was seated properly.",
     refund_requested_pence: 9750, status: "opened",
   });
