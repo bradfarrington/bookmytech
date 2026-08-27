@@ -19,8 +19,10 @@ import { apiError, apiOk, readJsonBody } from "@/lib/mobile/respond";
 //
 // Thin wrapper over `openDisputeFor` — the SAME function the website's dispute
 // form calls through app/actions/disputes.ts. Opening also moves the booking to
-// `disputed`, reverses the mechanic's payout if it had already been transferred,
-// and emails the admin team and the other party. None of that is repeated here.
+// `disputed` and emails the admin team and the other party. The mechanic's
+// completion payout is left alone — a refund, if the admin grants one, is
+// clawed back through the mechanic ledger at resolution. None of that is
+// repeated here.
 //
 // OWNERSHIP is derived, not claimed: the core works out whether the caller is
 // this booking's customer or its mechanic and refuses anyone who is neither. The

@@ -7,12 +7,12 @@ import { siteUrl, formatPrice, formatJobNumber } from "@/lib/utils";
 import { RESOLUTION_LABELS, type ResolutionKind } from "@/lib/disputes/constants";
 import { grantCredit } from "@/lib/credits/credits";
 import { refundPayment } from "@/lib/stripe/refund";
+import { recordRefundClawback } from "@/lib/mechanics/balance";
 import { applySuspension } from "@/lib/mechanics/suspend";
 import {
   mechanicEmail,
   openDisputeFor,
   partyForDispute,
-  releaseMechanicPayout,
   revalidateDispute,
   sendDisputeMessageFor,
   serviceName,
@@ -179,14 +179,21 @@ export async function resolveDispute(
   const note = input.note.trim();
   if (!note) return { ok: false, error: "Add a customer-facing explanation for the decision." };
 
+  // Money model (owner decision 2026-08-27, replacing the reverse-on-open hold):
+  // the mechanic was paid at completion and KEEPS that transfer whatever the
+  // outcome. "No refund" / "resolved" moves no money at all. A full or partial
+  // refund is fronted by BMT from its Stripe balance and clawed back from the
+  // mechanic through the ledger — their balance goes negative by the refunded
+  // amount and is netted off their next payout (lib/mechanics/balance.ts,
+  // completeAndCharge). Identical to the admin refund in app/actions/bookings.ts.
+
   // Money facts for this booking.
   const { data: money } = await admin
     .from("bookings")
-    .select("total_pence, credit_applied_pence, mechanic_payout_pence, stripe_payment_intent_id, customer_id")
+    .select("total_pence, credit_applied_pence, stripe_payment_intent_id, customer_id")
     .eq("id", dispute.booking_id)
     .single();
   const chargedPence = Math.max(0, (money?.total_pence ?? 0) - (money?.credit_applied_pence ?? 0));
-  const payoutPence = money?.mechanic_payout_pence ?? 0;
 
   // Resolve the amounts from the chosen outcome.
   let refundPence = 0;
@@ -194,32 +201,50 @@ export async function resolveDispute(
   else if (input.resolution === "partial_refund")
     refundPence = Math.min(Math.max(0, Math.round(input.refundPence ?? 0)), chargedPence);
   const creditPence = Math.max(0, Math.round(input.creditPence ?? 0));
+  const ref = formatJobNumber(booking.job_number);
 
-  // 1) Refund the customer's card (if there's a captured charge).
+  // 1) Refund the customer's card (if there's a captured charge). Retry-safe:
+  //    a refund this dispute already issued (an earlier attempt that failed
+  //    further down, or a double click) is not issued again.
   if (refundPence > 0 && money?.stripe_payment_intent_id) {
-    const r = await refundPayment(money.stripe_payment_intent_id, refundPence);
-    if (!r.ok) return { ok: false, error: `Refund failed: ${r.error}. Nothing was changed — try again.` };
-    await admin.from("booking_events").insert({
-      booking_id: dispute.booking_id,
-      event_type: "payment_refunded",
-      actor_id: userId,
-      actor_role: "admin",
-      payload: { amount_pence: refundPence, refund_id: r.refundId, dispute_id: disputeId },
-    });
+    const { data: prior } = await admin
+      .from("booking_events")
+      .select("id")
+      .eq("booking_id", dispute.booking_id)
+      .eq("event_type", "payment_refunded")
+      .eq("payload->>dispute_id", disputeId)
+      .limit(1);
+    if (!prior?.length) {
+      const r = await refundPayment(money.stripe_payment_intent_id, refundPence);
+      if (!r.ok) return { ok: false, error: `Refund failed: ${r.error}. Nothing was changed — try again.` };
+      await admin.from("booking_events").insert({
+        booking_id: dispute.booking_id,
+        event_type: "payment_refunded",
+        actor_id: userId,
+        actor_role: "admin",
+        reason: RESOLUTION_LABELS[input.resolution],
+        payload: { amount_pence: refundPence, refund_id: r.refundId, dispute_id: disputeId },
+      });
+
+      // 2) Recover it from the mechanic — balance goes negative, netted off
+      //    their next payout. No mechanic → BMT absorbs it.
+      if (booking.mechanic_id) {
+        await recordRefundClawback(
+          admin,
+          booking.mechanic_id,
+          dispute.booking_id,
+          refundPence,
+          r.refundId,
+          userId,
+          `Dispute refund on job ${ref}: ${RESOLUTION_LABELS[input.resolution]}`,
+        );
+      }
+    }
   }
 
-  // 2) Compensation credit.
+  // 3) Compensation credit.
   if (creditPence > 0 && money?.customer_id) {
-    await grantCredit(admin, money.customer_id, creditPence, "compensation", `Dispute resolution — booking ${formatJobNumber(booking.job_number)}`);
-  }
-
-  // 3) Mechanic payout: refunds come out of the mechanic's share first. If the
-  //    payout was held on open, re-transfer what remains; if it was never held
-  //    (e.g. uncaptured job) there's nothing to move.
-  if (dispute.payout_held) {
-    const reTransfer = Math.max(0, payoutPence - refundPence);
-    if (reTransfer > 0) await releaseMechanicPayout(admin, booking, reTransfer);
-    else await admin.from("disputes").update({ payout_held: false }).eq("id", disputeId);
+    await grantCredit(admin, money.customer_id, creditPence, "compensation", `Dispute resolution — booking ${ref}`);
   }
 
   // 4) Flag the mechanic on a loss.
@@ -277,7 +302,6 @@ export async function resolveDispute(
   });
 
   // 6) Tell both parties.
-  const ref = formatJobNumber(booking.job_number);
   if (booking.customer_email) {
     const to = booking.customer_email;
     renderTemplateEmail("dispute_resolved_customer", {
@@ -297,8 +321,8 @@ export async function resolveDispute(
       decision: RESOLUTION_LABELS[input.resolution],
       payout_line:
         refundPence > 0
-          ? "A refund was issued to the customer; your payout for this job was adjusted accordingly."
-          : "Your payout for this job has been released.",
+          ? `A refund of ${formatPrice(refundPence)} was issued to the customer. It's been deducted from your balance and will come off your next payout.`
+          : "Your payout for this job is unaffected.",
     })
       .then(({ subject, html }) => sendEmail({ to: mechTo, subject, html }))
       .catch(() => {});

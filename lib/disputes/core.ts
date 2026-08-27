@@ -37,8 +37,8 @@ import {
 //
 // `disputes` and `dispute_messages` have no INSERT/UPDATE policies at all (see
 // 0025) — every write goes through the service-role client here, because opening
-// a dispute also reverses a mechanic's Stripe transfer and moves the booking's
-// status. The party checks below are therefore the whole of the protection.
+// a dispute moves the booking's status and resolving one moves money. The party
+// checks below are therefore the whole of the protection.
 // Reads are the other way round: parties get scoped SELECT policies, so the
 // mobile app reads a dispute and its thread straight from Supabase.
 
@@ -219,9 +219,12 @@ export async function openDisputeFor(
     payload: { dispute_id: dispute.id, status_from: booking.status },
   });
 
-  // Hold the mechanic's payout if it was already transferred at completion.
-  const held = await holdMechanicPayout(admin, bookingId);
-  if (held) await admin.from("disputes").update({ payout_held: true }).eq("id", dispute.id);
+  // The mechanic's completion payout is NOT touched. Money model (owner
+  // decision 2026-08-27): they were paid at completion and keep it; if the
+  // resolution refunds the customer, BMT fronts the refund and claws it back
+  // through the mechanic ledger (see resolveDispute). `disputes.payout_held`
+  // stays false — it's a relic of the reverse-on-open model, which broke
+  // because the re-transfer needed platform funds that hadn't settled.
 
   // Notify the admin team + the other party.
   await notifyDisputeOpened(admin, booking, role, dispute.id);
@@ -231,53 +234,6 @@ export async function openDisputeFor(
   revalidatePath("/admin/disputes");
   if (booking.mechanic_id) revalidatePath(`/mechanic/jobs/${bookingId}`);
   return { ok: true, disputeId: dispute.id };
-}
-
-// ---------------------------------------------------------------------------
-// Payout hold — reverse the mechanic's transfer while a dispute is open.
-// ---------------------------------------------------------------------------
-
-/**
- * If the mechanic was already paid for this booking (a payout_transferred event
- * exists), reverse the Stripe transfer so the funds sit on the platform balance
- * until the dispute resolves. Best-effort + non-fatal: returns true only if a
- * reversal actually happened. The reverse re-transfer / refund happens at
- * resolution (see resolveDispute).
- */
-async function holdMechanicPayout(admin: Admin, bookingId: string): Promise<boolean> {
-  const { data: ev } = await admin
-    .from("booking_events")
-    .select("payload")
-    .eq("booking_id", bookingId)
-    .eq("event_type", "payout_transferred")
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  const transferId = (ev?.payload as { transfer_id?: string } | null)?.transfer_id;
-  if (!transferId) return false;
-
-  let stripe: typeof import("@/lib/stripe/server").stripe | null = null;
-  try {
-    stripe = (await import("@/lib/stripe/server")).stripe;
-  } catch {
-    return false;
-  }
-  try {
-    const reversal = await stripe.transfers.createReversal(transferId, {
-      metadata: { booking_id: bookingId, reason: "dispute_opened" },
-    });
-    await admin.from("booking_events").insert({
-      booking_id: bookingId,
-      event_type: "payout_reversed",
-      actor_role: "system",
-      reason: "Mechanic payout held pending dispute resolution.",
-      payload: { transfer_id: transferId, reversal_id: reversal.id, amount_pence: reversal.amount },
-    });
-    return true;
-  } catch (err) {
-    console.error("Failed to reverse payout for booking", bookingId, err);
-    return false;
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -459,8 +415,8 @@ export async function sendDisputeMessageFor(
 }
 
 // ---------------------------------------------------------------------------
-// Opener withdraws (satisfied / sorted) — closes with no refund and releases
-// the mechanic's held payout. Money-bearing outcomes go through admin (Step 4).
+// Opener withdraws (satisfied / sorted) — closes with no refund; no money moves.
+// Money-bearing outcomes go through admin (resolveDispute).
 // ---------------------------------------------------------------------------
 
 export async function withdrawDisputeFor(
@@ -499,9 +455,6 @@ export async function withdrawDisputeFor(
     payload: { dispute_id: disputeId, resolution: "withdrawn" },
   });
 
-  // Release the mechanic's payout if it was held.
-  if (dispute.payout_held) await releaseMechanicPayout(admin, booking);
-
   // Notify both parties.
   const ref = formatJobNumber(booking.job_number);
   if (booking.customer_email) {
@@ -518,58 +471,4 @@ export async function withdrawDisputeFor(
 
   revalidateDispute(disputeId, dispute.booking_id);
   return { ok: true };
-}
-
-// ---------------------------------------------------------------------------
-// Re-pay the mechanic after a held payout is released (withdraw / found in their
-// favour). We reversed the original transfer on open, so create a fresh one.
-// ---------------------------------------------------------------------------
-
-export async function releaseMechanicPayout(
-  admin: Admin,
-  booking: DisputeBooking,
-  amountOverride?: number,
-): Promise<boolean> {
-  const { data: mech } = await admin
-    .from("mechanics")
-    .select("stripe_account_id")
-    .eq("id", booking.mechanic_id ?? "")
-    .maybeSingle();
-  const { data: full } = await admin
-    .from("bookings")
-    .select("mechanic_payout_pence")
-    .eq("id", booking.id)
-    .single();
-  // Default to the full snapshotted payout; the arbitration path passes a reduced
-  // amount when a partial refund has eaten into the mechanic's share.
-  const amount = amountOverride ?? full?.mechanic_payout_pence ?? 0;
-  if (!mech?.stripe_account_id || amount <= 0) return false;
-
-  let stripe: typeof import("@/lib/stripe/server").stripe | null = null;
-  try {
-    stripe = (await import("@/lib/stripe/server")).stripe;
-  } catch {
-    return false;
-  }
-  try {
-    const transfer = await stripe.transfers.create({
-      amount,
-      currency: "gbp",
-      destination: mech.stripe_account_id,
-      transfer_group: booking.id,
-      metadata: { booking_id: booking.id, reason: "dispute_released" },
-    });
-    await admin.from("booking_events").insert({
-      booking_id: booking.id,
-      event_type: "payout_transferred",
-      actor_role: "system",
-      reason: "Payout released after dispute resolution.",
-      payload: { amount_pence: amount, transfer_id: transfer.id },
-    });
-    await admin.from("disputes").update({ payout_held: false }).eq("booking_id", booking.id);
-    return true;
-  } catch (err) {
-    console.error("Failed to release payout for booking", booking.id, err);
-    return false;
-  }
 }

@@ -133,7 +133,7 @@ Mentioned in the live monitor's "needs attention" panel (task 04). Wire it up pr
 - [x] Mechanic can open dispute from job detail — "Raise an issue" on the mechanic job detail → `/mechanic/disputes/new/[bookingId]`.
 - [x] In-app message thread per dispute — admin sees all correspondence — `dispute_messages` (3-party: customer / mechanic / admin mediator), shared `DisputeThread` (polling, RLS read).
 - [x] Notification sent to admin and assigned mechanic when dispute is opened — emails to `ADMIN_NOTIFY_EMAIL` + the other party.
-- [x] Stripe payment hold on opened dispute — `openDispute` reverses the mechanic's transfer (if already paid at completion) and sets `disputes.payout_held`.
+- [x] ~~Stripe payment hold on opened dispute — `openDispute` reverses the mechanic's transfer (if already paid at completion) and sets `disputes.payout_held`.~~ **Removed 2026-08-27 (owner decision).** The hold reversed the completion transfer, but the re-transfer at resolution drew on the platform's *available* balance while the reversed funds were still *pending*, so Stripe refused it, the failure was swallowed, and the dispute closed with the mechanic unpaid (seen live: £51 reversed, never re-sent). Opening a dispute now leaves the payout alone; `disputes.payout_held` is a relic column, always false.
 - [x] 48 h auto-escalation to admin — `/api/cron/escalate-disputes` (hourly): opened >48h or responded >48h → escalated. Parties can also escalate manually.
 - [x] Admin arbitration UI with case file + decision flow — `/admin/disputes` queue + `/admin/disputes/[id]` (booking/customer/mechanic facts, payment status, suggested-resolution rule, thread, decision panel).
 - [x] Refund via Stripe API on resolution — `lib/stripe/refund.ts`; `resolveDispute` refunds the card.
@@ -148,10 +148,10 @@ Mentioned in the live monitor's "needs attention" panel (task 04). Wire it up pr
 
 **Implementation notes / deviations:**
 - **Party self-resolution = the opener withdraws** (satisfied / sorted). Anything money-bearing (refund / partial / credit) is **admin-executed** in arbitration — a mechanic can't move money, so binding outcomes are admin-gated. Full propose/counter/accept between parties was not built (deliberate simplification).
-- **Refund accounting:** refunds come out of the **mechanic's payout first**, then the platform fee. On open we reverse the payout transfer; on resolve we re-transfer `max(0, payout − refund)`.
+- **Refund accounting (revised 2026-08-27):** the mechanic **keeps the completion transfer whatever the outcome**. "No refund" / withdrawn moves no money. A full or partial refund is fronted by BMT from its Stripe balance (`refundPayment`) and **clawed back from the mechanic through `mechanic_ledger`** (`recordRefundClawback` — balance goes negative by the refunded amount, netted off their next payout by `nettedPayout` in `completeAndCharge`). Same model as the admin refund in `app/actions/bookings.ts`. `resolveDispute` is retry-safe: a refund already issued for the dispute (a `payment_refunded` event carrying its `dispute_id`) is not issued twice.
 - **Crons are Next API routes** (`escalate-disputes` hourly, `lift-suspensions` daily) + `vercel.json`, not Supabase edge functions (project convention).
 - **rating<4.0 / acceptance<70% auto-flags** (from the prose) are **deferred** to a future nightly metrics job — only the explicit "flag on lost disputes" + the 3-losses auto-suspend are built. The overview perf-flags panel already surfaces rating<4 live.
-- ⚠️ Migration `0025`. The **Stripe refund + transfer-reversal + re-transfer paths were not live-fired** (no running app/keys) — build + 39 unit tests pass; exercise a real dispute resolution before relying on the money movements.
+- ⚠️ Migration `0025`. The reversal/re-transfer paths are gone (see above). The **refund + ledger clawback path in `resolveDispute` has not been live-fired since the 2026-08-27 rewrite** — run one test-mode dispute through full and partial refund and check `mechanic_ledger` goes negative by the refunded amount.
 
 **Files touched:**
 - `app/(customer)/dashboard/disputes/new/[booking-id]/page.tsx`
