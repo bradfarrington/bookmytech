@@ -10,7 +10,6 @@ import {
   useStripe,
   useElements,
 } from "@stripe/react-stripe-js";
-import { addDays, format, isToday, isTomorrow } from "date-fns";
 import { Loader2, Lock, CheckCircle2, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
@@ -20,7 +19,18 @@ import { prepareCheckout, createBookingAction } from "@/app/actions/create-booki
 import type { CreateBookingInput, PrepareCheckoutResult } from "@/app/actions/create-booking";
 import { reportOrphanedHold } from "@/app/actions/orphaned-hold";
 import { ensureCustomerAccount, requestPasswordReset } from "@/app/actions/booking-account";
-import { TWO_HOUR_SLOTS, ALL_DAY_SLOT, slotIso, formatBookingSlot } from "@/lib/slots";
+import {
+  TWO_HOUR_SLOTS,
+  ALL_DAY_SLOT,
+  slotIso,
+  formatBookingSlot,
+  isSlotBookable,
+  dayHasBookableSlot,
+  upcomingDayKeys,
+  dayChipLabel,
+  londonDateKey,
+  MIN_LEAD_MINUTES,
+} from "@/lib/slots";
 import { track, FUNNEL_EVENTS } from "@/lib/analytics/track";
 
 type ParkingType = "driveway" | "street" | "car_park" | "other";
@@ -40,12 +50,6 @@ const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
 
 const inputClass =
   "h-12 rounded-lg border border-border bg-surface-card px-3 text-sm text-text-primary outline-none transition-colors placeholder:text-text-muted focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/25";
-
-function dayName(date: Date) {
-  if (isToday(date)) return "Today";
-  if (isTomorrow(date)) return "Tmrw";
-  return format(date, "EEE");
-}
 
 // Narrow the prepareCheckout result to its success shapes once we've handled !ok.
 type ReadyCheckout = Extract<PrepareCheckoutResult, { ok: true }>;
@@ -73,7 +77,17 @@ interface CheckoutDraft {
   common: ConfirmCommon;
   /** What the hold was reduced by — createBooking redeems against it. */
   creditAppliedPence: number;
+  /**
+   * The prepared checkout itself, so a customer whose window closed while
+   * they were at their bank can pick another time and finish on the hold they
+   * already confirmed. Absent on drafts parked by older builds.
+   */
+  checkout?: ReadyCheckout;
 }
+
+/** Shown on the picker when the customer is sent back to choose again. */
+const SLOT_PASSED_NOTICE =
+  "That arrival window has passed while you were checking out. Pick another time — your card is already authorised, so you won't need to enter it again.";
 
 /** `pi_3abc..._secret_xyz` → `pi_3abc...` */
 function intentIdFrom(clientSecret: string): string {
@@ -195,13 +209,37 @@ export function SlotPicker({
   returnedIntentSecret,
 }: SlotPickerProps) {
   const router = useRouter();
-  const days = Array.from({ length: 7 }, (_, i) => addDays(new Date(), i));
-  const [selectedDay, setSelectedDay] = useState(days[0]);
+
+  // "Now", re-read every minute so a customer who sits on the page watches
+  // windows close rather than booking one that has quietly passed. All the
+  // date/window maths is UK time (lib/slots) — a device in another zone, or
+  // the UTC server rendering this, sees the same days and the same cut-offs.
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 60_000);
+    return () => clearInterval(id);
+  }, []);
+
+  // Seven UK calendar days from today, as "YYYY-MM-DD" keys. Today drops out
+  // of the *selectable* set once its last window has closed (after 7pm), so
+  // the default selection is the first day that still has something to offer.
+  const days = upcomingDayKeys(now);
+  const [selectedDay, setSelectedDay] = useState(
+    () => days.find((d) => dayHasBookableSlot(d, now)) ?? days[0],
+  );
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   // The arrival window the customer picked (persisted + shown to the mechanic).
   // Tracked alongside selectedSlot because the "8am–10am" and all-day windows
   // share the same start time — the ISO alone can't tell them apart.
   const [selectedWindow, setSelectedWindow] = useState<string | null>(null);
+
+  // A window chosen earlier can close while the form is being filled in. It's
+  // judged against `now` at render, so the CTA disables (and the button loses
+  // its highlight) rather than sending a start the server would reject.
+  const selectedSlotOpen =
+    !!selectedSlot &&
+    new Date(selectedSlot).getTime() - now.getTime() >= MIN_LEAD_MINUTES * 60_000;
+
   const [addressLine1, setAddressLine1] = useState("");
   const [postcode, setPostcode] = useState(defaultPostcode);
   const [parkingType, setParkingType] = useState<ParkingType>("driveway");
@@ -230,6 +268,24 @@ export function SlotPicker({
   const [stripeError, setStripeError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
+  // A hold the customer has ALREADY confirmed on their card. Set the moment
+  // confirmPayment succeeds and kept if the booking write then fails: Stripe
+  // refuses a second confirm on an authorised intent, and a reload would
+  // prepare a fresh intent and place a SECOND hold. With this remembered, a
+  // retry — or a re-picked time after the window closed — goes straight to
+  // the booking write against the hold they already have.
+  const [confirmedIntentId, setConfirmedIntentId] = useState<string | null>(null);
+  const [slotNotice, setSlotNotice] = useState<string | null>(null);
+
+  // The window closed under them (a 3-D Secure trip that outlasted the lead
+  // time, or a long think). Nothing was written and the hold is untouched:
+  // drop the slot so the picker comes back, keep everything else.
+  function handleSlotPassed() {
+    setSelectedSlot(null);
+    setSelectedWindow(null);
+    setSlotNotice(SLOT_PASSED_NOTICE);
+  }
+
   // Where we are in the return-from-redirect path (see the draft helpers above).
   // "idle" is every ordinary render — the customer arriving at this page normally.
   // Seeded from the prop, not from an effect: a customer coming back from their
@@ -247,18 +303,20 @@ export function SlotPicker({
 
   const canProceed =
     !wrongRole &&
-    !!selectedSlot &&
+    selectedSlotOpen &&
     addressLine1.trim().length > 3 &&
     postcode.trim().length >= 5 &&
     (hasAccount || accountFilled);
 
   // Put a parked draft back on the form, for when the customer failed the
   // challenge and has to try again. Nothing was taken in that case.
-  function restoreDraft(c: ConfirmCommon) {
-    setSelectedSlot(c.selectedSlot || null);
-    setSelectedWindow(c.selectedWindow || null);
-    const when = new Date(c.selectedSlot);
-    if (c.selectedSlot && !Number.isNaN(when.getTime())) setSelectedDay(when);
+  function restoreDraft(c: ConfirmCommon, opts: { keepSlot?: boolean } = {}) {
+    if (opts.keepSlot !== false) {
+      setSelectedSlot(c.selectedSlot || null);
+      setSelectedWindow(c.selectedWindow || null);
+      const when = new Date(c.selectedSlot);
+      if (c.selectedSlot && !Number.isNaN(when.getTime())) setSelectedDay(londonDateKey(when));
+    }
     setAddressLine1(c.addressLine1);
     setPostcode(c.postcode);
     if (PARKING_OPTIONS.some((o) => o.value === c.parkingType)) {
@@ -332,6 +390,20 @@ export function SlotPicker({
           }),
         );
         if (!result.ok) {
+          // The bank took longer than the window's lead time. The hold is
+          // good and stays theirs — put them back on the picker with
+          // everything else restored, and finish on this intent without
+          // confirming again. (Needs the checkout parked in the draft; a
+          // draft from an older build without it is treated as stranded.)
+          if (result.code === "slot_passed" && draft.checkout) {
+            clearDraft(paymentIntent.id);
+            restoreDraft(draft.common, { keepSlot: false });
+            setCheckout(draft.checkout);
+            setConfirmedIntentId(paymentIntent.id);
+            setSlotNotice(SLOT_PASSED_NOTICE);
+            setResume({ phase: "idle" });
+            return;
+          }
           void reportOrphanedHold(paymentIntent.id, `booking write failed: ${result.error}`);
           setResume({ phase: "stranded", detail: result.error });
           return;
@@ -490,7 +562,7 @@ export function SlotPicker({
   if (checkout && selectedSlot) {
     // Fully credit-covered — no card needed.
     if (checkout.mode === "free") {
-      return <FreeCheckoutForm {...common} checkout={checkout} />;
+      return <FreeCheckoutForm {...common} checkout={checkout} onSlotPassed={handleSlotPassed} />;
     }
     // Pre-auth: place the manual-capture hold via Stripe Elements.
     return (
@@ -498,36 +570,53 @@ export function SlotPicker({
         stripe={stripePromise}
         options={{ clientSecret: checkout.clientSecret, appearance: { theme: "stripe" } }}
       >
-        <CheckoutForm {...common} checkout={checkout} />
+        <CheckoutForm
+          {...common}
+          checkout={checkout}
+          confirmedIntentId={confirmedIntentId}
+          onConfirmed={setConfirmedIntentId}
+          onSlotPassed={handleSlotPassed}
+        />
       </Elements>
     );
   }
 
   return (
     <div className="flex flex-col gap-6">
+      {slotNotice && (
+        <p role="alert" className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          {slotNotice}
+        </p>
+      )}
+
       {/* Date strip */}
       <div>
         <p className="mb-2 text-sm font-semibold text-text-primary">Select a date</p>
         <div className="grid grid-cols-7 gap-2">
           {days.map((day) => {
-            const active = day.toDateString() === selectedDay.toDateString();
+            const active = day === selectedDay;
+            const bookable = dayHasBookableSlot(day, now);
+            const label = dayChipLabel(day, now);
             return (
               <button
-                key={day.toISOString()}
+                key={day}
                 type="button"
+                disabled={!bookable}
+                title={bookable ? undefined : "No more arrival windows today"}
                 onClick={() => { setSelectedDay(day); setSelectedSlot(null); setSelectedWindow(null); }}
                 className={cn(
                   "flex flex-col items-center gap-1 rounded-2xl border py-3 text-center transition-colors",
                   active
                     ? "border-brand-blue bg-brand-blue"
                     : "border-border bg-surface-card hover:border-brand-blue/40",
+                  "disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-border",
                 )}
               >
                 <span className={cn("text-[11px] font-semibold uppercase tracking-wide", active ? "text-blue-200" : "text-text-muted")}>
-                  {dayName(day)}
+                  {label.weekday}
                 </span>
                 <span className={cn("text-xl font-extrabold leading-none", active ? "text-white" : "text-text-primary")}>
-                  {format(day, "d")}
+                  {label.dayOfMonth}
                 </span>
               </button>
             );
@@ -541,17 +630,21 @@ export function SlotPicker({
         <div className="grid grid-cols-3 gap-3">
           {TWO_HOUR_SLOTS.map((slot) => {
             const isoValue = slotIso(selectedDay, slot.startHour);
-            const active = selectedSlot === isoValue && selectedWindow === slot.window;
+            const bookable = isSlotBookable(selectedDay, slot, now);
+            const active = bookable && selectedSlot === isoValue && selectedWindow === slot.window;
             return (
               <button
                 key={slot.window}
                 type="button"
+                disabled={!bookable}
+                title={bookable ? undefined : "This window has passed"}
                 onClick={() => { setSelectedSlot(isoValue); setSelectedWindow(slot.window); }}
                 className={cn(
                   "flex items-center justify-center rounded-xl border px-2 py-4 text-center text-sm font-bold transition-colors",
                   active
                     ? "border-brand-blue bg-brand-blue text-white"
                     : "border-border bg-surface-card text-text-primary hover:border-brand-blue/50",
+                  "disabled:cursor-not-allowed disabled:text-text-muted disabled:line-through disabled:opacity-50 disabled:hover:border-border",
                 )}
               >
                 {slot.window}
@@ -562,19 +655,23 @@ export function SlotPicker({
 
         {(() => {
           const isoValue = slotIso(selectedDay, ALL_DAY_SLOT.startHour);
-          const active = selectedSlot === isoValue && selectedWindow === ALL_DAY_SLOT.window;
+          const bookable = isSlotBookable(selectedDay, ALL_DAY_SLOT, now);
+          const active = bookable && selectedSlot === isoValue && selectedWindow === ALL_DAY_SLOT.window;
           return (
             <button
               type="button"
+              disabled={!bookable}
+              title={bookable ? undefined : "The all-day window has already started"}
               onClick={() => { setSelectedSlot(isoValue); setSelectedWindow(ALL_DAY_SLOT.window); }}
               className={cn(
                 "mt-3 flex w-full flex-col items-center gap-0.5 rounded-xl border px-2 py-3.5 text-center transition-colors",
                 active
                   ? "border-brand-blue bg-brand-blue text-white"
                   : "border-border bg-surface-card hover:border-brand-blue/50",
+                "disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-border",
               )}
             >
-              <span className={cn("text-sm font-bold", active ? "text-white" : "text-text-primary")}>
+              <span className={cn("text-sm font-bold", active ? "text-white" : bookable ? "text-text-primary" : "text-text-muted line-through")}>
                 All day
               </span>
               <span className={cn("text-[11px] leading-tight", active ? "text-blue-200" : "text-text-muted")}>
@@ -583,6 +680,12 @@ export function SlotPicker({
             </button>
           );
         })()}
+
+        {!dayHasBookableSlot(selectedDay, now) && (
+          <p className="mt-3 rounded-lg bg-surface px-4 py-3 text-sm text-text-secondary">
+            No more arrival windows today — pick another day above.
+          </p>
+        )}
       </div>
 
       {/* Address */}
@@ -878,55 +981,76 @@ function BookingRecap({ c }: { c: ConfirmCommon }) {
 
 function CheckoutForm({
   checkout,
+  confirmedIntentId,
+  onConfirmed,
+  onSlotPassed,
   ...c
-}: ConfirmCommon & { checkout: Extract<ReadyCheckout, { mode: "preauth" }> }) {
+}: ConfirmCommon & {
+  checkout: Extract<ReadyCheckout, { mode: "preauth" }>;
+  /** The intent already authorised on the card, if this checkout's is. */
+  confirmedIntentId: string | null;
+  onConfirmed: (intentId: string) => void;
+  onSlotPassed: () => void;
+}) {
   const stripe = useStripe();
   const elements = useElements();
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  const piId = intentIdFrom(checkout.clientSecret);
+  // The hold is already placed on THIS intent (a retry after the booking
+  // write failed, or a re-picked time). Confirming again is refused by
+  // Stripe, so the card step is skipped and only the booking is written.
+  const alreadyConfirmed = confirmedIntentId === piId;
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!stripe || !elements) return;
+    if (!alreadyConfirmed && (!stripe || !elements)) return;
     setSubmitting(true);
     setError(null);
 
-    const piId = intentIdFrom(checkout.clientSecret);
+    if (!alreadyConfirmed && stripe && elements) {
+      // Park the draft BEFORE confirming. If the issuer wants a 3-D Secure
+      // challenge Stripe can't run inline, the next thing that happens is the
+      // page navigating away — this component won't be here to save anything
+      // later. The checkout goes with it so the return path can put the
+      // customer back on the picker if their window has closed meanwhile.
+      saveDraft(piId, { common: c, creditAppliedPence: checkout.creditAppliedPence, checkout });
 
-    // Park the draft BEFORE confirming. If the issuer wants a 3-D Secure
-    // challenge Stripe can't run inline, the next thing that happens is the page
-    // navigating away — this component won't be here to save anything later.
-    saveDraft(piId, { common: c, creditAppliedPence: checkout.creditAppliedPence });
-
-    // Place the manual-capture hold now (captured on completion). The hold is
-    // always taken — credit only reduces its amount.
-    const { error: confirmError, paymentIntent } = await stripe.confirmPayment({
-      elements,
-      confirmParams: {
-        payment_method_data: {
-          billing_details: { name: c.customerName, email: c.customerEmail },
+      // Place the manual-capture hold now (captured on completion). The hold is
+      // always taken — credit only reduces its amount.
+      const { error: confirmError, paymentIntent } = await stripe.confirmPayment({
+        elements,
+        confirmParams: {
+          payment_method_data: {
+            billing_details: { name: c.customerName, email: c.customerEmail },
+          },
+          // Required even with `redirect: "if_required"`, which only means "don't
+          // redirect unless you have to". When Stripe decides it does have to and
+          // finds no return_url, it rejects the confirmation outright and the
+          // customer sees a payment failure that retrying can't fix. Must be
+          // absolute, and must point somewhere that renders.
+          return_url: `${window.location.origin}/book/slot?${new URLSearchParams(returnParams(c))}`,
         },
-        // Required even with `redirect: "if_required"`, which only means "don't
-        // redirect unless you have to". When Stripe decides it does have to and
-        // finds no return_url, it rejects the confirmation outright and the
-        // customer sees a payment failure that retrying can't fix. Must be
-        // absolute, and must point somewhere that renders.
-        return_url: `${window.location.origin}/book/slot?${new URLSearchParams(returnParams(c))}`,
-      },
-      redirect: "if_required",
-    });
-    // Past this point we did NOT redirect — this component still holds every
-    // answer, so the parked draft has no further use either way.
-    clearDraft(piId);
-    if (confirmError) {
-      setError(confirmError.message ?? "Payment failed. Please try again.");
-      setSubmitting(false);
-      return;
-    }
-    if (!paymentIntent) {
-      setError("Something went wrong. Please try again.");
-      setSubmitting(false);
-      return;
+        redirect: "if_required",
+      });
+      // Past this point we did NOT redirect — this component still holds every
+      // answer, so the parked draft has no further use either way.
+      clearDraft(piId);
+      if (confirmError) {
+        setError(confirmError.message ?? "Payment failed. Please try again.");
+        setSubmitting(false);
+        return;
+      }
+      if (!paymentIntent) {
+        setError("Something went wrong. Please try again.");
+        setSubmitting(false);
+        return;
+      }
+      // The hold is live from here. Remember it before anything else can fail,
+      // so every later attempt writes against this hold instead of confirming
+      // again (refused) or reloading (a second hold).
+      onConfirmed(piId);
     }
 
     const result = await createBookingAction(
@@ -937,12 +1061,20 @@ function CheckoutForm({
       }),
     );
     if (!result.ok) {
+      setSubmitting(false);
+      // Not stranded: nothing was written and the hold is still theirs. Send
+      // them back to pick a time; they come back here with the card step
+      // already done.
+      if (result.code === "slot_passed") {
+        onSlotPassed();
+        return;
+      }
       // The hold is already live here, so this is the same orphaned hold the
       // redirect path can produce — tell ops either way. The customer keeps
-      // their filled-in form and sees the real error.
+      // their filled-in form and sees the real error; pressing the button
+      // again retries the write on this hold.
       void reportOrphanedHold(piId, `booking write failed: ${result.error}`);
       setError(result.error);
-      setSubmitting(false);
       return;
     }
     window.location.href = `/book/confirmed/${result.bookingId}`;
@@ -958,12 +1090,22 @@ function CheckoutForm({
         chargePence={checkout.chargePence}
       />
 
-      <div>
-        <p className="mb-3 text-sm font-semibold text-text-primary">Payment details</p>
-        <div className="rounded-xl border border-border p-4">
-          <PaymentElement />
+      {alreadyConfirmed ? (
+        <p className="flex items-start gap-2 rounded-lg bg-green-50 px-4 py-3 text-sm font-medium text-success">
+          <CheckCircle2 size={16} className="mt-0.5 shrink-0" />
+          <span>
+            Your card is already authorised for {formatPrice(checkout.chargePence)} — nothing more
+            to enter. Confirm below to finish your booking.
+          </span>
+        </p>
+      ) : (
+        <div>
+          <p className="mb-3 text-sm font-semibold text-text-primary">Payment details</p>
+          <div className="rounded-xl border border-border p-4">
+            <PaymentElement />
+          </div>
         </div>
-      </div>
+      )}
 
       {error && (
         <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-danger">{error}</p>
@@ -974,10 +1116,14 @@ function CheckoutForm({
         variant="primary"
         size="lg"
         fullWidth
-        disabled={!stripe || submitting}
+        disabled={(!alreadyConfirmed && !stripe) || submitting}
         iconLeft={submitting ? Loader2 : Lock}
       >
-        {submitting ? "Processing…" : `Pre-authorise ${formatPrice(checkout.chargePence)}`}
+        {submitting
+          ? "Processing…"
+          : alreadyConfirmed
+            ? "Confirm booking"
+            : `Pre-authorise ${formatPrice(checkout.chargePence)}`}
       </Button>
       <p className="text-center text-[11px] text-text-muted">
         No money is taken now. Your card is pre-authorised only — charged when the job is complete.
@@ -999,8 +1145,12 @@ function CheckoutForm({
 
 function FreeCheckoutForm({
   checkout,
+  onSlotPassed,
   ...c
-}: ConfirmCommon & { checkout: Extract<ReadyCheckout, { mode: "free" }> }) {
+}: ConfirmCommon & {
+  checkout: Extract<ReadyCheckout, { mode: "free" }>;
+  onSlotPassed: () => void;
+}) {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -1015,8 +1165,13 @@ function FreeCheckoutForm({
       }),
     );
     if (!result.ok) {
-      setError(result.error);
       setSubmitting(false);
+      // No card involved — just back to the picker for another time.
+      if (result.code === "slot_passed") {
+        onSlotPassed();
+        return;
+      }
+      setError(result.error);
       return;
     }
     window.location.href = `/book/confirmed/${result.bookingId}`;

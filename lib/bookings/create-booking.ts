@@ -6,6 +6,7 @@ import { renderTemplateEmail } from "@/emails/resolve";
 import { sendSms } from "@/lib/sms/send-sms";
 import { renderSmsTemplate } from "@/lib/sms/render-template";
 import { formatPrice, formatJobNumber } from "@/lib/utils";
+import { BOOKING_TIME_ZONE } from "@/lib/slots";
 import { dispatchBooking } from "@/lib/dispatch/dispatch";
 import { quoteRepair } from "@/lib/haynespro/repair-booking";
 import { trackEvent } from "@/app/actions/track-event";
@@ -74,6 +75,20 @@ export interface CreateBookingInput {
   creditAppliedPence?: number;
 }
 
+export type CreateBookingResult =
+  | { ok: true; bookingId: string }
+  | {
+      ok: false;
+      error: string;
+      /**
+       * `slot_passed`: the chosen window's start is already behind us. Nothing
+       * was written and any pre-auth hold is untouched and still usable — the
+       * client should have the customer pick another time and call again with
+       * the same intent, not report the hold as stranded.
+       */
+      code?: "slot_passed";
+    };
+
 /**
  * Write the booking, dispatch it and notify the customer.
  *
@@ -84,7 +99,29 @@ export interface CreateBookingInput {
 export async function createBooking(
   input: CreateBookingInput,
   customerId: string | null,
-): Promise<{ ok: true; bookingId: string } | { ok: false; error: string }> {
+): Promise<CreateBookingResult> {
+  // The picker hides windows that have closed, but that's a browser-side
+  // courtesy (a stale tab, a clock set wrong, an old mobile build). Never
+  // write a booking whose window has already started — no mechanic can be
+  // dispatched to it and it would sort into the past on every dashboard.
+  //
+  // This check runs BEFORE anything touches Stripe, and the hold (if any) is
+  // left exactly as it was: the client is expected to keep the intent, send
+  // the customer back to pick another time, and call again with the same
+  // `stripePaymentIntentId`. `code` is what lets it tell this apart from a
+  // failure that has genuinely stranded the hold.
+  const startMs = Date.parse(input.scheduledAt);
+  if (Number.isNaN(startMs)) {
+    return { ok: false, error: "Please choose an arrival window for your booking." };
+  }
+  if (startMs < Date.now()) {
+    return {
+      ok: false,
+      code: "slot_passed",
+      error: "That arrival window has already passed. Please go back and pick a later time.",
+    };
+  }
+
   // Snapshot a phone onto the booking so SMS touchpoints (on the way, complete,
   // cancel, message nudges) can reach the customer. Signed-in customers use
   // their profile phone; the funnel also collects an optional number (the only
@@ -206,14 +243,20 @@ export async function createBooking(
     mode === "free"
       ? `Covered in full by your account credit (${formatPrice(price.totalPence)}). Nothing to pay.`
       : `Amount pre-authorised${passedCredit > 0 ? ` (after ${formatPrice(passedCredit)} credit)` : ""}: ${formatPrice(chargedPence)}`;
+  // UK time explicitly — this runs on a UTC server, and "6pm" in BST is 17:00Z.
   const whenLabel = `${new Date(input.scheduledAt).toLocaleDateString("en-GB", {
     weekday: "long",
     day: "numeric",
     month: "long",
+    timeZone: BOOKING_TIME_ZONE,
   })}${
     input.slotWindow
       ? ` · ${input.slotWindow}`
-      : `, ${new Date(input.scheduledAt).toLocaleTimeString("en-GB", { hour: "numeric", minute: "2-digit" })}`
+      : `, ${new Date(input.scheduledAt).toLocaleTimeString("en-GB", {
+          hour: "numeric",
+          minute: "2-digit",
+          timeZone: BOOKING_TIME_ZONE,
+        })}`
   }`;
   const vehicleLabel = `${input.vehicleReg ? `${input.vehicleReg} — ` : ""}${input.vehicleMake}${
     input.vehicleModel ? ` ${input.vehicleModel}` : ""

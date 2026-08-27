@@ -39,7 +39,14 @@ export async function funnelToCheckout(page: Page, newAccount?: { email: string 
   await expect(page).toHaveURL(/\/book\/match/);
   await page.getByRole("button", { name: /Pick a time/i }).click();
   await expect(page).toHaveURL(/\/book\/slot/);
-  await page.getByRole("button", { name: /Morning/i }).click();
+  // Windows that have already closed today render disabled, so take the first
+  // one that's still open — it may be on a later day chip if it's late in the
+  // day, but the picker pre-selects the first day with an open window.
+  await page
+    .getByRole("button", { name: /^(8am|10am|12pm|2pm|4pm|6pm)–/ })
+    .and(page.locator(":enabled"))
+    .first()
+    .click();
   await page.getByPlaceholder("House number and street").fill(TEST_ADDRESS);
 
   if (newAccount) {

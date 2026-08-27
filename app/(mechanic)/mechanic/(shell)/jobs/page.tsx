@@ -172,7 +172,7 @@ export default async function MechanicJobsPage() {
       scheduleItems.push({
         bookingId: b.id,
         time: b.scheduled_at
-          ? new Date(b.scheduled_at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })
+          ? new Date(b.scheduled_at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/London" })
           : "—",
         title,
         where: b.area ?? b.postcode ?? "—",

@@ -5,6 +5,7 @@ import {
   createBooking,
   prepareCheckoutFor,
   type CreateBookingInput,
+  type CreateBookingResult,
   type PrepareCheckoutInput,
 } from "@/lib/bookings/create-booking";
 
@@ -27,12 +28,13 @@ import {
 export type {
   PaymentMode,
   CreateBookingInput,
+  CreateBookingResult,
   PrepareCheckoutResult,
 } from "@/lib/bookings/create-booking";
 
 export async function createBookingAction(
   input: CreateBookingInput,
-): Promise<{ ok: true; bookingId: string } | { ok: false; error: string }> {
+): Promise<CreateBookingResult> {
   const supabase = await createClient();
   const {
     data: { user },
