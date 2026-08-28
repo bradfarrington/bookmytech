@@ -54,6 +54,25 @@ browser — prefixed `NEXT_PUBLIC_`) · **Required** = app breaks without it.
 | `MOT_TOKEN_URL` | ✅ | plain | OAuth token endpoint (Microsoft login URL — not secret). |
 | `MOT_SCOPE` | ✅ | plain | OAuth scope (`https://tapi.dvsa.gov.uk/.default`). |
 
+## Repair catalogue & labour times (HaynesPro) — required for booking
+
+Every booking is a HaynesPro repair (Task 17), so without these the booking
+funnel has nothing to sell. `lib/haynespro/client.ts` treats the integration as
+**unconfigured** when the two distributor values are missing (`/admin/vehicles`
+shows a "not configured" banner and lookups fail).
+
+| Var | Req | Type | Notes |
+|-----|-----|------|-------|
+| `HAYNESPRO_DISTRIBUTOR_USERNAME` | ✅ | 🔑 | Data Exchange distributor login (`lib/haynespro/client.ts`). |
+| `HAYNESPRO_DISTRIBUTOR_PASSWORD` | ✅ | 🔑 | Data Exchange distributor password. |
+| `HAYNESPRO_USERNAME` | ⬜ | plain | Per-app username minted against the distributor account. Falls back to `bookmytech`. |
+| `HAYNESPRO_SSO_COMPANY_ID` | ✅ | 🔑 | Portal-to-Portal SSO (the mechanic's "open manual" link, `lib/haynespro/sso.ts`). Unset = SSO links are simply not offered. |
+| `HAYNESPRO_SSO_PASSWORD` | ✅ | 🔑 | SSO distributor password. |
+| `HAYNESPRO_SSO_USERTYPE` | ⬜ | plain | Falls back to `demo`. Set to the live value once off the demo licence. |
+
+> `VRM_LOOKUP_USERNAME` / `VRM_LOOKUP_API_TOKEN` are in `.env.local` but **nothing
+> reads them** — leftovers from an earlier supplier. Don't add them to Vercel.
+
 ## SMS credits (Twilio) — feature not fully wired yet
 
 | Var | Req | Type | Notes |
@@ -131,3 +150,85 @@ money and create accounts.
 
 > CLI shortcut: `vercel link` then `vercel env add <NAME> production`. List with
 > `vercel env ls`. Pull prod values locally with `vercel env pull`.
+
+---
+
+## Search indexing — only the production domain is ever indexed
+
+The app keeps itself out of search engines everywhere except `bookmytech.co.uk`
+(and its subdomains). There is **no flag to set** — the rule is keyed on the
+hostname, so the testing subdomain can never be indexed by accident and the
+real domain can never be left noindexed by a forgotten switch.
+
+- `lib/site.ts` — the rule (`isIndexableHost`, `isProductionSite`).
+- `proxy.ts` — sets `X-Robots-Tag: noindex, nofollow` on every response whose
+  `Host` is not production. Vercel does this itself for `*.vercel.app` URLs but
+  not for custom domains, which is why the app has to.
+- `app/layout.tsx` — adds the matching `<meta name="robots" content="noindex">`
+  when `NEXT_PUBLIC_SITE_URL` is not production.
+- `app/robots.ts` — `/robots.txt`. Disallows the signed-in areas and machine
+  endpoints on every host, and deliberately does **not** `Disallow: /` on
+  staging: a crawler must be allowed to read a page to see its noindex, and
+  Google still lists URLs it is forbidden to fetch when something links to them.
+
+Check after any deploy: `curl -sI https://<host>/ | grep -i x-robots-tag` —
+present off production, absent on it.
+
+## Staging for owner testing — `bmt.thedigicraft.co.uk`
+
+A full copy of the site the owner can test as admin, customer and mechanic,
+invisible to search engines (see above). A separate Vercel project, not a
+branch of the future production one, so its env vars and domain never mix with
+the real ones.
+
+1. **Vercel plan first.** The team is on Hobby, and `vercel.json` schedules nine
+   crons, several every 5 minutes or hourly. **Hobby refuses to deploy any cron
+   expression that runs more than once a day** — the build fails with *"Hobby
+   accounts are limited to daily cron jobs"* — so the project must be on Pro
+   before the first deploy. The crons are not optional for a realistic test:
+   they time out mechanic offers, escalate disputes and send reminders. (Hobby
+   is also for non-commercial use only.)
+2. **Create the project.** Vercel → Add New → Project → import
+   `bradfarrington/bookmytech`, production branch `main`, framework Next.js
+   (auto-detected). Add the env vars *before* the first deploy.
+3. **Environment variables (Production scope).** Every ✅ Required row above,
+   with staging values:
+   - `NEXT_PUBLIC_SITE_URL=https://bmt.thedigicraft.co.uk` — email links, invite
+     / set-password links and Stripe return URLs are all built from it.
+   - Supabase: the existing dev project (migrated, has data). `APP_ENCRYPTION_KEY`
+     must be the value that encrypted that project's rows — copy it from `.env.local`.
+   - Stripe: **test** keys (`sk_test_…` / `pk_test_…`) so the owner can pay with
+     `4242 4242 4242 4242` and a test mechanic can finish Connect onboarding
+     without real money. Create a **test-mode** webhook endpoint for
+     `https://bmt.thedigicraft.co.uk/api/webhooks/stripe` → `STRIPE_WEBHOOK_SECRET`.
+   - `CRON_SECRET`: set it — unset means the cron routes are public.
+   - Twilio: leave unset unless you want real texts sent to the tester's phone.
+     GoCardless / Xero: sandbox or unset.
+   - DVLA / MOT / HaynesPro keys as in `.env.local` — note these are billed per
+     lookup, on staging as much as anywhere.
+4. **Domain.** Project → Settings → Domains → add `bmt.thedigicraft.co.uk`. If
+   `thedigicraft.co.uk` is already a domain in this Vercel team it verifies at
+   once; otherwise add the CNAME Vercel shows (`cname.vercel-dns.com`) at the
+   registrar.
+5. **Supabase → Authentication → URL Configuration.** Add
+   `https://bmt.thedigicraft.co.uk/**` to *Redirect URLs*. Mechanic invites,
+   customer set-password links and password resets pass a `redirectTo` built
+   from `NEXT_PUBLIC_SITE_URL`; Supabase silently substitutes its *Site URL* for
+   any `redirectTo` not on the list, and the link lands on the wrong host.
+6. **Deploy, then check:** `curl -sI https://bmt.thedigicraft.co.uk/ | grep -i x-robots-tag`
+   prints `noindex, nofollow`, and `/robots.txt` lists the private areas.
+7. **Test accounts.** One Supabase user has one `profiles.role`, and the
+   customer dashboard bounces admins and mechanics to their own areas, so the
+   owner needs three sign-ins. Plus-addressing on one inbox works
+   (`owner+admin@…`, `owner+mechanic@…`, `owner+customer@…`).
+   - Admin: sign up as a customer, then in the SQL editor
+     `update public.profiles set role = 'admin' where id = '<auth user uuid>';`
+   - Mechanic: admin invites them (or they apply at `/mechanics/apply` and the
+     admin approves — the more realistic test).
+   - Customer: `/signup`, or the account created during a booking.
+
+**Moving to `bookmytech.co.uk` later:** add the domain to the production
+project, set `NEXT_PUBLIC_SITE_URL`, swap Stripe to live keys and a live
+webhook, add the new host to Supabase *Redirect URLs*, then remove
+`bmt.thedigicraft.co.uk` from the staging project. There is nothing to
+"un-noindex" — the staging host was never in the index.

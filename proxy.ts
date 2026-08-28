@@ -1,7 +1,24 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { isIndexableHost } from "@/lib/site";
 
 export async function proxy(request: NextRequest) {
+  const response = await handleRequest(request);
+
+  // Only the production domain may be indexed (see lib/site.ts). Vercel stamps
+  // this header on its *.vercel.app deployment URLs itself but not on custom
+  // domains, so the client-testing subdomain needs it from us. A header rather
+  // than a robots.txt Disallow: a Disallow only stops crawling, and Google will
+  // still list a URL it is forbidden to read if anything links to it — noindex
+  // is the instruction that actually keeps a page out of results, and the bot
+  // has to be allowed to fetch the page to see it.
+  if (!isIndexableHost(request.headers.get("host"))) {
+    response.headers.set("X-Robots-Tag", "noindex, nofollow");
+  }
+  return response;
+}
+
+async function handleRequest(request: NextRequest) {
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(
