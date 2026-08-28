@@ -797,16 +797,16 @@ export const EMAIL_TEMPLATE_DEFS: readonly EmailTemplateDef[] = [
   {
     key: "dispute_withdrawn_mechanic",
     label: "Dispute withdrawn (to mechanic)",
-    description: "Sent to the mechanic when a dispute is withdrawn and their payout released.",
+    description: "Sent to the mechanic when a dispute is withdrawn; their payout is unaffected.",
     category: "dispute",
     subject: "Dispute closed — booking {{ref}}",
-    preheader: "The dispute has been withdrawn; your payout is released.",
+    preheader: "The dispute has been withdrawn; your payout is unaffected.",
     variables: [
       { name: "service", description: "Service name", example: "Full service" },
       { name: "ref", description: "Booking reference", example: "A1B2C3D4" },
     ],
     blocks: [
-      { id: "body", type: "paragraph", text: "The dispute on {{service}} has been withdrawn. Your payout for this job has been released." },
+      { id: "body", type: "paragraph", text: "The dispute on {{service}} has been withdrawn. Your payout for this job is unaffected." },
     ],
   },
   {
@@ -873,7 +873,7 @@ export const EMAIL_TEMPLATE_DEFS: readonly EmailTemplateDef[] = [
       { name: "ref", description: "Booking reference", example: "A1B2C3D4" },
       { name: "service", description: "Service name", example: "Full service" },
       { name: "decision", description: "Resolution decision", example: "Partial refund" },
-      { name: "payout_line", description: "Payout outcome line", example: "Your payout for this job has been released." },
+      { name: "payout_line", description: "Payout outcome line", example: "Your payout for this job is unaffected." },
     ],
     blocks: [
       { id: "heading", type: "heading", text: "Dispute resolved" },
