@@ -113,8 +113,22 @@ export interface VehicleDetailsInput {
 const NEGATIVE_CACHE_TTL_MS = 10 * 60 * 1000;
 const negativeCache = new Map<string, number>();
 
-function cacheKey(reg: string): string {
+/** The `haynespro_vehicle_cache` primary key for a reg: uppercase, no spaces. */
+export function cacheRegKey(reg: string): string {
   return (reg || "").toUpperCase().replace(/\s+/g, "");
+}
+
+/**
+ * Forget that a reg failed to resolve.
+ *
+ * A reg we couldn't match is negative-cached for ten minutes, and that check
+ * runs BEFORE the database read — so a customer who fails to resolve and then
+ * corrects the vehicle by hand would keep getting null from this instance for
+ * the rest of the window, with their correction sitting in the table unread.
+ * The manual-selection path calls this straight after writing the row.
+ */
+export function clearNegativeCache(reg: string): void {
+  negativeCache.delete(cacheRegKey(reg));
 }
 
 type DbClient = SupabaseClient;
@@ -230,7 +244,7 @@ export async function resolveVehicle(
   reg: string,
   db: DbClient,
 ): Promise<ResolvedVehicle | null> {
-  const key = cacheKey(reg);
+  const key = cacheRegKey(reg);
   if (!key) return null;
 
   const failedUntil = negativeCache.get(key);
@@ -240,11 +254,20 @@ export async function resolveVehicle(
   const { data: cached } = await db
     .from("haynespro_vehicle_cache")
     .select(
-      "reg, car_type_id, repairtime_type_id, description, hp_make, hp_model_label, expires_at",
+      "reg, car_type_id, repairtime_type_id, description, hp_make, hp_model_label, resolved_via, expires_at",
     )
     .eq("reg", key)
     .maybeSingle();
-  if (cached && new Date(cached.expires_at).getTime() > Date.now()) {
+  // A MANUAL row is a customer telling us which car this actually is, and it
+  // outranks anything the fuzzy matcher would produce from DVLA's make and
+  // model strings — that guess is what they were correcting. So it never
+  // expires and is never overwritten: letting the TTL lapse would silently
+  // revert the price to the wrong variant a month later, which is the exact
+  // failure this feature exists to fix. (`expires_at` is also written far
+  // future, so this holds even if a row is read by something that doesn't
+  // know the rule.)
+  const manual = cached?.resolved_via === "manual";
+  if (cached && (manual || new Date(cached.expires_at).getTime() > Date.now())) {
     return {
       reg: key,
       carTypeId: cached.car_type_id,

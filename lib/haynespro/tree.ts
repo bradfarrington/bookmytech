@@ -84,6 +84,36 @@ export async function getModelWithTypes(modelId: number): Promise<HpTreeNode | n
 }
 
 /**
+ * One TYPE node by its car-type id — the level the price depends on. Carries
+ * `fullName` ("FORD Ranger 2.0 EcoBlue"), `name` ("2.0 EcoBlue") and
+ * `superElementId` (its MODEL), which is how a manually chosen type is turned
+ * into a complete cache row (lib/haynespro/vehicle-picker.ts).
+ *
+ * Verified live 2026-09-01. Two things to know:
+ *
+ *  - **Ids are namespaced per level.** `vehicle_id=270` is FORD at MAKE level
+ *    and an "ALFA ROMEO 33 (905) 1.7 8V QV" at TYPE level. So this must only
+ *    ever be called with an id the caller believes is a TYPE, and the node it
+ *    returns — not the id it was asked about — is the authority on what the
+ *    vehicle actually is.
+ *  - **Not-found is HTTP 200.** An unknown id (or a MAKE/MODEL id asked for at
+ *    TYPE level) comes back as an all-null node with `status.statusCode 6`
+ *    ("Vehicle not found"), which `haynesProCall` passes through unchanged. So
+ *    a null `id` is the miss, and returning null for it also keeps `memoised`
+ *    from caching a miss for a day.
+ */
+export async function getCarTypeNode(carTypeId: number): Promise<HpTreeNode | null> {
+  return memoised(`type:${carTypeId}`, TREE_TTL_MS, async () => {
+    const node = await treeCall({
+      vehicle_id: carTypeId,
+      vehicle_level: "TYPE",
+      filter_toVehicleLevel: "TYPE",
+    });
+    return node?.id == null ? null : node;
+  });
+}
+
+/**
  * Filename slug for the bundled brand logo pack (`public/brands/<slug>.png`).
  * Must stay in sync with the pack's generator: lowercase ASCII, runs of
  * non-alphanumerics collapsed to "-".

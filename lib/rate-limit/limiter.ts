@@ -70,6 +70,16 @@ export const RATE_LIMIT_DEFAULTS = {
   mobile_message_user_daily: 200,
   mobile_message_ip_burst: 40,
   mobile_message_ip_daily: 600,
+  // Correcting the vehicle a reg resolved to (POST /vehicle/resolve). Tighter
+  // than anything else here on purpose: it is the only customer-reachable write
+  // to SHARED pricing state — the vehicle cache is keyed on reg alone, so one
+  // correction moves that plate's price for every customer, web included. The
+  // make guard is what makes it safe; this is what makes it quiet. A real
+  // customer corrects their car once, and gets a few goes at the picker.
+  mobile_vehicle_user_burst: 5,
+  mobile_vehicle_user_daily: 20,
+  mobile_vehicle_ip_burst: 10,
+  mobile_vehicle_ip_daily: 60,
   // Dispute photo uploads. Each one puts up to 10 MB into the job-media bucket
   // that we then store forever, so the bucket — not CPU — is what's being
   // protected. A dispute takes at most MAX_DISPUTE_PHOTOS (6) images.

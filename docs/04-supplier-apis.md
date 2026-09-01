@@ -55,6 +55,11 @@ All calls REST JSON, all returned real data:
 
 2. getRepairtimeTypesV2?vrid=…&descriptionLanguage=en&carTypeId=26650      (VW Golf IV 1.4 AKQ)
    → [{make:"VW", model:"GOLF IV (1J1)", repairtimeTypeId:8799, typeCategory:"CAR", rootNodeId:"root"}, …]
+   ⚠️ ITS make/model ARE A DIFFERENT VOCABULARY FROM THE TREE'S. The tree's
+   "FORD Ranger 2.0 EcoBlue" answers make:"FORD USA", model:"RANGER Extended
+   Cab Pickup"; the tree's "VOLKSWAGEN" is "VW" here. Use it for the
+   repairtimeTypeId only — never to decide what make a vehicle is.
+   [verified 2026-09-01, Task 20]
 
 3. getRepairtimeNodesByGenartsV4?vrid=…&repairtimeTypeId=8799&typeCategory=CAR&genArtNumbers=402
    → "Renew the front brake pads"  id=1M01510000WV0  value=70   (= 0.70 h)
@@ -78,6 +83,21 @@ All calls REST JSON, all returned real data:
      served image/svg+xml + gzip + CORS * → renders in a plain <img>).
    MODEL→TYPE likewise. ⚠️ vehicle_id is the BARE integer id (no m_/t_ prefix);
    filter_category values: PASSENGER / LCV / TRUCK / MOTORCYCLE.
+   A single TYPE can also be fetched by id: vehicle_id=<carTypeId>&
+   vehicle_level=TYPE&filter_toVehicleLevel=TYPE → the node with fullName
+   ("FORD Ranger 2.0 EcoBlue"), name, engineCode, fuelType (an ARRAY here,
+   a string in findCarTypesByDetailsV3), capacity, output and superElementId
+   (its MODEL).  [verified 2026-09-01, Task 20]
+   ⚠️⚠️ IDS ARE NAMESPACED PER LEVEL. vehicle_id=270 is FORD at MAKE level and
+   an unrelated "ALFA ROMEO 33 (905) 1.7 8V QV" at TYPE level. Never assume an
+   id identifies a vehicle without the level — trust the node that comes back,
+   not the id you sent.
+   ⚠️ NOT-FOUND IS HTTP 200: an unknown id (or a MAKE/MODEL id asked for at
+   TYPE level) returns an all-null node with status.statusCode 6 ("Vehicle not
+   found"). haynesProCall passes it straight through — it only re-auths on 5 —
+   so a null `id` is the miss. getRepairtimeTypesV2 answers the same way.
+   ⚠️ `output` is kW, not bhp (TESLA Model 3 Long Range = 211 → 283 bhp), and
+   `capacity` is 0, not null, on an EV.
 
 7. getStoryOverview?vrid=…&carType=26650 → 18 repair manuals (name + storyId).
    getStoryInfoV6?carTypeId=…&storyId=…&smartLinks=false → {name, storyLines[]}

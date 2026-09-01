@@ -49,8 +49,15 @@ export function staffRefusal(caller: MobileCaller): Response | null {
  *              dispute open/withdraw, releasing a stranded hold)
  *   message  — dispute thread messages
  *   upload   — dispute photos
+ *   vehicle  — correcting the vehicle a reg resolved to (shared pricing state)
  */
-export type MobileLimitFamily = "checkout" | "booking" | "action" | "message" | "upload";
+export type MobileLimitFamily =
+  | "checkout"
+  | "booking"
+  | "action"
+  | "message"
+  | "upload"
+  | "vehicle";
 
 /**
  * Count this request against its bucket family. Returns a ready-to-return 429

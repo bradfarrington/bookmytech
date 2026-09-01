@@ -8,6 +8,14 @@ import {
   pickBestCandidate,
   scoreCandidate,
 } from "./vehicle";
+import {
+  flattenFuelType,
+  kwToBhp,
+  makesMatch,
+  toPickerMake,
+  toPickerModel,
+  toPickerType,
+} from "./vehicle-picker";
 import type { HpCarType } from "./types";
 
 describe("extractStatusCode", () => {
@@ -341,5 +349,136 @@ describe("repair search ranking", () => {
     expect(affinityFor("Brake pads", ["brake", "pads"])).toBe(2);
     expect(affinityFor("Brakes (Mechanical)", ["brake", "pads"])).toBe(1);
     expect(affinityFor("Cooling system", ["brake", "pads"])).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Manual vehicle selection (Task 20). Node shapes below are copied verbatim
+// from live replies captured on 2026-09-01.
+// ---------------------------------------------------------------------------
+
+describe("picker node flattening", () => {
+  it("keeps a make to id + name", () => {
+    expect(toPickerMake({ id: 270, level: "MAKE", name: "FORD", fullName: "FORD" })).toEqual({
+      id: 270,
+      name: "FORD",
+    });
+  });
+
+  it("keeps a model's production years — customers pick by shape-and-era", () => {
+    // FORD lists four vehicles called "Ranger"; the years are how they differ.
+    expect(
+      toPickerModel({
+        id: 102000254,
+        level: "MODEL",
+        name: "Ranger",
+        fullName: "FORD Ranger",
+        madeFrom: "2011",
+        madeUntil: "2023",
+        image: "https://www.haynespro-assets.com/workshop/images/319045505.svgz",
+      }),
+    ).toEqual({
+      id: 102000254,
+      name: "Ranger",
+      madeFrom: "2011",
+      madeUntil: "2023",
+      image: "https://www.haynespro-assets.com/workshop/images/319045505.svgz",
+    });
+  });
+
+  it("sends a type's power as BOTH kW and bhp, never one unlabelled number", () => {
+    expect(
+      toPickerType({
+        id: 619117140,
+        level: "TYPE",
+        name: "2.0 EcoBlue",
+        fullName: "FORD Ranger 2.0 EcoBlue",
+        madeFrom: "2023",
+        madeUntil: null,
+        engineCode: "YN2R",
+        fuelType: ["DIESEL"],
+        capacity: 1995,
+        output: 155,
+      }),
+    ).toEqual({
+      id: 619117140,
+      name: "2.0 EcoBlue",
+      fullName: "FORD Ranger 2.0 EcoBlue",
+      engineCode: "YN2R",
+      fuelType: "DIESEL",
+      capacity: 1995,
+      outputKw: 155,
+      outputBhp: 208,
+      madeFrom: "2023",
+      madeUntil: null,
+    });
+  });
+
+  it("reports an EV's capacity as null, not 0 cc", () => {
+    const ev = toPickerType({
+      id: 619017105,
+      level: "TYPE",
+      name: "Long Range",
+      fullName: "TESLA Model 3 Long Range",
+      capacity: 0,
+      output: 211,
+      fuelType: ["ELECTRICAL"],
+    });
+    expect(ev?.capacity).toBeNull();
+    expect(ev?.outputKw).toBe(211);
+    expect(ev?.outputBhp).toBe(283); // and NOT 211 — the kW/bhp trap
+  });
+
+  it("drops nodes with no id — including HaynesPro's 'Vehicle not found' node", () => {
+    // An unknown id comes back at HTTP 200 as an all-null node with
+    // status.statusCode 6, so a null id is the miss.
+    expect(toPickerMake({ id: null, name: null })).toBeNull();
+    expect(toPickerModel({ id: null, name: null })).toBeNull();
+    expect(toPickerType({ id: null, name: null })).toBeNull();
+  });
+
+  it("flattens fuelType from either wire shape", () => {
+    expect(flattenFuelType("DIESEL")).toBe("DIESEL");
+    expect(flattenFuelType(["DIESEL"])).toBe("DIESEL");
+    expect(flattenFuelType(["PETROL", "ELECTRIC"])).toBe("PETROL / ELECTRIC");
+    expect(flattenFuelType(null)).toBeNull();
+    expect(flattenFuelType([])).toBeNull();
+  });
+
+  it("treats a missing or zero output as no figure at all", () => {
+    expect(kwToBhp(null)).toBeNull();
+    expect(kwToBhp(0)).toBeNull();
+  });
+});
+
+describe("makesMatch — the guard on a shared, unscoped price", () => {
+  it("permits any variant of the make DVLA holds", () => {
+    // The whole point: the variant is what's ambiguous, so a Ranger may be
+    // repointed at any other Ford.
+    expect(makesMatch("FORD", "FORD")).toBe(true);
+    expect(makesMatch("ford", "FORD")).toBe(true);
+  });
+
+  it("refuses a different make — the attack this exists to stop", () => {
+    expect(makesMatch("FORD", "PORSCHE")).toBe(false);
+    expect(makesMatch("VOLKSWAGEN", "VOLVO")).toBe(false);
+    expect(makesMatch("ALPINA", "ALPINE")).toBe(false);
+  });
+
+  it("survives the two sources spelling one manufacturer differently", () => {
+    expect(makesMatch("MG MOTOR UK LTD", "MG")).toBe(true);
+    expect(makesMatch("GREAT WALL", "GREAT WALL (GWM)")).toBe(true);
+    expect(makesMatch("DS AUTOMOBILES", "DS")).toBe(true);
+    expect(makesMatch("LAND ROVER", "LAND ROVER")).toBe(true);
+    expect(makesMatch("CITROËN", "CITROEN")).toBe(true);
+    expect(makesMatch("ŠKODA", "SKODA")).toBe(true);
+    expect(makesMatch("VW", "VOLKSWAGEN")).toBe(true);
+    expect(makesMatch("MERCEDES", "MERCEDES-BENZ")).toBe(true);
+  });
+
+  it("refuses when either side is missing — an unguarded write is the refusal", () => {
+    expect(makesMatch(null, "FORD")).toBe(false);
+    expect(makesMatch("FORD", null)).toBe(false);
+    expect(makesMatch("", "")).toBe(false);
   });
 });
