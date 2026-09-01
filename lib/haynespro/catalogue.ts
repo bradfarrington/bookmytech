@@ -29,6 +29,16 @@ export interface CatalogueVehicle {
   description: string;
   /** Included so a client can show a rate without a second round trip. */
   hourlyRatePence: number;
+  /**
+   * The vehicle's make as DVLA holds it, uppercased — "FORD".
+   *
+   * ADDITIVE AND OPTIONAL ON PURPOSE (same reasoning as `CatalogueFailure.retryable`):
+   * a phone running an older build ignores a field it has never heard of. It is
+   * here so a client offering "that's not my car" can seed the make picker
+   * without a second round trip to DVLA — the manual-correction guard requires
+   * the chosen vehicle to be of this make.
+   */
+  make?: string | null;
 }
 
 export interface CatalogueNode {
@@ -154,6 +164,7 @@ async function loadContext(
       vehicle: {
         description: resolved.description ?? "vehicle",
         hourlyRatePence,
+        make: resolved.hpMake,
       },
       excluded,
     },

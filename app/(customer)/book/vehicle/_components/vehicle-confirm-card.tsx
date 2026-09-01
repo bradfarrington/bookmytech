@@ -1,13 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { CheckCircle, ChevronRight } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ArrowLeft, CheckCircle, ChevronRight } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Pill } from "@/components/ui/pill";
 import { ProgressStepper } from "@/components/customer/progress-stepper";
+import { VehiclePicker } from "@/components/customer/vehicle-picker";
 import type { VehicleDetails } from "@/lib/dvla/types";
-import { ManualVehicleForm } from "./manual-vehicle-form";
 
 interface VehicleConfirmCardProps {
   details: VehicleDetails;
@@ -17,6 +18,7 @@ interface VehicleConfirmCardProps {
 
 export function VehicleConfirmCard({ details, reg, nextHref }: VehicleConfirmCardProps) {
   const [showManual, setShowManual] = useState(false);
+  const router = useRouter();
 
   const title = [details.yearOfManufacture, details.make, details.model]
     .filter(Boolean)
@@ -26,16 +28,44 @@ export function VehicleConfirmCard({ details, reg, nextHref }: VehicleConfirmCar
     return s.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
   }
 
+  // Picking a vehicle here writes the real HaynesPro car type against this reg,
+  // so the next step prices the corrected car. Straight on to the repairs step
+  // rather than back to this card: this card shows DVLA's record, which the
+  // correction hasn't changed and isn't about.
   if (showManual) {
     return (
-      <ManualVehicleForm
-        reg={reg}
-        defaultMake={details.make}
-        defaultModel={details.model ?? ""}
-        defaultYear={details.yearOfManufacture?.toString() ?? ""}
-        onBack={() => setShowManual(false)}
-        nextHref={nextHref}
-      />
+      <div className="flex flex-col gap-6">
+        <ProgressStepper currentStep={1} />
+
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setShowManual(false)}
+            className="flex size-9 items-center justify-center rounded-full border border-border text-text-secondary hover:bg-surface"
+            aria-label="Back"
+          >
+            <ArrowLeft size={18} />
+          </button>
+          <div>
+            <h1 className="text-2xl font-bold text-text-primary">Choose your vehicle</h1>
+            <p className="text-sm text-text-secondary">
+              Pick the exact model and engine for{" "}
+              <span className="font-semibold tracking-wide">{reg}</span> and we&apos;ll
+              price repairs against it.
+            </p>
+          </div>
+        </div>
+
+        <Card>
+          <VehiclePicker
+            reg={reg}
+            dvlaMake={details.make}
+            onSaved={() => router.push(nextHref)}
+            onCancel={() => setShowManual(false)}
+            cancelLabel="Back"
+          />
+        </Card>
+      </div>
     );
   }
 
@@ -110,7 +140,7 @@ export function VehicleConfirmCard({ details, reg, nextHref }: VehicleConfirmCar
           onClick={() => setShowManual(true)}
           className="text-center text-sm font-medium text-brand-blue hover:underline"
         >
-          Details look wrong? Edit manually
+          Not your car? Choose it manually
         </button>
       </div>
     </div>

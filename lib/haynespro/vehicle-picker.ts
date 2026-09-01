@@ -21,6 +21,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getHourlyRatePence } from "@/lib/pricing/calculate";
 import type { CatalogueVehicle } from "./catalogue";
+import { makesMatch } from "./make-match";
 import { getCarTypeNode, getMakeWithModels, getMakes, getModelWithTypes, getRepairtimeTypeId } from "./tree";
 import { cacheRegKey, clearNegativeCache, deriveModelLabel } from "./vehicle";
 import type { HpTreeNode } from "./types";
@@ -163,56 +164,12 @@ export async function listTypes(modelId: number): Promise<PickerType[] | null> {
 // The make guard.
 // ---------------------------------------------------------------------------
 
-/**
- * DVLA make strings and HaynesPro make names for the same manufacturer.
- * Everything else is handled by normalisation plus the prefix rule below;
- * these are the pairs where neither is a prefix of the other.
- */
-const MAKE_ALIASES: Record<string, string> = {
-  VW: "VOLKSWAGEN",
-  MERCEDES: "MERCEDESBENZ",
-  MERC: "MERCEDESBENZ",
-  LDV: "MAXUSLDV",
-  GWM: "GREATWALLGWM",
-};
-
-/** Uppercase, de-accent, letters and digits only: "CITROËN" and "Citroen" agree. */
-function normaliseMake(raw: string | null | undefined): string {
-  const stripped = (raw ?? "")
-    .normalize("NFKD")
-    .replace(/[̀-ͯ]/g, "")
-    .toUpperCase()
-    .replace(/[^A-Z0-9]+/g, "");
-  return MAKE_ALIASES[stripped] ?? stripped;
-}
-
-/**
- * Does the chosen vehicle's make agree with the make DVLA holds for the reg?
- *
- * **This is the guard that makes the correction safe to expose.** The vehicle
- * cache is keyed on reg alone with no customer scoping, so one person's
- * correction moves that plate's price for everyone, web customers included.
- * That is right when it is the right car — and an open door otherwise. DVLA is
- * authoritative on MAKE; it is the variant that is ambiguous. So a Ranger may
- * be repointed at any other Ranger (or any other Ford), and never at a 911.
- *
- * Either-direction prefix, not equality, because the two sources spell the same
- * manufacturer differently: DVLA's "MG MOTOR UK LTD" against HaynesPro's "MG",
- * "GREAT WALL" against "GREAT WALL (GWM)", "DS AUTOMOBILES" against "DS".
- * Checked against the live 89-make list on 2026-09-01: **no HaynesPro make name
- * is a prefix of another** (the near misses — ALPINA/ALPINE, VOLKSWAGEN/VOLVO —
- * both diverge), so the prefix rule cannot let one make masquerade as another.
- * Pure — unit-tested.
- */
-export function makesMatch(
-  dvlaMake: string | null | undefined,
-  hpMake: string | null | undefined,
-): boolean {
-  const a = normaliseMake(dvlaMake);
-  const b = normaliseMake(hpMake);
-  if (!a || !b) return false;
-  return a.startsWith(b) || b.startsWith(a);
-}
+// Lives in ./make-match.ts, which imports nothing, because the customer's
+// picker needs it in the BROWSER to seed itself with the make DVLA already
+// knows — and a client component cannot import this module without pulling the
+// HaynesPro client and the pricing engine into the bundle. Re-exported here so
+// the server side reads as one piece.
+export { makesMatch, normaliseMake } from "./make-match";
 
 // ---------------------------------------------------------------------------
 // The correction.
@@ -230,8 +187,19 @@ export type ManualVehicleResult =
 export interface ManualVehicleInput {
   reg: string;
   carTypeId: number;
-  /** The VERIFIED caller, for the audit trail. Never taken from a request body. */
-  callerId: string;
+  /**
+   * The VERIFIED caller, for the audit trail — from a Bearer token or a cookie
+   * session, never from anything the client sent.
+   *
+   * **Null means a guest**, and that is deliberate rather than a gap: the web
+   * funnel prices a job before asking anyone to make an account, so the step
+   * where a customer notices the wrong car is a step guests are standing on.
+   * Demanding a sign-in to fix it would gate the funnel at its worst moment.
+   * What actually keeps this safe is the DVLA make guard below, which applies
+   * to everyone; the audit row still records `resolved_at`, just without a name
+   * against it. The mobile endpoint always passes a real id.
+   */
+  callerId: string | null;
 }
 
 /**

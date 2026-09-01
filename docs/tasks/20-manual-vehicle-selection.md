@@ -1,6 +1,6 @@
-# Task 20 — Manual vehicle selection (`app/api/mobile/v1/vehicle/**`)
+# Task 20 — Manual vehicle selection (mobile API + web funnel)
 
-**Status:** ✅ Complete (2026-09-01) — all four endpoints of the app's `manual-vehicle-crm-prompt.md` shipped, on a new shared core `lib/haynespro/vehicle-picker.ts`. **One migration to apply — `0051` — and this checkout has no SQL access, so it was NOT applied here.** Everything either side of the write was proved live against a local dev server and the real HaynesPro/DVLA APIs (see "What was verified"); the write itself refuses with `unavailable` until `0051` lands, and says so by name in the server log. **Deviations from the prompt:** a type's power is sent as `outputKw` **and** `outputBhp` rather than one field called `output` (HaynesPro's number is kW, and the prompt asked not to mislabel it); two failure codes exist that the prompt didn't name (`type_unknown`, `vehicle_unknown`) alongside `make_mismatch` and `no_coverage`; the three read endpoints answer an outage with a 200 `{ ok: false, code: "unavailable" }` rather than an empty list.
+**Status:** ✅ Complete (2026-09-01) — **both clients.** Stage 1 shipped the four endpoints of the app's `manual-vehicle-crm-prompt.md` on a new shared core `lib/haynespro/vehicle-picker.ts`; Stage 2 put the same picker into the **website**, which the prompt had deliberately left out but which had the identical wrong-price bug. Migration `0051` was applied by Brad mid-task, so the full happy path is **verified end-to-end in a real browser** — see "What was verified". **Deviations from the prompt:** a type's power is sent as `outputKw` **and** `outputBhp` rather than one field called `output` (HaynesPro's number is kW, and the prompt asked not to mislabel it); two failure codes exist that the prompt didn't name (`type_unknown`, `vehicle_unknown`) alongside `make_mismatch` and `no_coverage`; the three read endpoints answer an outage with a 200 `{ ok: false, code: "unavailable" }` rather than an empty list; `CatalogueVehicle` gained an **optional, additive** `make`.
 
 ## Why this exists
 
@@ -8,7 +8,7 @@ Reg → HaynesPro vehicle is **not a lookup, it is a fuzzy match**. `resolveVehi
 
 The live tree makes that concrete. `FORD Ranger (2011–2023)` lists **three variants all named "2.0 (EcoBlue)"**, separated only by engine code and power — 132 kW `YM2X`, 125 kW `BC2X`, 96 kW `YL2X`. Nothing in DVLA's `RANGER WILDTRAK ECOBLUE 4X4 A` picks between them. **A wrong variant means wrong labour times, which means a wrong price.**
 
-Until now the customer had no way to correct it. The web funnel's "Edit manually" form collects make/model/year as free text and threads it through the URL for **display only** — it never reaches `repair-catalogue.ts`, so the page shows the corrected car and keeps charging for the guessed one. The app had the same link wired to an empty `onPress`, which is what started this.
+Until this task, neither client could correct it. The web funnel's "Edit manually" form collected make/model/year as free text and threaded it through the URL for **display only** — it never reached the pricing engine, so the page showed the corrected car and kept charging for the guessed one. The app had the same link wired to an empty `onPress`, which is what started this. Stage 1 fixed the app; Stage 2 fixed the website.
 
 ## P1–P3 — the cascade ✅
 
@@ -65,6 +65,25 @@ Both verified live on 2026-09-01 and now recorded in `docs/04-supplier-apis.md`:
 - **`getRepairtimeTypesV2`'s make is a different vocabulary from the tree's.** For the tree's "FORD Ranger 2.0 EcoBlue" it answers `make: "FORD USA"`, `model: "RANGER Extended Cab Pickup"`. Using it for the make guard would have refused half of the corrections it is meant to permit.
 - Not-found is **HTTP 200** with an all-null node carrying `status.statusCode 6` ("Vehicle not found"), which `haynesProCall` passes straight through (it only re-auths on 5). A null `id` is the miss — and returning null for it also stops `memoised` caching a miss for a day.
 
+## Stage 2 — the same picker on the website ✅
+
+The prompt left the web funnel alone as "yours to schedule". It shouldn't have waited: the website had the *same* bug and a worse version of it, because the thing it offered instead **looked** like a fix.
+
+**What was there.** Two places let a customer say "that's not my car", and neither could change a price:
+
+- The landing-page modal (`vehicle-lookup-modal.tsx`) — "Not your car? **Try a different reg**", which just closes the modal. Correct for a typo, useless for a wrong match.
+- `/book/vehicle` — "Details look wrong? **Edit manually**" → a free-text make/model/year form that threaded its answers through the URL and was read only by `vehicleLabel()` for the caption. **The page showed the corrected car and kept charging for the guessed one.** That form is now deleted.
+
+**Where the picker went, and why there.** The vehicle step shows DVLA's record, which is nearly always right at make-and-model level. The variant — the thing the price is built from — is only ever visible on `/book/repairs`: *"Repair times matched to your FORD Ranger 3.0 TDCI"*. So that line is where someone notices, and it is now where the fix lives, as a "Not your car?" link that opens the picker inline and `router.refresh()`es on success. It is also on `/book/vehicle` (replacing the free-text form, continuing straight to the repairs step) and — the biggest win — **on the not-matched dead end**: a reg HaynesPro can't match used to end at "we can't price this vehicle online yet, get in touch", and now offers "tell us what you drive" first and the help link second.
+
+**Wiring.** `app/actions/vehicle-picker.ts` — four `"use server"` actions that are each a call into the same `lib/haynespro/vehicle-picker.ts` the mobile routes use, so the two clients cannot disagree about which car a reg is. `components/customer/vehicle-picker.tsx` is the shared UI (three cascading `Select`s, used from three places).
+
+Three things worth knowing:
+
+- **The make is fixed, not a dropdown.** The picker seeds itself with DVLA's make and shows it as a read-only "FORD · from DVLA" row, because the server refuses a correction whose make disagrees with DVLA — offering the choice would be offering a dead end. Only if DVLA's make matches nothing in HaynesPro's list does a make dropdown appear. That needed `makesMatch` in the *browser*, so it moved to `lib/haynespro/make-match.ts`, which imports nothing and is safe to bundle.
+- **`CatalogueVehicle` gained `make`** so the repairs page can seed the picker without a second DVLA call. Optional and additive — an older app build ignores it. DVLA is only called on the *failure* path, where it is a cache hit from step 1 anyway.
+- **Guests may correct a vehicle.** The funnel prices a job before asking for an account, so the moment someone spots the wrong car is a moment they are usually anonymous; requiring a sign-in would gate the funnel at its worst point and leave the wrong price standing for everyone who declines. The DVLA make guard doesn't depend on who is calling, so the blast radius is unchanged — a plate can still only move to a different variant of its own make. `resolved_by` is null for a guest, `resolved_at` is still stamped, and the `vehicle` rate family applies per IP. **`selectVehicleManually` is the one place to change if this should be signed-in only.**
+
 ## What was verified
 
 **Live, against the real APIs and a local dev server** (`npm run dev`, real HaynesPro + real DVLA + the live Supabase project), using `S28BSW` — an existing cache row that is itself the case that prompted this: a Ford Ranger fuzzy-matched to "3.0 TDCI".
@@ -86,11 +105,24 @@ Both verified live on 2026-09-01 and now recorded in `docs/04-supplier-apis.md`:
 | 6th call in a minute | 429 with `Retry-After` |
 | the live `S28BSW` cache row afterwards | **untouched** |
 
-The write itself could not be completed: `0051` is not applied, so it fails with `PGRST204 Could not find the 'resolved_at' column` and returns `unavailable`. The failure is **closed, not open** — nothing is written and the existing row is intact — and the log names the migration. Everything upstream of it ran green.
+During that run `0051` had not yet been applied, so the write itself failed **closed, not open** — `PGRST204 Could not find the 'resolved_at' column`, nothing written, the existing row intact, and the migration named in the log. Everything upstream of it ran green.
 
-Also: `tsc --noEmit` clean, `eslint` clean, production build compiles with all four routes present, **156 unit tests (12 new)** covering the node flattening (kW→bhp, EV capacity, the two `fuelType` shapes, null-id drops) and every branch of `makesMatch`.
+**Then Stage 2, in a real browser** (Playwright against the dev server), once `0051` had been applied:
 
-The live schema was diffed at the same time: **`0048`, `0049` and `0050` have since been applied** (`mechanic_locations`, `customer_push_tokens`, `push_receipts` are all present). `0051` is the only outstanding one.
+| | |
+|---|---|
+| `/book/repairs?reg=S28BSW` | "Repair times matched to your FORD Ranger 3.0 TDCI" + "Not your car?" |
+| the picker opens | make seeded and fixed: **"FORD · from DVLA"** |
+| models | 96, including all four Fords called "Ranger", separated by year: `Ranger (1999–2011)`, `(2006–2012)`, `(2011–2023)`, `(2022–on)` |
+| variants | 26, labelled with what actually tells them apart — `2.0 (EcoBlue) · 1996 cc · 177 bhp · 2019–2022`, then 168 bhp, then 129 bhp |
+| "Use this vehicle" | **saved** — the row became `car_type_id 619023273`, `repairtime_type_id 141852`, `description "FORD Ranger 2.0 (EcoBlue)"`, `resolved_via 'manual'`, `resolved_at` stamped, `resolved_by` null (guest), `expires_at 2126` |
+| browser console / page errors | none |
+
+**That run changed a live cache row, and it was put back.** `S28BSW` was an existing fuzzy-matched row, not a scratch one. It was restored by deleting the manual row and re-requesting the page, which re-resolved it to exactly what it held before — `car_type_id 619114949`, `"FORD Ranger 3.0 TDCI"`, `resolved_via 'details'` — with a fresh 30-day TTL, which is what any normal re-resolution does. **Use a scratch reg next time:** the cache is keyed on reg alone and global, so there is no such thing as a private test write here.
+
+Also: `tsc --noEmit` clean, `eslint` clean on every file touched, production build compiles with all four routes present, **156 unit tests (12 new)** covering the node flattening (kW→bhp, EV capacity, the two `fuelType` shapes, null-id drops) and every branch of `makesMatch`.
+
+The live schema was diffed during Stage 1: `0048`, `0049` and `0050` had already been applied. `0051` was applied by Brad partway through Stage 2 — **there is no outstanding migration.**
 
 ## Acceptance criteria
 
@@ -107,12 +139,14 @@ The live schema was diffed at the same time: **`0048`, `0049` and `0050` have si
 - [x] Response is the same `vehicle` shape `/repairs/tree` returns
 - [x] No pricing endpoint gained a `carTypeId` parameter — the cache is the seam
 - [x] Unit tests for the pure helpers; live probe of every refusal path
-- [ ] The happy path writing a row end-to-end — **blocked on `0051` being applied**
+- [x] The happy path writing a row end-to-end — driven in a real browser once `0051` landed
+- [x] The same picker on the website: `/book/vehicle`, `/book/repairs`, and the not-matched dead end
+- [x] The free-text "Edit manually" form deleted
 
 ## Follow-ups
 
-- **Apply `0051`, then re-run the happy path.** Point a reg at a different variant of its own make and check `/repairs/tree` for that reg re-prices against the new `repairtime_type_id`. Until then `/vehicle/resolve` refuses every correction with `unavailable`, so the app's "Wrong car?" flow will look broken.
-- **The web funnel's free-text form is untouched**, as the prompt asked. `book/vehicle/_components/manual-vehicle-form.tsx` still collects make/model/year as free text and threads it through the URL for display only — so **the website still shows a corrected car and charges for the guessed one**. Everything needed to fix it now exists (`listMakes` / `listModels` / `listTypes` / `applyManualVehicleSelection` are plain functions, not route handlers); it is a web UI change with no mobile dependency, and it is the obvious next job.
+- **The landing-page modal still only says "Try a different reg".** `app/(customer)/_components/vehicle-lookup-modal.tsx` shows DVLA's record before the funnel starts, and at that point "you typed the wrong reg" really is the likeliest explanation — no price has been quoted yet. Left deliberately. Worth revisiting only if people are bouncing there.
+- **A guest can correct any plate they know the number of.** Bounded by the DVLA make guard (a Ford can only become another Ford) and the per-IP `vehicle` limits, and deliberate — the funnel prices before it asks for an account. But it is the loosest door in the system, and `selectVehicleManually` is the single place to close it if that stops being the right trade.
 - **A correction is permanent and global, and nothing can undo it from the app.** Whoever corrects a plate last wins it for every future customer of that plate, and the only way back is SQL. That is the right default (an unmatched car is worse than a mis-corrected one) but `/admin/vehicles` should grow a view of manual rows — `resolved_via = 'manual'` with `resolved_by`/`resolved_at` is exactly the query — with a "revert to automatic" button that deletes the row and lets it re-resolve.
 - **HaynesPro car-type ids are not stable across their quarterly database updates**, which is why every other row expires. Manual rows deliberately don't, so after an update a manual row may point at an id that has moved. It fails safe (the catalogue reports no repair data rather than mispricing), but the admin view above is what would make it visible.
 - **No route-handler test is repeatable.** Same gap as Tasks 18 and 19: the probes here were real but throwaway. The `vehicle` bucket is 5/min per user, so a ported Playwright spec must space its calls or use a fresh account per case — the probe run hit its own limit mid-suite.

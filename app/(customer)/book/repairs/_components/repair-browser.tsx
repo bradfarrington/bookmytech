@@ -1,8 +1,11 @@
 import Link from "next/link";
-import { ChevronRight, Wrench } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatPrice } from "@/lib/utils";
 import { getRepairCatalogueLevel } from "@/lib/haynespro/catalogue";
+import { lookupVehicleAction } from "@/app/actions/lookup-vehicle";
+import { VehiclePicker } from "@/components/customer/vehicle-picker";
+import { VehicleBanner } from "./vehicle-banner";
 
 // Customer-facing browse of the HaynesPro repair-times tree for THEIR car
 // (Task 16 Stage G). Groups drill down (?node=…) until timed leaf repairs,
@@ -38,23 +41,54 @@ export async function RepairBrowser({
   const result = await getRepairCatalogueLevel(reg, nodeId, createAdminClient());
 
   if (!result.ok) {
-    // The catalogue's `message` is written for the app, which can't render a
-    // link. Here the same two answers get the /help link inline.
+    // `retryable` means the fault is ours (licence down, HaynesPro unreachable),
+    // so there is nothing the customer can pick their way out of. Every other
+    // failure is about THIS vehicle — we couldn't match the reg, or we matched
+    // one with no repair times — and picking the car by hand is a genuine fix
+    // rather than a consolation. It used to be a dead end ending in "get in
+    // touch", which is why this offers the picker first and the link second.
+    //
+    // DVLA is only asked here, on the failure path, and it answered a moment ago
+    // at step 1, so this is a cache hit rather than a second billed lookup.
+    const dvla = result.retryable ? null : await lookupVehicleAction(reg);
+
     return (
-      <Empty>
-        {result.code === "vehicle_not_matched" ? (
-          <>
-            We couldn&apos;t match your reg to our repair database, so we
-            can&apos;t price repairs for this vehicle online yet. Please{" "}
-          </>
-        ) : (
-          <>There&apos;s no repair-time data for this exact vehicle yet. Please </>
+      <div className="flex flex-col gap-4">
+        <Empty>
+          {result.code === "vehicle_not_matched" && !result.retryable ? (
+            <>
+              We couldn&apos;t match <span className="font-semibold">{reg}</span> to our
+              repair database, so we can&apos;t price repairs for it yet.
+            </>
+          ) : result.code === "no_repair_data" ? (
+            <>There&apos;s no repair-time data for this exact vehicle yet.</>
+          ) : (
+            <>{result.message}</>
+          )}
+        </Empty>
+
+        {!result.retryable && (
+          <div className="flex flex-col gap-4 rounded-2xl border border-border bg-surface-card p-4 shadow-card">
+            <div>
+              <p className="text-sm font-bold text-text-primary">
+                Tell us what you drive
+              </p>
+              <p className="mt-0.5 text-[13px] text-text-secondary">
+                Pick your model and engine and we&apos;ll price repairs against it.
+              </p>
+            </div>
+            <VehiclePicker reg={reg} dvlaMake={dvla?.ok ? dvla.details.make : null} />
+          </div>
         )}
-        <Link href="/help" className="font-semibold text-brand-blue hover:underline">
-          get in touch
-        </Link>{" "}
-        and we&apos;ll sort it for you.
-      </Empty>
+
+        <p className="text-center text-[13px] text-text-muted">
+          Still stuck?{" "}
+          <Link href="/help" className="font-semibold text-brand-blue hover:underline">
+            Get in touch
+          </Link>{" "}
+          and we&apos;ll sort it for you.
+        </p>
+      </div>
     );
   }
 
@@ -92,10 +126,11 @@ export async function RepairBrowser({
 
   return (
     <div className="flex flex-col gap-4">
-      <p className="flex items-center gap-2 rounded-lg bg-blue-50/60 px-3.5 py-2.5 text-[13px] text-text-secondary">
-        <Wrench size={14} className="shrink-0 text-brand-blue" />
-        Repair times matched to your {vehicle.description}
-      </p>
+      <VehicleBanner
+        reg={reg}
+        description={vehicle.description}
+        make={vehicle.make}
+      />
 
       {/* Breadcrumbs */}
       <nav className="flex flex-wrap items-center gap-1.5 text-sm text-text-secondary">
