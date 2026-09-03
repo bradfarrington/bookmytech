@@ -6,10 +6,21 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { sendEmail } from "@/lib/email/send";
 import { renderTemplateEmail } from "@/emails/resolve";
 import { sendPushToCustomer } from "@/lib/push/send";
-import { shortPersonName } from "@/lib/utils";
+import { sendSms } from "@/lib/sms/send-sms";
+import { renderSmsTemplate } from "@/lib/sms/render-template";
+import { ALL_DAY_SLOT, formatBookingSlot } from "@/lib/slots";
+import { formatJobNumber, shortPersonName } from "@/lib/utils";
 
 export type OfferActionResult =
-  | { ok: true; bookingId?: string }
+  | {
+      ok: true;
+      bookingId?: string;
+      /**
+       * The accepted booking is an ALL-DAY one, so the mechanic should be taken
+       * straight to the job page to pick a 2-hour arrival window (Task 21).
+       */
+      needsArrivalWindow?: boolean;
+    }
   | { ok: false; error: string };
 
 // All offer mutations verify the caller is the owning mechanic (RLS-aware
@@ -106,7 +117,9 @@ export async function acceptOffer(offerId: string): Promise<OfferActionResult> {
   // replacement has accepted and nothing else changes.
   const { data: booking } = await admin
     .from("bookings")
-    .select("customer_id, customer_email, customer_name, scheduled_at, repair_description")
+    .select(
+      "customer_id, customer_email, customer_name, customer_phone, scheduled_at, slot_window, job_number, repair_description",
+    )
     .eq("id", offer.booking_id)
     .single();
   const { data: profile } = await admin
@@ -115,20 +128,24 @@ export async function acceptOffer(offerId: string): Promise<OfferActionResult> {
     .eq("id", guard.mechanicId)
     .single();
   const mechanicName = profile?.full_name ?? "Your mechanic";
+  // "Wed 3 Sep · 8am–10am" in UK time — the window the customer picked, not a
+  // bare 08:00 (which is what an all-day booking used to be emailed as).
+  const slotLabel = formatBookingSlot(booking?.scheduled_at ?? null, booking?.slot_window);
+  const isAllDay = booking?.slot_window === ALL_DAY_SLOT.window;
+  const ref = formatJobNumber(booking?.job_number);
+  const templateKey = isReplacement ? "replacement_confirmed" : "mechanic_confirmed";
   if (booking?.customer_email) {
     const serviceName = booking.repair_description ?? "Vehicle repair";
-    const slotLabel = booking.scheduled_at
-      ? new Date(booking.scheduled_at).toLocaleString("en-GB", {
-          dateStyle: "full",
-          timeStyle: "short",
-        })
-      : "your booked time";
     const to = booking.customer_email;
-    renderTemplateEmail(isReplacement ? "replacement_confirmed" : "mechanic_confirmed", {
+    renderTemplateEmail(templateKey, {
       name: booking.customer_name ?? "there",
       mechanic: mechanicName,
       service: serviceName,
+      ref,
       when: slotLabel,
+      optional_note: isAllDay
+        ? "You booked an all-day slot — your mechanic will confirm a 2-hour arrival window for the day."
+        : "",
     })
       .then(({ subject, html }) => sendEmail({ to, subject, html }))
       .catch(console.error);
@@ -142,11 +159,19 @@ export async function acceptOffer(offerId: string): Promise<OfferActionResult> {
     bookingId: offer.booking_id,
   }).catch(() => {});
 
+  // And a text (Task 22) — the same news on the same channels as en-route.
+  if (booking?.customer_phone) {
+    const phone = booking.customer_phone;
+    renderSmsTemplate(templateKey, { mechanic: mechanicName, when: slotLabel, ref })
+      .then((body) => sendSms({ to: phone, body }))
+      .catch(() => {});
+  }
+
   revalidatePath("/mechanic/jobs");
   // The customer's tracker + dashboard reflect the new assignment.
   revalidatePath(`/book/confirmed/${offer.booking_id}`);
   revalidatePath("/dashboard");
-  return { ok: true, bookingId: offer.booking_id };
+  return { ok: true, bookingId: offer.booking_id, needsArrivalWindow: isAllDay };
 }
 
 export async function declineOffer(offerId: string): Promise<OfferActionResult> {

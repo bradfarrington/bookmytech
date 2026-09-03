@@ -7,12 +7,14 @@ import { cn } from "@/lib/utils";
 
 export interface ScheduleItem {
   bookingId: string;
-  time: string; // "12:00"
+  time: string; // "10am–12pm", "All day", or "12:00" for a legacy row
   title: string; // "Brake pads · VW Golf"
   where: string; // "Peckham SE15"
   earnings: string; // formatted "£89" or ""
   status: "confirmed" | "en_route" | "in_progress" | "completed" | "cancelled" | "disputed";
   isNext: boolean;
+  /** A confirmed all-day job whose 2-hour arrival window hasn't been picked yet. */
+  needsWindow: boolean;
 }
 
 const DOT: Record<ScheduleItem["status"], string> = {
@@ -57,7 +59,7 @@ export function Schedule({ items }: { items: ScheduleItem[] }) {
               href={`/mechanic/jobs/${item.bookingId}`}
               className="flex items-center gap-3.5 border-b border-border-subtle py-3 last:border-b-0 transition-colors hover:bg-surface"
             >
-              <span className="w-12 shrink-0 text-sm font-semibold tabular-nums text-text-muted">
+              <span className="w-[4.5rem] shrink-0 text-xs font-semibold leading-tight tabular-nums text-text-muted sm:w-20 sm:text-sm">
                 {item.time}
               </span>
               <span
@@ -82,6 +84,7 @@ export function Schedule({ items }: { items: ScheduleItem[] }) {
                   {item.where}
                 </span>
               </span>
+              {item.needsWindow && <Pill tone="pending">Pick a window</Pill>}
               {item.isNext && <Pill tone="active">Next up</Pill>}
               {item.status === "completed" && <Pill tone="success">Done</Pill>}
               {item.earnings && (

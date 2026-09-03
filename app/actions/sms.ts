@@ -6,6 +6,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { findPackage } from "@/lib/sms/packages";
 import { sendSms } from "@/lib/sms/send-sms";
 import { SMS_TEMPLATE_BY_KEY } from "@/lib/sms/templates";
+import { clearNotificationToggleCache } from "@/lib/notifications/toggles";
 import { siteUrl } from "@/lib/utils";
 
 // Admin SMS controls (Task 13 Stage B). Mutations verify the caller is an admin
@@ -224,6 +225,34 @@ export async function resetSmsTemplate(key: string): Promise<SmsResult> {
   const admin = createAdminClient();
   const { error } = await admin.from("sms_templates").delete().eq("key", key);
   if (error) return { ok: false, error: error.message };
+  revalidatePath("/admin/sms/templates");
+  return { ok: true };
+}
+
+/**
+ * Switch one lifecycle text on or off (Task 22). Stored in
+ * `notification_toggles` (0053) rather than on the override row, so a "Reset to
+ * default" never silently re-enables a template. A switched-off template
+ * resolves to an empty body and `sendSms` skips it before spending a credit.
+ */
+export async function setSmsTemplateEnabled(key: string, enabled: boolean): Promise<SmsResult> {
+  const guard = await requireAdmin();
+  if (!guard.ok) return guard;
+  if (!SMS_TEMPLATE_BY_KEY[key]) return { ok: false, error: "Unknown template." };
+
+  const admin = createAdminClient();
+  const { error } = await admin.from("notification_toggles").upsert(
+    {
+      channel: "sms",
+      key,
+      enabled,
+      updated_at: new Date().toISOString(),
+      updated_by: guard.adminId,
+    },
+    { onConflict: "channel,key" },
+  );
+  if (error) return { ok: false, error: error.message };
+  clearNotificationToggleCache();
   revalidatePath("/admin/sms/templates");
   return { ok: true };
 }

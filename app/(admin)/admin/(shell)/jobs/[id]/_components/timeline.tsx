@@ -8,6 +8,7 @@ import {
   CheckCircle2,
   StickyNote,
   ArrowRightLeft,
+  CalendarClock,
   type LucideIcon,
 } from "lucide-react";
 
@@ -28,6 +29,7 @@ const META: Record<string, { label: string; icon: LucideIcon; tone: string }> = 
   disputed: { label: "Flagged as disputed", icon: AlertTriangle, tone: "text-red-600" },
   payment_authorised: { label: "Payment pre-authorised", icon: CreditCard, tone: "text-brand-blue" },
   payment_captured: { label: "Payment captured", icon: CheckCircle2, tone: "text-green-600" },
+  arrival_window_set: { label: "Arrival window set", icon: CalendarClock, tone: "text-brand-blue" },
   note: { label: "Note", icon: StickyNote, tone: "text-text-muted" },
 };
 

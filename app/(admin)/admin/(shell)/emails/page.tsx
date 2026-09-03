@@ -2,6 +2,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { Overline } from "@/components/ui/overline";
 import { EMAIL_TEMPLATE_DEFS } from "@/emails/registry";
 import { isEditableBlock } from "@/emails/blocks";
+import { isEmailTemplateLocked } from "@/lib/notifications/locked";
+import { fetchDisabledKeys } from "@/lib/notifications/toggles";
 import {
   EmailTemplatesEditor,
   type EmailTemplateRow,
@@ -11,14 +13,16 @@ export const dynamic = "force-dynamic";
 
 export default async function AdminEmailsPage() {
   const admin = createAdminClient();
-  const { data: overrides } = await admin
-    .from("email_templates")
-    .select("key, subject, blocks");
+  const [{ data: overrides }, disabled] = await Promise.all([
+    admin.from("email_templates").select("key, subject, blocks"),
+    fetchDisabledKeys("email"),
+  ]);
   const byKey = new Map((overrides ?? []).map((o) => [o.key, o]));
 
   const templates: EmailTemplateRow[] = EMAIL_TEMPLATE_DEFS.map((def) => {
     const ov = byKey.get(def.key);
     const blockOverrides = (ov?.blocks as Record<string, string> | undefined) ?? {};
+    const locked = isEmailTemplateLocked(def.key);
     return {
       key: def.key,
       label: def.label,
@@ -34,6 +38,9 @@ export default async function AdminEmailsPage() {
         override: blockOverrides[b.id] ?? null,
       })),
       hasOverride: !!ov,
+      // A locked template is always on, whatever the table says.
+      enabled: locked || !disabled.has(def.key),
+      locked,
     };
   });
 
@@ -48,7 +55,8 @@ export default async function AdminEmailsPage() {
           merge tags, <code className="rounded bg-surface px-1 py-0.5 text-xs">**bold**</code>{" "}
           and <code className="rounded bg-surface px-1 py-0.5 text-xs">[links](url)</code>. Layout
           and branding stay fixed. Preview any change before saving, and reset to the default
-          any time.
+          any time. Each email has a switch to stop it going out; password resets and internal
+          alerts stay on.
         </p>
       </header>
       <EmailTemplatesEditor templates={templates} />

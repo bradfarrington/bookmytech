@@ -1,5 +1,6 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isNotificationEnabled } from "@/lib/notifications/toggles";
 import { layout } from "./_layout";
 import { renderEmail, escapeHtml } from "./render";
 import { CUSTOM_RENDERERS } from "./custom-renderers";
@@ -91,9 +92,23 @@ async function fetchOverride(
 }
 
 /**
+ * The value `renderTemplateEmail` returns for a template an admin has switched
+ * OFF (Task 22). `sendEmail` refuses to send an empty `html`, so the ~40 call
+ * sites that do `.then(({ subject, html }) => sendEmail({ to, subject, html }))`
+ * need no change and no throw: the email simply doesn't go. Anything that
+ * inspects the result can test `isSkippedEmail`.
+ */
+export const SKIPPED_EMAIL: RenderedEmail = Object.freeze({ subject: "", html: "" });
+
+export function isSkippedEmail(email: RenderedEmail): boolean {
+  return email.html === "";
+}
+
+/**
  * Render a live email: overrides over code defaults, merge vars interpolated,
  * MJML compiled. Throws only on genuine MJML compile bugs — a missing override
- * or table just uses defaults.
+ * or table just uses defaults. A template switched off by an admin returns
+ * `SKIPPED_EMAIL` instead of rendering.
  */
 export async function renderTemplateEmail(
   key: string,
@@ -101,6 +116,7 @@ export async function renderTemplateEmail(
 ): Promise<RenderedEmail> {
   const def = EMAIL_TEMPLATE_BY_KEY[key];
   if (!def) throw new Error(`Unknown email template: ${key}`);
+  if (!(await isNotificationEnabled("email", key))) return SKIPPED_EMAIL;
   const override = await fetchOverride(key);
   return renderFromCopy(def, override?.subject || def.subject, override?.blocks ?? {}, vars);
 }

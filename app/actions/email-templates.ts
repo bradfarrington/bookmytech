@@ -6,6 +6,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { EMAIL_TEMPLATE_BY_KEY } from "@/emails/registry";
 import { isEditableBlock } from "@/emails/blocks";
 import { previewTemplateEmail } from "@/emails/resolve";
+import { isEmailTemplateLocked } from "@/lib/notifications/locked";
+import { clearNotificationToggleCache } from "@/lib/notifications/toggles";
 
 export type EmailTemplateResult = { ok: true } | { ok: false; error: string };
 
@@ -83,6 +85,40 @@ export async function resetEmailTemplate(key: string): Promise<EmailTemplateResu
   const admin = createAdminClient();
   const { error } = await admin.from("email_templates").delete().eq("key", key);
   if (error) return { ok: false, error: error.message };
+  revalidatePath("/admin/emails");
+  return { ok: true };
+}
+
+/**
+ * Switch one email on or off (Task 22). Stored in `notification_toggles`
+ * (0053), separate from the override row, so "Reset" never re-enables a
+ * template. `renderTemplateEmail` returns an empty render for a switched-off
+ * key and `sendEmail` drops it. Security-critical and internal alerts are
+ * locked on (lib/notifications/locked.ts).
+ */
+export async function setEmailTemplateEnabled(
+  key: string,
+  enabled: boolean,
+): Promise<EmailTemplateResult> {
+  const guard = await requireAdmin();
+  if (!guard.ok) return guard;
+  if (!EMAIL_TEMPLATE_BY_KEY[key]) return { ok: false, error: "Unknown template." };
+  if (isEmailTemplateLocked(key))
+    return { ok: false, error: "This email can't be switched off." };
+
+  const admin = createAdminClient();
+  const { error } = await admin.from("notification_toggles").upsert(
+    {
+      channel: "email",
+      key,
+      enabled,
+      updated_at: new Date().toISOString(),
+      updated_by: guard.adminId,
+    },
+    { onConflict: "channel,key" },
+  );
+  if (error) return { ok: false, error: error.message };
+  clearNotificationToggleCache();
   revalidatePath("/admin/emails");
   return { ok: true };
 }

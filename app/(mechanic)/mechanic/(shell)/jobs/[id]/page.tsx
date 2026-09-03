@@ -3,8 +3,12 @@ import { createClient } from "@/lib/supabase/server";
 import { geocodePostcode, haversineMiles, type LatLng } from "@/lib/geo/postcodes";
 import { mechanicSharePence } from "@/lib/earnings";
 import { isHaynesProSsoConfigured } from "@/lib/haynespro/sso";
-import { formatBookingSlot } from "@/lib/slots";
+import { ALL_DAY_SLOT, formatBookingSlot } from "@/lib/slots";
 import { formatJobNumber } from "@/lib/utils";
+import {
+  loadArrivalWindowOptions,
+  type ArrivalWindowOptions,
+} from "@/lib/mechanics/arrival-windows";
 import { JobDetail, type JobDetailProps } from "./_components/job-detail";
 import type { TimelineEvent } from "@/app/(admin)/admin/(shell)/jobs/[id]/_components/timeline";
 
@@ -150,6 +154,21 @@ export default async function MechanicJobDetailPage({ params }: PageProps) {
     ? formatBookingSlot(booking.scheduled_at, booking.slot_window, { relative: true })
     : "To be confirmed";
 
+  // --- Arrival window (Task 21) --------------------------------------------
+  // Only an ALL-DAY job this mechanic holds, still confirmed, gets the picker.
+  // Read under the mechanic's own RLS client: their availability row and their
+  // other bookings are both own-row readable.
+  const arrivalWindows: ArrivalWindowOptions | null =
+    booking.status === "confirmed" &&
+    booking.mechanic_id === user.id &&
+    booking.slot_window === ALL_DAY_SLOT.window &&
+    booking.scheduled_at
+      ? await loadArrivalWindowOptions(supabase, user.id, {
+          id: booking.id,
+          scheduled_at: booking.scheduled_at,
+        })
+      : null;
+
   const address =
     [booking.address_line_1, booking.address_line_2, booking.postcode].filter(Boolean).join(", ") || "—";
 
@@ -183,6 +202,8 @@ export default async function MechanicJobDetailPage({ params }: PageProps) {
     rescheduleStatus: booking.reschedule_status,
     rescheduleProposedAt: booking.reschedule_proposed_at,
     scheduledAt: booking.scheduled_at,
+    slotWindow: booking.slot_window ?? null,
+    arrivalWindows,
     events,
     photos,
     signatureUrl,

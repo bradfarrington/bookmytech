@@ -41,6 +41,14 @@ export function OfferCard({ offer }: { offer: OfferView }) {
         router.refresh();
         return;
       }
+      // An all-day job: straight to the job page, where the arrival-window
+      // picker is the first thing they see (Task 21). Anything else stays on
+      // the feed.
+      if (result.needsArrivalWindow && result.bookingId) {
+        toast.success("Job accepted — now pick an arrival window.");
+        router.push(`/mechanic/jobs/${result.bookingId}`);
+        return;
+      }
       toast.success("Job accepted — it's yours.");
       router.refresh();
     });

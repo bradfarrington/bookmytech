@@ -4,6 +4,7 @@ import { sendEmail } from "@/lib/email/send";
 import { renderLowCreditEmail } from "@/emails/low-sms-credits";
 import { siteUrl } from "@/lib/utils";
 import { recordTestOutbox } from "@/lib/test-outbox";
+import { gsmFriendly } from "./templates";
 
 // SMS sender — real Twilio implementation (Task 13 Stage B, sms-credits skill).
 //
@@ -34,12 +35,16 @@ type Admin = ReturnType<typeof createAdminClient>;
 
 export async function sendSms({
   to,
-  body,
+  body: rawBody,
 }: {
   to: string | null | undefined;
   body: string;
 }): Promise<boolean> {
   if (!to) return false;
+  // An empty body is how a switched-off template arrives (lib/sms/render-template.ts,
+  // Task 22). Refuse it here, BEFORE the credit reservation, so it costs nothing.
+  const body = gsmFriendly(rawBody).trim();
+  if (!body) return false;
 
   // Test mode: capture the SMS and skip Twilio + credit logic (lib/test-outbox.ts).
   if (recordTestOutbox("sms", { to, body })) return true;

@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Check, Loader2, MessageSquare, Send, Zap } from "lucide-react";
 import { cn, formatPrice } from "@/lib/utils";
 import { Icon } from "@/components/ui/icon";
+import { Switch } from "@/components/ui/switch";
 import {
   createCheckout,
   saveLowCreditEmail,
@@ -148,26 +149,12 @@ function BalanceAndToggle({ balance, smsEnabled }: { balance: number; smsEnabled
         </div>
       </div>
 
-      <button
-        type="button"
-        role="switch"
-        aria-checked={enabled}
-        aria-label="Enable SMS notifications"
+      <Switch
+        checked={enabled}
+        onChange={() => toggle()}
         disabled={pending}
-        onClick={toggle}
-        className={cn(
-          "relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors",
-          enabled ? "bg-success" : "bg-border",
-          pending && "opacity-60",
-        )}
-      >
-        <span
-          className={cn(
-            "inline-block size-5 transform rounded-full bg-white shadow transition-transform",
-            enabled ? "translate-x-6" : "translate-x-1",
-          )}
-        />
-      </button>
+        label="Enable SMS notifications"
+      />
     </div>
   );
 }

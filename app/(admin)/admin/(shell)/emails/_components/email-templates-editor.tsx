@@ -5,10 +5,12 @@ import { toast } from "sonner";
 import { ChevronDown, Eye, Loader2, RotateCcw, Save } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Icon } from "@/components/ui/icon";
+import { Switch } from "@/components/ui/switch";
 import {
   saveEmailTemplate,
   resetEmailTemplate,
   previewEmailTemplate,
+  setEmailTemplateEnabled,
 } from "@/app/actions/email-templates";
 
 export interface EmailBlockRow {
@@ -28,6 +30,10 @@ export interface EmailTemplateRow {
   variables: { name: string; description: string }[];
   blocks: EmailBlockRow[];
   hasOverride: boolean;
+  /** Off = this email never goes out (Task 22). */
+  enabled: boolean;
+  /** Can't be switched off (password reset, internal alerts). */
+  locked: boolean;
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -88,9 +94,11 @@ function TemplateCard({ template }: { template: EmailTemplateRow }) {
     Object.fromEntries(template.blocks.map((b) => [b.id, b.override ?? b.defaultText])),
   );
   const [isOverride, setIsOverride] = useState(template.hasOverride);
+  const [enabled, setEnabled] = useState(template.enabled);
   const [previewHtml, setPreviewHtml] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const [previewing, startPreview] = useTransition();
+  const [flipping, startFlip] = useTransition();
 
   function save() {
     start(async () => {
@@ -127,33 +135,74 @@ function TemplateCard({ template }: { template: EmailTemplateRow }) {
     });
   }
 
+  function flip(next: boolean) {
+    setEnabled(next); // optimistic
+    startFlip(async () => {
+      const res = await setEmailTemplateEnabled(template.key, next);
+      if (!res.ok) {
+        setEnabled(!next);
+        toast.error(res.error);
+      } else {
+        toast.success(next ? `"${template.label}" is on.` : `"${template.label}" is off — it won't send.`);
+      }
+    });
+  }
+
   return (
-    <div className={CARD}>
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center justify-between gap-4 p-5 text-left"
-      >
-        <div>
-          <div className="flex items-center gap-2">
-            <h3 className="text-sm font-bold text-text-primary">{template.label}</h3>
-            <span
-              className={cn(
-                "rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide",
-                isOverride ? "bg-brand-blue/10 text-brand-blue" : "bg-surface text-text-muted",
+    <div className={cn(CARD, !enabled && "opacity-75")}>
+      {/* Header: the expand button and the on/off switch are siblings, never
+          nested, so a tap on the switch doesn't also open the card. */}
+      <div className="flex items-center gap-3 p-5">
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          className="flex min-w-0 flex-1 items-center justify-between gap-4 text-left"
+        >
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="text-sm font-bold text-text-primary">{template.label}</h3>
+              <span
+                className={cn(
+                  "rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide",
+                  isOverride ? "bg-brand-blue/10 text-brand-blue" : "bg-surface text-text-muted",
+                )}
+              >
+                {isOverride ? "Customised" : "Default"}
+              </span>
+              {!enabled && (
+                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-700">
+                  Off
+                </span>
               )}
-            >
-              {isOverride ? "Customised" : "Default"}
-            </span>
+            </div>
+            <p className="mt-0.5 text-xs text-text-muted">{template.description}</p>
           </div>
-          <p className="mt-0.5 text-xs text-text-muted">{template.description}</p>
-        </div>
-        <Icon
-          icon={ChevronDown}
-          size={18}
-          className={cn("shrink-0 text-text-muted transition-transform", open && "rotate-180")}
-        />
-      </button>
+          <Icon
+            icon={ChevronDown}
+            size={18}
+            className={cn("shrink-0 text-text-muted transition-transform", open && "rotate-180")}
+          />
+        </button>
+        {template.locked ? (
+          <span
+            className="shrink-0 text-[11px] font-semibold text-text-muted"
+            title="This email can't be switched off"
+          >
+            Always on
+          </span>
+        ) : (
+          <div className="flex shrink-0 items-center gap-2">
+            <span className="text-[11px] font-semibold text-text-muted">{enabled ? "On" : "Off"}</span>
+            <Switch
+              size="sm"
+              checked={enabled}
+              onChange={flip}
+              disabled={flipping}
+              label={`Send "${template.label}" emails`}
+            />
+          </div>
+        )}
+      </div>
 
       {open && (
         <div className="space-y-4 border-t border-border-subtle p-5">

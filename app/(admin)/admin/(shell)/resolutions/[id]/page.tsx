@@ -9,21 +9,26 @@ import { CustomerComms, type TemplateOption } from "@/components/resolutions/cus
 import { loadCase, loadMessages } from "@/lib/resolutions/load";
 import { EMAIL_TEMPLATE_DEFS } from "@/emails/registry";
 import { SMS_TEMPLATE_DEFS } from "@/lib/sms/templates";
+import { fetchDisabledKeys } from "@/lib/notifications/toggles";
 
 export const dynamic = "force-dynamic";
-
-const emailTemplates: TemplateOption[] = EMAIL_TEMPLATE_DEFS.filter(
-  (t) => t.category === "customer",
-).map((t) => ({ value: t.key, label: t.label }));
-
-const smsTemplates: TemplateOption[] = SMS_TEMPLATE_DEFS.map((t) => ({
-  value: t.key,
-  label: t.label,
-}));
 
 export default async function AdminCasePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await createClient();
+
+  // Only customer-facing templates that are switched ON: a switched-off one
+  // would render empty and the manual send would fail confusingly.
+  const [emailOff, smsOff] = await Promise.all([
+    fetchDisabledKeys("email"),
+    fetchDisabledKeys("sms"),
+  ]);
+  const emailTemplates: TemplateOption[] = EMAIL_TEMPLATE_DEFS.filter(
+    (t) => t.category === "customer" && !emailOff.has(t.key),
+  ).map((t) => ({ value: t.key, label: t.label }));
+  const smsTemplates: TemplateOption[] = SMS_TEMPLATE_DEFS.filter(
+    (t) => t.audience === "customer" && !smsOff.has(t.key),
+  ).map((t) => ({ value: t.key, label: t.label }));
 
   const kase = await loadCase(supabase, id);
   if (!kase) notFound();

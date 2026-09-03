@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { geocodePostcode, haversineMiles, type LatLng } from "@/lib/geo/postcodes";
 import { mechanicSharePence } from "@/lib/earnings";
 import { formatPrice } from "@/lib/utils";
-import { formatBookingSlot } from "@/lib/slots";
+import { ALL_DAY_SLOT, formatBookingSlot } from "@/lib/slots";
 import { KpiCards, type MechanicKpis } from "./_components/kpi-cards";
 import { OfferFeed, type OfferView } from "./_components/offer-feed";
 import { Schedule, type ScheduleItem } from "./_components/schedule";
@@ -49,6 +49,7 @@ interface BookingJoin {
 interface ScheduleRow {
   id: string;
   scheduled_at: string | null;
+  slot_window: string | null;
   status: string;
   postcode: string | null;
   area: string | null;
@@ -139,7 +140,7 @@ export default async function MechanicJobsPage() {
   const { data: bookingRows } = await supabase
     .from("bookings")
     .select(
-      "id, scheduled_at, status, postcode, area, total_pence, commission_rate, vehicle_make, vehicle_model, repair_description",
+      "id, scheduled_at, slot_window, status, postcode, area, total_pence, commission_rate, vehicle_make, vehicle_model, repair_description",
     )
     .eq("mechanic_id", user.id)
     .gte("scheduled_at", startOfToday().toISOString())
@@ -169,16 +170,25 @@ export default async function MechanicJobsPage() {
       }
       const isNext = isUpcoming && nextAssigned;
       if (isNext) nextAssigned = false;
+      // Show the arrival window rather than a bare start time — an all-day job
+      // is "All day", not "08:00". Legacy rows without a window keep the time.
+      const isAllDay = b.slot_window === ALL_DAY_SLOT.window;
+      const time = isAllDay
+        ? "All day"
+        : b.slot_window ??
+          (b.scheduled_at
+            ? new Date(b.scheduled_at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/London" })
+            : "—");
       scheduleItems.push({
         bookingId: b.id,
-        time: b.scheduled_at
-          ? new Date(b.scheduled_at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/London" })
-          : "—",
+        time,
         title,
         where: b.area ?? b.postcode ?? "—",
         earnings: formatPrice(mechanicSharePence(b.total_pence ?? 0, b.commission_rate ?? 0.15)),
         status,
         isNext,
+        // A confirmed all-day job still needs its 2-hour window picking (Task 21).
+        needsWindow: isAllDay && status === "confirmed",
       });
     }
 

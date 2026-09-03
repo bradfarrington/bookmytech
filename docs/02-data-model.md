@@ -121,9 +121,13 @@ Append-only audit log for every meaningful change on a booking. Powers the admin
 | payload       | jsonb        | structured extras (`{ from: 'confirmed', to: 'en_route' }` etc.)            |
 | created_at    | timestamptz  | default now()                                                               |
 
-**Event types:** `'created' | 'status_changed' | 'mechanic_assigned' | 'mechanic_reassigned' | 'cancelled' | 'disputed' | 'payment_authorised' | 'payment_captured' | 'note'`.
+**Event types** (CHECK last widened in `0052`): `'created' | 'status_changed' | 'mechanic_assigned' | 'mechanic_reassigned' | 'reschedule_proposed' | 'reschedule_accepted' | 'reschedule_declined' | 'arrival_window_set' | 'cancelled' | 'disputed' | 'dispute_opened' | 'dispute_responded' | 'dispute_escalated' | 'dispute_resolved' | 'resolution_opened' | 'resolution_redistributed' | 'payment_authorised' | 'payment_captured' | 'payment_refunded' | 'payout_transferred' | 'payout_reversed' | 'message_sent' | 'note'`. `arrival_window_set` (Task 21) records a mechanic narrowing an all-day booking — payload `{ from_window, to_window, from, to, day }`; the booking's own `slot_window`/`scheduled_at` are updated in place.
 
 **Append-only.** Never UPDATE or DELETE rows here — if a fact about an event was wrong, write a corrective event (typically `'note'`). The composite index on `(booking_id, created_at desc)` supports the timeline render.
+
+### `notification_toggles`
+
+Admin on/off switches for each SMS and email template (Task 22, `0053_notification_toggles.sql`). Primary key `(channel, key)`, `channel` ∈ `'sms' | 'email'`, `enabled boolean default true`, `updated_at`, `updated_by`. **A key with no row is ON.** Service-role only (RLS enabled, no policies). Read through `lib/notifications/toggles.ts` (60 s per-instance cache, fails open) by `renderTemplateEmail` and `getSmsTemplateBody`; written by `setSmsTemplateEnabled` / `setEmailTemplateEnabled`. Kept separate from `sms_templates` / `email_templates` because those hold overrides only and "reset" deletes the row.
 
 ### `mechanic_applications`
 

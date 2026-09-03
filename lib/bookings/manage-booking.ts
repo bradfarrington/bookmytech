@@ -6,7 +6,8 @@ import { sendEmail } from "@/lib/email/send";
 import { renderTemplateEmail } from "@/emails/resolve";
 import { sendSms } from "@/lib/sms/send-sms";
 import { renderSmsTemplate } from "@/lib/sms/render-template";
-import { formatPrice } from "@/lib/utils";
+import { formatBookingSlot } from "@/lib/slots";
+import { formatJobNumber, formatPrice } from "@/lib/utils";
 import { ownsBooking, type BookingCaller } from "@/lib/bookings/ownership";
 
 // The one implementation of "cancel this booking", "move this booking" and
@@ -51,22 +52,34 @@ export type { BookingCaller } from "@/lib/bookings/ownership";
 export const CANCELLABLE = ["sourcing_mechanic", "confirmed", "en_route"] as const;
 export const RESCHEDULABLE = ["sourcing_mechanic", "confirmed"] as const;
 
+// "Thu 4 Sep · 14:00" in UK time. A rescheduled booking is an exact time, so no
+// window; a formatter without an explicit zone printed BST an hour early on
+// Vercel (UTC).
 function fmt(iso: string): string {
-  return new Date(iso).toLocaleString("en-GB", {
-    dateStyle: "full",
-    timeStyle: "short",
-  });
+  return formatBookingSlot(iso);
 }
 
 // Look up the assigned mechanic's email so we can tell them the outcome. The
 // email lives on the auth user, not the profile, so go through the admin API.
-async function mechanicEmail(
+export async function mechanicEmail(
   admin: ReturnType<typeof createAdminClient>,
   mechanicId: string | null,
 ): Promise<string | null> {
   if (!mechanicId) return null;
   const { data } = await admin.auth.admin.getUserById(mechanicId);
   return data.user?.email ?? null;
+}
+
+// The mechanic's mobile for their SMS (Task 22). Lives on `profiles.phone` —
+// copied there from their application at approval — which is also what the
+// unread-message sweep texts.
+export async function mechanicPhone(
+  admin: ReturnType<typeof createAdminClient>,
+  mechanicId: string | null,
+): Promise<string | null> {
+  if (!mechanicId) return null;
+  const { data } = await admin.from("profiles").select("phone").eq("id", mechanicId).maybeSingle();
+  return data?.phone ?? null;
 }
 
 /**
@@ -79,8 +92,8 @@ async function requireBookingCustomer(bookingId: string, caller: BookingCaller) 
   const { data: booking } = await admin
     .from("bookings")
     .select(
-      `id, status, scheduled_at, customer_id, customer_email, customer_name, customer_phone,
-       mechanic_id, total_pence, stripe_payment_intent_id`,
+      `id, job_number, status, scheduled_at, slot_window, customer_id, customer_email, customer_name,
+       customer_phone, mechanic_id, total_pence, stripe_payment_intent_id`,
     )
     .eq("id", bookingId)
     .single();
@@ -255,12 +268,18 @@ export async function cancelBookingFor(
     });
   }
 
-  // Tell the assigned mechanic their job is off.
+  // Tell the assigned mechanic their job is off — email and text.
   const cancelMechTo = await mechanicEmail(admin, booking.mechanic_id);
   if (cancelMechTo) {
     renderTemplateEmail("mechanic_job_cancelled", {})
       .then(({ subject, html }) => sendEmail({ to: cancelMechTo, subject, html }))
       .catch(console.error);
+  }
+  const cancelMechPhone = await mechanicPhone(admin, booking.mechanic_id);
+  if (cancelMechPhone) {
+    renderSmsTemplate("mech_job_cancelled", { ref: formatJobNumber(booking.job_number) })
+      .then((body) => sendSms({ to: cancelMechPhone, body }))
+      .catch(() => {});
   }
 
   // Confirm to the customer.
@@ -344,12 +363,19 @@ export async function rescheduleBookingFor(
   });
 
   const slotLabel = fmt(when.toISOString());
+  const ref = formatJobNumber(booking.job_number);
 
   const moveMechTo = await mechanicEmail(admin, booking.mechanic_id);
   if (moveMechTo) {
     renderTemplateEmail("mechanic_booking_rescheduled", { slot: slotLabel })
       .then(({ subject, html }) => sendEmail({ to: moveMechTo, subject, html }))
       .catch(console.error);
+  }
+  const moveMechPhone = await mechanicPhone(admin, booking.mechanic_id);
+  if (moveMechPhone) {
+    renderSmsTemplate("mech_booking_rescheduled", { ref, slot: slotLabel })
+      .then((body) => sendSms({ to: moveMechPhone, body }))
+      .catch(() => {});
   }
 
   const rescheduleEmail = booking.customer_email;
@@ -360,6 +386,12 @@ export async function rescheduleBookingFor(
     })
       .then(({ subject, html }) => sendEmail({ to: rescheduleEmail, subject, html }))
       .catch(console.error);
+  }
+  if (booking.customer_phone) {
+    const phone = booking.customer_phone;
+    renderSmsTemplate("booking_rescheduled", { slot: slotLabel })
+      .then((body) => sendSms({ to: phone, body }))
+      .catch(() => {});
   }
 
   revalidatePath("/dashboard");
@@ -398,7 +430,7 @@ export async function respondToRescheduleFor(
   const { data: booking } = await admin
     .from("bookings")
     .select(
-      `id, status, customer_id, customer_email, mechanic_id, scheduled_at,
+      `id, job_number, status, customer_id, customer_email, mechanic_id, scheduled_at, slot_window,
        reschedule_status, reschedule_proposed_at, reschedule_note`,
     )
     .eq("id", bookingId)
@@ -448,15 +480,28 @@ export async function respondToRescheduleFor(
     payload: { from: original, proposed, decision },
   });
 
-  // Tell the mechanic the outcome so they don't have to keep checking.
+  // Tell the mechanic the outcome so they don't have to keep checking — email
+  // and text. On a decline the job stays where it was, window and all.
+  const proposedLabel = fmt(proposed);
+  const originalLabel = original
+    ? formatBookingSlot(original, booking.slot_window)
+    : proposedLabel;
+  const ref = formatJobNumber(booking.job_number);
   const outcomeTo = await mechanicEmail(admin, booking.mechanic_id);
   if (outcomeTo) {
     const email = accepted
-      ? renderTemplateEmail("mechanic_reschedule_accepted", { proposed: fmt(proposed) })
-      : renderTemplateEmail("mechanic_reschedule_declined", { original: fmt(original ?? proposed) });
+      ? renderTemplateEmail("mechanic_reschedule_accepted", { proposed: proposedLabel })
+      : renderTemplateEmail("mechanic_reschedule_declined", { original: originalLabel });
     email
       .then(({ subject, html }) => sendEmail({ to: outcomeTo, subject, html }))
       .catch(console.error);
+  }
+  const outcomePhone = await mechanicPhone(admin, booking.mechanic_id);
+  if (outcomePhone) {
+    const sms = accepted
+      ? renderSmsTemplate("mech_reschedule_accepted", { ref, slot: proposedLabel })
+      : renderSmsTemplate("mech_reschedule_declined", { ref, original: originalLabel });
+    sms.then((body) => sendSms({ to: outcomePhone, body })).catch(() => {});
   }
 
   revalidatePath(`/book/confirmed/${bookingId}`);

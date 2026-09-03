@@ -5,12 +5,14 @@ import {
   addDaysToKey,
   dayChipLabel,
   dayHasBookableSlot,
+  dayOfWeekForKey,
   daysBetweenKeys,
   formatBookingSlot,
   isSlotBookable,
   londonDateKey,
   londonInstant,
   slotIso,
+  twoHourSlotByWindow,
   upcomingDayKeys,
 } from "./slots";
 
@@ -68,6 +70,25 @@ describe("calendar key arithmetic", () => {
     expect(keys).toHaveLength(7);
     expect(keys[0]).toBe("2026-08-27");
     expect(keys[6]).toBe("2026-09-02");
+  });
+
+  it("dayOfWeekForKey is plain calendar arithmetic (0 = Sunday)", () => {
+    expect(dayOfWeekForKey("2026-09-03")).toBe(4); // Thursday
+    expect(dayOfWeekForKey("2026-09-06")).toBe(0); // Sunday
+    expect(dayOfWeekForKey("2026-09-07")).toBe(1); // Monday
+  });
+});
+
+describe("twoHourSlotByWindow", () => {
+  it("finds a 2-hour window by its stored label", () => {
+    expect(twoHourSlotByWindow("2pm–4pm")).toEqual({ window: "2pm–4pm", startHour: 14 });
+  });
+
+  it("never matches the all-day label, a hyphenated variant, or nothing", () => {
+    expect(twoHourSlotByWindow(ALL_DAY_SLOT.window)).toBeNull();
+    expect(twoHourSlotByWindow("2pm-4pm")).toBeNull();
+    expect(twoHourSlotByWindow(null)).toBeNull();
+    expect(twoHourSlotByWindow("")).toBeNull();
   });
 });
 

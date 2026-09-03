@@ -76,6 +76,12 @@ function describe(e: ActivityEvent): { icon: LucideIcon; label: string; tone: To
       return { icon: CalendarClock, label: "Reschedule accepted", tone: "success" };
     case "reschedule_declined":
       return { icon: CalendarClock, label: "Reschedule declined", tone: "neutral" };
+    case "arrival_window_set":
+      return {
+        icon: CalendarClock,
+        label: `Arrival window set → ${String(p.to_window ?? "")}`.trim(),
+        tone: "active",
+      };
     case "cancelled":
       return { icon: Ban, label: "Booking cancelled", tone: "neutral" };
     case "disputed":

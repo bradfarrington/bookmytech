@@ -31,10 +31,12 @@ import { Pill } from "@/components/ui/pill";
 import { Overline } from "@/components/ui/overline";
 import { formatPrice } from "@/lib/utils";
 import { Timeline, type TimelineEvent } from "@/app/(admin)/admin/(shell)/jobs/[id]/_components/timeline";
+import type { ArrivalWindowOptions } from "@/lib/mechanics/arrival-windows";
 import { EarningsBreakdown } from "./earnings-breakdown";
 import { JobActions } from "./job-actions";
 import { PhotoUploader, type JobPhoto } from "./photo-uploader";
 import { PartsOrder, type JobPart } from "./parts-order";
+import { ArrivalWindowPicker } from "./arrival-window-picker";
 
 export interface JobDetailProps {
   bookingId: string;
@@ -68,6 +70,10 @@ export interface JobDetailProps {
   rescheduleStatus: string | null;
   rescheduleProposedAt: string | null;
   scheduledAt: string | null;
+  slotWindow: string | null;
+  // Arrival window (Task 21): present only while this is a confirmed ALL-DAY
+  // job of the mechanic's — the six 2-hour windows annotated from their calendar.
+  arrivalWindows: ArrivalWindowOptions | null;
   events: TimelineEvent[];
   // Job evidence (mechanic-captured)
   photos: JobPhoto[];
@@ -170,6 +176,11 @@ export function JobDetail(props: JobDetailProps) {
           </p>
           <p className="mt-1 text-sm text-red-800">{cancellationReason}</p>
         </Card>
+      )}
+
+      {/* Arrival window — an all-day job the mechanic hasn't narrowed yet */}
+      {props.arrivalWindows && (
+        <ArrivalWindowPicker bookingId={bookingId} options={props.arrivalWindows} />
       )}
 
       {/* Info tiles */}

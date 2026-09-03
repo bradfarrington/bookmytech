@@ -44,6 +44,19 @@ export const ALL_DAY_SLOT: BookingSlotOption = {
   startHour: 8,
 };
 
+/** Length of every 2-hour window, in hours. */
+export const TWO_HOUR_SLOT_HOURS = 2;
+
+/**
+ * The 2-hour option whose stored label matches exactly, or null. The all-day
+ * label is deliberately NOT a match — callers use this to tell "the customer
+ * chose a specific window" from "the customer chose all day".
+ */
+export function twoHourSlotByWindow(window: string | null | undefined): BookingSlotOption | null {
+  if (!window) return null;
+  return TWO_HOUR_SLOTS.find((s) => s.window === window) ?? null;
+}
+
 // --- UK calendar days -------------------------------------------------------
 //
 // A "day" in the picker is a UK calendar date, carried as a "YYYY-MM-DD" key.
@@ -66,6 +79,16 @@ export function addDaysToKey(key: string, n: number): string {
 /** Whole calendar days from `fromKey` to `toKey` (negative when `toKey` is earlier). */
 export function daysBetweenKeys(fromKey: string, toKey: string): number {
   return Math.round((keyToUtcMidnight(toKey) - keyToUtcMidnight(fromKey)) / 86_400_000);
+}
+
+/**
+ * JS-style weekday (0 = Sunday … 6 = Saturday) for a UK calendar key. Plain
+ * calendar arithmetic on the key — never `getDay()` on an instant, which would
+ * answer in the server's zone (UTC on Vercel) and slip a day around midnight.
+ * Matches `mechanic_availability.day_of_week`.
+ */
+export function dayOfWeekForKey(key: string): number {
+  return new Date(keyToUtcMidnight(key)).getUTCDay();
 }
 
 /**
@@ -143,6 +166,11 @@ function dayPart(when: Date): string {
     month: "short",
     timeZone: BOOKING_TIME_ZONE,
   });
+}
+
+/** "Wed 3 Jul" for an instant — the UK calendar day on its own, no time part. */
+export function formatBookingDay(iso: string): string {
+  return dayPart(new Date(iso));
 }
 
 /**

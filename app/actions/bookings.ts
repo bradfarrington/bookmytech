@@ -7,6 +7,11 @@ import { refundPayment } from "@/lib/stripe/refund";
 import { recordRefundClawback } from "@/lib/mechanics/balance";
 import { formatPrice, formatJobNumber, shortPersonName } from "@/lib/utils";
 import { sendPushToCustomer } from "@/lib/push/send";
+import { sendEmail } from "@/lib/email/send";
+import { renderTemplateEmail } from "@/emails/resolve";
+import { sendSms } from "@/lib/sms/send-sms";
+import { renderSmsTemplate } from "@/lib/sms/render-template";
+import { ALL_DAY_SLOT, formatBookingSlot } from "@/lib/slots";
 
 export type BookingActionResult = { ok: true } | { ok: false; error: string };
 
@@ -228,7 +233,9 @@ export async function reassignMechanic(
 
   const { data: booking } = await supabase
     .from("bookings")
-    .select("status, mechanic_id, customer_id")
+    .select(
+      "status, mechanic_id, customer_id, customer_email, customer_name, customer_phone, scheduled_at, slot_window, job_number, repair_description",
+    )
     .eq("id", id)
     .single();
   if (!booking) return { ok: false, error: "Booking not found." };
@@ -259,18 +266,48 @@ export async function reassignMechanic(
     },
   });
 
-  // Same push the customer gets when a mechanic accepts an offer — an admin
-  // assignment is the same news to them. Best-effort.
+  // The same email, push and text the customer gets when a mechanic accepts an
+  // offer (job-offers.ts) — an admin assignment is the same news to them. All
+  // best-effort. A guest has no device, so without the email and text they
+  // used to learn nothing here at all.
   const { data: profile } = await createAdminClient()
     .from("profiles")
     .select("full_name")
     .eq("id", mechanicId)
     .maybeSingle();
+  const isReplacement = Boolean(booking.mechanic_id);
+  const templateKey = isReplacement ? "replacement_confirmed" : "mechanic_confirmed";
+  const mechanicName = profile?.full_name ?? "Your mechanic";
+  const slotLabel = formatBookingSlot(booking.scheduled_at, booking.slot_window);
+  const isAllDay = booking.slot_window === ALL_DAY_SLOT.window;
+  const ref = formatJobNumber(booking.job_number);
+
+  if (booking.customer_email) {
+    const to = booking.customer_email;
+    renderTemplateEmail(templateKey, {
+      name: booking.customer_name ?? "there",
+      mechanic: mechanicName,
+      service: booking.repair_description ?? "Vehicle repair",
+      ref,
+      when: slotLabel,
+      optional_note: isAllDay
+        ? "You booked an all-day slot — your mechanic will confirm a 2-hour arrival window for the day."
+        : "",
+    })
+      .then(({ subject, html }) => sendEmail({ to, subject, html }))
+      .catch(console.error);
+  }
   sendPushToCustomer(booking.customer_id, {
-    title: booking.mechanic_id ? "Your replacement mechanic is confirmed" : "Your mechanic is confirmed",
+    title: isReplacement ? "Your replacement mechanic is confirmed" : "Your mechanic is confirmed",
     body: `${shortPersonName(profile?.full_name)} has taken your job.`,
     bookingId: id,
   }).catch(() => {});
+  if (booking.customer_phone) {
+    const phone = booking.customer_phone;
+    renderSmsTemplate(templateKey, { mechanic: mechanicName, when: slotLabel, ref })
+      .then((body) => sendSms({ to: phone, body }))
+      .catch(() => {});
+  }
 
   revalidate(id);
   return { ok: true };

@@ -15,6 +15,9 @@ export async function sendEmail({
   subject: string;
   html: string;
 }): Promise<void> {
+  // An empty body is `renderTemplateEmail`'s signal that an admin switched the
+  // template off (emails/resolve.ts → SKIPPED_EMAIL). Nothing to send.
+  if (!html) return;
   // Test mode: capture the email and skip the real send (see lib/test-outbox.ts).
   if (recordTestOutbox("email", { to, subject })) return;
   if (!resend) {

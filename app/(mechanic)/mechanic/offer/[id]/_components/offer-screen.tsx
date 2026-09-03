@@ -38,7 +38,12 @@ export function OfferScreen(props: OfferScreenProps) {
     startTransition(async () => {
       const res = await acceptOffer(offerId);
       if (res.ok) {
-        toast.success("Job accepted — it's yours.");
+        // The job page opens with the arrival-window picker for an all-day job.
+        toast.success(
+          res.needsArrivalWindow
+            ? "Job accepted — now pick an arrival window."
+            : "Job accepted — it's yours.",
+        );
         router.push(`/mechanic/jobs/${res.bookingId ?? bookingId}`);
       } else {
         toast.error(res.error);
