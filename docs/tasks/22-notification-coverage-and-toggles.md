@@ -1,6 +1,6 @@
 # Task 22 — SMS for every booking-time event, and per-template on/off switches
 
-**Status:** ✅ Complete (2026-09-03) — code complete on branch `task-21-22-arrival-window-notifications`, alongside Task 21. **Migration `0053` is NOT yet applied** (Brad applies it); until it is, every switch reads as ON (the gate fails open) and the admin switches error on save. **Not yet fired against Twilio** — none of the new texts has been sent to a real number (there are no live Twilio credentials in dev; Task 13's touchpoints were in the same position).
+**Status:** ✅ Complete (2026-09-03) — code complete on branch `task-21-22-arrival-window-notifications`, alongside Task 21. **Migration `0053` is applied** (Brad ran it 2026-09-03; `notification_toggles` confirmed in the live PostgREST schema with all five columns). **Not yet fired against Twilio** — none of the new texts has been sent to a real number (there are no live Twilio credentials in dev; Task 13's touchpoints were in the same position).
 
 ## Why this exists
 
