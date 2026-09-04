@@ -1,6 +1,6 @@
 # Task 24 — Several repairs in one booking (the trolley)
 
-**Status:** ✅ Complete (2026-09-04) — merged to `main` 2026-09-04 (branch `task-24-multi-repair-bookings`). **Migration `0055` is NOT yet applied** (Brad, via Studio). The single-job path never touches the new table or column, so the code is safe to deploy first; a multi-job booking attempted before `0055` fails at the lines insert, is rolled back, and the customer sees "please try again" with a live hold (the existing orphaned-hold path) — apply the migration first. HaynesPro's basket calculation verified live (below). `tsc` clean, unit tests green (new suites listed below), production build clean, lint unchanged from baseline. **Not exercised in a browser this session** — the manual script is below.
+**Status:** ✅ Complete (2026-09-04) — merged to `main` 2026-09-04 (branch `task-24-multi-repair-bookings`). **Migration `0055` applied** — Brad ran it 2026-09-04; `booking_repairs` and `bookings.combine_source` are confirmed in the live schema. HaynesPro's basket calculation verified live (below). `tsc` clean, unit tests green (new suites listed below), production build clean, lint unchanged from baseline. **Not exercised in a browser this session** — the manual script is below.
 
 ## Why this exists
 
@@ -118,5 +118,5 @@ Mechanic **offer screen** (a "Jobs (n)" card — the accept/decline decision nee
 
 - [x] Update this file's status + acceptance boxes.
 - [x] Update `docs/HANDOFF.md`, `docs/02-data-model.md`, `docs/04-supplier-apis.md`, `docs/tasks/18-mobile-api.md`.
-- [ ] Apply migration `0055` (Brad, via Studio).
+- [x] Apply migration `0055` (Brad, via Studio, 2026-09-04).
 - [x] Commit.

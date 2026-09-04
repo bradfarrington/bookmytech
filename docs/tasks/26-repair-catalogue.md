@@ -1,6 +1,6 @@
 # Task 26 — Our own layer over the HaynesPro repair tree: categories, moves, renames, combined repairs
 
-**Status:** ✅ Complete (2026-09-04) — merged to `main` 2026-09-04 (branch `task-24-multi-repair-bookings`). **Migration `0056` is NOT yet applied** (Brad, via Studio; needs `0055` first). Until it is, the catalogue is exactly HaynesPro's — the overlay loads as empty — and every control on `/admin/repairs` other than the hide switch fails with a toast. `tsc` clean, unit tests green, production build clean, lint clean on the changed files. **Not exercised in a browser this session** — the manual script is below.
+**Status:** ✅ Complete (2026-09-04) — merged to `main` 2026-09-04 (branch `task-24-multi-repair-bookings`). **Migration `0056` applied** — Brad ran it 2026-09-04; the four tables (including `repair_bundles.node_ids`, the job pool) and `booking_repairs.item_id` / `item_label` are confirmed in the live schema. `tsc` clean, unit tests green, production build clean, lint clean on the changed files. **Not exercised in a browser this session** — the manual script is below.
 
 ## Why this exists
 
@@ -84,5 +84,5 @@ Migration `0056` → `npm run db:types`. Everything on the wire is additive (abo
 
 - [x] Update this file's status + acceptance boxes.
 - [x] Update `docs/HANDOFF.md`, `docs/02-data-model.md`, `docs/tasks/18-mobile-api.md`.
-- [ ] Apply migration `0056` (Brad, via Studio).
+- [x] Apply migration `0056` (Brad, via Studio, 2026-09-04).
 - [x] Commit.
