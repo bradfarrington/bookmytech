@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, BookOpen, ChevronRight, ClipboardList, Clock } from "lucide-react";
+import { ArrowLeft, BookOpen, ChevronRight, ClipboardList, Clock, Lock } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
 import { Overline } from "@/components/ui/overline";
+import type { ExclusionTarget } from "@/app/actions/vehicle-exclusions";
 import {
   getAdjustments,
   getCapacities,
@@ -15,14 +16,28 @@ import {
   getStoryList,
 } from "@/lib/haynespro/tree";
 import type { HpAdjustment, HpStoryLine, HpTreeNode } from "@/lib/haynespro/types";
+import {
+  exclusionStateForModel,
+  isNodeVisible,
+  nodeAvailability,
+  type ExclusionScope,
+  type NodeAvailability,
+  type RepairExclusionRow,
+} from "@/lib/haynespro/exclusions";
 import { repairGroupIcon } from "@/lib/repair-group-icons";
 import { RepairToggle } from "../../_components/repair-toggle";
+import { ScopePicker } from "../../_components/scope-picker";
 import { TypePicker } from "../../_components/type-picker";
 
-// Admin model page (Task 16 Stage E): per-model repair availability toggles
-// over the repair-times tree, plus read-only browsing of repair manuals and
-// vehicle technical data for a chosen engine variant. Deep data is per-TYPE —
-// the picker swaps the variant.
+// Admin model page (Task 16 Stage E): repair availability toggles over the
+// repair-times tree, plus read-only browsing of repair manuals and vehicle
+// technical data for a chosen engine variant. Deep data is per-TYPE — the
+// picker swaps the variant.
+//
+// Toggles have two scopes (Task 23): "This model only" (the default) and "All
+// vehicles" (?scope=global). A node hidden for all vehicles shows a lock on a
+// model page but its toggle stays live — switching it on there writes a
+// per-model override rather than touching the global hide.
 
 export const dynamic = "force-dynamic";
 
@@ -39,6 +54,8 @@ interface ModelPageProps {
   searchParams: Promise<{
     type?: string;
     tab?: string;
+    /** "global" = toggles apply to every vehicle; absent = this model only. */
+    scope?: string;
     node?: string;
     crumbs?: string;
     story?: string;
@@ -65,6 +82,7 @@ export default async function AdminVehicleModelPage({
 
   const tab: TabKey = (TABS.find((t) => t.key === query.tab)?.key ??
     "repairs") as TabKey;
+  const scope: ExclusionScope = query.scope === "global" ? "global" : "model";
 
   // "VOLKSWAGEN Golf IV (1J1…)" minus the model name = the make name — the
   // exclusion keys (Stage D) that the booking-funnel matcher compares against.
@@ -154,6 +172,7 @@ export default async function AdminVehicleModelPage({
           typeParam={String(selectedType.id)}
           nodeId={query.node ?? "root"}
           crumbs={query.crumbs ?? ""}
+          scope={scope}
         />
       ) : tab === "manuals" ? (
         <ManualsPanel
@@ -187,8 +206,30 @@ function fmtHours(n: number): string {
 }
 
 // ---------------------------------------------------------------------------
-// Repair times — tree browse with per-model availability toggles.
+// Repair times — tree browse with availability toggles (model / all vehicles).
 // ---------------------------------------------------------------------------
+
+/** The small caption under a node explaining a state its toggle alone can't. */
+function availabilityNote(
+  availability: NodeAvailability,
+  globalScope: boolean,
+): { text: string; lock?: boolean } | null {
+  if (globalScope) {
+    if (availability === "shown_override") return { text: "Shown for this model (override)" };
+    if (availability === "hidden_model") return { text: "Hidden for this model" };
+    return null;
+  }
+  switch (availability) {
+    case "hidden_global":
+      return { text: "Hidden for all vehicles", lock: true };
+    case "shown_override":
+      return { text: "Shown for this model · hidden elsewhere" };
+    case "hidden_model":
+      return { text: "Hidden from customers" };
+    default:
+      return null;
+  }
+}
 
 async function RepairsPanel({
   carTypeId,
@@ -198,6 +239,7 @@ async function RepairsPanel({
   typeParam,
   nodeId,
   crumbs,
+  scope,
 }: {
   carTypeId: number;
   makeName: string;
@@ -206,6 +248,7 @@ async function RepairsPanel({
   typeParam: string;
   nodeId: string;
   crumbs: string;
+  scope: ExclusionScope;
 }) {
   const repairtimeTypeId = await getRepairtimeTypeId(carTypeId);
   if (repairtimeTypeId == null) {
@@ -217,15 +260,26 @@ async function RepairsPanel({
   }
 
   const supabase = await createClient();
+  // The whole (small) table, partitioned in memory by the same rule the
+  // funnel applies — so this page and the customer browser can't disagree.
   const [nodes, { data: exclusionRows }] = await Promise.all([
     getRepairtimeSubnodes(repairtimeTypeId, nodeId),
-    supabase
-      .from("repair_vehicle_exclusions")
-      .select("node_id")
-      .eq("make_name", makeName)
-      .eq("model_name", modelName),
+    supabase.from("repair_vehicle_exclusions").select("*"),
   ]);
-  const excluded = new Set((exclusionRows ?? []).map((r) => r.node_id));
+  const state = exclusionStateForModel(
+    (exclusionRows ?? []) as RepairExclusionRow[],
+    makeName,
+    modelName,
+  );
+  const global = scope === "global";
+  const scopeParam = global ? "&scope=global" : "";
+  const target: ExclusionTarget = global
+    ? { scope: "global" }
+    : { scope: "model", makeName, modelName };
+  // What the toggle shows: in model scope the effective state for THIS model
+  // (overrides included); in global scope only the global hide itself.
+  const visibleFor = (id: string) =>
+    global ? !state.globalHidden.has(id) : isNodeVisible(nodeAvailability(id, state));
   // Groups render as an icon-tile grid (same treatment as the brand grid);
   // timed leaf repairs keep the hours + toggle list below.
   const groups = nodes.filter((n) => n.id != null && n.hasSubnodes);
@@ -242,33 +296,51 @@ async function RepairsPanel({
     const nextCrumbs = [...trail, { id, label }]
       .map((c) => `${c.id}~${c.label}`)
       .join("|");
-    return `${base}?tab=repairs&type=${typeParam}&node=${encodeURIComponent(id)}&crumbs=${encodeURIComponent(nextCrumbs)}`;
+    return `${base}?tab=repairs&type=${typeParam}&node=${encodeURIComponent(id)}&crumbs=${encodeURIComponent(nextCrumbs)}${scopeParam}`;
   };
   const crumbHref = (index: number) => {
-    if (index < 0) return `${base}?tab=repairs&type=${typeParam}`;
+    if (index < 0) return `${base}?tab=repairs&type=${typeParam}${scopeParam}`;
     const upto = trail.slice(0, index + 1);
-    return `${base}?tab=repairs&type=${typeParam}&node=${encodeURIComponent(upto[index].id)}&crumbs=${encodeURIComponent(upto.map((c) => `${c.id}~${c.label}`).join("|"))}`;
+    return `${base}?tab=repairs&type=${typeParam}&node=${encodeURIComponent(upto[index].id)}&crumbs=${encodeURIComponent(upto.map((c) => `${c.id}~${c.label}`).join("|"))}${scopeParam}`;
   };
 
   return (
     <div className="space-y-4">
-      <nav className="flex flex-wrap items-center gap-1.5 text-sm text-text-secondary">
-        <Link href={crumbHref(-1)} className="font-semibold text-brand-blue hover:underline">
-          All groups
-        </Link>
-        {trail.map((c, i) => (
-          <span key={`${c.id}-${i}`} className="flex items-center gap-1.5">
-            <span className="text-text-muted">/</span>
-            {i === trail.length - 1 ? (
-              <span className="font-semibold text-text-primary">{c.label}</span>
-            ) : (
-              <Link href={crumbHref(i)} className="text-brand-blue hover:underline">
-                {c.label}
-              </Link>
-            )}
-          </span>
-        ))}
-      </nav>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <nav className="flex flex-wrap items-center gap-1.5 text-sm text-text-secondary">
+          <Link href={crumbHref(-1)} className="font-semibold text-brand-blue hover:underline">
+            All groups
+          </Link>
+          {trail.map((c, i) => (
+            <span key={`${c.id}-${i}`} className="flex items-center gap-1.5">
+              <span className="text-text-muted">/</span>
+              {i === trail.length - 1 ? (
+                <span className="font-semibold text-text-primary">{c.label}</span>
+              ) : (
+                <Link href={crumbHref(i)} className="text-brand-blue hover:underline">
+                  {c.label}
+                </Link>
+              )}
+            </span>
+          ))}
+        </nav>
+        <div className="flex shrink-0 items-center gap-2 text-sm text-text-secondary">
+          <span>Apply changes to</span>
+          <ScopePicker value={scope} />
+        </div>
+      </div>
+
+      {global && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          You&apos;re editing the list for{" "}
+          <span className="font-semibold">every vehicle</span>. Anything switched
+          off here disappears for all makes and models — a model page can still
+          switch it back on for that model alone.{" "}
+          <Link href="/admin/vehicles/hidden" className="font-semibold underline">
+            Review what&apos;s hidden
+          </Link>
+        </div>
+      )}
 
       {nodes.length === 0 && (
         <p className="rounded-2xl border border-border bg-surface-card px-4 py-8 text-center text-sm text-text-muted shadow-card">
@@ -283,23 +355,23 @@ async function RepairsPanel({
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {groups.map((node) => {
             const id = node.id as string;
-            const hidden = excluded.has(id);
+            const visible = visibleFor(id);
+            const note = availabilityNote(nodeAvailability(id, state), global);
             const GroupIcon = repairGroupIcon(node.description);
             return (
               <div
                 key={id}
                 className={cn(
                   "relative rounded-xl border border-border bg-surface-card shadow-card transition-colors hover:border-brand-blue/40",
-                  hidden && "opacity-60",
+                  !visible && "opacity-60",
                 )}
               >
                 <span className="absolute right-8 top-1/2 z-10 -translate-y-1/2">
                   <RepairToggle
-                    makeName={makeName}
-                    modelName={modelName}
+                    target={target}
                     nodeId={id}
                     description={node.description}
-                    initialAvailable={!hidden}
+                    initialAvailable={visible}
                   />
                 </span>
                 <Link
@@ -309,22 +381,30 @@ async function RepairsPanel({
                   <span
                     className={cn(
                       "flex size-8 shrink-0 items-center justify-center rounded-lg",
-                      hidden ? "bg-surface" : "bg-blue-50",
+                      visible ? "bg-blue-50" : "bg-surface",
                     )}
                   >
                     <GroupIcon
                       size={16}
-                      className={hidden ? "text-text-muted" : "text-brand-blue"}
+                      className={visible ? "text-brand-blue" : "text-text-muted"}
                     />
                   </span>
-                  <span
-                    className={cn(
-                      "min-w-0 flex-1 truncate text-sm font-semibold",
-                      hidden ? "text-text-muted" : "text-text-primary",
+                  <span className="flex min-w-0 flex-1 flex-col">
+                    <span
+                      className={cn(
+                        "truncate text-sm font-semibold",
+                        visible ? "text-text-primary" : "text-text-muted",
+                      )}
+                      title={node.description ?? undefined}
+                    >
+                      {node.description}
+                    </span>
+                    {note && (
+                      <span className="flex items-center gap-1 text-[11px] font-medium text-text-muted">
+                        {note.lock && <Lock size={10} />}
+                        {note.text}
+                      </span>
                     )}
-                    title={node.description ?? undefined}
-                  >
-                    {node.description}
                   </span>
                   <ChevronRight
                     size={14}
@@ -348,26 +428,28 @@ async function RepairsPanel({
           <ul className="divide-y divide-border-subtle">
             {leaves.map((node) => {
               const id = node.id as string;
-              const hidden = excluded.has(id);
+              const visible = visibleFor(id);
+              const note = availabilityNote(nodeAvailability(id, state), global);
               return (
                 <li key={id} className="flex items-center gap-3 px-4 py-3 text-sm">
                   <span
                     className={cn(
                       "min-w-0 flex-1",
-                      hidden ? "text-text-muted" : "text-text-secondary",
+                      visible ? "text-text-secondary" : "text-text-muted",
                     )}
                   >
                     {node.description}
-                    {hidden && (
-                      <span className="ml-2 text-[11px] font-medium text-text-muted">
-                        Hidden from customers
+                    {note && (
+                      <span className="ml-2 inline-flex items-center gap-1 text-[11px] font-medium text-text-muted">
+                        {note.lock && <Lock size={10} />}
+                        {note.text}
                       </span>
                     )}
                   </span>
                   <span
                     className={cn(
                       "shrink-0 font-semibold",
-                      hidden ? "text-text-muted" : "text-text-primary",
+                      visible ? "text-text-primary" : "text-text-muted",
                     )}
                   >
                     {typeof node.value === "number" && node.value > 0
@@ -375,11 +457,10 @@ async function RepairsPanel({
                       : "—"}
                   </span>
                   <RepairToggle
-                    makeName={makeName}
-                    modelName={modelName}
+                    target={target}
                     nodeId={id}
                     description={node.description}
-                    initialAvailable={!hidden}
+                    initialAvailable={visible}
                   />
                 </li>
               );
@@ -388,9 +469,9 @@ async function RepairsPanel({
         </div>
       )}
       <p className="text-xs text-text-muted">
-        Switching a repair or group off hides it from the customer
-        &ldquo;Repairs for your car&rdquo; browser for every variant of this
-        model. Hiding a group hides everything inside it.
+        {global
+          ? "Switching a repair or group off here hides it for every make and model. A model page can still switch it back on for that model alone. Hiding a group hides everything inside it."
+          : "Switching a repair or group off hides it from the customer “Repairs for your car” browser for every variant of this model. Hiding a group hides everything inside it. A repair hidden for all vehicles can be switched back on here — for this model only."}
       </p>
     </div>
   );

@@ -1,7 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { affinityFor, matchRank, toCatalogueNode } from "./catalogue";
 import { extractStatusCode, isAuthFailure } from "./client";
-import { excludedRepairNodeIdsForLabel, normaliseLabel } from "./exclusions";
+import {
+  GLOBAL_SCOPE,
+  excludedRepairNodeIdsForLabel,
+  exclusionStateForModel,
+  isGlobalExclusionRow,
+  isNodeVisible,
+  nodeAvailability,
+  normaliseLabel,
+} from "./exclusions";
 import {
   buildModelCandidates,
   deriveModelLabel,
@@ -283,6 +291,81 @@ describe("repair node exclusions", () => {
   it("unresolved vehicles and other models match nothing (default ON)", () => {
     expect(excludedRepairNodeIdsForLabel(null, rows).size).toBe(0);
     expect(excludedRepairNodeIdsForLabel("FORD Focus II", rows).size).toBe(0);
+  });
+
+  // Task 23: global hides + per-model overrides. Ids are real — verified live
+  // 2026-09-04: 1P1 "Body - Exterior", 1M2 "Brakes (Mechanical)",
+  // 1M01510000WV0 "Renew the front brake pads" on a Golf VII and a Ranger.
+  const scoped = [
+    { node_id: "1P1", make_name: GLOBAL_SCOPE, model_name: GLOBAL_SCOPE, mode: "hide" },
+    { node_id: "1M01510000WV0", make_name: GLOBAL_SCOPE, model_name: GLOBAL_SCOPE, mode: "hide" },
+    { node_id: "1M01510000WV0", make_name: "VOLKSWAGEN", model_name: "Golf VII", mode: "show" },
+    { node_id: "1M2", make_name: "FORD", model_name: "Ranger", mode: "hide" },
+  ];
+
+  it("global hides apply to every vehicle, resolved or not", () => {
+    const everywhere = new Set(["1P1", "1M01510000WV0"]);
+    expect(excludedRepairNodeIdsForLabel(null, scoped)).toEqual(everywhere);
+    expect(excludedRepairNodeIdsForLabel("", scoped)).toEqual(everywhere);
+    expect(excludedRepairNodeIdsForLabel("SEAT Leon", scoped)).toEqual(everywhere);
+  });
+
+  it("a model's 'show' row lifts a global hide for that model only", () => {
+    expect(excludedRepairNodeIdsForLabel("VOLKSWAGEN Golf VII", scoped)).toEqual(
+      new Set(["1P1"]),
+    );
+    expect(excludedRepairNodeIdsForLabel("VOLKSWAGEN Golf VI", scoped)).toEqual(
+      new Set(["1P1", "1M01510000WV0"]),
+    );
+  });
+
+  it("a model's own hides add to the global set", () => {
+    expect(excludedRepairNodeIdsForLabel("FORD Ranger", scoped)).toEqual(
+      new Set(["1P1", "1M01510000WV0", "1M2"]),
+    );
+  });
+
+  it("a 'show' row with no global hide behind it changes nothing", () => {
+    const lonely = [{ node_id: "X", make_name: "FORD", model_name: "Ranger", mode: "show" }];
+    expect(excludedRepairNodeIdsForLabel("FORD Ranger", lonely).size).toBe(0);
+  });
+
+  it("rows written before the mode column exist behave as hides", () => {
+    const legacy = [{ node_id: "1M2", make_name: "FORD", model_name: "Ranger" }];
+    expect(excludedRepairNodeIdsForLabel("FORD Ranger", legacy)).toEqual(new Set(["1M2"]));
+  });
+
+  it("partial wildcards are inert and a global 'show' row never hides", () => {
+    const odd = [
+      { node_id: "A", make_name: GLOBAL_SCOPE, model_name: "Golf VII", mode: "hide" },
+      { node_id: "B", make_name: "VOLKSWAGEN", model_name: GLOBAL_SCOPE, mode: "hide" },
+      { node_id: "C", make_name: GLOBAL_SCOPE, model_name: GLOBAL_SCOPE, mode: "show" },
+    ];
+    expect(excludedRepairNodeIdsForLabel("VOLKSWAGEN Golf VII", odd).size).toBe(0);
+    expect(excludedRepairNodeIdsForLabel(null, odd).size).toBe(0);
+    expect(isGlobalExclusionRow(odd[0])).toBe(false);
+    expect(isGlobalExclusionRow(odd[1])).toBe(false);
+    expect(isGlobalExclusionRow(odd[2])).toBe(true);
+  });
+
+  it("partitions rows for the admin model page and names each node's state", () => {
+    const golf = exclusionStateForModel(scoped, "VOLKSWAGEN", "Golf VII");
+    expect(golf.globalHidden).toEqual(new Set(["1P1", "1M01510000WV0"]));
+    expect(golf.modelShown).toEqual(new Set(["1M01510000WV0"]));
+    expect(golf.modelHidden.size).toBe(0); // the Ranger's row is not the Golf's
+    expect(nodeAvailability("1P1", golf)).toBe("hidden_global");
+    expect(nodeAvailability("1M01510000WV0", golf)).toBe("shown_override");
+    expect(nodeAvailability("1M2", golf)).toBe("shown");
+
+    // Same normalised match as the funnel — case and spacing don't matter.
+    const ranger = exclusionStateForModel(scoped, "ford", "  ranger ");
+    expect(nodeAvailability("1M2", ranger)).toBe("hidden_model");
+    expect(nodeAvailability("1M01510000WV0", ranger)).toBe("hidden_global");
+
+    expect(isNodeVisible("shown")).toBe(true);
+    expect(isNodeVisible("shown_override")).toBe(true);
+    expect(isNodeVisible("hidden_global")).toBe(false);
+    expect(isNodeVisible("hidden_model")).toBe(false);
   });
 });
 
