@@ -1,6 +1,6 @@
 # Task 23 — Hide a repair for all vehicles, with per-model overrides
 
-**Status:** ✅ Complete (2026-09-04) — code complete on branch `task-23-global-repair-hides`. **Migration `0054` is NOT yet applied** (Brad, via Studio). Until it is: model-scope toggles keep working exactly as before (rows without a `mode` column read as hides), but switching anything off for *all vehicles* or switching a globally hidden repair back on for one model fails with a toast (the upsert names the missing column). `tsc` clean, 191 unit tests (7 new), production build clean, lint unchanged from baseline. **Not exercised in a browser this session** — the manual script is below.
+**Status:** ✅ Complete (2026-09-04) — merged to `main` 2026-09-04 (branch `task-23-global-repair-hides`). **Migration `0054` is NOT yet applied** (Brad, via Studio). Until it is: model-scope toggles keep working exactly as before (rows without a `mode` column read as hides), but switching anything off for *all vehicles* or switching a globally hidden repair back on for one model fails with a toast (the upsert names the missing column). `tsc` clean, 191 unit tests (7 new), production build clean, lint unchanged from baseline. **Not exercised in a browser this session** — the manual script is below.
 
 ## Why this exists
 

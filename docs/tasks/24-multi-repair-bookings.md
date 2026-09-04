@@ -1,6 +1,6 @@
 # Task 24 — Several repairs in one booking (the trolley)
 
-**Status:** ✅ Complete (2026-09-04) — code complete on branch `task-24-multi-repair-bookings` (stacked on `task-23-global-repair-hides`). **Migration `0055` is NOT yet applied** (Brad, via Studio). The single-job path never touches the new table or column, so the code is safe to deploy first; a multi-job booking attempted before `0055` fails at the lines insert, is rolled back, and the customer sees "please try again" with a live hold (the existing orphaned-hold path) — apply the migration first. HaynesPro's basket calculation verified live (below). `tsc` clean, unit tests green (new suites listed below), production build clean, lint unchanged from baseline. **Not exercised in a browser this session** — the manual script is below.
+**Status:** ✅ Complete (2026-09-04) — merged to `main` 2026-09-04 (branch `task-24-multi-repair-bookings`). **Migration `0055` is NOT yet applied** (Brad, via Studio). The single-job path never touches the new table or column, so the code is safe to deploy first; a multi-job booking attempted before `0055` fails at the lines insert, is rolled back, and the customer sees "please try again" with a live hold (the existing orphaned-hold path) — apply the migration first. HaynesPro's basket calculation verified live (below). `tsc` clean, unit tests green (new suites listed below), production build clean, lint unchanged from baseline. **Not exercised in a browser this session** — the manual script is below.
 
 ## Why this exists
 

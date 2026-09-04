@@ -1,6 +1,6 @@
 # Task 25 — A Disputes area in the mechanic dashboard
 
-**Status:** ✅ Complete (2026-09-04) — code complete on branch `task-25-mechanic-disputes` (cut from `main`, independent of Tasks 23/24). **No migration.** `tsc` clean, unit tests green (4 new), production build clean, lint unchanged from baseline. **Not exercised in a browser this session** — the manual script is below.
+**Status:** ✅ Complete (2026-09-04) — merged to `main` 2026-09-04 (branch `task-25-mechanic-disputes`). **No migration.** `tsc` clean, unit tests green (4 new), production build clean, lint unchanged from baseline. **Not exercised in a browser this session** — the manual script is below.
 
 ## Why this exists
 

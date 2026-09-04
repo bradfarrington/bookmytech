@@ -1,6 +1,6 @@
 # Task 26 — Our own layer over the HaynesPro repair tree: categories, moves, renames, combined repairs
 
-**Status:** ✅ Complete (2026-09-04) — code complete on branch `task-24-multi-repair-bookings` (on top of Tasks 23 and 24). **Migration `0056` is NOT yet applied** (Brad, via Studio; needs `0055` first). Until it is, the catalogue is exactly HaynesPro's — the overlay loads as empty — and every control on `/admin/repairs` other than the hide switch fails with a toast. `tsc` clean, unit tests green, production build clean, lint clean on the changed files. **Not exercised in a browser this session** — the manual script is below.
+**Status:** ✅ Complete (2026-09-04) — merged to `main` 2026-09-04 (branch `task-24-multi-repair-bookings`). **Migration `0056` is NOT yet applied** (Brad, via Studio; needs `0055` first). Until it is, the catalogue is exactly HaynesPro's — the overlay loads as empty — and every control on `/admin/repairs` other than the hide switch fails with a toast. `tsc` clean, unit tests green, production build clean, lint clean on the changed files. **Not exercised in a browser this session** — the manual script is below.
 
 ## Why this exists
 

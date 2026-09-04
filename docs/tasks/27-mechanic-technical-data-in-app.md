@@ -1,6 +1,6 @@
 # Task 27 — Mechanic's repair manuals and technical data, inside the app
 
-**Status:** ✅ Complete (2026-09-04) — code complete on branch `task-24-multi-repair-bookings`. No migration. `tsc`, build and lint clean. **Not exercised in a browser this session.**
+**Status:** ✅ Complete (2026-09-04) — merged to `main` 2026-09-04 (branch `task-24-multi-repair-bookings`). No migration. `tsc`, build and lint clean. **Not exercised in a browser this session.**
 
 ## Why this exists
 
