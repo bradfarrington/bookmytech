@@ -909,3 +909,19 @@ customer through leaving the same review twice.
 ## When complete
 
 Update `docs/HANDOFF.md`, set the current task, commit.
+
+## Task 24 additions (2026-09-04) — several repairs in one booking
+
+Additive only; every request and response above is unchanged for a single job. See `docs/tasks/24-multi-repair-bookings.md`.
+
+- `POST /quote`, `POST /checkout/prepare`, `POST /bookings` accept an optional **`repairNodeIds: string[]`** (1–8 ids; wins over `repairNodeId` when non-empty; a non-array or an array containing non-strings is a 400). `repairNodeId` alone still works exactly as before.
+- `POST /quote` with `repairNodeIds` returns the same seven `quote` fields describing the whole visit (`nodeId` = the first job, `description` = a summary such as "Renew both front brake discs + 1 more job", `rawHours` = the combined book time) **plus** `lines: [{ nodeId, description, rawHours, chargedHours, linePence }]`, `combinedRawHours` and `combineSource: "haynespro" | "sum"`. `chargedHours` 0 means the job is covered by another in the basket. The 1-hour minimum applies once to the visit. A `repairNodeId` request's JSON is byte-identical to before.
+- No new GET endpoint: the app nests **`booking_repairs(position, description, charged_hours)`** on its existing `bookings` select (customer RLS covers it) and falls back to `repair_description` when the array is empty. Migration **`0055`** → `npm run db:types`.
+
+## Task 26 additions (2026-09-04) — categories and combined repairs
+
+Additive only. See `docs/tasks/26-repair-catalogue.md`.
+
+- `/repairs/tree` and `/repairs/search` nodes may now carry ids that start with **`g:`** (a category the admin created — a `group`, drill in with it as usual) or **`b:`** (one bookable option of a combined repair — a `repair`, quote and book it as usual). Treat every id as opaque. Nodes gain optional `bundleId`, `bundleName`, `optionLabel` (null when the combined repair has a single option) and `custom` (true on our categories); a client that knows them can group a bundle's options under one heading.
+- `/quote`, `/checkout/prepare` and `/bookings` accept `b:` ids in `repairNodeId` / `repairNodeIds` transparently. A `repairNodeIds` `/quote` gains `items: [{ id, label, nodeIds }]` — what each chosen id stood for — and every entry of `lines` carries `itemId` / `itemLabel`.
+- `booking_repairs` rows gain `item_id` / `item_label` (the combined repair a job came from). Migration **`0056`** → `npm run db:types`.

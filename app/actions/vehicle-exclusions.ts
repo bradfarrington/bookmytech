@@ -150,5 +150,6 @@ export async function setRepairVehicleAvailability(
   }
 
   revalidatePath("/admin/vehicles", "layout");
+  revalidatePath("/admin/repairs", "layout");
   return { ok: true };
 }

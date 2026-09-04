@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { formatPrice, formatJobNumber } from "@/lib/utils";
 import { formatBookingSlot } from "@/lib/slots";
+import { groupRepairLines, repairLinesFor, type BookingRepairRow } from "@/lib/bookings/repair-lines";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { BookingTracker, type BookingMechanic } from "./_components/booking-tracker";
@@ -29,11 +30,22 @@ export default async function ConfirmedPage({ params }: ConfirmedPageProps) {
 
   const { data: booking } = await supabase
     .from("bookings")
-    .select("id, job_number, vehicle_reg, vehicle_make, vehicle_model, scheduled_at, slot_window, created_at, total_pence, customer_name, customer_email, address_line_1, status, mechanic_id, reschedule_status, reschedule_proposed_at, reschedule_note")
+    .select("id, job_number, vehicle_reg, vehicle_make, vehicle_model, scheduled_at, slot_window, created_at, total_pence, customer_name, customer_email, address_line_1, status, mechanic_id, reschedule_status, reschedule_proposed_at, reschedule_note, repair_node_id, repair_description")
     .eq("id", id)
     .single();
 
   if (!booking) notFound();
+
+  // The job lines of a multi-job booking (Task 24). A separate query rather
+  // than an embed so the page still renders before migration 0055 exists —
+  // an error here just means "one job", which repairLinesFor synthesises.
+  const { data: lineRows } = await supabase
+    .from("booking_repairs")
+    .select("*")
+    .eq("booking_id", id)
+    .order("position");
+  const lines = repairLinesFor(booking, (lineRows ?? null) as BookingRepairRow[] | null);
+  const lineGroups = groupRepairLines(lines);
 
   // Is the viewer already signed in? If so, route them to their dashboard
   // instead of nudging them to create an account.
@@ -116,6 +128,32 @@ export default async function ConfirmedPage({ params }: ConfirmedPageProps) {
           {booking.customer_name && (
             <Row label="Name" value={booking.customer_name} />
           )}
+          <Row
+            label={lineGroups.length > 1 ? `Repairs (${lineGroups.length})` : "Repair"}
+            value={
+              lines.length > 1 ? (
+                <ul className="flex flex-col gap-0.5">
+                  {lineGroups.map((group) => (
+                    <li key={group.key}>
+                      {group.label ? (
+                        <>
+                          {group.label}
+                          <span className="font-normal text-text-muted">
+                            {" "}
+                            ({group.lines.map((l) => l.description).join(", ")})
+                          </span>
+                        </>
+                      ) : (
+                        group.lines[0].description
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                lines[0].description
+              )
+            }
+          />
           <Row label="Vehicle" value={`${booking.vehicle_reg}${vehicle ? ` — ${vehicle}` : ""}`} />
           {slotDate && <Row label="Date & time" value={slotDate} />}
           {booking.address_line_1 && (
@@ -152,7 +190,7 @@ export default async function ConfirmedPage({ params }: ConfirmedPageProps) {
   );
 }
 
-function Row({ label, value }: { label: string; value: string }) {
+function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex items-start justify-between gap-4 text-sm">
       <dt className="shrink-0 text-text-muted">{label}</dt>

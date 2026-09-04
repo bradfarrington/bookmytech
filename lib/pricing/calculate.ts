@@ -207,3 +207,35 @@ export async function getHourlyRatePence(client?: DbClient): Promise<number> {
     return DEFAULT_HOURLY_RATE_PENCE;
   }
 }
+
+/**
+ * How several repairs booked together are timed (Task 24):
+ *   "sum"       — each job's own book time, added up. The owner's choice
+ *                 (2026-09-04: "if we add two jobs together it should charge
+ *                 for both") and the default.
+ *   "haynespro" — HaynesPro's basket calculation, which removes the overlap
+ *                 (renewing the discs already takes the pads off, so the pads
+ *                 add no time). Switchable in /admin/pricing.
+ */
+export type RepairCombineMode = "sum" | "haynespro";
+export const DEFAULT_REPAIR_COMBINE_MODE: RepairCombineMode = "sum";
+export const REPAIR_COMBINE_MODE_KEY = "repair_combine_mode";
+
+/** Pure — anything but the two known values is the default. */
+export function parseRepairCombineMode(raw: unknown): RepairCombineMode {
+  return raw === "haynespro" ? "haynespro" : DEFAULT_REPAIR_COMBINE_MODE;
+}
+
+export async function getRepairCombineMode(client?: DbClient): Promise<RepairCombineMode> {
+  const db = client ?? (await import("@/lib/supabase/admin")).createAdminClient();
+  try {
+    const { data } = await db
+      .from("platform_settings")
+      .select("value")
+      .eq("key", REPAIR_COMBINE_MODE_KEY)
+      .maybeSingle();
+    return parseRepairCombineMode(data?.value);
+  } catch {
+    return DEFAULT_REPAIR_COMBINE_MODE;
+  }
+}

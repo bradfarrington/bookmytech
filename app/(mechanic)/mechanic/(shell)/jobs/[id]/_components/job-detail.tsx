@@ -3,7 +3,7 @@ import {
   ArrowLeft,
   BookOpen,
   Car,
-  ExternalLink,
+  ChevronRight,
   MapPin,
   CalendarClock,
   Clock,
@@ -43,7 +43,10 @@ export interface JobDetailProps {
   status: string;
   shortRef: string; // short id ("ref" is reserved by React — can't be a prop name)
   createdAt: string | null;
+  /** One line for the booking — a summary ("X + 2 more jobs") when there are several. */
   serviceName: string;
+  /** Every job of a multi-job booking (Task 24); absent for one job. */
+  serviceLines?: Array<{ description: string; chargedHours: number | null }>;
   vehicle: string; // "VW Golf"
   reg: string | null;
   whenLabel: string;
@@ -85,6 +88,10 @@ export interface JobDetailProps {
   technicalDataEnabled: boolean;
 }
 
+function ChevronRightIcon() {
+  return <ChevronRight size={13} className="text-text-muted" />;
+}
+
 const STATUS_LABEL: Record<string, string> = {
   sourcing_mechanic: "Sourcing mechanic",
   confirmed: "Confirmed",
@@ -108,6 +115,7 @@ export function JobDetail(props: JobDetailProps) {
     bookingId,
     status,
     serviceName,
+    serviceLines,
     vehicle,
     reg,
     customerName,
@@ -145,6 +153,22 @@ export function JobDetail(props: JobDetailProps) {
             </h1>
             <Pill tone={statusTone(status)}>{STATUS_LABEL[status] ?? status}</Pill>
           </div>
+          {serviceLines && serviceLines.length > 1 && (
+            <ul className="mt-2 flex flex-col gap-1 rounded-xl border border-border bg-surface-card px-4 py-3 text-sm">
+              {serviceLines.map((line, index) => (
+                <li key={`${index}-${line.description}`} className="flex items-start justify-between gap-3">
+                  <span className="text-text-primary">{line.description}</span>
+                  <span className="shrink-0 text-xs text-text-muted">
+                    {line.chargedHours == null
+                      ? ""
+                      : line.chargedHours === 0
+                        ? "no extra time"
+                        : `${Number(line.chargedHours.toFixed(2))} h`}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
           <p className="mt-1.5 flex flex-wrap items-center gap-x-2 text-sm text-text-muted">
             <Car size={14} className="text-text-muted" />
             <span className="font-medium text-text-secondary">{vehicle}</span>
@@ -254,34 +278,31 @@ export function JobDetail(props: JobDetailProps) {
             )}
           </Card>
 
-          {/* Technical data — one-time SSO deep links into WorkshopData Touch
-              for THIS booking's vehicle (Task 16). Links mint per click, so
-              plain anchors hit the route handler directly. */}
+          {/* Technical data — the manufacturer's repair manuals and technical
+              data for THIS booking's vehicle, shown inside the app (Task 27;
+              they used to open HaynesPro's WorkshopData site, which the owner
+              doesn't want anyone sent to). */}
           {technicalDataEnabled && (
             <Card className="space-y-3 p-6">
               <CardTitle icon={BookOpen}>Technical data</CardTitle>
               <p className="text-sm text-text-secondary">
-                Manufacturer data for this vehicle — opens in HaynesPro
-                WorkshopData.
+                The manufacturer&apos;s repair manuals and technical data for this vehicle.
               </p>
               <div className="flex flex-wrap gap-2">
                 {(
                   [
-                    ["repairmanuals", "Repair manuals"],
-                    ["maintenance", "Service data"],
-                    ["electronics", "Wiring & electronics"],
+                    ["manuals", "Repair manuals"],
+                    ["data", "Technical data"],
                   ] as const
-                ).map(([subject, label]) => (
-                  <a
-                    key={subject}
-                    href={`/api/haynespro/sso?booking=${bookingId}&subject=${subject}`}
-                    target="_blank"
-                    rel="noreferrer"
+                ).map(([tab, label]) => (
+                  <Link
+                    key={tab}
+                    href={`/mechanic/jobs/${bookingId}/technical?tab=${tab}`}
                     className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3.5 py-2 text-sm font-semibold text-text-primary transition-colors hover:border-brand-blue/50 hover:text-brand-blue"
                   >
                     {label}
-                    <ExternalLink size={13} className="text-text-muted" />
-                  </a>
+                    <ChevronRightIcon />
+                  </Link>
                 ))}
               </div>
             </Card>

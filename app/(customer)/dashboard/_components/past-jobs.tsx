@@ -128,7 +128,7 @@ export function PastJobs({ jobs, mechanics, ratedByBooking, disputes }: PastJobs
                     <RebookControl
                       reg={job.vehicleReg}
                       postcode={job.postcode}
-                      repairNodeId={job.repairNodeId}
+                      repairNodeIds={job.repairNodeIds}
                       make={job.vehicleMake}
                       model={job.vehicleModel}
                       mechanicId={job.mechanicId}

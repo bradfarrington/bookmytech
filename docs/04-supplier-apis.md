@@ -116,6 +116,27 @@ All calls REST JSON, all returned real data:
    <code>0</code> + one-time redirectUrl into WorkshopData Touch.
    ⚠️ The WSDL element really is spelled "companyIdentificaton".
 
+10. processRepairTasksV4?vrid=…&descriptionLanguage=en&repairtimeTypeId=115566
+    &typeCategory=CAR&repairTaskIds=<id>&repairTaskIds=<id>
+    &repairVatRates=20&repairVatRates=20                (one per task)
+    &labourRateMechanical=6000&labourRateBody=6000&labourRateElectronics=6000
+                                                        (pence per hour; required)
+    → an OBJECT, not an array: {status:{statusCode}, totalRepairTime,
+      repairPriceWithoutVat, totalRepairPrice, basketItems:[{id, description,
+      calculatedTime, jobType, priceWithoutVat, subtotal, repairtimesInfo:{
+      includedList, notIncludedList, preliminaryList, followUpWorkList}}]}
+    HaynesPro's basket calculation — several jobs priced as one visit, with the
+    overlap between them removed. Golf VII (repairtimeTypeId 115566):
+      [1M01822000WV0 both front brake discs 110, 1M01510000WV0 front pads 80]
+        → totalRepairTime 110 · discs calculatedTime 110 · pads 0
+      [front pads] → 80 (same as getRepairtimeNodesV4)
+      [front pads 80, 1M01534000WV0 rear pads 80] → 160 (nothing overlaps)
+    ⚠️ Match basketItems by `id`, never by position. The basket does NOT say
+    which item absorbed a zeroed line (includedList names sub-operations with
+    different ids). The price fields use the labour rate you send — ignore
+    them; BMT prices from lib/pricing/calculate.ts. Times are hours × 100.
+    Rerun: node scripts/verify-repair-combination.mjs  [verified 2026-09-04, Task 24]
+
 API self-documentation: `GET /workshopServices3/swagger-resources` lists the
 spec groups; `GET /workshopServices3/v3/api-docs?group=<name>` returns full
 OpenAPI (param names/types) per group — fastest way to check an op's signature.

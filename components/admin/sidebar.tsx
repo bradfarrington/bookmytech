@@ -25,6 +25,7 @@ import {
   Star,
   UserRound,
   Users,
+  Wrench,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Icon } from "@/components/ui/icon";
@@ -70,6 +71,7 @@ const NAV_GROUPS: readonly NavGroup[] = [
       { label: "Pricing", href: "/admin/pricing", icon: PoundSterling },
       { label: "Areas & demand", href: "/admin/areas", icon: Map },
       { label: "Analytics", href: "/admin/analytics", icon: BarChart3 },
+      { label: "Repairs", href: "/admin/repairs", icon: Wrench },
       { label: "Vehicles", href: "/admin/vehicles", icon: Car },
       { label: "Parts", href: "/admin/parts", icon: Package },
       { label: "SMS", href: "/admin/sms", icon: MessageSquare },

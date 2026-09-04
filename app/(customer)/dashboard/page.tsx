@@ -54,6 +54,35 @@ export default async function DashboardPage() {
     .or(`customer_id.eq.${user.id},customer_email.eq.${email}`)
     .order("scheduled_at", { ascending: false });
 
+  // Job lines of multi-job bookings (Task 24), one query for the lot. An
+  // error here (e.g. before migration 0055 exists) just means every booking
+  // shows as one job, which is what the booking row itself describes.
+  const bookingIds = (rows ?? []).map((b) => b.id as string);
+  const linesByBooking = new Map<
+    string,
+    Array<{ nodeId: string; description: string; itemId: string | null; itemLabel: string | null }>
+  >();
+  if (bookingIds.length) {
+    const { data: lineRows } = await admin
+      .from("booking_repairs")
+      .select("*")
+      .in("booking_id", bookingIds)
+      .order("position");
+    for (const line of lineRows ?? []) {
+      const list = linesByBooking.get(line.booking_id) ?? [];
+      list.push({
+        nodeId: line.node_id,
+        description: line.description ?? "Vehicle repair",
+        itemId: line.item_id ?? null,
+        itemLabel: line.item_label ?? null,
+      });
+      linesByBooking.set(line.booking_id, list);
+    }
+  }
+  // "Book again" carries what the customer CHOSE — a combined repair as one
+  // id — and the card lists it once by its name.
+  const uniq = (values: string[]) => [...new Set(values)];
+
   const bookings: DashboardBooking[] = (rows ?? []).map((b) => ({
     id: b.id,
     jobNumber: b.job_number ?? null,
@@ -74,6 +103,14 @@ export default async function DashboardPage() {
     rescheduleNote: b.reschedule_note,
     repairDescription: b.repair_description ?? "Vehicle repair",
     repairNodeId: b.repair_node_id ?? null,
+    repairNodeIds: linesByBooking.get(b.id)
+      ? uniq(linesByBooking.get(b.id)!.map((line) => (line.itemLabel ? line.itemId ?? line.nodeId : line.nodeId)))
+      : b.repair_node_id
+        ? [b.repair_node_id]
+        : [],
+    repairLines: linesByBooking.get(b.id)
+      ? uniq(linesByBooking.get(b.id)!.map((line) => line.itemLabel ?? line.description))
+      : [b.repair_description ?? "Vehicle repair"],
   }));
 
   // Resolve the assigned mechanics in one round-trip each (profile + rating).

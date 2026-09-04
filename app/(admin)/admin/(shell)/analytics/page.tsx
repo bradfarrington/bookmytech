@@ -189,7 +189,8 @@ export default async function AdminAnalyticsPage({
   const mechMap = new Map<string, number>();
   for (const b of periodBookings.filter(revenueable)) {
     const gmv = b.total_pence ?? 0;
-    const repair = b.repair_description ?? "Vehicle repair";
+    // A multi-job booking's summary is "X + 2 more jobs" — bucket it under X.
+    const repair = (b.repair_description ?? "Vehicle repair").replace(/ \+ \d+ more jobs?$/, "");
     mixMap.set(repair, (mixMap.get(repair) ?? 0) + gmv);
     if (b.area) areaMap.set(b.area, (areaMap.get(b.area) ?? 0) + gmv);
     if (b.mechanic_id) mechMap.set(b.mechanic_id, (mechMap.get(b.mechanic_id) ?? 0) + gmv);

@@ -1,4 +1,5 @@
 import { createBooking, type CreateBookingInput } from "@/lib/bookings/create-booking";
+import { MAX_REPAIRS_PER_BOOKING, readRepairIdList } from "@/lib/bookings/repair-ids";
 import { enforceBookingLimits, staffRefusal } from "@/lib/mobile/booking-guards";
 import { apiError, apiOk, readJsonBody } from "@/lib/mobile/respond";
 import { requireMobileUser } from "@/lib/supabase/mobile";
@@ -45,6 +46,8 @@ interface BookingBody {
   vehicleMake?: unknown;
   vehicleModel?: unknown;
   repairNodeId?: unknown;
+  /** Several jobs in one visit (Task 24, additive) — wins over repairNodeId when non-empty. */
+  repairNodeIds?: unknown;
   scheduledAt?: unknown;
   slotWindow?: unknown;
   customerName?: unknown;
@@ -84,6 +87,7 @@ export async function POST(request: Request): Promise<Response> {
   const vehicleMake = asString(body.vehicleMake);
   const vehicleModel = asString(body.vehicleModel);
   const repairNodeId = asString(body.repairNodeId);
+  const repairNodeIds = readRepairIdList(body.repairNodeIds);
   const scheduledAt = asString(body.scheduledAt);
   const slotWindow = asString(body.slotWindow);
   const customerName = asString(body.customerName);
@@ -98,7 +102,13 @@ export async function POST(request: Request): Promise<Response> {
 
   if (!vehicleReg) return apiError("We need your registration number to book this repair.", 400);
   if (!vehicleMake) return apiError("We need your vehicle's make to book this repair.", 400);
-  if (!repairNodeId) return apiError("Choose the repair you need first.", 400);
+  if (repairNodeIds === null) return apiError("Choose the repairs you need first.", 400);
+  if (!repairNodeId && repairNodeIds.length === 0) {
+    return apiError("Choose the repair you need first.", 400);
+  }
+  if (repairNodeIds.length > MAX_REPAIRS_PER_BOOKING) {
+    return apiError(`You can book up to ${MAX_REPAIRS_PER_BOOKING} jobs in one visit.`, 400);
+  }
   if (!customerName) return apiError("Enter the name we should put on the booking.", 400);
   if (!addressLine1) return apiError("Enter the address we're coming to.", 400);
   if (!postcode) return apiError("Enter the postcode we're coming to.", 400);
@@ -134,7 +144,8 @@ export async function POST(request: Request): Promise<Response> {
     vehicleReg,
     vehicleMake,
     vehicleModel: vehicleModel || undefined,
-    repairNodeId,
+    repairNodeId: repairNodeId || undefined,
+    repairNodeIds: repairNodeIds.length ? repairNodeIds : undefined,
     scheduledAt,
     slotWindow: slotWindow || undefined,
     // From the verified token, never the body — see the note above.

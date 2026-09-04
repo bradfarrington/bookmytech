@@ -1,5 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
 import { Overline } from "@/components/ui/overline";
+import {
+  DEFAULT_REPAIR_COMBINE_MODE,
+  REPAIR_COMBINE_MODE_KEY,
+  parseRepairCombineMode,
+} from "@/lib/pricing/calculate";
 import { AreasSection, type AreaRowData } from "./_components/areas-section";
 import {
   PlatformDefaultsSection,
@@ -15,6 +20,7 @@ const SETTING_DEFAULTS: PlatformSettings = {
   cancel_fee_before_24h: 0,
   cancel_fee_within_24h: 3000,
   cancel_fee_mechanic_en_route: 5000,
+  repair_combine_mode: DEFAULT_REPAIR_COMBINE_MODE,
 };
 
 export default async function AdminPricingPage() {
@@ -35,7 +41,11 @@ export default async function AdminPricingPage() {
 
   const settings: PlatformSettings = { ...SETTING_DEFAULTS };
   for (const row of settingRows ?? []) {
-    const key = row.key as keyof PlatformSettings;
+    if (row.key === REPAIR_COMBINE_MODE_KEY) {
+      settings.repair_combine_mode = parseRepairCombineMode(row.value);
+      continue;
+    }
+    const key = row.key as Exclude<keyof PlatformSettings, "repair_combine_mode">;
     const n = typeof row.value === "number" ? row.value : Number(row.value);
     if (key in settings && Number.isFinite(n)) settings[key] = n;
   }

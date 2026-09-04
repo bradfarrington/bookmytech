@@ -17,6 +17,7 @@ import { createClient } from "@/lib/supabase/client";
 import { cn, formatPrice, vehicleLabel } from "@/lib/utils";
 import { prepareCheckout, createBookingAction } from "@/app/actions/create-booking";
 import type { CreateBookingInput, PrepareCheckoutResult } from "@/app/actions/create-booking";
+import { groupRepairLines, type RepairLineLite } from "@/lib/bookings/repair-lines";
 import { reportOrphanedHold } from "@/app/actions/orphaned-hold";
 import { ensureCustomerAccount, requestPasswordReset } from "@/app/actions/booking-account";
 import {
@@ -108,8 +109,37 @@ function readDraft(intentId: string): CheckoutDraft | null {
     const raw = sessionStorage.getItem(DRAFT_PREFIX + intentId);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as CheckoutDraft;
-    // A draft missing either of these can't produce a bookable row.
-    if (!parsed?.common?.selectedSlot || !parsed.common.addressLine1) return null;
+    // Drafts parked by pre-Task-24 builds carry one `repairNodeId`. Upgrade
+    // them, so a customer who was at their bank while this deployed still
+    // completes their booking instead of being told their hold is stranded.
+    const legacy = parsed?.common as
+      | (ConfirmCommon & { repairNodeId?: string; repairName?: string })
+      | undefined;
+    if (
+      legacy &&
+      !Array.isArray(legacy.repairNodeIds) &&
+      typeof legacy.repairNodeId === "string" &&
+      legacy.repairNodeId
+    ) {
+      legacy.repairNodeIds = [legacy.repairNodeId];
+      legacy.repairLines = [
+        {
+          nodeId: legacy.repairNodeId,
+          description: legacy.repairName ?? "Vehicle repair",
+          chargedHours: 0,
+        },
+      ];
+    }
+    // A draft missing any of these can't produce a bookable row.
+    if (
+      !parsed?.common?.selectedSlot ||
+      !parsed.common.addressLine1 ||
+      !Array.isArray(parsed.common.repairNodeIds) ||
+      parsed.common.repairNodeIds.length === 0
+    ) {
+      return null;
+    }
+    if (!Array.isArray(parsed.common.repairLines)) parsed.common.repairLines = [];
     return parsed;
   } catch {
     return null;
@@ -126,7 +156,7 @@ function clearDraft(intentId: string): void {
 
 /**
  * Query for the return URL. It must land on a page that RENDERS: /book/slot
- * bounces to /book without `reg` and `repair`. The rest is carried so the header
+ * bounces to /book without `reg` and `repairs`. The rest is carried so the header
  * and the form still describe the right vehicle if we have to put the customer
  * back on it. The address is deliberately absent — that's what the draft is for.
  */
@@ -149,7 +179,7 @@ const NOTHING_HELD = new Set([
 ]);
 
 function returnParams(c: ConfirmCommon): Record<string, string> {
-  const params: Record<string, string> = { reg: c.reg, repair: c.repairNodeId };
+  const params: Record<string, string> = { reg: c.reg, repairs: c.repairNodeIds.join(",") };
   if (c.make) params.make = c.make;
   if (c.model) params.model = c.model;
   if (c.preferredMechanicId) params.pref = c.preferredMechanicId;
@@ -161,10 +191,10 @@ interface SlotPickerProps {
   make: string;
   model?: string;
   defaultPostcode?: string;
-  /** Display name of the repair being booked, e.g. "Renew the front brake pads". */
-  repairName: string;
-  /** HaynesPro repair node id — the server re-quotes from (reg, node). */
-  repairNodeId: string;
+  /** HaynesPro repair node ids, in the customer's order — the server re-quotes from (reg, nodes). */
+  repairNodeIds: string[];
+  /** The same jobs with their names and charged hours, for the recap (Task 24). */
+  repairLines: RepairLineLite[];
   pricePence: number;
   preferredMechanicId?: string;
   /** Signed-in customer's spendable account credit (0 for guests). */
@@ -196,8 +226,8 @@ export function SlotPicker({
   make,
   model,
   defaultPostcode = "",
-  repairName,
-  repairNodeId,
+  repairNodeIds,
+  repairLines,
   pricePence,
   preferredMechanicId,
   availableCreditPence = 0,
@@ -446,7 +476,12 @@ export function SlotPicker({
 
   function handleProceedToPayment() {
     if (!canProceed) return;
-    track(FUNNEL_EVENTS.slotPicked, { repairNodeId, slot: selectedSlot });
+    track(FUNNEL_EVENTS.slotPicked, {
+      repairNodeId: repairNodeIds[0],
+      repairNodeIds,
+      repairCount: repairNodeIds.length,
+      slot: selectedSlot,
+    });
     setStripeError(null);
     setAccountError(null);
     startTransition(async () => {
@@ -469,7 +504,12 @@ export function SlotPicker({
         setAccountReady(true);
       }
 
-      const result = await prepareCheckout({ postcode, vehicleReg: reg, repairNodeId });
+      const result = await prepareCheckout({
+        postcode,
+        vehicleReg: reg,
+        repairNodeId: repairNodeIds[0],
+        repairNodeIds,
+      });
       if (!result.ok) {
         setStripeError(result.error);
         return;
@@ -500,8 +540,8 @@ export function SlotPicker({
     reg,
     make,
     model,
-    repairName,
-    repairNodeId,
+    repairNodeIds,
+    repairLines,
     preferredMechanicId,
     // Identity is settled before this step — the checkout no longer asks.
     customerName: signedIn ? customerName : name.trim(),
@@ -900,8 +940,8 @@ interface ConfirmCommon {
   reg: string;
   make: string;
   model?: string;
-  repairName: string;
-  repairNodeId: string;
+  repairNodeIds: string[];
+  repairLines: RepairLineLite[];
   preferredMechanicId?: string;
   /** Resolved before this step — the customer always has an account by now. */
   customerName: string;
@@ -917,7 +957,8 @@ function bookingInputFrom(
     vehicleReg: c.reg,
     vehicleMake: c.make,
     vehicleModel: c.model,
-    repairNodeId: c.repairNodeId,
+    repairNodeId: c.repairNodeIds[0],
+    repairNodeIds: c.repairNodeIds,
     scheduledAt: c.selectedSlot,
     slotWindow: c.selectedWindow || undefined,
     customerEmail: c.customerEmail,
@@ -932,20 +973,54 @@ function bookingInputFrom(
   };
 }
 
-// Price breakdown shown on every confirm step.
+function hoursLabel(h: number): string {
+  return `${Number(h.toFixed(2))} h`;
+}
+
+// Price breakdown shown on every confirm step. Several jobs list each one
+// above the total: the visit is priced as a whole (overlapping work isn't
+// charged twice), so the lines carry time, not money.
 function PriceSummary({
   totalPence,
   creditAppliedPence,
   chargePence,
+  lines,
 }: {
   totalPence: number;
   creditAppliedPence: number;
   chargePence: number;
+  lines?: RepairLineLite[];
 }) {
+  const multi = (lines?.length ?? 0) > 1;
   return (
     <div className="rounded-xl border border-border bg-surface p-4 text-sm">
-      <div className="flex items-center justify-between text-text-secondary">
-        <span>Repair total</span>
+      {multi &&
+        groupRepairLines(lines!).map((group) => (
+          <div key={group.key} className="mb-1">
+            {group.label && <p className="font-medium text-text-secondary">{group.label}</p>}
+            {group.lines.map((line) => (
+              <div
+                key={line.nodeId}
+                className={cn(
+                  "flex items-start justify-between gap-3 text-text-muted",
+                  group.label && "pl-3",
+                )}
+              >
+                <span className="min-w-0">{line.description}</span>
+                <span className="shrink-0 text-xs">
+                  {line.chargedHours === 0 ? "no extra time" : hoursLabel(line.chargedHours)}
+                </span>
+              </div>
+            ))}
+          </div>
+        ))}
+      <div
+        className={cn(
+          "flex items-center justify-between text-text-secondary",
+          multi && "mt-1 border-t border-border pt-2",
+        )}
+      >
+        <span>{multi ? "Jobs total" : "Repair total"}</span>
         <span>{formatPrice(totalPence)}</span>
       </div>
       {creditAppliedPence > 0 && (
@@ -964,9 +1039,44 @@ function PriceSummary({
 
 // Job + account recap at the top of the confirm step.
 function BookingRecap({ c }: { c: ConfirmCommon }) {
+  const groups = groupRepairLines(c.repairLines);
+  const multi = c.repairLines.length > 1;
   return (
     <div className="rounded-xl border border-border bg-surface p-4 text-sm">
-      <p className="font-semibold text-text-primary">{c.repairName}</p>
+      {multi ? (
+        <>
+          <p className="font-semibold text-text-primary">
+            {groups.length > 1 ? `${groups.length} jobs` : groups[0].label}
+          </p>
+          <ul className="mt-1 flex flex-col gap-0.5 text-text-secondary">
+            {groups.map((group) =>
+              group.label && groups.length > 1 ? (
+                <li key={group.key} className="flex gap-2">
+                  <span className="text-text-muted">•</span>
+                  <span>
+                    {group.label}
+                    <span className="text-text-muted">
+                      {" "}
+                      ({group.lines.map((l) => l.description).join(", ")})
+                    </span>
+                  </span>
+                </li>
+              ) : (
+                group.lines.map((line) => (
+                  <li key={line.nodeId} className="flex gap-2">
+                    <span className="text-text-muted">•</span>
+                    {line.description}
+                  </li>
+                ))
+              ),
+            )}
+          </ul>
+        </>
+      ) : (
+        <p className="font-semibold text-text-primary">
+          {c.repairLines[0]?.description ?? "Vehicle repair"}
+        </p>
+      )}
       <p className="text-text-secondary">
         {vehicleLabel(c.reg, c.make, c.model)} · {formatBookingSlot(c.selectedSlot, c.selectedWindow)}
       </p>
@@ -1088,6 +1198,7 @@ function CheckoutForm({
         totalPence={checkout.totalPence}
         creditAppliedPence={checkout.creditAppliedPence}
         chargePence={checkout.chargePence}
+        lines={c.repairLines}
       />
 
       {alreadyConfirmed ? (
@@ -1185,6 +1296,7 @@ function FreeCheckoutForm({
         totalPence={checkout.totalPence}
         creditAppliedPence={checkout.creditAppliedPence}
         chargePence={0}
+        lines={c.repairLines}
       />
 
       <p className="rounded-lg bg-green-50 px-4 py-3 text-sm font-medium text-success">

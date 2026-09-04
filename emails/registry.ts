@@ -272,7 +272,12 @@ export const EMAIL_TEMPLATE_DEFS: readonly EmailTemplateDef[] = [
     variables: [
       { name: "name", description: "Customer's name", example: "Alex" },
       { name: "ref", description: "Short booking reference", example: "A1B2C3D4" },
-      { name: "service", description: "Service booked", example: "Full service" },
+      { name: "service", description: "Service booked (a summary when several jobs were booked together)", example: "Full service" },
+      {
+        name: "repairs",
+        description: "Every job in a multi-job booking, '|'-separated — empty for one job",
+        example: "Renew both front brake discs|Renew the front brake pads",
+      },
       { name: "vehicle", description: "Vehicle description", example: "AB12 CDE — Ford Focus" },
       { name: "when", description: "Scheduled date/time", example: "Monday 3 August · 8am–10am" },
       { name: "pay_line", description: "Payment summary line", example: "Amount pre-authorised: £120.00" },
@@ -286,6 +291,7 @@ export const EMAIL_TEMPLATE_DEFS: readonly EmailTemplateDef[] = [
         text: "We've received your booking and are now matching you with the best available mechanic in your area. You'll hear from us as soon as one accepts — usually within minutes.",
       },
       { id: "summary", type: "custom", render: "booking_summary" },
+      { id: "repairs", type: "custom", render: "repair_list" },
       { id: "pay", type: "paragraph", text: "**{{pay_line}}**" },
       {
         id: "holdnote",

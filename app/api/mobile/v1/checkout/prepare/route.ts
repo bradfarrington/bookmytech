@@ -1,4 +1,5 @@
 import { prepareCheckoutFor } from "@/lib/bookings/create-booking";
+import { MAX_REPAIRS_PER_BOOKING, readRepairIdList } from "@/lib/bookings/repair-ids";
 import { enforceBookingLimits, staffRefusal } from "@/lib/mobile/booking-guards";
 import { apiError, apiOk, readJsonBody } from "@/lib/mobile/respond";
 import { requireMobileUser } from "@/lib/supabase/mobile";
@@ -7,6 +8,8 @@ import { requireMobileUser } from "@/lib/supabase/mobile";
 // pre-auth hold. AUTHENTICATED.
 //
 // Body: { postcode, vehicleReg, repairNodeId }
+//       or, for several jobs in one visit (Task 24, additive):
+//       { postcode, vehicleReg, repairNodeIds: [id, …] }   (wins when non-empty)
 // 200:  the PrepareCheckoutResult from lib/bookings/create-booking.ts,
 //       UNCHANGED — including the `{ ok: false, error }` arm. A repair we can't
 //       price, or a Stripe refusal, is a request that RAN with a negative
@@ -35,6 +38,7 @@ interface PrepareBody {
   postcode?: unknown;
   vehicleReg?: unknown;
   repairNodeId?: unknown;
+  repairNodeIds?: unknown;
 }
 
 const asString = (value: unknown): string => (typeof value === "string" ? value.trim() : "");
@@ -53,12 +57,19 @@ export async function POST(request: Request): Promise<Response> {
   const postcode = asString(parsed.body.postcode).toUpperCase();
   const vehicleReg = asString(parsed.body.vehicleReg);
   const repairNodeId = asString(parsed.body.repairNodeId);
+  const repairNodeIds = readRepairIdList(parsed.body.repairNodeIds);
 
   if (!vehicleReg) {
     return apiError("We need your registration number to price this repair.", 400);
   }
-  if (!repairNodeId) {
+  if (repairNodeIds === null) {
+    return apiError("Choose the repairs you need first.", 400);
+  }
+  if (!repairNodeId && repairNodeIds.length === 0) {
     return apiError("Choose the repair you need first.", 400);
+  }
+  if (repairNodeIds.length > MAX_REPAIRS_PER_BOOKING) {
+    return apiError(`You can book up to ${MAX_REPAIRS_PER_BOOKING} jobs in one visit.`, 400);
   }
   if (!postcode) {
     return apiError("Enter the postcode we're coming to.", 400);
@@ -67,6 +78,14 @@ export async function POST(request: Request): Promise<Response> {
   const limited = await enforceBookingLimits(request, caller, "checkout");
   if (limited) return limited;
 
-  const result = await prepareCheckoutFor({ postcode, vehicleReg, repairNodeId }, caller.userId);
+  const result = await prepareCheckoutFor(
+    {
+      postcode,
+      vehicleReg,
+      repairNodeId: repairNodeId || undefined,
+      repairNodeIds: repairNodeIds.length ? repairNodeIds : undefined,
+    },
+    caller.userId,
+  );
   return apiOk(result);
 }

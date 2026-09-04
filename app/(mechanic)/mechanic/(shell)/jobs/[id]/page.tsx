@@ -2,9 +2,10 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { geocodePostcode, haversineMiles, type LatLng } from "@/lib/geo/postcodes";
 import { mechanicSharePence } from "@/lib/earnings";
-import { isHaynesProSsoConfigured } from "@/lib/haynespro/sso";
+import { isHaynesProConfigured } from "@/lib/haynespro/client";
 import { ALL_DAY_SLOT, formatBookingSlot } from "@/lib/slots";
 import { formatJobNumber } from "@/lib/utils";
+import { repairLinesFor, type BookingRepairRow } from "@/lib/bookings/repair-lines";
 import {
   loadArrivalWindowOptions,
   type ArrivalWindowOptions,
@@ -46,6 +47,17 @@ export default async function MechanicJobDetailPage({ params }: PageProps) {
     .maybeSingle();
 
   if (!booking) notFound();
+
+  // Every job of a multi-job booking (Task 24), under the mechanic's own RLS
+  // ("Mechanics read assigned booking repairs", 0055). A separate query so the
+  // page still renders before that migration exists — an error just means
+  // "one job", which repairLinesFor synthesises from the booking row.
+  const { data: lineRows } = await supabase
+    .from("booking_repairs")
+    .select("*")
+    .eq("booking_id", id)
+    .order("position");
+  const repairLines = repairLinesFor(booking, (lineRows ?? null) as BookingRepairRow[] | null);
 
   const { data: mechanic } = await supabase
     .from("mechanics")
@@ -178,6 +190,14 @@ export default async function MechanicJobDetailPage({ params }: PageProps) {
     shortRef: formatJobNumber(booking.job_number),
     createdAt: booking.created_at,
     serviceName: booking.repair_description ?? "Vehicle repair",
+    serviceLines:
+      repairLines.length > 1
+        ? repairLines.map((line) => ({
+            // The real job first; the combined repair it came from after it.
+            description: line.itemLabel ? `${line.description} · ${line.itemLabel}` : line.description,
+            chargedHours: line.chargedHours,
+          }))
+        : undefined,
     vehicle: [booking.vehicle_make, booking.vehicle_model].filter(Boolean).join(" ") || "Vehicle",
     reg: booking.vehicle_reg,
     whenLabel,
@@ -209,7 +229,9 @@ export default async function MechanicJobDetailPage({ params }: PageProps) {
     signatureUrl,
     hasSignature: signatureUrl != null,
     disputeId: disputeRow?.id ?? null,
-    technicalDataEnabled: isHaynesProSsoConfigured(),
+    // In-app manuals + technical data (Task 27) need the Data Exchange
+    // credentials, not the SSO ones.
+    technicalDataEnabled: isHaynesProConfigured(),
   };
 
   return <JobDetail {...detail} />;

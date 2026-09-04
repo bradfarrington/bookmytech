@@ -62,6 +62,18 @@ export function ActiveBookingCard({ booking, mechanic }: ActiveBookingCardProps)
           />
         )}
 
+        {/* Every job of a multi-job booking (the header shows the summary). */}
+        {booking.repairLines.length > 1 && (
+          <ul className="flex flex-col gap-1 rounded-xl bg-surface px-4 py-3 text-sm text-text-secondary">
+            {booking.repairLines.map((line, index) => (
+              <li key={`${index}-${line}`} className="flex gap-2">
+                <span className="text-text-muted">•</span>
+                {line}
+              </li>
+            ))}
+          </ul>
+        )}
+
         {/* Slot + address */}
         <div className="flex flex-col gap-2 text-sm">
           <p className="flex items-center gap-2 text-text-secondary">

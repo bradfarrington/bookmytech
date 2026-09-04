@@ -20,6 +20,7 @@ import { Pill } from "@/components/ui/pill";
 import { Overline } from "@/components/ui/overline";
 import { formatPrice, formatJobNumber } from "@/lib/utils";
 import { calcEarnings } from "@/lib/earnings";
+import { repairLinesFor, type BookingRepairRow } from "@/lib/bookings/repair-lines";
 import { Timeline, type TimelineEvent } from "./_components/timeline";
 import { BookingActions } from "./_components/booking-actions";
 
@@ -106,6 +107,20 @@ export default async function BookingDetailPage({ params }: PageProps) {
     .single();
 
   if (!booking) notFound();
+
+  // Every job of a multi-job booking, and how its combined time was derived
+  // (Task 24). Separate queries so the page still renders before migration
+  // 0055 exists — errors just mean "one job" / "not combined".
+  const [{ data: lineRows }, { data: combineRow }] = await Promise.all([
+    supabase
+      .from("booking_repairs")
+      .select("*")
+      .eq("booking_id", id)
+      .order("position"),
+    supabase.from("bookings").select("combine_source").eq("id", id).maybeSingle(),
+  ]);
+  const repairLines = repairLinesFor(booking, (lineRows ?? null) as BookingRepairRow[] | null);
+  const combineSource: string | null = combineRow?.combine_source ?? null;
 
   const [{ data: events }, { data: mechRows }, paymentStatus] =
     await Promise.all([
@@ -227,9 +242,45 @@ export default async function BookingDetailPage({ params }: PageProps) {
             />
             <Row
               icon={Wrench}
-              label="Repair"
-              value={booking.repair_description ?? "Vehicle repair"}
+              label={repairLines.length > 1 ? `Repairs (${repairLines.length})` : "Repair"}
+              value={
+                repairLines.length > 1 ? (
+                  <ul className="flex flex-col gap-1">
+                    {repairLines.map((line) => (
+                      <li key={line.nodeId ?? line.position} className="flex flex-wrap items-baseline gap-x-2">
+                        <span>{line.description}</span>
+                        {line.itemLabel && (
+                          <span className="text-xs font-normal text-brand-blue">{line.itemLabel}</span>
+                        )}
+                        <span className="text-xs font-normal text-text-muted">
+                          {line.rawHours != null && line.chargedHours != null
+                            ? line.chargedHours === 0
+                              ? `${line.rawHours} h book time · no extra time`
+                              : line.chargedHours < line.rawHours
+                                ? `${line.rawHours} h → ${line.chargedHours} h charged`
+                                : `${line.chargedHours} h`
+                            : ""}
+                          {line.linePence != null && ` · ${formatPrice(line.linePence)}`}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  booking.repair_description ?? "Vehicle repair"
+                )
+              }
             />
+            {repairLines.length > 1 && (
+              <Row
+                icon={Wrench}
+                label="How the time was worked out"
+                value={
+                  combineSource === "haynespro"
+                    ? "HaynesPro combined the jobs (overlapping work removed)"
+                    : "Each job's book time added together"
+                }
+              />
+            )}
             <Row icon={Wrench} label="Mechanic" value={currentMechanicName ?? "Unassigned"} />
             <Row
               icon={CalendarClock}
@@ -380,7 +431,7 @@ function Row({
 }: {
   icon: React.ComponentType<{ size?: number; className?: string }>;
   label: string;
-  value: string;
+  value: React.ReactNode;
 }) {
   return (
     <div className="flex items-start gap-3">
@@ -389,7 +440,7 @@ function Row({
         <p className="text-[11px] font-semibold uppercase tracking-[0.04em] text-text-muted">
           {label}
         </p>
-        <p className="break-words text-sm font-semibold text-text-primary">{value}</p>
+        <div className="break-words text-sm font-semibold text-text-primary">{value}</div>
       </div>
     </div>
   );

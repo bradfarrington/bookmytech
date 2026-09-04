@@ -8,7 +8,8 @@ import { renderSmsTemplate } from "@/lib/sms/render-template";
 import { formatPrice, formatJobNumber } from "@/lib/utils";
 import { BOOKING_TIME_ZONE } from "@/lib/slots";
 import { dispatchBooking } from "@/lib/dispatch/dispatch";
-import { quoteRepair } from "@/lib/haynespro/repair-booking";
+import { quoteRepairs } from "@/lib/haynespro/repair-booking";
+import { MAX_REPAIRS_PER_BOOKING, repairIdsFromInput } from "@/lib/bookings/repair-ids";
 import { trackEvent } from "@/app/actions/track-event";
 import { FUNNEL_EVENTS } from "@/lib/analytics/events";
 import { availableCreditPence, redeemCreditForBooking } from "@/lib/credits/credits";
@@ -50,9 +51,13 @@ export interface CreateBookingInput {
   vehicleReg: string;
   vehicleMake: string;
   vehicleModel?: string;
-  /** HaynesPro repair node id — what's being booked. The server re-quotes it
-   *  from (reg, nodeId); nothing is priced client-side. */
-  repairNodeId: string;
+  /** HaynesPro repair node id — the pre-Task-24 single-job field. Still
+   *  honoured; ignored when `repairNodeIds` is present and non-empty. */
+  repairNodeId?: string;
+  /** Every repair in the booking, in the customer's order (Task 24, up to
+   *  MAX_REPAIRS_PER_BOOKING). The server re-quotes the set from (reg, ids) —
+   *  nothing is priced client-side. */
+  repairNodeIds?: string[];
   scheduledAt: string; // ISO string — the window start
   /** Human arrival window the customer picked ("8am–10am" … "All day (8am–8pm)"). */
   slotWindow?: string;
@@ -144,22 +149,34 @@ export async function createBooking(
   const passedCredit = customerId ? Math.max(0, Math.round(input.creditAppliedPence ?? 0)) : 0;
 
   // Recompute the canonical price server-side — never trust a client-supplied
-  // total. The same (reg, repair node) inputs produced the prepare amount
+  // total. The same (reg, repair nodes) inputs produced the prepare amount
   // moments earlier. The full breakdown is snapshotted onto the row so later
   // pricing changes never apply retroactively.
-  const quote = await quoteRepair(
-    input.vehicleReg,
-    input.repairNodeId,
-    createAdminClient(),
-  );
+  const ids = repairIdsFromInput(input);
+  if (ids.length === 0) {
+    return { ok: false, error: "Choose the repairs you need first." };
+  }
+  if (ids.length > MAX_REPAIRS_PER_BOOKING) {
+    return {
+      ok: false,
+      error: `You can book up to ${MAX_REPAIRS_PER_BOOKING} jobs in one visit.`,
+    };
+  }
+  const quote = await quoteRepairs(input.vehicleReg, ids, createAdminClient());
   if (!quote) {
     return {
       ok: false,
-      error: "We couldn't price this repair. Please start the booking again.",
+      error:
+        ids.length > 1
+          ? "We couldn't price these repairs. Please start the booking again."
+          : "We couldn't price this repair. Please start the booking again.",
     };
   }
   const price = quote.breakdown;
+  // The summary ("Renew the alternator + 2 more jobs") — what every one-line
+  // reader shows. The individual lines go to booking_repairs below.
   const repairDescription = quote.description;
+  const multiJob = quote.lines.length > 1;
 
   // Write the booking through the service-role client (the codebase convention —
   // see 0023: "all writes go through the service-role client in the server").
@@ -173,8 +190,11 @@ export async function createBooking(
     .from("bookings")
     .insert({
       customer_id: customerId,
-      repair_node_id: input.repairNodeId,
+      repair_node_id: quote.nodeIds[0],
       repair_description: repairDescription,
+      // Only named on a multi-job booking: the column arrives with migration
+      // 0055, and a single-job insert must keep working before it is applied.
+      ...(multiJob ? { combine_source: quote.combineSource } : {}),
       vehicle_reg: input.vehicleReg,
       vehicle_make: input.vehicleMake,
       vehicle_model: input.vehicleModel ?? null,
@@ -211,6 +231,37 @@ export async function createBooking(
     return { ok: false, error: error?.message ?? "Failed to create booking" };
   }
 
+  // The job lines of a multi-job booking (Task 24). Written right after the
+  // booking and before anything references it (credit, events, dispatch all
+  // come later), so a failure here can simply take the booking row with it
+  // and report the same "please try again" the customer would get from any
+  // other insert failure. Single-job bookings write no lines.
+  if (multiJob) {
+    // item_id / item_label (0056) name the combined repair a job came from.
+    // Only sent when a line has one — a combined repair can't exist before
+    // that migration, so a plain multi-job insert never names the columns.
+    const { error: linesError } = await db.from("booking_repairs").insert(
+      quote.lines.map((line, index) => ({
+        booking_id: data.id,
+        position: index,
+        node_id: line.nodeId,
+        description: line.description,
+        raw_hours: line.rawHours,
+        charged_hours: line.chargedHours,
+        line_pence: line.linePence,
+        ...(line.itemLabel ? { item_id: line.itemId, item_label: line.itemLabel } : {}),
+      })),
+    );
+    if (linesError) {
+      console.error("[booking] repair lines insert failed; booking rolled back", data.id, linesError);
+      await db.from("bookings").delete().eq("id", data.id);
+      return {
+        ok: false,
+        error: "We couldn't save the jobs on this booking. Please try again.",
+      };
+    }
+  }
+
   // Redeem the customer's account credit against this booking (service-role —
   // customer_credits has no browser write policy). Clamp to what the charge was
   // actually reduced by so the ledger can't diverge from what Stripe took, and
@@ -226,7 +277,11 @@ export async function createBooking(
   // Record the final funnel step (server-side so it's never lost to navigation).
   void trackEvent(FUNNEL_EVENTS.bookingConfirmed, {
     bookingId: data.id,
-    repairNodeId: input.repairNodeId,
+    repairNodeId: quote.nodeIds[0],
+    repairNodeIds: quote.nodeIds,
+    itemIds: quote.itemIds,
+    repairCount: quote.nodeIds.length,
+    combineSource: quote.combineSource,
     totalPence: price.totalPence,
   });
 
@@ -265,6 +320,18 @@ export async function createBooking(
     name: input.customerName,
     ref: formatJobNumber(data.job_number),
     service: repairDescription,
+    // Every job on a multi-job booking, "|"-packed for the repair_list block
+    // (emails/custom-renderers.ts). Empty — and the block renders nothing —
+    // for one job. "|" is the pack delimiter, so it can't appear in a name.
+    repairs: multiJob
+      ? quote.items
+          .map((item) => {
+            const jobs = quote.lines.filter((l) => l.itemId === item.id).map((l) => l.description);
+            return item.label ? `${item.label} (${jobs.join(", ")})` : jobs.join(", ");
+          })
+          .map((s) => s.replace(/\|/g, "/"))
+          .join("|")
+      : "",
     vehicle: vehicleLabel,
     when: whenLabel,
     pay_line: payLine,
@@ -285,10 +352,12 @@ export async function createBooking(
 export interface PrepareCheckoutInput {
   postcode: string;
   /** Booking vehicle reg — the hold must match the amount createBooking
-   *  re-quotes from the same (reg, node) moments later. */
+   *  re-quotes from the same (reg, nodes) moments later. */
   vehicleReg: string;
-  /** HaynesPro repair node id — what's being booked. */
-  repairNodeId: string;
+  /** HaynesPro repair node id — the pre-Task-24 single-job field. */
+  repairNodeId?: string;
+  /** Every repair in the booking (Task 24); wins over `repairNodeId` when non-empty. */
+  repairNodeIds?: string[];
 }
 
 export type PrepareCheckoutResult =
@@ -322,17 +391,27 @@ export async function prepareCheckoutFor(
   input: PrepareCheckoutInput,
   customerId: string | null,
 ): Promise<PrepareCheckoutResult> {
-  const quote = await quoteRepair(
-    input.vehicleReg,
-    input.repairNodeId,
-    createAdminClient(),
-  );
+  const ids = repairIdsFromInput(input);
+  if (ids.length === 0) {
+    return { ok: false, error: "Choose the repairs you need first." };
+  }
+  if (ids.length > MAX_REPAIRS_PER_BOOKING) {
+    return {
+      ok: false,
+      error: `You can book up to ${MAX_REPAIRS_PER_BOOKING} jobs in one visit.`,
+    };
+  }
+  const quote = await quoteRepairs(input.vehicleReg, ids, createAdminClient());
   if (!quote) {
     return {
       ok: false,
-      error: "We couldn't price this repair. Please start the booking again.",
+      error:
+        ids.length > 1
+          ? "We couldn't price these repairs. Please start the booking again."
+          : "We couldn't price this repair. Please start the booking again.",
     };
   }
+  // The combined total — one hold for the whole visit.
   const totalPence = quote.breakdown.totalPence;
 
   // Account credit (signed-in only) reduces the amount held — never the payout.
@@ -367,7 +446,7 @@ export async function prepareCheckoutFor(
       // is captured days later. Both funnels collect a card and nothing else:
       // the website's PaymentElement and the app's PaymentSheet.
       payment_method_types: ["card"],
-      description: "Book My Tech — repair pre-authorisation",
+      description: `Book My Tech — ${ids.length > 1 ? `${ids.length} repairs` : "repair"} pre-authorisation`,
       // Who this hold belongs to, so it can be proved later. Nothing reads it
       // during checkout — it exists for lib/stripe/release-hold.ts, which
       // cancels a hold the customer abandoned and must confirm the intent is

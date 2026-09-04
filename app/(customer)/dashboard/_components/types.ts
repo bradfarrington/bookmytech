@@ -22,8 +22,14 @@ export interface DashboardBooking {
   rescheduleStatus: string | null;
   rescheduleProposedAt: string | null;
   rescheduleNote: string | null;
+  /** One line for the whole booking ("X + 2 more jobs" when there are several). */
   repairDescription: string;
+  /** The first job's HaynesPro node id (legacy single-job field). */
   repairNodeId: string | null;
+  /** Every job's node id, in order — what "Book again" rebooks (Task 24). */
+  repairNodeIds: string[];
+  /** Every job's name, in order. One entry for a single-job booking. */
+  repairLines: string[];
 }
 
 export interface MechanicLite {

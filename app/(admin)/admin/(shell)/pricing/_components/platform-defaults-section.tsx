@@ -1,6 +1,10 @@
 "use client";
 
-import { updatePlatformSetting } from "@/app/actions/pricing";
+import { useState, useTransition } from "react";
+import { toast } from "sonner";
+import { updatePlatformSetting, updateRepairCombineMode } from "@/app/actions/pricing";
+import { Select, type SelectOption } from "@/components/ui/select";
+import type { RepairCombineMode } from "@/lib/pricing/calculate";
 import { InlineNumber } from "./inline-edit";
 import { pounds, percent } from "./converters";
 
@@ -11,6 +15,39 @@ export interface PlatformSettings {
   cancel_fee_before_24h: number;
   cancel_fee_within_24h: number;
   cancel_fee_mechanic_en_route: number;
+  /** How several repairs booked together are timed (Task 24). */
+  repair_combine_mode: RepairCombineMode;
+}
+
+const COMBINE_OPTIONS: ReadonlyArray<SelectOption<RepairCombineMode>> = [
+  { value: "sum", label: "Add each job's book time" },
+  { value: "haynespro", label: "HaynesPro combined (overlap removed)" },
+];
+
+function CombineModeSelect({ initial }: { initial: RepairCombineMode }) {
+  const [mode, setMode] = useState<RepairCombineMode>(initial);
+  const [pending, startTransition] = useTransition();
+  return (
+    <Select
+      value={mode}
+      onChange={(next) => {
+        const previous = mode;
+        setMode(next);
+        startTransition(async () => {
+          const result = await updateRepairCombineMode(next);
+          if (!result.ok) {
+            setMode(previous);
+            toast.error(result.error);
+            return;
+          }
+          toast.success("Saved — applies to new quotes.");
+        });
+      }}
+      options={COMBINE_OPTIONS}
+      aria-label="Several jobs in one booking"
+      className={pending ? "opacity-60" : undefined}
+    />
+  );
 }
 
 function Row({
@@ -71,6 +108,12 @@ export function PlatformDefaultsSection({ settings }: { settings: PlatformSettin
               ariaLabel="Pro take rate"
               onSave={(v) => updatePlatformSetting("take_rate_pro", v ?? 0)}
             />
+          </Row>
+          <Row
+            label="Several jobs in one booking"
+            hint="Add every job's book time, or let HaynesPro remove the overlap (e.g. pads add nothing once the discs are off)"
+          >
+            <CombineModeSelect initial={settings.repair_combine_mode} />
           </Row>
         </div>
       </section>

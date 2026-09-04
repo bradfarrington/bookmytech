@@ -14,6 +14,7 @@
 // state instead of erroring.
 
 import { haynesProCall } from "./client";
+import { parseProcessRepairTasks, type CombinedRepairTimes } from "./combine";
 import type {
   HpAdjustment,
   HpRepairtimeNode,
@@ -176,6 +177,40 @@ export async function getRepairNodesByIds(
     }),
   );
   return nodes ?? [];
+}
+
+/**
+ * HaynesPro's basket calculation for several repairs at once (Task 24):
+ * each job's time after overlap removal, and the total. Null on any failure
+ * so the caller falls back to a plain sum — the funnel never blocks on it.
+ *
+ * The labour rate is required by the operation (it prices the basket too) but
+ * only the times are used, which is why the rate is NOT part of the memo key:
+ * a rate change mid-hour still re-prices correctly because the money comes
+ * from lib/pricing/calculate.ts, never from HaynesPro's subtotal.
+ */
+export async function combineRepairTimes(
+  repairtimeTypeId: number,
+  nodeIds: readonly string[],
+  labourRatePence: number,
+): Promise<CombinedRepairTimes | null> {
+  const ids = [...new Set(nodeIds)];
+  if (ids.length < 2) return null;
+  const key = `rtcombine:${repairtimeTypeId}:${[...ids].sort().join(",")}`;
+  return memoised(key, DATA_TTL_MS, async () => {
+    const rate = Math.max(0, Math.round(labourRatePence));
+    const payload = await haynesProCall<unknown>("processRepairTasksV4", {
+      descriptionLanguage: "en",
+      repairtimeTypeId,
+      typeCategory: "CAR",
+      repairTaskIds: ids,
+      repairVatRates: ids.map(() => 20),
+      labourRateMechanical: rate,
+      labourRateBody: rate,
+      labourRateElectronics: rate,
+    });
+    return parseProcessRepairTasks(payload, ids);
+  });
 }
 
 /** Repair manuals available for the car type. */

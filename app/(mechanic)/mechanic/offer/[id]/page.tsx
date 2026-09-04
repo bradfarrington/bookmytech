@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { geocodePostcode, haversineMiles, type LatLng } from "@/lib/geo/postcodes";
 import { mechanicSharePence } from "@/lib/earnings";
 import { formatBookingSlot } from "@/lib/slots";
+import { repairLinesFor, type BookingRepairRow } from "@/lib/bookings/repair-lines";
 import { OfferScreen } from "./_components/offer-screen";
 
 export const dynamic = "force-dynamic";
@@ -71,6 +72,17 @@ export default async function OfferPage({ params }: PageProps) {
     | null;
   if (!booking) notFound();
 
+  // Every job of a multi-job booking (Task 24). A mechanic must see all of
+  // them BEFORE accepting, which "Mechanics read offered booking repairs"
+  // (0055) allows while the offer is live. Separate query so the screen still
+  // renders before that migration exists — an error just means "one job".
+  const { data: lineRows } = await supabase
+    .from("booking_repairs")
+    .select("*")
+    .eq("booking_id", booking.id)
+    .order("position");
+  const repairLines = repairLinesFor(booking, (lineRows ?? null) as BookingRepairRow[] | null);
+
   // Offer already resolved (this mechanic responded, or someone else accepted
   // and it was superseded) → the job's no longer up for grabs.
   if (offer.response !== null) {
@@ -131,6 +143,14 @@ export default async function OfferPage({ params }: PageProps) {
         bookingId={booking.id}
         mechanicId={user.id}
         serviceName={booking.repair_description ?? "Vehicle repair"}
+        serviceLines={
+          repairLines.length > 1
+            ? repairLines.map((line) => ({
+                description: line.itemLabel ? `${line.description} · ${line.itemLabel}` : line.description,
+                chargedHours: line.chargedHours,
+              }))
+            : undefined
+        }
         vehicle={[booking.vehicle_make, booking.vehicle_model].filter(Boolean).join(" ") || "Vehicle"}
         reg={booking.vehicle_reg}
         whenLabel={formatBookingSlot(booking.scheduled_at, booking.slot_window, { relative: true })}

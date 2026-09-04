@@ -12,7 +12,10 @@ interface OfferScreenProps {
   offerId: string;
   bookingId: string;
   mechanicId: string;
+  /** One line for the booking — a summary ("X + 2 more jobs") when there are several. */
   serviceName: string;
+  /** Every job of a multi-job booking (Task 24); absent for one job. */
+  serviceLines?: Array<{ description: string; chargedHours: number | null }>;
   vehicle: string;
   reg: string | null;
   whenLabel: string;
@@ -25,7 +28,19 @@ interface OfferScreenProps {
 const SWIPE_THRESHOLD = 120; // px of left-drag to trigger decline
 
 export function OfferScreen(props: OfferScreenProps) {
-  const { offerId, bookingId, serviceName, vehicle, reg, whenLabel, where, distanceLabel, notes, earningsPence } = props;
+  const {
+    offerId,
+    bookingId,
+    serviceName,
+    serviceLines,
+    vehicle,
+    reg,
+    whenLabel,
+    where,
+    distanceLabel,
+    notes,
+    earningsPence,
+  } = props;
   const router = useRouter();
   const [pending, startTransition] = useTransition();
 
@@ -109,6 +124,30 @@ export function OfferScreen(props: OfferScreenProps) {
           <Tile icon={Wrench} label="Service" value={serviceName} />
           <Tile icon={Car} label="Vehicle" value={reg ? `${vehicle} · ${reg}` : vehicle} />
         </div>
+
+        {/* Every job of a multi-job booking — the decision needs all of them. */}
+        {serviceLines && serviceLines.length > 1 && (
+          <div className="rounded-2xl border border-border bg-surface-card p-4">
+            <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.04em] text-text-muted">
+              <Wrench size={12} />
+              Jobs ({serviceLines.length})
+            </div>
+            <ul className="flex flex-col gap-1.5 text-sm">
+              {serviceLines.map((line, index) => (
+                <li key={`${index}-${line.description}`} className="flex items-start justify-between gap-3">
+                  <span className="leading-relaxed text-text-primary">{line.description}</span>
+                  <span className="shrink-0 text-xs text-text-muted">
+                    {line.chargedHours == null
+                      ? ""
+                      : line.chargedHours === 0
+                        ? "no extra time"
+                        : `${Number(line.chargedHours.toFixed(2))} h`}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         {/* Customer notes */}
         {notes && (

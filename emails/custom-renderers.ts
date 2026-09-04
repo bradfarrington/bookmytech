@@ -106,6 +106,18 @@ export const CUSTOM_RENDERERS: Record<string, CustomRenderer> = {
     </mj-text>`;
   },
 
+  // booking_confirmed — every job of a multi-job booking (Task 24), under the
+  // summary card whose "Service" row carries the one-line summary. Renders
+  // nothing for a single job (the var is empty then).
+  repair_list(vars) {
+    const items = packedList(vars.repairs);
+    if (items.length < 2) return "";
+    return `<mj-text padding-top="4px" font-size="13px">
+      <strong>Jobs in this booking</strong><br />
+      ${items.map((i) => `&bull; ${escapeHtml(i)}`).join("<br />")}
+    </mj-text>`;
+  },
+
   // booking summary card (ref · service · vehicle · when) used by booking emails.
   booking_summary(vars) {
     const rows: [string, unknown][] = [

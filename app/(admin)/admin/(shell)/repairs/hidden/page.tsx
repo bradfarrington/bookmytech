@@ -2,18 +2,17 @@ import Link from "next/link";
 import { ArrowLeft, EyeOff } from "lucide-react";
 import { Overline } from "@/components/ui/overline";
 import {
-  GLOBAL_SCOPE,
   isGlobalExclusionRow,
   type RepairExclusionRow,
 } from "@/lib/haynespro/exclusions";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { ShowAgainButton } from "../_components/show-again-button";
+import { ShowAgainButton } from "../../vehicles/_components/show-again-button";
 
-// Review page for everything switched off (Task 23). The model pages are where
-// hides get written, one node at a time while browsing a tree; this is the one
-// place that lists the result — every repair hidden for all vehicles (with the
-// models that override it), then the per-model hides — so the admin can see
-// what customers can't, and put it back.
+// Review page for everything switched off (Task 23). /admin/repairs and the
+// model pages are where hides get written, one node at a time while browsing
+// a tree; this is the one place that lists the result — every repair hidden
+// for all vehicles (with the models that override it), then the per-model
+// hides — so the admin can see what customers can't, and put it back.
 
 export const dynamic = "force-dynamic";
 
@@ -64,14 +63,14 @@ export default async function AdminHiddenRepairsPage() {
     <div className="space-y-6">
       <header className="flex items-center gap-3">
         <Link
-          href="/admin/vehicles"
+          href="/admin/repairs"
           className="flex size-9 shrink-0 items-center justify-center rounded-full border border-border text-text-secondary hover:bg-surface"
-          aria-label="Back to vehicles"
+          aria-label="Back to repairs"
         >
           <ArrowLeft size={18} />
         </Link>
         <div>
-          <Overline>Vehicles</Overline>
+          <Overline>Repairs</Overline>
           <h1 className="mt-1 text-3xl font-bold tracking-tight text-text-primary">
             Hidden repairs
           </h1>
@@ -94,9 +93,8 @@ export default async function AdminHiddenRepairsPage() {
               Nothing is hidden for all vehicles
             </p>
             <p className="mx-auto mt-1 max-w-md text-sm text-text-muted">
-              Open any model&apos;s Repair times tab, set &ldquo;Apply changes
-              to&rdquo; to All vehicles, and switch off the groups and repairs
-              you never do. They&apos;ll be listed here.
+              Open Repairs and switch off the groups and jobs you never do. They&apos;ll be
+              listed here.
             </p>
           </div>
         ) : (
@@ -176,9 +174,9 @@ export default async function AdminHiddenRepairsPage() {
       )}
 
       <p className="text-xs text-text-muted">
-        A global hide keys on the HaynesPro repair id ({GLOBAL_SCOPE} scope), which
-        means the same job on every make. &ldquo;Shown on&rdquo; lists the models
-        whose own page switched that repair back on.
+        A global hide keys on the HaynesPro repair id, which means the same job on every
+        make. &ldquo;Shown on&rdquo; lists the models whose own page switched that repair
+        back on.
       </p>
     </div>
   );

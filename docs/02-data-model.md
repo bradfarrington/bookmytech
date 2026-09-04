@@ -43,7 +43,8 @@ The core transaction record. The columns below the first divider were added in `
 | customer_id                | uuid FK     | → profiles(id), nullable for guest flows                              |
 | mechanic_id                | uuid FK     | → profiles(id), nullable until assigned                               |
 | repair_node_id             | text        | HaynesPro repair-tree node id (0038); the booking's identity          |
-| repair_description         | text        | display name, e.g. "Renew the front brake pads" (0038; 0040 backfilled legacy rows) |
+| repair_description         | text        | display name, e.g. "Renew the front brake pads" (0038; 0040 backfilled legacy rows). On a multi-job booking (Task 24) a summary: "Renew the alternator + 2 more jobs"; `repair_node_id` is then the first job and the lines live in `booking_repairs` |
+| combine_source             | text        | 0055 — how a multi-job booking's time was derived: `sum` (each job's book time added — the default, `platform_settings.repair_combine_mode`) / `haynespro` (basket calculation removed the overlap; admin opt-in) / null (one job / pre-Task-24) |
 | vehicle_reg                | text        | UK reg plate                                                          |
 | vehicle_make               | text        | from DVLA lookup                                                      |
 | vehicle_model              | text        | from DVLA + DVSA MOT enrichment                                       |
@@ -135,6 +136,23 @@ Which HaynesPro repairs customers can book (Task 16 Stage G, `0039`; global scop
 
 Three kinds of row: `('*', '*', node, 'hide')` hides the node for **every vehicle**; `(make, model, node, 'hide')` hides it for that model; `(make, model, node, 'show')` is a per-model **override** that re-enables a node hidden for all vehicles. Effective hidden set = (global hides − the model's `show` rows) ∪ the model's `hide` rows — `lib/haynespro/exclusions.ts` is the single matcher for the customer browser, the search walker and `quoteRepair`. Partial wildcards match nothing and the action refuses to write them; a `show` row without a global hide behind it does nothing and is deleted when the global hide is lifted. Fails open: an unresolvable vehicle still gets the global hides; an unreadable table hides nothing. RLS: admin SELECT; writes via the service-role client from `app/actions/vehicle-exclusions.ts`.
 
+### `booking_repairs` — `0055`
+
+The job lines of a booking with several HaynesPro repairs (Task 24). Columns: `booking_id` (→ `bookings`, cascade), `position`, `node_id`, `description` (snapshot of the HaynesPro name at booking time, like `booking_parts.part_name`), `raw_hours` (the job's own book time), `charged_hours` (what it was charged at — equal to `raw_hours` in the default "add each job" mode; after overlap removal, 0 = covered by another job, in the HaynesPro mode), `line_pence` (`charged_hours × rate`, informational: lines need not sum to `total_pence` because the 1-hour minimum applies once to the visit), `created_at`; from `0056`, `item_id` / `item_label` — the combined repair (Task 26) a job came from, null for a job booked on its own. Unique on `(booking_id, node_id)`; index on `(booking_id, position)`.
+
+**No rows = a single-job booking** (every booking before this task, and every one-job booking after it): its job is on the `bookings` row as before. Readers go through `lib/bookings/repair-lines.ts` `repairLinesFor()`, which returns the rows or one synthetic line. `bookings.service_duration_hours` holds the billed hours for the **whole visit** (arrival-window clash detection reads it). RLS: SELECT only — the booking's customer (id or guest email), the assigned mechanic, a mechanic holding a live `job_offers` row (the offer screen lists the jobs before acceptance), admins; written only by the service-role client in `lib/bookings/create-booking.ts`.
+
+### The repair catalogue overlay — `0056` (Task 26)
+
+Our layer over HaynesPro's repair tree; HaynesPro stays the source of every job and time. Keyed on HaynesPro node ids, which mean the same job on every make, so one overlay applies to every vehicle. `parent_id` values are `'root'`, a HaynesPro group id, or `g:<uuid>` (one of our categories).
+
+- **`repair_catalogue_groups`** — a category we created: `name`, `parent_id`, `display_order`. Customers see it as a group with id `g:<uuid>`.
+- **`repair_catalogue_overrides`** — per HaynesPro node (`node_id` PK, `kind` group/repair, `description` snapshot): `custom_name` (our name) and/or `parent_id` (where it now lives; null = where HaynesPro lists it). A row with neither is deleted.
+- **`repair_bundles`** — a combined repair: `name`, `parent_id`, `is_active`, and `node_ids text[]` — the pool of HaynesPro jobs the admin added once. Listed like a category's child.
+- **`repair_bundle_options`** — its bookable options (`label`, `node_ids text[]` — a subset of the bundle's pool, `position`; cascade on the bundle). Customers see id `b:<uuid>`; the quote expands it to its jobs and keeps the option on each `booking_repairs` line as `item_id` / `item_label`. Removing a job from the pool removes it from every option.
+
+Read server-side by `lib/catalogue/load-overlay.ts` (empty on any error, so the catalogue is HaynesPro's until the migration exists); composed by `lib/catalogue/overlay.ts`. Written only by `app/actions/repair-catalogue.ts`. RLS: admin SELECT on all four (parity with `repair_vehicle_exclusions`); no other policies.
+
 ### `mechanic_applications`
 
 Backs the public `/mechanics/apply` wizard and the `/admin/approvals` queue. Created in `0013_mechanic_applications.sql` (Task 07 Stage 1). The row is inserted only on final submit; documents are uploaded to the **private** `mechanic-docs` storage bucket before submit (under a client-generated draft UUID) and their object keys land in the `doc_*` columns. Bank details are **AES-256-GCM encrypted** at the application level (`lib/crypto/encrypt.ts`, key in `APP_ENCRYPTION_KEY`) — never plain text.
@@ -198,6 +216,15 @@ A `public.is_admin()` `SECURITY DEFINER` function is the single source of truth 
 - `SELECT`: `Admins can view all bookings` — `using (public.is_admin())`
 - `UPDATE`: `Admins can update all bookings` — `using (public.is_admin()) with check (public.is_admin())`
 - ❌ **No mechanic-side policies yet.** Added when the mechanic dashboard lands (task 05).
+
+**`booking_repairs`** — defined in `0055_booking_repairs.sql` (Task 24). SELECT only:
+- `Customers read own booking repairs` — the booking's `customer_id = auth.uid()`, or a guest booking on `auth.email()`
+- `Mechanics read assigned booking repairs` — the booking's `mechanic_id = auth.uid()`
+- `Mechanics read offered booking repairs` — a `job_offers` row for the booking with `mechanic_id = auth.uid()` (the offer screen, before acceptance)
+- `Admins read all booking repairs` — `using (public.is_admin())`
+- No INSERT/UPDATE/DELETE: rows are written by the service-role client alongside the booking.
+
+**`repair_catalogue_groups`, `repair_catalogue_overrides`, `repair_bundles`, `repair_bundle_options`** — defined in `0056_repair_catalogue.sql` (Task 26). One SELECT policy each, `using (public.is_admin())`; read server-side through the service-role client, written only by admin actions.
 - The confirmation page uses the service-role client (see `lib/supabase/admin.ts`) to bypass these for the post-booking redirect read.
 
 **`mechanics`** — defined in `0004_mechanics_and_booking_lifecycle.sql`.

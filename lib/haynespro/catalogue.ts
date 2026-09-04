@@ -13,11 +13,26 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { billableHours } from "@/lib/pricing/billable";
-import { getHourlyRatePence } from "@/lib/pricing/calculate";
+import { getHourlyRatePence, getRepairCombineMode } from "@/lib/pricing/calculate";
+import { loadCatalogueOverlay } from "@/lib/catalogue/load-overlay";
+import {
+  bundlesAt,
+  composeLevel,
+  extraNodeIdsFor,
+  isCustomGroupId,
+  optionDisplayName,
+  bundleOptionId,
+  type CatalogueOverlay,
+} from "@/lib/catalogue/overlay";
 import { isHaynesProConfigured } from "./client";
 import { excludedRepairNodeIdsForVehicle } from "./exclusions";
 import { isCatalogueOutage, readHaynesProHealth } from "./health";
-import { getRepairtimeSubnodes } from "./tree";
+import {
+  combineRepairTimes,
+  getRepairNodesByIds,
+  getRepairtimeSubnodes,
+  getRepairtimeTypeId,
+} from "./tree";
 import { resolveVehicle } from "./vehicle";
 import type { HpRepairtimeNode } from "./types";
 
@@ -42,6 +57,11 @@ export interface CatalogueVehicle {
 }
 
 export interface CatalogueNode {
+  /**
+   * A HaynesPro node id, or — since Task 26 — "g:<uuid>" for a category the
+   * admin created (drill in with it like any group) or "b:<uuid>" for one
+   * bookable option of a combined repair (quote and book it like any repair).
+   */
   id: string;
   description: string;
   /** `group` drills further in; `repair` is bookable and priced. */
@@ -50,6 +70,18 @@ export interface CatalogueNode {
   billedHours: number | null;
   /** Repairs only: billedHours × the hourly rate. */
   pricePence: number | null;
+  /**
+   * Combined repairs (Task 26). ADDITIVE AND OPTIONAL: a bookable option of a
+   * combined repair is a plain `repair` to any client that doesn't know these
+   * fields; a client that does can group a bundle's options under one heading
+   * ("Brake pads & discs" → Front / Rear). `optionLabel` is null when the
+   * bundle has a single option.
+   */
+  bundleId?: string;
+  bundleName?: string;
+  optionLabel?: string | null;
+  /** ADDITIVE: true for a category the admin created. */
+  custom?: true;
 }
 
 /**
@@ -133,6 +165,28 @@ interface CatalogueContext {
   vehicle: CatalogueVehicle;
   /** Node ids switched off for this model — hidden, and never walked into. */
   excluded: Set<string>;
+  /** The admin's layer over the tree (Task 26): names, moves, categories, combined repairs. */
+  overlay: CatalogueOverlay;
+  /** Hours for several jobs together — added up, or HaynesPro-combined when the admin opted in. */
+  combineHours: (nodeIds: string[], nodeHours: ReadonlyMap<string, number>) => Promise<number | null>;
+}
+
+/**
+ * Book time per node id on this vehicle for ids HaynesPro's own listing of a
+ * level won't supply (moved-in leaves, the jobs inside combined repairs).
+ * One batched call; ids the vehicle doesn't have simply don't come back.
+ */
+async function hoursForNodes(
+  repairtimeTypeId: number,
+  nodeIds: string[],
+): Promise<Map<string, number>> {
+  const hours = new Map<string, number>();
+  if (nodeIds.length === 0) return hours;
+  const nodes = await getRepairNodesByIds(repairtimeTypeId, nodeIds);
+  for (const n of nodes) {
+    if (n.id != null && typeof n.value === "number" && n.value > 0) hours.set(n.id, n.value / 100);
+  }
+  return hours;
 }
 
 async function loadContext(
@@ -152,23 +206,86 @@ async function loadContext(
   }
   if (resolved.repairtimeTypeId == null) return NO_REPAIR_DATA;
 
-  const [hourlyRatePence, excluded] = await Promise.all([
+  const [hourlyRatePence, excluded, overlay, combineMode] = await Promise.all([
     getHourlyRatePence(db),
     excludedRepairNodeIdsForVehicle(resolved.hpModelLabel, db),
+    loadCatalogueOverlay(db),
+    getRepairCombineMode(db),
   ]);
+  const repairtimeTypeId = resolved.repairtimeTypeId;
+
+  // The same arithmetic quoteRepairs uses for several jobs, so a combined
+  // repair's browse price and its quote agree.
+  const combineHours = async (
+    nodeIds: string[],
+    nodeHours: ReadonlyMap<string, number>,
+  ): Promise<number | null> => {
+    if (nodeIds.length > 1 && combineMode === "haynespro") {
+      const combined = await combineRepairTimes(repairtimeTypeId, nodeIds, hourlyRatePence);
+      if (combined) return combined.totalRepairTime / 100;
+    }
+    let total = 0;
+    for (const id of nodeIds) {
+      const h = nodeHours.get(id);
+      if (h == null) return null;
+      total += h;
+    }
+    return Math.round(total * 100) / 100;
+  };
 
   return {
     ok: true,
     context: {
-      repairtimeTypeId: resolved.repairtimeTypeId,
+      repairtimeTypeId,
       vehicle: {
         description: resolved.description ?? "vehicle",
         hourlyRatePence,
         make: resolved.hpMake,
       },
       excluded,
+      overlay,
+      combineHours,
     },
   };
+}
+
+/**
+ * Compose one level: HaynesPro's nodes plus the admin's overlay. Times for
+ * moved-in leaves and bundle jobs are fetched in one batch, and combined
+ * repairs are priced up front so composeLevel can stay synchronous.
+ */
+async function composeLevelFor(
+  context: CatalogueContext,
+  levelId: string,
+  raw: HpRepairtimeNode[],
+): Promise<CatalogueNode[]> {
+  const extraIds = extraNodeIdsFor(levelId, context.overlay);
+  const nodeHours = await hoursForNodes(context.repairtimeTypeId, extraIds);
+
+  const combined = new Map<string, number | null>();
+  for (const { bundle, options } of bundlesAt(levelId, context.overlay)) {
+    if (!bundle.is_active) continue;
+    for (const option of options) {
+      combined.set(option.id, await context.combineHours(option.node_ids, nodeHours));
+    }
+  }
+  // composeLevel calls this per option with that option's ids; look the
+  // pre-computed answer up by id set.
+  const key = (ids: string[]) => [...ids].sort().join(",");
+  const byIds = new Map<string, number | null>();
+  for (const { options } of bundlesAt(levelId, context.overlay)) {
+    for (const option of options) byIds.set(key(option.node_ids), combined.get(option.id) ?? null);
+  }
+
+  return composeLevel({
+    levelId,
+    raw,
+    overlay: context.overlay,
+    excluded: context.excluded,
+    hourlyRatePence: context.vehicle.hourlyRatePence,
+    nodeHours,
+    combineHours: (ids) => byIds.get(key(ids)) ?? null,
+  });
 }
 
 /**
@@ -219,7 +336,11 @@ export async function getRepairCatalogueLevel(
   const { context } = loaded;
 
   const level = nodeId?.trim() || ROOT_NODE_ID;
-  const raw = await getRepairtimeSubnodes(context.repairtimeTypeId, level);
+  // A category the admin created has no HaynesPro node behind it: its
+  // contents are entirely what the overlay put there.
+  const raw = isCustomGroupId(level)
+    ? []
+    : await getRepairtimeSubnodes(context.repairtimeTypeId, level);
 
   // getRepairtimeSubnodes swallows upstream failures as []. At the root that is
   // indistinguishable from "HaynesPro is down", and every vehicle with a
@@ -228,10 +349,7 @@ export async function getRepairCatalogueLevel(
   // is a legitimate answer and stays one.
   if (level === ROOT_NODE_ID && raw.length === 0) return NO_REPAIR_DATA;
 
-  const nodes = raw
-    .filter((n) => n.id == null || !context.excluded.has(n.id))
-    .map((n) => toCatalogueNode(n, context.vehicle.hourlyRatePence))
-    .filter((n): n is CatalogueNode => n !== null);
+  const nodes = await composeLevelFor(context, level, raw);
 
   return { ok: true, vehicle: context.vehicle, nodes };
 }
@@ -286,8 +404,41 @@ export async function searchRepairCatalogue(
 ): Promise<CatalogueSearch> {
   const loaded = await loadContext(reg, db);
   if (!loaded.ok) return loaded;
-  const { context } = loaded;
+  return runSearch(loaded.context, query, { bundles: true });
+}
 
+/**
+ * The same walk for the admin, on a car type rather than a reg (Task 26: the
+ * job search on a combined repair's card). Nothing is hidden here — the admin
+ * is choosing jobs, not booking them — and combined repairs are left out,
+ * because they are what's being built.
+ */
+export async function searchJobsForCarType(
+  carTypeId: number,
+  query: string,
+  db: SupabaseClient,
+): Promise<CatalogueSearch> {
+  const repairtimeTypeId = await getRepairtimeTypeId(carTypeId);
+  if (repairtimeTypeId == null) return NO_REPAIR_DATA;
+  const [hourlyRatePence, overlay] = await Promise.all([
+    getHourlyRatePence(db),
+    loadCatalogueOverlay(db),
+  ]);
+  const context: CatalogueContext = {
+    repairtimeTypeId,
+    vehicle: { description: `car type ${carTypeId}`, hourlyRatePence },
+    excluded: new Set(),
+    overlay,
+    combineHours: async () => null,
+  };
+  return runSearch(context, query, { bundles: false });
+}
+
+async function runSearch(
+  context: CatalogueContext,
+  query: string,
+  options: { bundles: boolean },
+): Promise<CatalogueSearch> {
   const needle = query.trim().toLowerCase();
   const tokens = needle.split(/\s+/).filter(Boolean);
   if (tokens.length === 0) {
@@ -302,6 +453,17 @@ export async function searchRepairCatalogue(
   const queue: PendingGroup[] = [{ id: ROOT_NODE_ID, depth: 0, affinity: 0, seq: 0 }];
   let expansions = 0;
   let seq = 1;
+
+  // Combined repairs (Task 26) aren't in HaynesPro's tree, so the walk can't
+  // find them. Match them by name up front — cheap, and exactly what someone
+  // typing "pads discs" is after.
+  if (options.bundles) {
+    const bundleHits = await bundleSearchHits(context, needle, tokens);
+    for (const node of bundleHits) {
+      seen.add(`${node.kind}:${node.description.toLowerCase()}`);
+      hits.push({ node, rank: matchRank(node.description, needle, tokens) ?? 2, order: seq++ });
+    }
+  }
 
   while (queue.length > 0 && expansions < SEARCH_MAX_EXPANSIONS) {
     // Most promising first: name affinity, then shallowest, then discovery
@@ -325,7 +487,13 @@ export async function searchRepairCatalogue(
       for (const hpNode of levels[i]) {
         if (hpNode.id == null || context.excluded.has(hpNode.id)) continue;
 
-        const node = toCatalogueNode(hpNode, context.vehicle.hourlyRatePence);
+        // The admin's name for it, if any (Task 26). A moved node is still
+        // found — it exists on the vehicle wherever we list it.
+        const custom = context.overlay.overrides.get(hpNode.id)?.custom_name?.trim();
+        const node = toCatalogueNode(
+          custom ? { ...hpNode, description: custom } : hpNode,
+          context.vehicle.hourlyRatePence,
+        );
         // Untimed leaves are dropped, but groups are still queued — an
         // unmatched group name can still contain a matching repair.
         if (node?.kind === "group" && !queued.has(node.id)) {
@@ -359,6 +527,52 @@ export async function searchRepairCatalogue(
   }
 
   return finish(context, hits, queue.length > 0);
+}
+
+/**
+ * Combined repairs whose name (or option label) matches the query, priced for
+ * this vehicle. Only options every job of which the vehicle has are returned.
+ */
+async function bundleSearchHits(
+  context: CatalogueContext,
+  needle: string,
+  tokens: string[],
+): Promise<CatalogueNode[]> {
+  const candidates: Array<{ bundle: (typeof context.overlay.bundles)[number]; options: ReturnType<typeof bundlesAt>[number]["options"] }> = [];
+  for (const bundle of context.overlay.bundles) {
+    if (!bundle.is_active) continue;
+    const options = context.overlay.optionsByBundle.get(bundle.id) ?? [];
+    const matching = options.filter(
+      (o) => matchRank(optionDisplayName(bundle, o, options.length), needle, tokens) != null,
+    );
+    if (matching.length) candidates.push({ bundle, options: matching });
+  }
+  if (candidates.length === 0) return [];
+
+  const ids = [...new Set(candidates.flatMap((c) => c.options.flatMap((o) => o.node_ids)))];
+  const nodeHours = await hoursForNodes(context.repairtimeTypeId, ids);
+  const out: CatalogueNode[] = [];
+  for (const { bundle, options } of candidates) {
+    const optionCount = (context.overlay.optionsByBundle.get(bundle.id) ?? []).length;
+    for (const option of options) {
+      if (option.node_ids.length === 0) continue;
+      if (option.node_ids.some((id) => context.excluded.has(id) || !((nodeHours.get(id) ?? 0) > 0))) continue;
+      const raw = await context.combineHours(option.node_ids, nodeHours);
+      const billed = billableHours(raw);
+      if (billed == null) continue;
+      out.push({
+        id: bundleOptionId(option.id),
+        description: optionDisplayName(bundle, option, optionCount),
+        kind: "repair",
+        billedHours: billed,
+        pricePence: Math.round(billed * context.vehicle.hourlyRatePence),
+        bundleId: bundle.id,
+        bundleName: bundle.name,
+        optionLabel: optionCount > 1 ? option.label : null,
+      });
+    }
+  }
+  return out;
 }
 
 /** How many query tokens appear in a group's name — the walk's priority. */

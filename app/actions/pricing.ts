@@ -243,3 +243,46 @@ export async function updatePlatformSetting(
   revalidate();
   return { ok: true };
 }
+
+/**
+ * How several repairs booked together are timed (Task 24): "sum" adds each
+ * job's book time (the default — owner decision 2026-09-04), "haynespro" asks
+ * HaynesPro's basket calculation to remove the overlap between them. Applies
+ * to new quotes only; bookings keep the time they were priced at.
+ */
+export async function updateRepairCombineMode(mode: string): Promise<PricingResult> {
+  const guard = await requireAdmin();
+  if (!guard.ok) return guard;
+  if (mode !== "sum" && mode !== "haynespro") return { ok: false, error: "Unknown option." };
+
+  const { REPAIR_COMBINE_MODE_KEY } = await import("@/lib/pricing/calculate");
+  const admin = createAdminClient();
+  const { data: prev } = await admin
+    .from("platform_settings")
+    .select("value")
+    .eq("key", REPAIR_COMBINE_MODE_KEY)
+    .maybeSingle();
+
+  const { error } = await admin.from("platform_settings").upsert(
+    {
+      key: REPAIR_COMBINE_MODE_KEY,
+      value: mode,
+      updated_at: new Date().toISOString(),
+      updated_by: guard.adminId,
+    },
+    { onConflict: "key" },
+  );
+  if (error) return { ok: false, error: error.message };
+
+  await audit(
+    admin,
+    guard.adminId,
+    "platform_setting",
+    REPAIR_COMBINE_MODE_KEY,
+    REPAIR_COMBINE_MODE_KEY,
+    prev?.value ?? null,
+    mode,
+  );
+  revalidate();
+  return { ok: true };
+}

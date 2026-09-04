@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { vehicleLabel } from "@/lib/utils";
+import { parseRepairIds, repairsQuery } from "@/lib/bookings/repair-ids";
 import { ProgressStepper } from "@/components/customer/progress-stepper";
 import { TrackOnMount } from "@/components/analytics/track-on-mount";
 import { FUNNEL_EVENTS } from "@/lib/analytics/events";
@@ -10,6 +11,10 @@ import { RepairBrowser } from "./_components/repair-browser";
 // Step 2 of the funnel: browse the HaynesPro repair-times tree for THIS car
 // and pick the repair to book. Every booking is a repair priced from the OEM
 // book time — there is no packaged-services catalogue any more.
+//
+// Since Task 24 a customer can come back here from the price page to add
+// another job: `repairs=` carries what they've already chosen, the browser
+// shows it, and each leaf becomes "Add" rather than "Book".
 
 interface RepairsPageProps {
   searchParams: Promise<{
@@ -19,6 +24,11 @@ interface RepairsPageProps {
     postcode?: string;
     node?: string;
     crumbs?: string;
+    /** Jobs already in the booking (Task 24) — see lib/bookings/repair-ids.ts. */
+    repairs?: string;
+    repair?: string;
+    /** Preferred mechanic (rebook) — carried through so it survives an "add another job". */
+    pref?: string;
   }>;
 }
 
@@ -30,15 +40,22 @@ export default async function RepairsPage({ searchParams }: RepairsPageProps) {
     redirect("/book");
   }
 
+  const selectedIds = parseRepairIds(params);
+
   const vehicleParams = [
     params.make ? `make=${encodeURIComponent(params.make)}` : null,
     params.model ? `model=${encodeURIComponent(params.model)}` : null,
     params.postcode ? `postcode=${encodeURIComponent(params.postcode)}` : null,
+    params.pref ? `pref=${encodeURIComponent(params.pref)}` : null,
   ]
     .filter(Boolean)
     .join("&");
 
-  const backHref = `/book/vehicle?reg=${encodeURIComponent(reg)}${vehicleParams ? `&${vehicleParams}` : ""}`;
+  // Adding to a booking → back is the price page with what's chosen so far;
+  // starting one → back is the vehicle step.
+  const backHref = selectedIds.length
+    ? `/book/match?reg=${encodeURIComponent(reg)}&${repairsQuery(selectedIds)}${vehicleParams ? `&${vehicleParams}` : ""}`
+    : `/book/vehicle?reg=${encodeURIComponent(reg)}${vehicleParams ? `&${vehicleParams}` : ""}`;
 
   return (
     <div className="flex flex-col gap-6">
@@ -56,7 +73,9 @@ export default async function RepairsPage({ searchParams }: RepairsPageProps) {
           <ArrowLeft size={18} />
         </Link>
         <div>
-          <h1 className="text-2xl font-bold text-text-primary">What do you need?</h1>
+          <h1 className="text-2xl font-bold text-text-primary">
+            {selectedIds.length ? "Add another job" : "What do you need?"}
+          </h1>
           <p className="text-sm text-text-secondary">{vehicleLabel(reg, params.make, params.model)}</p>
         </div>
       </div>
@@ -66,8 +85,10 @@ export default async function RepairsPage({ searchParams }: RepairsPageProps) {
         make={params.make}
         model={params.model}
         postcode={params.postcode}
+        pref={params.pref}
         nodeId={params.node}
         crumbs={params.crumbs}
+        selectedIds={selectedIds}
       />
     </div>
   );
