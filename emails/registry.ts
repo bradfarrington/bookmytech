@@ -769,7 +769,9 @@ export const EMAIL_TEMPLATE_DEFS: readonly EmailTemplateDef[] = [
         text: "The customer on **{{service}}** (ref {{ref}}) has opened a dispute. Please add your account so we can resolve it quickly.",
       },
       { id: "link", type: "paragraph", text: "[Respond to the dispute →]({{link}})" },
-      { id: "note", type: "note", text: "Your payout for this job is paused until the dispute is resolved." },
+      // The "your payout is paused" note that used to sit here was removed in
+      // Task 25: payouts stopped being held for disputes in the 2026-08-27
+      // money-model change (see docs/HANDOFF.md), so it had become untrue.
     ],
   },
   {

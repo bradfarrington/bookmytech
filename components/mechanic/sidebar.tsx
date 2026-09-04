@@ -8,19 +8,25 @@ import { cn } from "@/lib/utils";
 import { Icon } from "@/components/ui/icon";
 import { Avatar } from "@/components/ui/avatar";
 import { signOut } from "@/app/actions/sign-out";
-import { MECHANIC_NAV_ITEMS, isNavItemActive } from "@/components/mechanic/nav-items";
+import {
+  MECHANIC_NAV_ITEMS,
+  isNavItemActive,
+  type MechanicNavBadges,
+} from "@/components/mechanic/nav-items";
 import { useSidebarCollapsed } from "@/lib/use-sidebar-collapsed";
 
 export interface MechanicSidebarProps {
   userName: string;
   /** Avatar tint index, so different mechanics aren't all the same colour. */
   avatarTint?: number;
+  /** Counts beside nav items, keyed by href (Task 25: open disputes). */
+  badges?: MechanicNavBadges;
 }
 
 // Desktop-only (hidden below md). On narrow viewports the same nav appears in
 // the slide-in drawer (components/mechanic/mobile-nav.tsx). Collapsible to an
 // icon rail; the collapsed header swaps the wordmark for the favicon.
-export function MechanicSidebar({ userName, avatarTint = 0 }: MechanicSidebarProps) {
+export function MechanicSidebar({ userName, avatarTint = 0, badges }: MechanicSidebarProps) {
   const pathname = usePathname();
   const { collapsed, toggle } = useSidebarCollapsed();
 
@@ -45,13 +51,14 @@ export function MechanicSidebar({ userName, avatarTint = 0 }: MechanicSidebarPro
       <nav className="flex-1 overflow-y-auto p-2.5">
         {MECHANIC_NAV_ITEMS.map((item) => {
           const isActive = isNavItemActive(pathname, item.href);
+          const badge = badges?.[item.href] ?? 0;
           return (
             <Link
               key={item.href}
               href={item.href}
-              title={collapsed ? item.label : undefined}
+              title={collapsed ? `${item.label}${badge > 0 ? ` (${badge})` : ""}` : undefined}
               className={cn(
-                "mb-px flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors",
+                "relative mb-px flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors",
                 collapsed && "justify-center px-0",
                 isActive
                   ? "bg-brand-blue font-semibold text-white"
@@ -63,7 +70,23 @@ export function MechanicSidebar({ userName, avatarTint = 0 }: MechanicSidebarPro
                 size={16}
                 className={isActive ? "text-white" : "text-text-muted"}
               />
-              {!collapsed && <span>{item.label}</span>}
+              {!collapsed && <span className="flex-1">{item.label}</span>}
+              {badge > 0 &&
+                (collapsed ? (
+                  <span
+                    aria-label={`${badge} needing attention`}
+                    className="absolute right-3 top-2 size-2 rounded-full border-[1.5px] border-surface-card bg-danger"
+                  />
+                ) : (
+                  <span
+                    className={cn(
+                      "rounded-full px-1.5 py-0.5 text-[11px] font-bold leading-none",
+                      isActive ? "bg-white/20 text-white" : "bg-red-100 text-red-700",
+                    )}
+                  >
+                    {badge}
+                  </span>
+                ))}
             </Link>
           );
         })}

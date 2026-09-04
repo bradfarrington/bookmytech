@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Briefcase } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { DisputeDetail } from "@/components/disputes/dispute-detail";
 import { loadDispute } from "@/lib/disputes/load";
@@ -20,14 +20,26 @@ export default async function MechanicDisputePage({
   if (!user) redirect("/mechanic/login");
 
   const loaded = await loadDispute(id, user.id);
-  if (!loaded || loaded.viewerRole !== "mechanic") redirect("/mechanic/jobs");
+  if (!loaded || loaded.viewerRole !== "mechanic") redirect("/mechanic/disputes");
 
   return (
     <div className="mx-auto flex max-w-xl flex-col gap-6">
-      <Link href={`/mechanic/jobs/${loaded.bookingId}`} className="inline-flex items-center gap-1.5 text-sm font-medium text-text-secondary hover:text-text-primary">
-        <ArrowLeft size={15} />
-        Back to job
-      </Link>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Link
+          href="/mechanic/disputes"
+          className="inline-flex items-center gap-1.5 text-sm font-medium text-text-secondary hover:text-text-primary"
+        >
+          <ArrowLeft size={15} />
+          Back to disputes
+        </Link>
+        <Link
+          href={`/mechanic/jobs/${loaded.bookingId}`}
+          className="inline-flex items-center gap-1.5 text-sm font-medium text-brand-blue hover:underline"
+        >
+          <Briefcase size={15} />
+          View job
+        </Link>
+      </div>
       <DisputeDetail data={loaded.data} viewerRole="mechanic" isOpener={loaded.isOpener} />
     </div>
   );

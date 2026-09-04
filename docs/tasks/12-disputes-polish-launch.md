@@ -278,3 +278,5 @@ Final items before going live to real customers.
 - Tag the release: `git tag v1.0.0 && git push --tags`
 
 After launch, the work shifts to operations, customer support, mechanic recruitment, and iterating based on real usage data. The codebase is in a good state to keep building.
+
+> **Task 25 (2026-09-04)** added the mechanic-side list — `/mechanic/disputes` with a sidebar entry and an open-count badge — and removed the stale "payout paused" line from the mechanic's dispute-opened email. See `docs/tasks/25-mechanic-disputes.md`.

@@ -339,6 +339,7 @@ export async function partyForDispute(disputeId: string, callerId: string) {
 export function revalidateDispute(disputeId: string, bookingId: string) {
   revalidatePath(`/dashboard/disputes/${disputeId}`);
   revalidatePath(`/mechanic/disputes/${disputeId}`);
+  revalidatePath("/mechanic/disputes");
   revalidatePath(`/admin/disputes/${disputeId}`);
   revalidatePath("/admin/disputes");
   revalidatePath("/dashboard");

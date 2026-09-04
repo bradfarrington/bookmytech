@@ -5,6 +5,7 @@ import {
   Inbox,
   LifeBuoy,
   PoundSterling,
+  Scale,
   SlidersHorizontal,
   Star,
   User,
@@ -17,6 +18,9 @@ export interface MechanicNavItem {
   icon: LucideIcon;
 }
 
+/** Counts to show beside nav items, keyed by href (e.g. open disputes). Absent/0 = no badge. */
+export type MechanicNavBadges = Record<string, number | undefined>;
+
 // Shared by the desktop sidebar and the mobile drawer so the two nav surfaces
 // never drift. (No bottom-tab bar — the mobile experience is a responsive
 // website, not an app shell.)
@@ -28,6 +32,9 @@ export const MECHANIC_NAV_ITEMS: readonly MechanicNavItem[] = [
   { label: "Availability", href: "/mechanic/availability", icon: SlidersHorizontal },
   { label: "Profile", href: "/mechanic/profile", icon: User },
   { label: "Documents", href: "/mechanic/documents", icon: FileText },
+  // Customer-facing complaints on the mechanic's jobs (Task 25). Separate
+  // from "Get help", which is the mechanic ↔ BMT Resolution Center.
+  { label: "Disputes", href: "/mechanic/disputes", icon: Scale },
   { label: "Get help", href: "/mechanic/resolutions", icon: LifeBuoy },
   { label: "Get paid", href: "/mechanic/onboarding/stripe", icon: CreditCard },
 ];

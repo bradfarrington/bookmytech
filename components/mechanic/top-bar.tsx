@@ -2,6 +2,7 @@ import { Bell } from "lucide-react";
 import { Icon } from "@/components/ui/icon";
 import { OnlineToggle } from "@/components/mechanic/online-toggle";
 import { MechanicMobileNav } from "@/components/mechanic/mobile-nav";
+import type { MechanicNavBadges } from "@/components/mechanic/nav-items";
 
 export interface MechanicTopBarProps {
   firstName: string;
@@ -9,9 +10,17 @@ export interface MechanicTopBarProps {
   status: "online" | "offline" | "on_job";
   /** Stripe payouts enabled — required before the mechanic can go online. */
   payoutsEnabled: boolean;
+  /** Counts beside nav items in the mobile drawer (Task 25: open disputes). */
+  badges?: MechanicNavBadges;
 }
 
-export function MechanicTopBar({ firstName, userName, status, payoutsEnabled }: MechanicTopBarProps) {
+export function MechanicTopBar({
+  firstName,
+  userName,
+  status,
+  payoutsEnabled,
+  badges,
+}: MechanicTopBarProps) {
   // Rendered server-side at request time, so the date is stable for hydration.
   const today = new Date().toLocaleDateString("en-GB", {
     weekday: "long",
@@ -22,7 +31,7 @@ export function MechanicTopBar({ firstName, userName, status, payoutsEnabled }: 
   return (
     <header className="flex h-[72px] shrink-0 items-center gap-3 border-b border-border bg-surface-card px-4 pt-[env(safe-area-inset-top)] md:gap-4 md:px-7">
       {/* Mobile: hamburger opens the nav drawer (desktop uses the sidebar). */}
-      <MechanicMobileNav userName={userName} />
+      <MechanicMobileNav userName={userName} badges={badges} />
 
       <div className="min-w-0">
         <p className="hidden text-[11px] font-bold uppercase tracking-[0.1em] text-text-muted sm:block">

@@ -9,16 +9,22 @@ import { cn } from "@/lib/utils";
 import { Icon } from "@/components/ui/icon";
 import { Avatar } from "@/components/ui/avatar";
 import { signOut } from "@/app/actions/sign-out";
-import { MECHANIC_NAV_ITEMS, isNavItemActive } from "@/components/mechanic/nav-items";
+import {
+  MECHANIC_NAV_ITEMS,
+  isNavItemActive,
+  type MechanicNavBadges,
+} from "@/components/mechanic/nav-items";
 
 export interface MechanicMobileNavProps {
   userName: string;
   avatarTint?: number;
+  /** Counts beside nav items, keyed by href (Task 25: open disputes). */
+  badges?: MechanicNavBadges;
 }
 
 // Hamburger + slide-in drawer for narrow viewports (the desktop sidebar is
 // hidden below md). This is responsive-web nav, not an app-style bottom bar.
-export function MechanicMobileNav({ userName, avatarTint = 0 }: MechanicMobileNavProps) {
+export function MechanicMobileNav({ userName, avatarTint = 0, badges }: MechanicMobileNavProps) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
@@ -74,6 +80,7 @@ export function MechanicMobileNav({ userName, avatarTint = 0 }: MechanicMobileNa
             <nav className="flex-1 overflow-y-auto p-3">
               {MECHANIC_NAV_ITEMS.map((item) => {
                 const isActive = isNavItemActive(pathname, item.href);
+                const badge = badges?.[item.href] ?? 0;
                 return (
                   <Link
                     key={item.href}
@@ -87,7 +94,17 @@ export function MechanicMobileNav({ userName, avatarTint = 0 }: MechanicMobileNa
                     )}
                   >
                     <Icon icon={item.icon} size={18} className={isActive ? "text-white" : "text-text-muted"} />
-                    <span>{item.label}</span>
+                    <span className="flex-1">{item.label}</span>
+                    {badge > 0 && (
+                      <span
+                        className={cn(
+                          "rounded-full px-2 py-0.5 text-xs font-bold leading-none",
+                          isActive ? "bg-white/20 text-white" : "bg-red-100 text-red-700",
+                        )}
+                      >
+                        {badge}
+                      </span>
+                    )}
                   </Link>
                 );
               })}
