@@ -164,6 +164,18 @@ export function ReviewStep({ services }: { services: ServiceLookup[] }) {
           {pending ? "Submitting…" : "Submit application"}
         </Button>
       </div>
+
+      <p className="text-right text-[11px] leading-[1.5] text-text-muted">
+        By submitting your application you agree to the{" "}
+        <Link href="/mechanic-agreement" target="_blank" className="font-semibold text-brand-blue hover:underline">
+          Mechanic Terms &amp; Conditions
+        </Link>{" "}
+        and{" "}
+        <Link href="/privacy" target="_blank" className="font-semibold text-brand-blue hover:underline">
+          Privacy Policy
+        </Link>
+        .
+      </p>
     </div>
   );
 }

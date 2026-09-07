@@ -1357,6 +1357,10 @@ function CheckoutForm({
         >
           cancellation policy
         </Link>
+        . By booking you agree to our{" "}
+        <Link href="/terms" target="_blank" className="font-semibold text-brand-blue hover:underline">
+          Terms &amp; Conditions
+        </Link>
         .
       </p>
     </form>

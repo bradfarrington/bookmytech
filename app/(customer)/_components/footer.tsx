@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { CookieSettingsLink } from "@/components/cookie-consent";
 
 type FooterColumn = {
   heading: string;
@@ -51,7 +52,7 @@ const COLUMNS: FooterColumn[] = [
     links: [
       { label: "Become a mechanic", href: "/mechanics" },
       { label: "Apply now", href: "/mechanics/apply" },
-      { label: "Mechanic agreement", href: "/mechanic-agreement" },
+      { label: "Mechanic terms", href: "/mechanic-agreement" },
       { label: "Help centre", href: "/help" },
       { label: "Mechanic login", href: "/mechanic/login" },
     ],
@@ -147,12 +148,19 @@ export function Footer() {
               </Link>
             </li>
             <li>
+              <CookieSettingsLink className="hover:text-white" />
+            </li>
+            <li>
               <Link href="/cancellation-policy" className="hover:text-white">
                 Cancellations
               </Link>
             </li>
           </ul>
         </div>
+        <p className="mt-3 text-xs text-white/45">
+          Book My Tech Ltd is registered in England and Wales, company no. 17379663. Registered
+          office: 2 Syerscote Lane, Wigginton, B79 9DX, United Kingdom.
+        </p>
       </div>
     </footer>
   );

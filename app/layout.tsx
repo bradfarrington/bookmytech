@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { ServiceWorkerRegister } from "@/components/pwa/service-worker-register";
+import { CookieConsent } from "@/components/cookie-consent";
 import { isProductionSite } from "@/lib/site";
 
 const inter = Inter({
@@ -50,6 +51,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col font-sans">
         {children}
         <ServiceWorkerRegister />
+        <CookieConsent />
       </body>
     </html>
   );

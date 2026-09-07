@@ -328,11 +328,11 @@ export default function HelpPage() {
             <p className="mt-4 text-center text-xs text-text-muted">
               Read our{" "}
               <Link href="/terms" className="font-semibold text-brand-blue hover:underline">
-                Terms
+                Terms &amp; Conditions
               </Link>
               ,{" "}
               <Link href="/privacy" className="font-semibold text-brand-blue hover:underline">
-                Privacy Notice
+                Privacy Policy
               </Link>{" "}
               and{" "}
               <Link href="/cookies" className="font-semibold text-brand-blue hover:underline">

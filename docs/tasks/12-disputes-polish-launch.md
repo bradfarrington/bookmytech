@@ -255,7 +255,8 @@ Final items before going live to real customers.
 - [ ] Rate limiting on auth endpoints (already provided by Supabase, verify config)
 - [ ] Spam protection on signup (hCaptcha or similar)
 - [ ] Pen-test minimum: at least manual SQL injection / XSS testing of forms
-- [ ] GDPR compliance: privacy policy, data deletion request flow, audit of where personal data lives
+- [x] GDPR compliance: privacy policy (Brad's document, published 2026-09-07 — Task 29) and cookie consent banner gating the analytics cookie (Task 29)
+- [ ] GDPR compliance: data deletion request flow, audit of where personal data lives
 - [ ] PCI compliance: confirmed by Stripe Connect handling all card data, no PII in logs
 - [ ] Insurance: confirm business has professional indemnity and public liability cover
 - [ ] Founder admin training: a 1h walkthrough of the admin console, dispute resolution, common ops scenarios
