@@ -128,6 +128,8 @@ Append-only audit log for every meaningful change on a booking. Powers the admin
 
 **Append-only.** Never UPDATE or DELETE rows here — if a fact about an event was wrong, write a corrective event (typically `'note'`). The composite index on `(booking_id, created_at desc)` supports the timeline render.
 
+**Published over Realtime** (`0058`) so the customer app's booking detail refreshes its history when an event lands (`arrival_window_set` in particular). RLS still gates what a subscriber sees. The website polls, by decision.
+
 ### `notification_toggles`
 
 Admin on/off switches for each SMS and email template (Task 22, `0053_notification_toggles.sql`). Primary key `(channel, key)`, `channel` ∈ `'sms' | 'email'`, `enabled boolean default true`, `updated_at`, `updated_by`. **A key with no row is ON.** Service-role only (RLS enabled, no policies). Read through `lib/notifications/toggles.ts` (60 s per-instance cache, fails open) by `renderTemplateEmail` and `getSmsTemplateBody`; written by `setSmsTemplateEnabled` / `setEmailTemplateEnabled`. Kept separate from `sms_templates` / `email_templates` because those hold overrides only and "reset" deletes the row.

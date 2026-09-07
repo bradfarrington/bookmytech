@@ -87,6 +87,7 @@ Under the All day button: **"Flexible? Offer more than one day"**. In flexible m
 4. **Semantics change:** while `confirmed`, `scheduled_at` may now move to a **different day** (one of `candidate_days`), not just later on the same day as Task 21 documented. Still not a reschedule — `reschedule_status` stays null; `candidate_days` goes null in the same update. Treat the Realtime UPDATE as a display refresh.
 5. `arrival_window_set` payload gains `candidate_days`; `reason` may now name the day.
 6. The customer's own reschedule (`POST /bookings/:id/reschedule`) now nulls `candidate_days` as well as `slot_window`.
+7. **Migration `0058`** (config only, no type change) adds `booking_events` to the `supabase_realtime` publication so the app's detail-screen subscription to the booking's events actually fires. Until it is applied that half of the subscription is silent, exactly as `bookings` was before `0049`.
 
 ## When complete
 
