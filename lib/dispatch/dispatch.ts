@@ -9,8 +9,11 @@ import { geocodePostcode, haversineMiles, outwardCode } from "@/lib/geo/postcode
 //   1. status = 'online' and approved (approved_at is set)
 //   2. the job address falls inside their service radius. We geocode both
 //      postcodes via postcodes.io and compare straight-line distance against
-//      service_radius_miles. If either postcode can't be geocoded we fall back
-//      to a coarse same-outward-code (district) match.
+//      service_radius_miles. A bare district ("NG12") geocodes to its centroid
+//      (lib/geo/postcodes.ts), so admin-set outward-only bases work too. Only
+//      if a postcode can't be geocoded at all (API down, nonsense input) do we
+//      fall back to a coarse same-outward-code (district) match — which is
+//      strict by nature: NG10 ≠ NG12 even though they're 9 miles apart.
 //
 // There is no specialism filter: every booking is a granular HaynesPro repair
 // (Task 17), which maps to no catalogue specialism — jobs broadcast to every
@@ -31,6 +34,33 @@ export interface DispatchResult {
   offered: number;
   /** True when we couldn't geocode the job and fell back to district matching. */
   usedFallback: boolean;
+}
+
+// One "nobody matched" note per booking. dispatchBooking re-runs every time a
+// mechanic comes online (redispatchPending), so without the check a stranded
+// booking would collect a duplicate note per toggle.
+async function noteNoMatch(
+  admin: ReturnType<typeof createAdminClient>,
+  bookingId: string,
+  reason: string,
+): Promise<void> {
+  const { data: existing } = await admin
+    .from("booking_events")
+    .select("id, payload")
+    .eq("booking_id", bookingId)
+    .eq("event_type", "note")
+    .limit(50);
+  const already = (existing ?? []).some(
+    (e) => (e.payload as { kind?: string } | null)?.kind === "dispatch_no_match",
+  );
+  if (already) return;
+  await admin.from("booking_events").insert({
+    booking_id: bookingId,
+    event_type: "note",
+    actor_role: "system",
+    reason,
+    payload: { kind: "dispatch_no_match" },
+  });
 }
 
 export async function dispatchBooking(bookingId: string): Promise<DispatchResult> {
@@ -58,7 +88,10 @@ export async function dispatchBooking(bookingId: string): Promise<DispatchResult
   const now = Date.now();
 
   const jobCoords = await geocodePostcode(booking.postcode);
-  const jobArea = booking.area ?? outwardCode(booking.postcode ?? "");
+  // Derive the district ourselves rather than trusting bookings.area: the SQL
+  // trigger splits on a space, so a postcode typed without one ("NG127GG")
+  // lands in `area` whole and could never equal a mechanic's district.
+  const jobArea = outwardCode(booking.postcode ?? "") || booking.area || "";
   let usedFallback = !jobCoords;
 
   const eligible: string[] = [];
@@ -88,7 +121,19 @@ export async function dispatchBooking(bookingId: string): Promise<DispatchResult
     if (inRange) eligible.push(m.id);
   }
 
-  if (!eligible.length) return { offered: 0, usedFallback };
+  if (!eligible.length) {
+    // Leave the admin a reason on the timeline. Before this, a booking that
+    // matched nobody sat silent until the 5-minute stall sweep, with no clue
+    // whether the postcode was bad or nobody was in range (Gareth's NG12 test).
+    await noteNoMatch(
+      admin,
+      bookingId,
+      jobCoords
+        ? `No online mechanic has ${booking.postcode} inside their service radius (${mechanics.length} online checked).`
+        : `Couldn't place postcode "${booking.postcode}" on the map — it may be mistyped. Only mechanics based in district ${jobArea || "?"} could be matched, and none were online.`,
+    );
+    return { offered: 0, usedFallback };
+  }
 
   // Same-mechanic rebooking (Task 11 Stage 1): when the customer asked for their
   // previous mechanic and that mechanic is currently eligible + online, offer

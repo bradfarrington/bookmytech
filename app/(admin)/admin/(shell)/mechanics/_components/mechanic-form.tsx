@@ -131,7 +131,8 @@ export function MechanicForm({ services }: MechanicFormProps) {
               className={`${FIELD_INPUT} font-bold uppercase tracking-[0.04em] placeholder:font-medium placeholder:normal-case placeholder:tracking-normal`}
             />
             <span className="text-xs font-normal text-text-muted">
-              Drives dispatch matching. Full postcode or outward code (e.g. &quot;SE15&quot;).
+              Drives dispatch matching. A full postcode pins the radius exactly; an outward
+              code (e.g. &quot;SE15&quot;) uses the centre of that district.
             </span>
           </label>
         </div>

@@ -44,7 +44,7 @@ export function ReferralCard({
   }
 
   return (
-    <section className="overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-brand-blue to-brand-blue-dark p-6 text-white">
+    <section className="@container overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-brand-blue to-brand-blue-dark p-6 text-white">
       <div className="flex items-start gap-3">
         <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-white/15">
           <Gift size={20} />
@@ -64,16 +64,20 @@ export function ReferralCard({
         </p>
       )}
 
-      <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-        <div className="flex flex-1 items-center justify-between rounded-lg bg-white/15 px-3 py-2.5">
-          <span className="text-xs uppercase tracking-wide text-blue-100">Your code</span>
-          <span className="font-mono text-base font-bold tracking-wider">{code}</span>
+      {/* Container query, not a viewport breakpoint: on desktop this card sits in a
+          ~340px sidebar, where the side-by-side row crammed the code, wrapped
+          "Copy link" and clipped the share button. Go horizontal only when the
+          card itself is wide enough (@lg = 32rem). */}
+      <div className="mt-4 flex flex-col gap-2 @lg:flex-row">
+        <div className="flex min-w-0 flex-1 items-center justify-between gap-3 rounded-lg bg-white/15 px-3 py-2.5">
+          <span className="whitespace-nowrap text-xs uppercase tracking-wide text-blue-100">Your code</span>
+          <span className="truncate font-mono text-base font-bold tracking-wider">{code}</span>
         </div>
-        <div className="flex gap-2">
+        <div className="flex shrink-0 gap-2">
           <button
             type="button"
             onClick={copy}
-            className="inline-flex h-11 flex-1 items-center justify-center gap-1.5 rounded-lg bg-white px-4 text-sm font-semibold text-brand-blue transition-colors hover:bg-blue-50"
+            className="inline-flex h-11 flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg bg-white px-4 text-sm font-semibold text-brand-blue transition-colors hover:bg-blue-50"
           >
             {copied ? <Check size={16} /> : <Copy size={16} />}
             {copied ? "Copied!" : "Copy link"}
@@ -82,7 +86,7 @@ export function ReferralCard({
             type="button"
             onClick={share}
             aria-label="Share"
-            className="inline-flex size-11 items-center justify-center rounded-lg bg-white/15 text-white transition-colors hover:bg-white/25"
+            className="inline-flex size-11 shrink-0 items-center justify-center rounded-lg bg-white/15 text-white transition-colors hover:bg-white/25"
           >
             <Share2 size={16} />
           </button>

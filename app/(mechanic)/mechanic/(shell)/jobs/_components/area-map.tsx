@@ -1,10 +1,10 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { MapPin } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Icon } from "@/components/ui/icon";
 import type { LatLng } from "@/lib/geo/postcodes";
-import { offsetMiles } from "@/lib/maps/project";
 
 export interface AreaPin {
   id: string;
@@ -22,13 +22,19 @@ export interface AreaMapProps {
   jobsInArea: number;
 }
 
-// Inline SVG service-area map — free, no key, no billing. Renders a dashed
-// radius circle around the mechanic's base and a pin per job, positioned by its
-// real offset from base. A live Google/Leaflet map can replace this block later
-// behind a GOOGLE_MAPS_API_KEY check; nothing else needs to change.
-const VIEW = 320;
-const CENTER = VIEW / 2;
-const CIRCLE_R = 120; // px radius the service radius maps to
+// Service-area card: a live OpenStreetMap map (Leaflet, free, no key) with a
+// dashed radius circle around the mechanic's base and a pin per upcoming job.
+// Leaflet needs `window`, so the map itself is a client-only chunk that loads
+// after hydration; the placeholder keeps the card's height stable meanwhile.
+const LeafletAreaMap = dynamic(() => import("./leaflet-map"), {
+  ssr: false,
+  loading: () => (
+    <div
+      className="h-64 w-full animate-pulse bg-gradient-to-br from-blue-100 to-blue-50"
+      aria-hidden="true"
+    />
+  ),
+});
 
 export function AreaMap({
   basePostcode,
@@ -37,8 +43,6 @@ export function AreaMap({
   pins,
   jobsInArea,
 }: AreaMapProps) {
-  const scale = CIRCLE_R / Math.max(1, radiusMiles); // px per mile
-
   return (
     <Card padded={false} className="overflow-hidden">
       <div className="bg-text-primary px-5 py-4 text-white">
@@ -54,37 +58,10 @@ export function AreaMap({
       </div>
 
       {baseCoords ? (
-        <div className="relative bg-gradient-to-br from-blue-100 to-blue-50">
-          <svg
-            viewBox={`0 0 ${VIEW} ${VIEW}`}
-            className="h-52 w-full"
-            role="img"
-            aria-label="Map of your service area"
-          >
-            {/* radius circle */}
-            <circle
-              cx={CENTER}
-              cy={CENTER}
-              r={CIRCLE_R}
-              fill="#2563EB"
-              fillOpacity={0.12}
-              stroke="#2563EB"
-              strokeWidth={1.5}
-              strokeDasharray="4 4"
-            />
-            {/* base */}
-            <circle cx={CENTER} cy={CENTER} r={6} fill="#2563EB" />
-            {/* job pins */}
-            {pins.map((pin) => {
-              const { north, east } = offsetMiles(baseCoords, pin);
-              let x = CENTER + east * scale;
-              let y = CENTER - north * scale;
-              // Keep stray pins inside the frame.
-              x = Math.max(8, Math.min(VIEW - 8, x));
-              y = Math.max(8, Math.min(VIEW - 8, y));
-              return <circle key={pin.id} cx={x} cy={y} r={4.5} fill="#22C55E" />;
-            })}
-          </svg>
+        // `isolate` keeps Leaflet's internal z-indexes (panes go up to 1000)
+        // from floating above the page's own overlays and dropdowns.
+        <div className="relative isolate">
+          <LeafletAreaMap base={baseCoords} radiusMiles={radiusMiles} pins={pins} />
         </div>
       ) : (
         <div className="flex flex-col items-center gap-2 px-6 py-12 text-center">
@@ -93,8 +70,9 @@ export function AreaMap({
             No service area yet
           </p>
           <p className="max-w-xs text-xs text-text-muted">
-            Add your base postcode in Availability to see your radius and the
-            jobs around you.
+            {basePostcode
+              ? "We couldn't place that postcode on the map. Ask support to check it."
+              : "Add your base postcode in Availability to see your radius and the jobs around you."}
           </p>
         </div>
       )}

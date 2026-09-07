@@ -21,8 +21,10 @@ interface ParsedMechanicForm {
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-// Outward code only — sufficient for dispatch matching (matches the
-// derive_postcode_district() function in 0004). Full postcode optional.
+// Full postcode, or the outward code on its own. Both geocode: a bare district
+// resolves to its centroid via postcodes.io /outcodes (lib/geo/postcodes.ts),
+// so dispatch's radius check works either way — a full postcode is just more
+// precise.
 const POSTCODE_RE = /^[A-Z]{1,2}[0-9][A-Z0-9]?(\s?[0-9][A-Z]{2})?$/i;
 
 function parseForm(formData: FormData): { ok: true; data: ParsedMechanicForm } | { ok: false; error: string } {
