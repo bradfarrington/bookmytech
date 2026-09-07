@@ -24,6 +24,7 @@ export interface BookingRow {
   payment_mode: string | null;
   scheduled_at: string | null;
   slot_window: string | null;
+  candidate_days: string[] | null;
   address_line_1: string | null;
   postcode: string | null;
   credit_applied_pence: number | null;
@@ -31,7 +32,7 @@ export interface BookingRow {
 
 const BOOKING_COLUMNS =
   "id, status, total_pence, stripe_payment_intent_id, customer_email, payment_mode, " +
-  "scheduled_at, slot_window, address_line_1, postcode, credit_applied_pence";
+  "scheduled_at, slot_window, candidate_days, address_line_1, postcode, credit_applied_pence";
 
 /** Look up an auth user's id by email (paginated; the test project is small). */
 export async function getUserId(email: string): Promise<string> {

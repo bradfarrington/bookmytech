@@ -50,6 +50,12 @@ interface BookingBody {
   repairNodeIds?: unknown;
   scheduledAt?: unknown;
   slotWindow?: unknown;
+  /**
+   * Several all-day dates the customer is happy with (Task 28, additive) —
+   * "YYYY-MM-DD" keys, needs `slotWindow` = the all-day label. Anything that
+   * isn't an array of strings is ignored, never refused.
+   */
+  candidateDays?: unknown;
   customerName?: unknown;
   addressLine1?: unknown;
   addressLine2?: unknown;
@@ -90,6 +96,9 @@ export async function POST(request: Request): Promise<Response> {
   const repairNodeIds = readRepairIdList(body.repairNodeIds);
   const scheduledAt = asString(body.scheduledAt);
   const slotWindow = asString(body.slotWindow);
+  const candidateDays = Array.isArray(body.candidateDays)
+    ? body.candidateDays.filter((d): d is string => typeof d === "string").map((d) => d.trim())
+    : [];
   const customerName = asString(body.customerName);
   const addressLine1 = asString(body.addressLine1);
   const addressLine2 = asString(body.addressLine2);
@@ -148,6 +157,7 @@ export async function POST(request: Request): Promise<Response> {
     repairNodeIds: repairNodeIds.length ? repairNodeIds : undefined,
     scheduledAt,
     slotWindow: slotWindow || undefined,
+    candidateDays: candidateDays.length ? candidateDays : undefined,
     // From the verified token, never the body — see the note above.
     customerEmail: caller.email,
     customerName,

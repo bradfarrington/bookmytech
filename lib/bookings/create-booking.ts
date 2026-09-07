@@ -6,7 +6,15 @@ import { renderTemplateEmail } from "@/emails/resolve";
 import { sendSms } from "@/lib/sms/send-sms";
 import { renderSmsTemplate } from "@/lib/sms/render-template";
 import { formatPrice, formatJobNumber } from "@/lib/utils";
-import { BOOKING_TIME_ZONE } from "@/lib/slots";
+import {
+  ALL_DAY_SLOT,
+  BOOKING_TIME_ZONE,
+  formatCandidateDays,
+  isDayKey,
+  isSlotBookable,
+  normaliseCandidateDays,
+  slotIso,
+} from "@/lib/slots";
 import { dispatchBooking } from "@/lib/dispatch/dispatch";
 import { quoteRepairs } from "@/lib/haynespro/repair-booking";
 import { MAX_REPAIRS_PER_BOOKING, repairIdsFromInput } from "@/lib/bookings/repair-ids";
@@ -61,6 +69,12 @@ export interface CreateBookingInput {
   scheduledAt: string; // ISO string — the window start
   /** Human arrival window the customer picked ("8am–10am" … "All day (8am–8pm)"). */
   slotWindow?: string;
+  /**
+   * Several all-day dates the customer is happy with (Task 28), as UK
+   * calendar keys "YYYY-MM-DD". Only meaningful with the all-day window; the
+   * server cleans the list and sets `scheduled_at` to the earliest day itself.
+   */
+  candidateDays?: string[];
   customerEmail: string;
   customerName: string;
   /** Optional — lets guests receive booking SMS updates (signed-in users use their profile phone). */
@@ -125,6 +139,41 @@ export async function createBooking(
       code: "slot_passed",
       error: "That arrival window has already passed. Please go back and pick a later time.",
     };
+  }
+
+  // Several all-day dates (Task 28). The list is cleaned here — never trusted
+  // — and `scheduled_at` is pinned to 8am on the earliest surviving day so
+  // every reader of that column sees a sensible single date. One survivor is
+  // an ordinary all-day booking on that day; none is the same "pick another
+  // time" the single-day path gives, with the hold left intact.
+  let scheduledAt = input.scheduledAt;
+  let candidateDays: string[] | null = null;
+  if (Array.isArray(input.candidateDays) && input.candidateDays.length > 0) {
+    if (input.slotWindow !== ALL_DAY_SLOT.window) {
+      return {
+        ok: false,
+        error: "Offering several days only works with the all-day window. Please go back and choose again.",
+      };
+    }
+    const now = new Date();
+    const days = normaliseCandidateDays(input.candidateDays, now);
+    if (days) {
+      candidateDays = days;
+      scheduledAt = slotIso(days[0], ALL_DAY_SLOT.startHour);
+    } else {
+      const survivor = input.candidateDays
+        .filter(isDayKey)
+        .sort()
+        .find((key) => isSlotBookable(key, ALL_DAY_SLOT, now));
+      if (!survivor) {
+        return {
+          ok: false,
+          code: "slot_passed",
+          error: "The days you offered have already started. Please go back and pick later days.",
+        };
+      }
+      scheduledAt = slotIso(survivor, ALL_DAY_SLOT.startHour);
+    }
   }
 
   // Snapshot a phone onto the booking so SMS touchpoints (on the way, complete,
@@ -198,8 +247,11 @@ export async function createBooking(
       vehicle_reg: input.vehicleReg,
       vehicle_make: input.vehicleMake,
       vehicle_model: input.vehicleModel ?? null,
-      scheduled_at: input.scheduledAt,
+      scheduled_at: scheduledAt,
       slot_window: input.slotWindow ?? null,
+      // Only named when set: the column arrives with migration 0057, and an
+      // ordinary insert must keep working before it is applied.
+      ...(candidateDays ? { candidate_days: candidateDays } : {}),
       status: "sourcing_mechanic",
       total_pence: price.totalPence,
       area_id: price.areaId,
@@ -299,20 +351,22 @@ export async function createBooking(
       ? `Covered in full by your account credit (${formatPrice(price.totalPence)}). Nothing to pay.`
       : `Amount pre-authorised${passedCredit > 0 ? ` (after ${formatPrice(passedCredit)} credit)` : ""}: ${formatPrice(chargedPence)}`;
   // UK time explicitly — this runs on a UTC server, and "6pm" in BST is 17:00Z.
-  const whenLabel = `${new Date(input.scheduledAt).toLocaleDateString("en-GB", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    timeZone: BOOKING_TIME_ZONE,
-  })}${
-    input.slotWindow
-      ? ` · ${input.slotWindow}`
-      : `, ${new Date(input.scheduledAt).toLocaleTimeString("en-GB", {
-          hour: "numeric",
-          minute: "2-digit",
-          timeZone: BOOKING_TIME_ZONE,
-        })}`
-  }`;
+  const whenLabel = candidateDays
+    ? `Any of ${formatCandidateDays(candidateDays)} · All day — your mechanic will confirm the day`
+    : `${new Date(scheduledAt).toLocaleDateString("en-GB", {
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+        timeZone: BOOKING_TIME_ZONE,
+      })}${
+        input.slotWindow
+          ? ` · ${input.slotWindow}`
+          : `, ${new Date(scheduledAt).toLocaleTimeString("en-GB", {
+              hour: "numeric",
+              minute: "2-digit",
+              timeZone: BOOKING_TIME_ZONE,
+            })}`
+      }`;
   const vehicleLabel = `${input.vehicleReg ? `${input.vehicleReg} — ` : ""}${input.vehicleMake}${
     input.vehicleModel ? ` ${input.vehicleModel}` : ""
   }`;

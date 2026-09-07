@@ -1,7 +1,7 @@
 // Plain, serialisable shapes shared between the dashboard server page and its
 // client components.
 
-import { formatBookingSlot } from "@/lib/slots";
+import { formatBookingWhen } from "@/lib/slots";
 
 export interface DashboardBooking {
   id: string;
@@ -10,6 +10,8 @@ export interface DashboardBooking {
   status: string;
   scheduledAt: string | null;
   slotWindow: string | null;
+  /** The days the customer offered (Task 28), until the mechanic picks one. */
+  candidateDays: string[] | null;
   createdAt: string | null;
   completedAt: string | null;
   totalPence: number;
@@ -61,6 +63,13 @@ export const STATUS_TONES: Record<string, string> = {
   disputed: "bg-amber-50 text-amber-800",
 };
 
-export function formatSlot(iso: string | null, window?: string | null): string {
-  return formatBookingSlot(iso, window);
+/** "Wed 3 Jul · 8am–10am", or "Any of … · All day" while several days are open. */
+export function formatSlot(
+  booking: Pick<DashboardBooking, "scheduledAt" | "slotWindow" | "candidateDays">,
+): string {
+  return formatBookingWhen({
+    scheduled_at: booking.scheduledAt,
+    slot_window: booking.slotWindow,
+    candidate_days: booking.candidateDays,
+  });
 }

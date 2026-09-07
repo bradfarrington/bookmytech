@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { geocodePostcode, haversineMiles, type LatLng } from "@/lib/geo/postcodes";
 import { mechanicSharePence } from "@/lib/earnings";
 import { formatPrice } from "@/lib/utils";
-import { ALL_DAY_SLOT, formatBookingSlot } from "@/lib/slots";
+import { ALL_DAY_SLOT, formatBookingWhen, isFlexibleBooking } from "@/lib/slots";
 import { KpiCards, type MechanicKpis } from "./_components/kpi-cards";
 import { OfferFeed, type OfferView } from "./_components/offer-feed";
 import { Schedule, type ScheduleItem } from "./_components/schedule";
@@ -41,6 +41,7 @@ interface BookingJoin {
   postcode: string | null;
   scheduled_at: string | null;
   slot_window: string | null;
+  candidate_days: string[] | null;
   total_pence: number | null;
   commission_rate: number | null;
   repair_description: string | null;
@@ -50,6 +51,7 @@ interface ScheduleRow {
   id: string;
   scheduled_at: string | null;
   slot_window: string | null;
+  candidate_days: string[] | null;
   status: string;
   postcode: string | null;
   area: string | null;
@@ -105,7 +107,7 @@ export default async function MechanicJobsPage() {
   const { data: offerRows } = await supabase
     .from("job_offers")
     .select(
-      "id, offered_at, booking:bookings(id, vehicle_reg, vehicle_make, vehicle_model, area, postcode, scheduled_at, slot_window, total_pence, commission_rate, repair_description)",
+      "id, offered_at, booking:bookings(id, vehicle_reg, vehicle_make, vehicle_model, area, postcode, scheduled_at, slot_window, candidate_days, total_pence, commission_rate, repair_description)",
     )
     .eq("mechanic_id", user.id)
     .is("response", null)
@@ -131,7 +133,7 @@ export default async function MechanicJobsPage() {
       reg: b.vehicle_reg ?? "",
       area: b.area ?? b.postcode ?? "—",
       distanceLabel,
-      slot: formatBookingSlot(b.scheduled_at, b.slot_window, { relative: true }),
+      slot: formatBookingWhen(b, { relative: true }),
       earningsPence: mechanicSharePence(b.total_pence ?? 0, b.commission_rate ?? 0.15),
     });
   }
@@ -140,7 +142,7 @@ export default async function MechanicJobsPage() {
   const { data: bookingRows } = await supabase
     .from("bookings")
     .select(
-      "id, scheduled_at, slot_window, status, postcode, area, total_pence, commission_rate, vehicle_make, vehicle_model, repair_description",
+      "id, scheduled_at, slot_window, candidate_days, status, postcode, area, total_pence, commission_rate, vehicle_make, vehicle_model, repair_description",
     )
     .eq("mechanic_id", user.id)
     .gte("scheduled_at", startOfToday().toISOString())
@@ -172,8 +174,13 @@ export default async function MechanicJobsPage() {
       if (isNext) nextAssigned = false;
       // Show the arrival window rather than a bare start time — an all-day job
       // is "All day", not "08:00". Legacy rows without a window keep the time.
+      // A flexible job (Task 28) is parked on its earliest offered day until
+      // the mechanic picks; say how many days are open.
       const isAllDay = b.slot_window === ALL_DAY_SLOT.window;
-      const time = isAllDay
+      const isFlexible = isFlexibleBooking(b);
+      const time = isFlexible
+        ? `Any of ${b.candidate_days!.length} days`
+        : isAllDay
         ? "All day"
         : b.slot_window ??
           (b.scheduled_at
@@ -187,8 +194,10 @@ export default async function MechanicJobsPage() {
         earnings: formatPrice(mechanicSharePence(b.total_pence ?? 0, b.commission_rate ?? 0.15)),
         status,
         isNext,
-        // A confirmed all-day job still needs its 2-hour window picking (Task 21).
+        // A confirmed all-day job still needs its 2-hour window picking (Task 21);
+        // a flexible one needs its day picking too (Task 28).
         needsWindow: isAllDay && status === "confirmed",
+        needsDay: isFlexible && status === "confirmed",
       });
     }
 

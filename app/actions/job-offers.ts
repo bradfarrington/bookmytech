@@ -8,7 +8,7 @@ import { renderTemplateEmail } from "@/emails/resolve";
 import { sendPushToCustomer } from "@/lib/push/send";
 import { sendSms } from "@/lib/sms/send-sms";
 import { renderSmsTemplate } from "@/lib/sms/render-template";
-import { ALL_DAY_SLOT, formatBookingSlot } from "@/lib/slots";
+import { ALL_DAY_SLOT, formatBookingSlot, formatBookingWhen, isFlexibleBooking } from "@/lib/slots";
 import { formatJobNumber, shortPersonName } from "@/lib/utils";
 
 export type OfferActionResult =
@@ -118,7 +118,7 @@ export async function acceptOffer(offerId: string): Promise<OfferActionResult> {
   const { data: booking } = await admin
     .from("bookings")
     .select(
-      "customer_id, customer_email, customer_name, customer_phone, scheduled_at, slot_window, job_number, repair_description",
+      "customer_id, customer_email, customer_name, customer_phone, scheduled_at, slot_window, candidate_days, job_number, repair_description",
     )
     .eq("id", offer.booking_id)
     .single();
@@ -129,9 +129,13 @@ export async function acceptOffer(offerId: string): Promise<OfferActionResult> {
     .single();
   const mechanicName = profile?.full_name ?? "Your mechanic";
   // "Wed 3 Sep · 8am–10am" in UK time — the window the customer picked, not a
-  // bare 08:00 (which is what an all-day booking used to be emailed as).
-  const slotLabel = formatBookingSlot(booking?.scheduled_at ?? null, booking?.slot_window);
+  // bare 08:00 (which is what an all-day booking used to be emailed as). A
+  // flexible booking (Task 28) reads "Any of … · All day".
+  const slotLabel = booking
+    ? formatBookingWhen(booking)
+    : formatBookingSlot(null);
   const isAllDay = booking?.slot_window === ALL_DAY_SLOT.window;
+  const isFlexible = booking ? isFlexibleBooking(booking) : false;
   const ref = formatJobNumber(booking?.job_number);
   const templateKey = isReplacement ? "replacement_confirmed" : "mechanic_confirmed";
   if (booking?.customer_email) {
@@ -143,9 +147,11 @@ export async function acceptOffer(offerId: string): Promise<OfferActionResult> {
       service: serviceName,
       ref,
       when: slotLabel,
-      optional_note: isAllDay
-        ? "You booked an all-day slot — your mechanic will confirm a 2-hour arrival window for the day."
-        : "",
+      optional_note: isFlexible
+        ? "You offered a choice of days — your mechanic will confirm which day and a 2-hour arrival window."
+        : isAllDay
+          ? "You booked an all-day slot — your mechanic will confirm a 2-hour arrival window for the day."
+          : "",
     })
       .then(({ subject, html }) => sendEmail({ to, subject, html }))
       .catch(console.error);

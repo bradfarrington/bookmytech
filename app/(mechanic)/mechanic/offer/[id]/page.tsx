@@ -4,7 +4,7 @@ import { CheckCircle2, ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { geocodePostcode, haversineMiles, type LatLng } from "@/lib/geo/postcodes";
 import { mechanicSharePence } from "@/lib/earnings";
-import { formatBookingSlot } from "@/lib/slots";
+import { formatBookingWhen } from "@/lib/slots";
 import { repairLinesFor, type BookingRepairRow } from "@/lib/bookings/repair-lines";
 import { OfferScreen } from "./_components/offer-screen";
 
@@ -46,7 +46,7 @@ export default async function OfferPage({ params }: PageProps) {
     .select(
       `id, response, mechanic_id, offered_at,
        booking:bookings(id, vehicle_reg, vehicle_make, vehicle_model, area, postcode,
-         scheduled_at, slot_window, total_pence, commission_rate, special_instructions,
+         scheduled_at, slot_window, candidate_days, total_pence, commission_rate, special_instructions,
          repair_description)`,
     )
     .eq("id", id)
@@ -64,6 +64,7 @@ export default async function OfferPage({ params }: PageProps) {
         postcode: string | null;
         scheduled_at: string | null;
         slot_window: string | null;
+        candidate_days: string[] | null;
         total_pence: number | null;
         commission_rate: number | null;
         special_instructions: string | null;
@@ -153,7 +154,7 @@ export default async function OfferPage({ params }: PageProps) {
         }
         vehicle={[booking.vehicle_make, booking.vehicle_model].filter(Boolean).join(" ") || "Vehicle"}
         reg={booking.vehicle_reg}
-        whenLabel={formatBookingSlot(booking.scheduled_at, booking.slot_window, { relative: true })}
+        whenLabel={formatBookingWhen(booking, { relative: true })}
         where={booking.area ?? booking.postcode ?? "—"}
         distanceLabel={distanceLabel}
         notes={booking.special_instructions}

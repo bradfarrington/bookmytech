@@ -21,6 +21,8 @@ export interface BookingRow {
   status: string;
   totalPence: number;
   scheduledAt: string | null;
+  /** "Wed 3 Sep · 8am–10am" / "Any of … · All day" — built server-side in UK time. */
+  whenLabel: string;
 }
 
 interface BookingsTableProps {
@@ -244,7 +246,7 @@ export function BookingsTable({
                       </Pill>
                     </td>
                     <td className="px-5 py-3 text-text-secondary">
-                      {formatDate(b.scheduledAt)}
+                      {b.whenLabel}
                     </td>
                     <td className="px-5 py-3 text-right font-semibold text-text-primary">
                       {formatPrice(b.totalPence)}

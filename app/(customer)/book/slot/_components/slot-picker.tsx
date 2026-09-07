@@ -24,13 +24,14 @@ import {
   TWO_HOUR_SLOTS,
   ALL_DAY_SLOT,
   slotIso,
-  formatBookingSlot,
+  formatBookingWhen,
   isSlotBookable,
   dayHasBookableSlot,
   upcomingDayKeys,
   dayChipLabel,
   londonDateKey,
   MIN_LEAD_MINUTES,
+  MAX_CANDIDATE_DAYS,
 } from "@/lib/slots";
 import { track, FUNNEL_EVENTS } from "@/lib/analytics/track";
 
@@ -140,6 +141,8 @@ function readDraft(intentId: string): CheckoutDraft | null {
       return null;
     }
     if (!Array.isArray(parsed.common.repairLines)) parsed.common.repairLines = [];
+    // Drafts parked before Task 28 carry no candidate days: a single day.
+    if (!Array.isArray(parsed.common.candidateDays)) parsed.common.candidateDays = [];
     return parsed;
   } catch {
     return null;
@@ -263,12 +266,47 @@ export function SlotPicker({
   // share the same start time — the ISO alone can't tell them apart.
   const [selectedWindow, setSelectedWindow] = useState<string | null>(null);
 
+  // Flexible mode (Task 28): the customer offers SEVERAL all-day dates and the
+  // mechanic picks one. The date strip becomes multi-select, the window is
+  // always all-day, and `selectedSlot` is parked on the earliest day so the
+  // rest of the checkout (lead-time check, draft, slot_passed) is unchanged.
+  const [flexible, setFlexible] = useState(false);
+  const [flexDays, setFlexDays] = useState<string[]>([]);
+
+  function applyFlexDays(days: string[]) {
+    const sorted = [...new Set(days)].sort();
+    setFlexDays(sorted);
+    if (sorted.length > 0) {
+      setSelectedSlot(slotIso(sorted[0], ALL_DAY_SLOT.startHour));
+      setSelectedWindow(ALL_DAY_SLOT.window);
+    } else {
+      setSelectedSlot(null);
+      setSelectedWindow(null);
+    }
+  }
+
+  function setFlexibleMode(on: boolean) {
+    setFlexible(on);
+    if (on) {
+      applyFlexDays(dayHasBookableSlot(selectedDay, now) ? [selectedDay] : []);
+    } else {
+      setFlexDays([]);
+      setSelectedSlot(null);
+      setSelectedWindow(null);
+    }
+  }
+
+  // The days still open to offer, judged against `now` like every window.
+  const openFlexDays = flexDays.filter((d) => isSlotBookable(d, ALL_DAY_SLOT, now));
+
   // A window chosen earlier can close while the form is being filled in. It's
   // judged against `now` at render, so the CTA disables (and the button loses
-  // its highlight) rather than sending a start the server would reject.
-  const selectedSlotOpen =
-    !!selectedSlot &&
-    new Date(selectedSlot).getTime() - now.getTime() >= MIN_LEAD_MINUTES * 60_000;
+  // its highlight) rather than sending a start the server would reject. In
+  // flexible mode the offer needs at least two days that are still open.
+  const selectedSlotOpen = flexible
+    ? openFlexDays.length >= 2
+    : !!selectedSlot &&
+      new Date(selectedSlot).getTime() - now.getTime() >= MIN_LEAD_MINUTES * 60_000;
 
   const [addressLine1, setAddressLine1] = useState("");
   const [postcode, setPostcode] = useState(defaultPostcode);
@@ -313,6 +351,7 @@ export function SlotPicker({
   function handleSlotPassed() {
     setSelectedSlot(null);
     setSelectedWindow(null);
+    setFlexDays([]);
     setSlotNotice(SLOT_PASSED_NOTICE);
   }
 
@@ -341,11 +380,16 @@ export function SlotPicker({
   // Put a parked draft back on the form, for when the customer failed the
   // challenge and has to try again. Nothing was taken in that case.
   function restoreDraft(c: ConfirmCommon, opts: { keepSlot?: boolean } = {}) {
+    const wasFlexible = c.candidateDays.length >= 2;
+    setFlexible(wasFlexible);
     if (opts.keepSlot !== false) {
       setSelectedSlot(c.selectedSlot || null);
       setSelectedWindow(c.selectedWindow || null);
+      setFlexDays(wasFlexible ? [...c.candidateDays].sort() : []);
       const when = new Date(c.selectedSlot);
       if (c.selectedSlot && !Number.isNaN(when.getTime())) setSelectedDay(londonDateKey(when));
+    } else {
+      setFlexDays([]);
     }
     setAddressLine1(c.addressLine1);
     setPostcode(c.postcode);
@@ -481,6 +525,7 @@ export function SlotPicker({
       repairNodeIds,
       repairCount: repairNodeIds.length,
       slot: selectedSlot,
+      candidateDayCount: flexible ? flexDays.length : 0,
     });
     setStripeError(null);
     setAccountError(null);
@@ -533,6 +578,7 @@ export function SlotPicker({
   const common = {
     selectedSlot: selectedSlot ?? "",
     selectedWindow: selectedWindow ?? "",
+    candidateDays: flexible ? flexDays : [],
     addressLine1,
     postcode,
     parkingType,
@@ -629,21 +675,42 @@ export function SlotPicker({
         </p>
       )}
 
-      {/* Date strip */}
+      {/* Date strip — single-select, or multi-select when offering several days */}
       <div>
-        <p className="mb-2 text-sm font-semibold text-text-primary">Select a date</p>
+        <p className="mb-2 text-sm font-semibold text-text-primary">
+          {flexible ? "Select the days you're happy with" : "Select a date"}
+        </p>
         <div className="grid grid-cols-7 gap-2">
           {days.map((day) => {
-            const active = day === selectedDay;
-            const bookable = dayHasBookableSlot(day, now);
+            const active = flexible ? flexDays.includes(day) : day === selectedDay;
+            const bookable = flexible
+              ? isSlotBookable(day, ALL_DAY_SLOT, now)
+              : dayHasBookableSlot(day, now);
             const label = dayChipLabel(day, now);
             return (
               <button
                 key={day}
                 type="button"
                 disabled={!bookable}
-                title={bookable ? undefined : "No more arrival windows today"}
-                onClick={() => { setSelectedDay(day); setSelectedSlot(null); setSelectedWindow(null); }}
+                title={
+                  bookable
+                    ? undefined
+                    : flexible
+                      ? "The all-day window has already started today"
+                      : "No more arrival windows today"
+                }
+                aria-pressed={flexible ? active : undefined}
+                onClick={() => {
+                  if (flexible) {
+                    applyFlexDays(
+                      active ? flexDays.filter((d) => d !== day) : [...flexDays, day],
+                    );
+                    return;
+                  }
+                  setSelectedDay(day);
+                  setSelectedSlot(null);
+                  setSelectedWindow(null);
+                }}
                 className={cn(
                   "flex flex-col items-center gap-1 rounded-2xl border py-3 text-center transition-colors",
                   active
@@ -664,8 +731,35 @@ export function SlotPicker({
         </div>
       </div>
 
+      {/* Offering several days: the whole day is open on each — no window grid */}
+      {flexible && (
+        <div className="flex flex-col gap-3 rounded-2xl border border-brand-blue/30 bg-blue-50/40 p-4">
+          <div>
+            <p className="text-sm font-semibold text-text-primary">
+              {openFlexDays.length === 0
+                ? "Tick at least two days above"
+                : openFlexDays.length === 1
+                  ? "Tick one more day above"
+                  : `${openFlexDays.length} days offered · All day (8am–8pm)`}
+            </p>
+            <p className="mt-0.5 text-[13px] text-text-secondary">
+              With several days offered, the whole day is open on each. Your mechanic picks the
+              day and a 2-hour arrival window, and we&apos;ll tell you straight away.
+              {flexDays.length >= MAX_CANDIDATE_DAYS ? " That's the most you can offer." : ""}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setFlexibleMode(false)}
+            className="self-start text-[13px] font-semibold text-brand-blue hover:underline"
+          >
+            Choose a single day and window instead
+          </button>
+        </div>
+      )}
+
       {/* Time slots — 2-hour arrival windows, plus an all-day option */}
-      <div>
+      <div hidden={flexible}>
         <p className="mb-2 text-sm font-semibold text-text-primary">Select an arrival window</p>
         <div className="grid grid-cols-3 gap-3">
           {TWO_HOUR_SLOTS.map((slot) => {
@@ -720,6 +814,15 @@ export function SlotPicker({
             </button>
           );
         })()}
+
+        {/* Task 28: offer several all-day dates and let the mechanic pick one. */}
+        <button
+          type="button"
+          onClick={() => setFlexibleMode(true)}
+          className="mt-3 text-[13px] font-semibold text-brand-blue hover:underline"
+        >
+          Flexible? Offer more than one day
+        </button>
 
         {!dayHasBookableSlot(selectedDay, now) && (
           <p className="mt-3 rounded-lg bg-surface px-4 py-3 text-sm text-text-secondary">
@@ -933,6 +1036,8 @@ export function SlotPicker({
 interface ConfirmCommon {
   selectedSlot: string;
   selectedWindow: string;
+  /** Several all-day dates offered (Task 28) — empty for a single-day booking. */
+  candidateDays: string[];
   addressLine1: string;
   postcode: string;
   parkingType: string;
@@ -961,6 +1066,7 @@ function bookingInputFrom(
     repairNodeIds: c.repairNodeIds,
     scheduledAt: c.selectedSlot,
     slotWindow: c.selectedWindow || undefined,
+    candidateDays: c.candidateDays.length >= 2 ? c.candidateDays : undefined,
     customerEmail: c.customerEmail,
     customerName: c.customerName,
     customerPhone: c.customerPhone || undefined,
@@ -1078,7 +1184,12 @@ function BookingRecap({ c }: { c: ConfirmCommon }) {
         </p>
       )}
       <p className="text-text-secondary">
-        {vehicleLabel(c.reg, c.make, c.model)} · {formatBookingSlot(c.selectedSlot, c.selectedWindow)}
+        {vehicleLabel(c.reg, c.make, c.model)} ·{" "}
+        {formatBookingWhen({
+          scheduled_at: c.selectedSlot,
+          slot_window: c.selectedWindow,
+          candidate_days: c.candidateDays,
+        })}
       </p>
       <p className="mt-2 border-t border-border pt-2 text-text-muted">
         Booking as <span className="font-medium text-text-secondary">{c.customerEmail}</span>

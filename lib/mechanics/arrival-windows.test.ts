@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { ALL_DAY_SLOT, slotIso } from "@/lib/slots";
 import {
   buildArrivalWindowOptions,
+  siblingDayKeys,
   type AvailabilityRow,
   type SiblingBooking,
 } from "./arrival-windows";
@@ -22,6 +23,7 @@ function sibling(over: Partial<SiblingBooking> & { scheduled_at: string }): Sibl
     service_duration_hours: over.service_duration_hours ?? null,
     status: over.status ?? "confirmed",
     scheduled_at: over.scheduled_at,
+    candidate_days: over.candidate_days ?? null,
   };
 }
 
@@ -206,6 +208,31 @@ describe("saved weekly hours (advisory)", () => {
     const r = build({ availability: hours(null, null) });
     expect(r.hours).toBeNull();
     expect(r.options.every((o) => !o.outsideHours)).toBe(true);
+  });
+});
+
+describe("flexible siblings (Task 28)", () => {
+  it("a still-flexible job counts as an all-day note on every day it offers", () => {
+    const flexible = sibling({
+      id: "flex",
+      job_number: 777,
+      scheduled_at: slotIso("2026-08-26", 8),
+      slot_window: ALL_DAY_SLOT.window,
+      candidate_days: ["2026-08-26", "2026-08-27", "2026-08-28"],
+    });
+    expect(siblingDayKeys(flexible)).toEqual(["2026-08-26", "2026-08-27", "2026-08-28"]);
+    // On the 27th it is an all-day note (never a clash), same as a plain all-day job.
+    const r = build({ dayKey: "2026-08-27", siblings: [flexible] });
+    expect(r.allDayJobs).toEqual([{ bookingId: "flex", jobNumber: "00777" }]);
+    expect(r.options.every((o) => o.clash === null)).toBe(true);
+  });
+
+  it("a narrowed job is on the one day of its start", () => {
+    const timed = sibling({ id: "t", scheduled_at: slotIso(BST_DAY, 10), slot_window: "10am–12pm" });
+    expect(siblingDayKeys(timed)).toEqual([BST_DAY]);
+    const allDay = sibling({ id: "a", scheduled_at: slotIso(BST_DAY, 8), slot_window: ALL_DAY_SLOT.window });
+    expect(siblingDayKeys(allDay)).toEqual([BST_DAY]);
+    expect(siblingDayKeys(sibling({ scheduled_at: null as unknown as string }))).toEqual([]);
   });
 });
 

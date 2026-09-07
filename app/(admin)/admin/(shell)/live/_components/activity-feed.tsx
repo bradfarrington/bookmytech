@@ -14,6 +14,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { formatBookingDay } from "@/lib/slots";
 import { Icon } from "@/components/ui/icon";
 
 export interface ActivityEvent {
@@ -79,7 +80,12 @@ function describe(e: ActivityEvent): { icon: LucideIcon; label: string; tone: To
     case "arrival_window_set":
       return {
         icon: CalendarClock,
-        label: `Arrival window set → ${String(p.to_window ?? "")}`.trim(),
+        // A flexible booking's pick names the day too — that's the news.
+        label: `Arrival window set → ${
+          Array.isArray(p.candidate_days) && typeof p.to === "string"
+            ? `${formatBookingDay(p.to)} `
+            : ""
+        }${String(p.to_window ?? "")}`.trim(),
         tone: "active",
       };
     case "cancelled":

@@ -53,8 +53,10 @@ export async function updateServiceRadius(miles: number): Promise<ProfileActionR
   if (!guard.ok) return guard;
 
   const radius = Math.round(miles);
-  if (!Number.isFinite(radius) || radius < 2 || radius > 20)
-    return { ok: false, error: "Pick a radius between 2 and 20 miles." };
+  // 100 is the schema's ceiling (0004) and what the application form and the
+  // admin form already allow; the mechanic's own editor used to stop at 20.
+  if (!Number.isFinite(radius) || radius < 2 || radius > 100)
+    return { ok: false, error: "Pick a radius between 2 and 100 miles." };
 
   const { error } = await guard.supabase
     .from("mechanics")

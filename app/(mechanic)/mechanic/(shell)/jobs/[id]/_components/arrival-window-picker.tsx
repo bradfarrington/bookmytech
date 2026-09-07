@@ -7,13 +7,19 @@ import { CalendarClock, Clock, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { dayChipLabel, formatBookingDay, londonInstant } from "@/lib/slots";
 import { setArrivalWindow } from "@/app/actions/mechanic-jobs";
 import type { ArrivalWindowOptions } from "@/lib/mechanics/arrival-windows";
 
 // The six 2-hour windows a mechanic can narrow an ALL-DAY job to (Task 21).
 // Rendered at the top of the job detail while the job is confirmed and still
 // all-day; it disappears on its own once a window is set, because the server
-// action changes `slot_window` and the page stops passing `options`.
+// action changes `slot_window` and the page stops passing `days`.
+//
+// With ONE day this is the Task 21 picker unchanged. With several — the
+// customer offered a choice of days (Task 28) — a row of day chips sits above
+// the grid, mirroring the customer's date strip, and the grid shows the
+// chosen day's windows. Day and window go to the server together.
 //
 // Mirrors the customer's slot picker so the two sides see the same grid. A
 // clash with another job is greyed out (the server refuses it too); a window
@@ -21,20 +27,32 @@ import type { ArrivalWindowOptions } from "@/lib/mechanics/arrival-windows";
 
 interface ArrivalWindowPickerProps {
   bookingId: string;
-  options: ArrivalWindowOptions;
+  /** One entry per day, in day order. Never empty. */
+  days: ArrivalWindowOptions[];
 }
 
-export function ArrivalWindowPicker({ bookingId, options }: ArrivalWindowPickerProps) {
+export function ArrivalWindowPicker({ bookingId, days }: ArrivalWindowPickerProps) {
   const router = useRouter();
+  const multiDay = days.length > 1;
+  // Start on the first day that still has something to offer.
+  const [selectedDay, setSelectedDay] = useState<string>(
+    () => (days.find((d) => d.anySelectable) ?? days[0]).dayKey,
+  );
   const [selected, setSelected] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+
+  const options = days.find((d) => d.dayKey === selectedDay) ?? days[0];
 
   function confirm() {
     if (!selected) return;
     startTransition(async () => {
-      const res = await setArrivalWindow(bookingId, selected);
+      const res = await setArrivalWindow(bookingId, selected, multiDay ? options.dayKey : undefined);
       if (res.ok) {
-        toast.success("Arrival window confirmed — the customer's been told.");
+        toast.success(
+          multiDay
+            ? "Day and arrival window confirmed — the customer's been told."
+            : "Arrival window confirmed — the customer's been told.",
+        );
       } else {
         toast.error(res.error);
       }
@@ -50,6 +68,9 @@ export function ArrivalWindowPicker({ bookingId, options }: ArrivalWindowPickerP
       ? `Your hours for this day are ${options.hours.start}–${options.hours.end}.`
       : null;
 
+  const dayLabel = formatBookingDay(londonInstant(options.dayKey, 12).toISOString());
+  const anyDaySelectable = days.some((d) => d.anySelectable);
+
   return (
     <Card className="space-y-4 border-brand-blue/30 bg-blue-50/40 p-5">
       <div className="flex items-start gap-3">
@@ -57,13 +78,61 @@ export function ArrivalWindowPicker({ bookingId, options }: ArrivalWindowPickerP
           <CalendarClock size={20} />
         </span>
         <div className="min-w-0">
-          <h2 className="text-base font-bold text-text-primary">Pick an arrival window</h2>
+          <h2 className="text-base font-bold text-text-primary">
+            {multiDay ? "Pick a day and an arrival window" : "Pick an arrival window"}
+          </h2>
           <p className="mt-0.5 text-sm text-text-secondary">
-            The customer booked all day. Choose the 2-hour window you&apos;ll arrive in — they&apos;ll
-            be told straight away. You can also leave it as all day.
+            {multiDay
+              ? "The customer is happy with any of these days. Choose the day and the 2-hour window you'll arrive in — they'll be told straight away."
+              : "The customer booked all day. Choose the 2-hour window you'll arrive in — they'll be told straight away. You can also leave it as all day."}
           </p>
         </div>
       </div>
+
+      {multiDay && (
+        <div className="grid grid-cols-4 gap-2 sm:grid-cols-7">
+          {days.map((d) => {
+            const active = d.dayKey === selectedDay;
+            const label = dayChipLabel(d.dayKey);
+            return (
+              <button
+                key={d.dayKey}
+                type="button"
+                disabled={pending}
+                title={d.anySelectable ? undefined : "No windows left on this day"}
+                onClick={() => {
+                  setSelectedDay(d.dayKey);
+                  setSelected(null);
+                }}
+                className={cn(
+                  "flex flex-col items-center gap-1 rounded-2xl border py-2.5 text-center transition-colors",
+                  active
+                    ? "border-brand-blue bg-brand-blue"
+                    : "border-border bg-surface-card hover:border-brand-blue/40",
+                  !d.anySelectable && !active && "opacity-50",
+                )}
+              >
+                <span
+                  className={cn(
+                    "text-[11px] font-semibold uppercase tracking-wide",
+                    active ? "text-blue-200" : "text-text-muted",
+                  )}
+                >
+                  {label.weekday}
+                </span>
+                <span
+                  className={cn(
+                    "text-lg font-extrabold leading-none",
+                    active ? "text-white" : "text-text-primary",
+                  )}
+                >
+                  {label.dayOfMonth}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {(hoursLine || options.allDayJobs.length > 0) && (
         <div className="space-y-1 rounded-lg bg-surface-card px-3.5 py-2.5 text-xs text-text-secondary">
@@ -77,7 +146,8 @@ export function ArrivalWindowPicker({ bookingId, options }: ArrivalWindowPickerP
             <p className="flex items-center gap-1.5">
               <TriangleAlert size={12} className="shrink-0 text-amber-600" />
               You also have {options.allDayJobs.map((j) => `#${j.jobNumber}`).join(", ")} booked as all
-              day — plan around {options.allDayJobs.length === 1 ? "it" : "them"}.
+              day{multiDay ? ` on ${dayLabel}` : ""} — plan around{" "}
+              {options.allDayJobs.length === 1 ? "it" : "them"}.
             </p>
           )}
         </div>
@@ -139,17 +209,23 @@ export function ArrivalWindowPicker({ bookingId, options }: ArrivalWindowPickerP
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-xs text-text-muted">
               {selected
-                ? `The customer will be told you'll arrive ${selected}.`
+                ? multiDay
+                  ? `The customer will be told you'll arrive ${dayLabel}, ${selected}.`
+                  : `The customer will be told you'll arrive ${selected}.`
                 : "Greyed-out windows clash with another job or have passed."}
             </p>
             <Button variant="primary" onClick={confirm} disabled={!selected || pending}>
-              {pending ? "Confirming…" : "Confirm window"}
+              {pending ? "Confirming…" : multiDay ? "Confirm day and window" : "Confirm window"}
             </Button>
           </div>
         </>
       ) : (
         <p className="rounded-lg bg-surface-card px-4 py-3 text-sm text-text-secondary">
-          No windows left today — the job stays all day.
+          {multiDay
+            ? anyDaySelectable
+              ? "No windows left on this day — pick another day above."
+              : "No windows left on any of the offered days — the job stays open."
+            : "No windows left today — the job stays all day."}
         </p>
       )}
     </Card>

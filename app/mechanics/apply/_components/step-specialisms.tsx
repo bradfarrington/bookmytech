@@ -72,7 +72,7 @@ export function StepSpecialisms({ services }: { services: ServiceOption[] }) {
         <input
           type="range"
           min={1}
-          max={50}
+          max={100}
           step={1}
           value={data.serviceRadiusMiles}
           onChange={(e) => update({ serviceRadiusMiles: Number(e.target.value) })}

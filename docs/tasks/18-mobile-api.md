@@ -381,6 +381,16 @@ failure, so a customer could not complete a booking at all.
 | `POST /checkout/prepare` `{postcode, vehicleReg, repairNodeId}` | `prepareCheckoutFor` |
 | `POST /bookings` | `createBooking` — **the cookie/Bearer trap lands here** |
 
+**Body fields added since (all optional, all additive):** `slotWindow` — the
+arrival window label the customer picked, verbatim from `lib/slots.ts`
+(`"8am–10am"` … `"6pm–8pm"` or `"All day (8am–8pm)"`; omitted = a legacy exact
+time). `repairNodeIds` (Task 24) — several jobs in one visit. `candidateDays`
+(Task 28) — two to seven `"YYYY-MM-DD"` UK calendar keys the customer is happy
+with; requires `slotWindow` to be the all-day label (a 2-hour window with days
+is `{ok:false, error}`), the server cleans the list and sets `scheduled_at` to
+8am on the earliest day itself; the row then carries `candidate_days` until the
+mechanic picks a day. A non-array is ignored, never refused.
+
 ### `lib/bookings/create-booking.ts` — the shared core
 
 Both endpoints are thin wrappers over the same functions the website books

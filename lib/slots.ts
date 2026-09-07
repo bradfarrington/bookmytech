@@ -126,6 +126,110 @@ export function isSlotBookable(
   return start - now.getTime() >= MIN_LEAD_MINUTES * 60_000;
 }
 
+// --- Flexible bookings: several all-day candidate days (Task 28) -----------
+//
+// A customer who is happy with any of several days books the all-day window
+// and lists the days in `bookings.candidate_days`. `scheduled_at` stays 8am on
+// the earliest of them so every reader of that column keeps working; the
+// mechanic later picks one day and a 2-hour window in a single move.
+
+/** The most candidate days a customer can offer — the picker shows seven. */
+export const MAX_CANDIDATE_DAYS = 7;
+
+/** The two columns that together say "still open to several days". */
+export interface FlexibleBookingFields {
+  slot_window: string | null | undefined;
+  /** Postgres `date[]` — PostgREST hands it over as "YYYY-MM-DD" strings. */
+  candidate_days?: string[] | null | undefined;
+}
+
+const DAY_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** A well-formed, real UK calendar key ("2026-02-30" is not). */
+export function isDayKey(value: unknown): value is string {
+  if (typeof value !== "string" || !DAY_KEY_RE.test(value)) return false;
+  const [y, m, d] = value.split("-").map(Number);
+  const probe = new Date(Date.UTC(y, m - 1, d));
+  return probe.getUTCFullYear() === y && probe.getUTCMonth() === m - 1 && probe.getUTCDate() === d;
+}
+
+/**
+ * True while the customer's several-day offer is still open: the booking is
+ * all-day AND lists two or more candidate days. Once the mechanic narrows it
+ * (or anyone reschedules it) `candidate_days` is nulled and this is false.
+ */
+export function isFlexibleBooking(b: FlexibleBookingFields): boolean {
+  return (
+    b.slot_window === ALL_DAY_SLOT.window &&
+    Array.isArray(b.candidate_days) &&
+    b.candidate_days.length >= 2
+  );
+}
+
+/**
+ * Clean a client-supplied list of candidate days into what can be written:
+ * valid keys only, deduplicated, sorted, days whose all-day window can no
+ * longer be booked dropped, capped at MAX_CANDIDATE_DAYS. Null when fewer
+ * than two days survive — one day is an ordinary all-day booking, not an
+ * offer of several.
+ */
+export function normaliseCandidateDays(
+  keys: unknown,
+  now: Date = new Date(),
+): string[] | null {
+  if (!Array.isArray(keys)) return null;
+  const clean = [...new Set(keys.filter(isDayKey))]
+    .sort()
+    .filter((key) => isSlotBookable(key, ALL_DAY_SLOT, now))
+    .slice(0, MAX_CANDIDATE_DAYS);
+  return clean.length >= 2 ? clean : null;
+}
+
+/**
+ * "Mon 8, Tue 9 or Wed 10 Sep" — the offered days as one phrase. The month is
+ * named once when every day shares it; otherwise each day carries its own
+ * ("Wed 30 Sep or Thu 1 Oct").
+ */
+export function formatCandidateDays(keys: string[]): string {
+  const days = keys.map((key) => londonInstant(key, 12));
+  const months = new Set(days.map((d) => d.toLocaleDateString("en-GB", { month: "short", timeZone: BOOKING_TIME_ZONE })));
+  const parts = days.map((d, i) =>
+    months.size === 1 && i < days.length - 1
+      ? d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", timeZone: BOOKING_TIME_ZONE })
+      : dayPart(d),
+  );
+  if (parts.length <= 1) return parts[0] ?? "";
+  return `${parts.slice(0, -1).join(", ")} or ${parts[parts.length - 1]}`;
+}
+
+/**
+ * The one label for "when" a booking is. A still-flexible booking reads
+ * "Any of Mon 8, Tue 9 or Wed 10 Sep · All day"; anything else is exactly
+ * `formatBookingSlot`. Every list, card, email and text should use this.
+ */
+export function formatBookingWhen(
+  b: FlexibleBookingFields & { scheduled_at: string | null | undefined },
+  opts: { relative?: boolean; now?: Date } = {},
+): string {
+  if (isFlexibleBooking(b)) {
+    const days = [...b.candidate_days!].sort();
+    const label = opts.relative ? relativeCandidateDays(days, opts.now ?? new Date()) : formatCandidateDays(days);
+    return `Any of ${label} · All day`;
+  }
+  return formatBookingSlot(b.scheduled_at ?? null, b.slot_window, opts);
+}
+
+/** The mechanic-view variant: "Today, Tomorrow or Wed 10 Sep". */
+function relativeCandidateDays(keys: string[], now: Date): string {
+  const today = londonDateKey(now);
+  const parts = keys.map((key) => {
+    const diff = daysBetweenKeys(today, key);
+    return diff === 0 ? "Today" : diff === 1 ? "Tomorrow" : dayPart(londonInstant(key, 12));
+  });
+  if (parts.length <= 1) return parts[0] ?? "";
+  return `${parts.slice(0, -1).join(", ")} or ${parts[parts.length - 1]}`;
+}
+
 /** Whether any window (2-hour or all-day) is still bookable on a day. */
 export function dayHasBookableSlot(key: string, now: Date = new Date()): boolean {
   return (

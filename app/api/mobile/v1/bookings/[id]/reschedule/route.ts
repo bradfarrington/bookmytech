@@ -19,9 +19,10 @@ import { apiError, apiOk, readJsonBody } from "@/lib/mobile/respond";
 // proposal, so an app that shows both a "reschedule" button and a "respond to
 // proposal" banner will find this clears the banner.
 //
-// `scheduledAt` clears the booking's arrival window (`slot_window`), because a
+// `scheduledAt` clears the booking's arrival window (`slot_window`) and any
+// choice of days the customer offered (`candidate_days`, Task 28), because a
 // specific chosen time and an "8am–10am" window can't both be true. The app
-// should expect `slot_window` to be null afterwards and render the exact time.
+// should expect both to be null afterwards and render the exact time.
 //
 // OWNERSHIP comes from the verified caller, never the path.
 

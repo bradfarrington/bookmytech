@@ -11,7 +11,7 @@ import { sendEmail } from "@/lib/email/send";
 import { renderTemplateEmail } from "@/emails/resolve";
 import { sendSms } from "@/lib/sms/send-sms";
 import { renderSmsTemplate } from "@/lib/sms/render-template";
-import { ALL_DAY_SLOT, formatBookingSlot } from "@/lib/slots";
+import { ALL_DAY_SLOT, formatBookingWhen, isFlexibleBooking } from "@/lib/slots";
 
 export type BookingActionResult = { ok: true } | { ok: false; error: string };
 
@@ -234,7 +234,7 @@ export async function reassignMechanic(
   const { data: booking } = await supabase
     .from("bookings")
     .select(
-      "status, mechanic_id, customer_id, customer_email, customer_name, customer_phone, scheduled_at, slot_window, job_number, repair_description",
+      "status, mechanic_id, customer_id, customer_email, customer_name, customer_phone, scheduled_at, slot_window, candidate_days, job_number, repair_description",
     )
     .eq("id", id)
     .single();
@@ -278,8 +278,9 @@ export async function reassignMechanic(
   const isReplacement = Boolean(booking.mechanic_id);
   const templateKey = isReplacement ? "replacement_confirmed" : "mechanic_confirmed";
   const mechanicName = profile?.full_name ?? "Your mechanic";
-  const slotLabel = formatBookingSlot(booking.scheduled_at, booking.slot_window);
+  const slotLabel = formatBookingWhen(booking);
   const isAllDay = booking.slot_window === ALL_DAY_SLOT.window;
+  const isFlexible = isFlexibleBooking(booking);
   const ref = formatJobNumber(booking.job_number);
 
   if (booking.customer_email) {
@@ -290,9 +291,11 @@ export async function reassignMechanic(
       service: booking.repair_description ?? "Vehicle repair",
       ref,
       when: slotLabel,
-      optional_note: isAllDay
-        ? "You booked an all-day slot — your mechanic will confirm a 2-hour arrival window for the day."
-        : "",
+      optional_note: isFlexible
+        ? "You offered a choice of days — your mechanic will confirm which day and a 2-hour arrival window."
+        : isAllDay
+          ? "You booked an all-day slot — your mechanic will confirm a 2-hour arrival window for the day."
+          : "",
     })
       .then(({ subject, html }) => sendEmail({ to, subject, html }))
       .catch(console.error);

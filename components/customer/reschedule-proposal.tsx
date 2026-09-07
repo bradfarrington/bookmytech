@@ -12,6 +12,12 @@ interface RescheduleProposalProps {
   proposedAt: string;
   /** ISO string of the current (original) slot, for the "keep instead" copy. */
   currentAt: string | null;
+  /**
+   * The current slot as the customer sees it elsewhere ("Wed 3 Sep · 8am–10am",
+   * or "Any of … · All day" for a flexible booking). Preferred over `currentAt`,
+   * which can only be shown as an exact time.
+   */
+  currentLabel?: string | null;
   note: string | null;
   /**
    * Tighter spacing for the smaller upcoming-booking cards, which are `p-4`
@@ -34,6 +40,7 @@ export function RescheduleProposal({
   bookingId,
   proposedAt,
   currentAt,
+  currentLabel: currentLabelProp,
   note,
   compact = false,
 }: RescheduleProposalProps) {
@@ -47,15 +54,17 @@ export function RescheduleProposal({
     hour: "numeric",
     minute: "2-digit",
   });
-  const currentLabel = currentAt
-    ? new Date(currentAt).toLocaleString("en-GB", {
-        weekday: "long",
-        day: "numeric",
-        month: "long",
-        hour: "numeric",
-        minute: "2-digit",
-      })
-    : null;
+  const currentLabel =
+    currentLabelProp ??
+    (currentAt
+      ? new Date(currentAt).toLocaleString("en-GB", {
+          weekday: "long",
+          day: "numeric",
+          month: "long",
+          hour: "numeric",
+          minute: "2-digit",
+        })
+      : null);
 
   function respond(decision: "accept" | "decline") {
     startTransition(async () => {

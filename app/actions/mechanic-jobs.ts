@@ -9,11 +9,13 @@ import { renderTemplateEmail } from "@/emails/resolve";
 import { sendSms } from "@/lib/sms/send-sms";
 import { renderSmsTemplate } from "@/lib/sms/render-template";
 import { sendPushToCustomer } from "@/lib/push/send";
-import { loadArrivalWindowOptions } from "@/lib/mechanics/arrival-windows";
+import { loadArrivalWindowOptionsForDays } from "@/lib/mechanics/arrival-windows";
 import {
   ALL_DAY_SLOT,
   formatBookingDay,
   formatBookingSlot,
+  isDayKey,
+  isFlexibleBooking,
   isSlotBookable,
   londonDateKey,
   slotIso,
@@ -236,13 +238,21 @@ export async function proposeReschedule(
  * the mobile app reading the row directly, shows the narrower window with no
  * further change. The original window is kept in the `arrival_window_set`
  * event (0052).
+ *
+ * A FLEXIBLE booking (Task 28) — the customer offered several days — takes
+ * `dayKey` as well: one of `candidate_days`. The pick lands on that day (which
+ * may be later than the earliest day `scheduled_at` was parked on), and
+ * `candidate_days` is cleared; the offered set goes into the event payload.
+ * Day and window are one move, and the same one shot.
  */
 export async function setArrivalWindow(
   bookingId: string,
   window: string,
+  dayKey?: string,
 ): Promise<MechanicJobResult> {
   const slot = twoHourSlotByWindow(window);
   if (!slot) return { ok: false, error: "Pick one of the arrival windows." };
+  if (dayKey !== undefined && !isDayKey(dayKey)) return { ok: false, error: "Pick one of the days." };
 
   const guard = await requireMechanic();
   if (!guard.ok) return guard;
@@ -252,7 +262,7 @@ export async function setArrivalWindow(
   const { data: booking } = await admin
     .from("bookings")
     .select(
-      `id, job_number, status, mechanic_id, scheduled_at, slot_window, reschedule_status,
+      `id, job_number, status, mechanic_id, scheduled_at, slot_window, candidate_days, reschedule_status,
        customer_id, customer_email, customer_name, customer_phone, repair_description`,
     )
     .eq("id", bookingId)
@@ -285,21 +295,38 @@ export async function setArrivalWindow(
     };
   if (!booking.scheduled_at) return { ok: false, error: "This job has no date yet." };
 
+  // Which day the window is on. A flexible booking needs one of the offered
+  // days; an ordinary all-day booking has exactly one day, and a `dayKey`
+  // that says otherwise is a stale form.
+  const flexible = isFlexibleBooking(booking);
+  const candidateDays = flexible ? [...(booking.candidate_days as string[])].sort() : null;
+  const bookingDay = londonDateKey(new Date(booking.scheduled_at));
+  let targetDay: string;
+  if (candidateDays) {
+    if (!dayKey || !candidateDays.includes(dayKey))
+      return { ok: false, error: "Pick one of the days the customer offered." };
+    targetDay = dayKey;
+  } else {
+    if (dayKey && dayKey !== bookingDay)
+      return { ok: false, error: "This job changed while you were choosing — refresh and try again." };
+    targetDay = bookingDay;
+  }
+
   const now = new Date();
-  const dayKey = londonDateKey(new Date(booking.scheduled_at));
-  const iso = slotIso(dayKey, slot.startHour);
-  if (!isSlotBookable(dayKey, slot, now))
+  const iso = slotIso(targetDay, slot.startHour);
+  if (!isSlotBookable(targetDay, slot, now))
     return { ok: false, error: `${slot.window} has already started or is too close — pick a later window.` };
 
   // Recompute the calendar server-side: a clash with another timed job is a
   // hard refusal whatever the client showed. Off-hours is advisory only.
-  const calendar = await loadArrivalWindowOptions(
+  const [calendar] = await loadArrivalWindowOptionsForDays(
     admin,
     guard.mechanicId,
-    { id: booking.id, scheduled_at: booking.scheduled_at },
+    { id: booking.id },
+    [targetDay],
     now,
   );
-  const option = calendar.options.find((o) => o.window === slot.window);
+  const option = calendar?.options.find((o) => o.window === slot.window);
   if (option?.clash)
     return {
       ok: false,
@@ -308,10 +335,15 @@ export async function setArrivalWindow(
 
   // Guarded, atomic: every predicate re-asserted in the WHERE so a customer
   // reschedule landing in between (which nulls slot_window), a double submit,
-  // or a status change can't be clobbered by a stale form.
+  // or a status change can't be clobbered by a stale form. The offered days
+  // are only named when there were some, so this works before 0057 too.
   const { data: updated, error } = await admin
     .from("bookings")
-    .update({ scheduled_at: iso, slot_window: slot.window })
+    .update({
+      scheduled_at: iso,
+      slot_window: slot.window,
+      ...(candidateDays ? { candidate_days: null } : {}),
+    })
     .eq("id", bookingId)
     .eq("mechanic_id", guard.mechanicId)
     .eq("status", "confirmed")
@@ -327,13 +359,16 @@ export async function setArrivalWindow(
     event_type: "arrival_window_set",
     actor_id: guard.mechanicId,
     actor_role: "mechanic",
-    reason: `Arrival window set to ${slot.window} (was ${ALL_DAY_SLOT.window})`,
+    reason: candidateDays
+      ? `Arrival window set to ${formatBookingDay(iso)} ${slot.window} (customer offered ${candidateDays.length} days)`
+      : `Arrival window set to ${slot.window} (was ${ALL_DAY_SLOT.window})`,
     payload: {
       from_window: ALL_DAY_SLOT.window,
       to_window: slot.window,
       from: booking.scheduled_at,
       to: iso,
-      day: dayKey,
+      day: targetDay,
+      ...(candidateDays ? { candidate_days: candidateDays } : {}),
     },
   });
   if (eventErr) {

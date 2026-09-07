@@ -4,7 +4,7 @@ import { CheckCircle, ArrowRight } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { formatPrice, formatJobNumber } from "@/lib/utils";
-import { formatBookingSlot } from "@/lib/slots";
+import { formatBookingWhen } from "@/lib/slots";
 import { groupRepairLines, repairLinesFor, type BookingRepairRow } from "@/lib/bookings/repair-lines";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -30,7 +30,7 @@ export default async function ConfirmedPage({ params }: ConfirmedPageProps) {
 
   const { data: booking } = await supabase
     .from("bookings")
-    .select("id, job_number, vehicle_reg, vehicle_make, vehicle_model, scheduled_at, slot_window, created_at, total_pence, customer_name, customer_email, address_line_1, status, mechanic_id, reschedule_status, reschedule_proposed_at, reschedule_note, repair_node_id, repair_description")
+    .select("id, job_number, vehicle_reg, vehicle_make, vehicle_model, scheduled_at, slot_window, candidate_days, created_at, total_pence, customer_name, customer_email, address_line_1, status, mechanic_id, reschedule_status, reschedule_proposed_at, reschedule_note, repair_node_id, repair_description")
     .eq("id", id)
     .single();
 
@@ -78,9 +78,7 @@ export default async function ConfirmedPage({ params }: ConfirmedPageProps) {
   }
 
   const ref = formatJobNumber(booking.job_number);
-  const slotDate = booking.scheduled_at
-    ? formatBookingSlot(booking.scheduled_at, booking.slot_window)
-    : null;
+  const slotDate = booking.scheduled_at ? formatBookingWhen(booking) : null;
 
   const vehicle = [booking.vehicle_make, booking.vehicle_model]
     .filter(Boolean)
@@ -107,6 +105,7 @@ export default async function ConfirmedPage({ params }: ConfirmedPageProps) {
           bookingId={booking.id}
           proposedAt={booking.reschedule_proposed_at}
           currentAt={booking.scheduled_at}
+          currentLabel={slotDate}
           note={booking.reschedule_note}
         />
       )}

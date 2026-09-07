@@ -8,9 +8,15 @@ import {
   dayOfWeekForKey,
   daysBetweenKeys,
   formatBookingSlot,
+  formatBookingWhen,
+  formatCandidateDays,
+  isDayKey,
+  isFlexibleBooking,
   isSlotBookable,
   londonDateKey,
   londonInstant,
+  MAX_CANDIDATE_DAYS,
+  normaliseCandidateDays,
   slotIso,
   twoHourSlotByWindow,
   upcomingDayKeys,
@@ -179,5 +185,109 @@ describe("formatBookingSlot", () => {
 
   it("handles a missing time", () => {
     expect(formatBookingSlot(null)).toBe("Time to be confirmed");
+  });
+});
+
+// --- Flexible bookings (Task 28) -------------------------------------------
+
+describe("isDayKey", () => {
+  it("accepts real calendar keys and rejects everything else", () => {
+    expect(isDayKey("2026-08-27")).toBe(true);
+    expect(isDayKey("2026-02-30")).toBe(false);
+    expect(isDayKey("2026-8-27")).toBe(false);
+    expect(isDayKey("2026-08-27T07:00:00Z")).toBe(false);
+    expect(isDayKey(20260827)).toBe(false);
+    expect(isDayKey(null)).toBe(false);
+  });
+});
+
+describe("normaliseCandidateDays", () => {
+  const early = new Date("2026-08-01T00:00:00Z");
+
+  it("dedupes, sorts, drops junk and caps at MAX_CANDIDATE_DAYS", () => {
+    expect(
+      normaliseCandidateDays(["2026-08-29", "2026-08-27", "2026-08-29", "nope", 42], early),
+    ).toEqual(["2026-08-27", "2026-08-29"]);
+    const many = Array.from({ length: 10 }, (_, i) => addDaysToKey("2026-08-20", i));
+    expect(normaliseCandidateDays(many, early)).toHaveLength(MAX_CANDIDATE_DAYS);
+  });
+
+  it("drops a day whose all-day window is no longer bookable", () => {
+    // 07:30Z on the 27th is 08:30 BST — the all-day window has started.
+    const now = new Date("2026-08-27T07:30:00Z");
+    expect(normaliseCandidateDays(["2026-08-27", "2026-08-28", "2026-08-29"], now)).toEqual([
+      "2026-08-28",
+      "2026-08-29",
+    ]);
+  });
+
+  it("is null for one survivor, for nothing, and for a non-array", () => {
+    expect(normaliseCandidateDays(["2026-08-27"], early)).toBeNull();
+    expect(normaliseCandidateDays([], early)).toBeNull();
+    expect(normaliseCandidateDays("2026-08-27", early)).toBeNull();
+    const now = new Date("2026-08-28T07:30:00Z");
+    expect(normaliseCandidateDays(["2026-08-27", "2026-08-28"], now)).toBeNull();
+  });
+
+  it("keeps a DST switch day as a plain key", () => {
+    expect(normaliseCandidateDays(["2026-10-25", "2026-10-24"], early)).toEqual([
+      "2026-10-24",
+      "2026-10-25",
+    ]);
+  });
+});
+
+describe("formatCandidateDays", () => {
+  it("names the month once when the days share it", () => {
+    expect(formatCandidateDays(["2026-10-06", "2026-10-07", "2026-10-08"])).toBe(
+      "Tue 6, Wed 7 or Thu 8 Oct",
+    );
+  });
+
+  it("names each month when they differ", () => {
+    expect(formatCandidateDays(["2026-10-31", "2026-11-01"])).toBe("Sat 31 Oct or Sun 1 Nov");
+  });
+
+  it("copes with a single day", () => {
+    expect(formatCandidateDays(["2026-10-06"])).toBe("Tue 6 Oct");
+  });
+});
+
+describe("isFlexibleBooking / formatBookingWhen", () => {
+  const flexible = {
+    scheduled_at: "2026-10-06T07:00:00.000Z",
+    slot_window: ALL_DAY_SLOT.window,
+    candidate_days: ["2026-10-08", "2026-10-06", "2026-10-07"],
+  };
+
+  it("is flexible only when all-day with two or more days", () => {
+    expect(isFlexibleBooking(flexible)).toBe(true);
+    expect(isFlexibleBooking({ ...flexible, candidate_days: ["2026-10-06"] })).toBe(false);
+    expect(isFlexibleBooking({ ...flexible, candidate_days: null })).toBe(false);
+    expect(isFlexibleBooking({ ...flexible, slot_window: "10am–12pm" })).toBe(false);
+  });
+
+  it("labels a flexible booking with the sorted days", () => {
+    expect(formatBookingWhen(flexible)).toBe("Any of Tue 6, Wed 7 or Thu 8 Oct · All day");
+  });
+
+  it("uses Today / Tomorrow in relative mode", () => {
+    const now = new Date("2026-10-06T06:00:00Z");
+    expect(formatBookingWhen(flexible, { relative: true, now })).toBe(
+      "Any of Today, Tomorrow or Thu 8 Oct · All day",
+    );
+  });
+
+  it("falls through to formatBookingSlot for everything else", () => {
+    expect(
+      formatBookingWhen({
+        scheduled_at: "2026-10-06T09:00:00.000Z",
+        slot_window: "10am–12pm",
+        candidate_days: null,
+      }),
+    ).toBe("Tue 6 Oct · 10am–12pm");
+    expect(formatBookingWhen({ scheduled_at: null, slot_window: null, candidate_days: null })).toBe(
+      "Time to be confirmed",
+    );
   });
 });

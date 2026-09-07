@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { formatBookingWhen } from "@/lib/slots";
 import { Overline } from "@/components/ui/overline";
 import {
   applyJobFilters,
@@ -41,7 +42,7 @@ export default async function AdminJobsPage({ searchParams }: AdminJobsPageProps
   const baseQuery = supabase
     .from("bookings")
     .select(
-      "id, job_number, status, area, total_pence, customer_name, vehicle_reg, vehicle_make, vehicle_model, mechanic_id, repair_description, scheduled_at, created_at",
+      "id, job_number, status, area, total_pence, customer_name, vehicle_reg, vehicle_make, vehicle_model, mechanic_id, repair_description, scheduled_at, slot_window, candidate_days, created_at",
       { count: "exact" },
     );
 
@@ -76,6 +77,13 @@ export default async function AdminJobsPage({ searchParams }: AdminJobsPageProps
     status: b.status,
     totalPence: b.total_pence ?? 0,
     scheduledAt: b.scheduled_at,
+    whenLabel: b.scheduled_at
+      ? formatBookingWhen({
+          scheduled_at: b.scheduled_at,
+          slot_window: b.slot_window,
+          candidate_days: b.candidate_days,
+        })
+      : "—",
   }));
 
   // Filter options come from a distinct-area view (0042) rather than whatever

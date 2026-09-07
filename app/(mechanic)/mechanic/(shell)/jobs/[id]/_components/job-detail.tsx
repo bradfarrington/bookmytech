@@ -75,8 +75,10 @@ export interface JobDetailProps {
   scheduledAt: string | null;
   slotWindow: string | null;
   // Arrival window (Task 21): present only while this is a confirmed ALL-DAY
-  // job of the mechanic's — the six 2-hour windows annotated from their calendar.
-  arrivalWindows: ArrivalWindowOptions | null;
+  // job of the mechanic's — the six 2-hour windows annotated from their
+  // calendar, one entry per day. Several entries when the customer offered
+  // several days (Task 28) and the mechanic still has to pick one.
+  arrivalWindows: ArrivalWindowOptions[] | null;
   events: TimelineEvent[];
   // Job evidence (mechanic-captured)
   photos: JobPhoto[];
@@ -203,8 +205,8 @@ export function JobDetail(props: JobDetailProps) {
       )}
 
       {/* Arrival window — an all-day job the mechanic hasn't narrowed yet */}
-      {props.arrivalWindows && (
-        <ArrivalWindowPicker bookingId={bookingId} options={props.arrivalWindows} />
+      {props.arrivalWindows && props.arrivalWindows.length > 0 && (
+        <ArrivalWindowPicker bookingId={bookingId} days={props.arrivalWindows} />
       )}
 
       {/* Info tiles */}

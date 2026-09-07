@@ -343,8 +343,10 @@ export async function rescheduleBookingFor(
     .update({
       scheduled_at: when.toISOString(),
       // The customer picked a specific time, so the arrival window no longer
-      // applies — clear it so displays show the exact rescheduled time.
+      // applies — clear it so displays show the exact rescheduled time. Any
+      // choice of days they offered (Task 28) is withdrawn the same way.
       slot_window: null,
+      candidate_days: null,
       // Supersede any pending mechanic proposal — the customer just set the time.
       reschedule_proposed_at: null,
       reschedule_note: null,
@@ -457,8 +459,9 @@ export async function respondToRescheduleFor(
       // On accept, move to the proposed slot; on decline keep the original.
       scheduled_at: accepted ? proposed : original,
       // Accepting sets a specific time, so the original arrival window no longer
-      // applies — clear it and let displays fall back to the exact time.
-      ...(accepted ? { slot_window: null } : {}),
+      // applies — clear it (and any offered days, Task 28) and let displays
+      // fall back to the exact time.
+      ...(accepted ? { slot_window: null, candidate_days: null } : {}),
       // Proposal consumed either way — returns both sides to the normal
       // confirmed state (no lingering banners).
       reschedule_proposed_at: null,

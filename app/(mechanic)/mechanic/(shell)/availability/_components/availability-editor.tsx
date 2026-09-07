@@ -225,7 +225,7 @@ function ServiceRadius({
         <input
           type="range"
           min={2}
-          max={20}
+          max={100}
           step={1}
           value={radius}
           onChange={(e) => setRadius(Number(e.target.value))}
@@ -234,7 +234,7 @@ function ServiceRadius({
         />
         <div className="flex justify-between text-[11px] text-text-muted">
           <span>2 mi</span>
-          <span>20 mi</span>
+          <span>100 mi</span>
         </div>
         <Button size="sm" fullWidth onClick={save} disabled={pending || !dirty}>
           {dirty ? "Save radius" : "Saved"}

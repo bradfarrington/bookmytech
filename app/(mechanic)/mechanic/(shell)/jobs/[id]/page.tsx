@@ -3,11 +3,11 @@ import { createClient } from "@/lib/supabase/server";
 import { geocodePostcode, haversineMiles, type LatLng } from "@/lib/geo/postcodes";
 import { mechanicSharePence } from "@/lib/earnings";
 import { isHaynesProConfigured } from "@/lib/haynespro/client";
-import { ALL_DAY_SLOT, formatBookingSlot } from "@/lib/slots";
+import { ALL_DAY_SLOT, formatBookingWhen, isFlexibleBooking, londonDateKey } from "@/lib/slots";
 import { formatJobNumber } from "@/lib/utils";
 import { repairLinesFor, type BookingRepairRow } from "@/lib/bookings/repair-lines";
 import {
-  loadArrivalWindowOptions,
+  loadArrivalWindowOptionsForDays,
   type ArrivalWindowOptions,
 } from "@/lib/mechanics/arrival-windows";
 import { JobDetail, type JobDetailProps } from "./_components/job-detail";
@@ -35,7 +35,7 @@ export default async function MechanicJobDetailPage({ params }: PageProps) {
   const { data: booking } = await supabase
     .from("bookings")
     .select(
-      `id, job_number, status, mechanic_id, scheduled_at, slot_window, created_at, total_pence, commission_rate,
+      `id, job_number, status, mechanic_id, scheduled_at, slot_window, candidate_days, created_at, total_pence, commission_rate,
        platform_fee_pence, mechanic_payout_pence,
        vehicle_reg, vehicle_make, vehicle_model, postcode, area,
        address_line_1, address_line_2,
@@ -163,22 +163,27 @@ export default async function MechanicJobDetailPage({ params }: PageProps) {
     .maybeSingle();
 
   const whenLabel = booking.scheduled_at
-    ? formatBookingSlot(booking.scheduled_at, booking.slot_window, { relative: true })
+    ? formatBookingWhen(booking, { relative: true })
     : "To be confirmed";
 
-  // --- Arrival window (Task 21) --------------------------------------------
-  // Only an ALL-DAY job this mechanic holds, still confirmed, gets the picker.
-  // Read under the mechanic's own RLS client: their availability row and their
-  // other bookings are both own-row readable.
-  const arrivalWindows: ArrivalWindowOptions | null =
+  // --- Arrival window (Task 21 / 28) ---------------------------------------
+  // Only an ALL-DAY job this mechanic holds, still confirmed, gets the picker:
+  // one day, or every day the customer offered. Read under the mechanic's own
+  // RLS client: their availability rows and their other bookings are both
+  // own-row readable.
+  const arrivalWindows: ArrivalWindowOptions[] | null =
     booking.status === "confirmed" &&
     booking.mechanic_id === user.id &&
     booking.slot_window === ALL_DAY_SLOT.window &&
     booking.scheduled_at
-      ? await loadArrivalWindowOptions(supabase, user.id, {
-          id: booking.id,
-          scheduled_at: booking.scheduled_at,
-        })
+      ? await loadArrivalWindowOptionsForDays(
+          supabase,
+          user.id,
+          { id: booking.id },
+          isFlexibleBooking(booking)
+            ? (booking.candidate_days as string[])
+            : [londonDateKey(new Date(booking.scheduled_at))],
+        )
       : null;
 
   const address =

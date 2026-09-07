@@ -15,6 +15,8 @@ export interface ScheduleItem {
   isNext: boolean;
   /** A confirmed all-day job whose 2-hour arrival window hasn't been picked yet. */
   needsWindow: boolean;
+  /** …and the customer offered several days, so the day needs picking too (Task 28). */
+  needsDay?: boolean;
 }
 
 const DOT: Record<ScheduleItem["status"], string> = {
@@ -84,7 +86,9 @@ export function Schedule({ items }: { items: ScheduleItem[] }) {
                   {item.where}
                 </span>
               </span>
-              {item.needsWindow && <Pill tone="pending">Pick a window</Pill>}
+              {item.needsWindow && (
+                <Pill tone="pending">{item.needsDay ? "Pick a day" : "Pick a window"}</Pill>
+              )}
               {item.isNext && <Pill tone="active">Next up</Pill>}
               {item.status === "completed" && <Pill tone="success">Done</Pill>}
               {item.earnings && (

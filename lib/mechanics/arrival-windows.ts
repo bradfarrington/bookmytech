@@ -6,6 +6,7 @@ import {
   TWO_HOUR_SLOT_HOURS,
   addDaysToKey,
   dayOfWeekForKey,
+  isFlexibleBooking,
   isSlotBookable,
   londonDateKey,
   londonInstant,
@@ -54,6 +55,11 @@ export interface SiblingBooking {
   /** Postgres `numeric` arrives as a string through PostgREST. */
   service_duration_hours: number | string | null;
   status: string;
+  /**
+   * A still-flexible sibling (Task 28) lists the days it might land on. It is
+   * an all-day note on EVERY one of those days, not just the earliest.
+   */
+  candidate_days?: string[] | null;
 }
 
 export interface ArrivalWindowClash {
@@ -210,6 +216,107 @@ export function buildArrivalWindowOptions(input: {
 }
 
 /**
+ * Which UK calendar days a sibling counts on. A timed or single all-day job
+ * is on the day of its start; a still-flexible job (Task 28) is a possible
+ * all-day job on every day the customer offered.
+ */
+export function siblingDayKeys(s: SiblingBooking): string[] {
+  if (!s.scheduled_at) return [];
+  if (isFlexibleBooking(s)) return [...new Set(s.candidate_days!)];
+  return [londonDateKey(new Date(s.scheduled_at))];
+}
+
+/**
+ * Build the calendar for SEVERAL days at once — the days a flexible booking
+ * offers (Task 28), or just the one day of an ordinary all-day booking. Two
+ * queries whatever the count: the saved hours for every weekday involved,
+ * and every occupying job of theirs between the first and last day.
+ *
+ * Results come back in `dayKeys` order. `loadArrivalWindowOptions` below is
+ * the one-day call, so the job page and the action can't disagree.
+ */
+export async function loadArrivalWindowOptionsForDays(
+  db: SupabaseClient,
+  mechanicId: string,
+  booking: { id: string },
+  dayKeys: string[],
+  now: Date = new Date(),
+): Promise<ArrivalWindowOptions[]> {
+  const days = [...new Set(dayKeys)].sort();
+  if (days.length === 0) return [];
+  const rangeStart = londonInstant(days[0], 0).toISOString();
+  const rangeEnd = londonInstant(addDaysToKey(days[days.length - 1], 1), 0).toISOString();
+  const weekdays = [...new Set(days.map(dayOfWeekForKey))];
+
+  // A flexible sibling's `scheduled_at` is its EARLIEST day, which may sit
+  // before this range while a later candidate day sits inside it — so those
+  // are fetched by day overlap, not by start instant, and merged.
+  const siblingColumns =
+    "id, job_number, scheduled_at, slot_window, service_duration_hours, status, candidate_days";
+  const timedQuery = (columns: string) =>
+    db
+      .from("bookings")
+      .select(columns)
+      .eq("mechanic_id", mechanicId)
+      .neq("id", booking.id)
+      .in("status", [...OCCUPYING_STATUSES])
+      .gte("scheduled_at", rangeStart)
+      .lt("scheduled_at", rangeEnd);
+  const [{ data: availabilityRows }, timedResult, { data: flexibleSiblings }] =
+    await Promise.all([
+      db
+        .from("mechanic_availability")
+        .select("day_of_week, is_active, start_time, end_time")
+        .eq("mechanic_id", mechanicId)
+        .in("day_of_week", weekdays),
+      timedQuery(siblingColumns),
+      db
+        .from("bookings")
+        .select(siblingColumns)
+        .eq("mechanic_id", mechanicId)
+        .neq("id", booking.id)
+        .in("status", [...OCCUPYING_STATUSES])
+        .overlaps("candidate_days", days),
+    ]);
+  // Before migration 0057 the column doesn't exist and the whole query fails;
+  // a clash must never be missed because of that, so ask again without it.
+  // (The flexible query failing just means there are no flexible siblings.)
+  const timedSiblings = timedResult.error
+    ? (await timedQuery(siblingColumns.replace(", candidate_days", ""))).data
+    : timedResult.data;
+
+  const availabilityByWeekday = new Map<number, AvailabilityRow>();
+  for (const row of (availabilityRows ?? []) as Array<AvailabilityRow & { day_of_week: number }>) {
+    availabilityByWeekday.set(row.day_of_week, row);
+  }
+
+  const siblingsById = new Map<string, SiblingBooking>();
+  for (const s of [
+    ...((timedSiblings ?? []) as unknown as SiblingBooking[]),
+    ...((flexibleSiblings ?? []) as unknown as SiblingBooking[]),
+  ]) {
+    siblingsById.set(s.id, s);
+  }
+  const siblingsByDay = new Map<string, SiblingBooking[]>();
+  for (const s of siblingsById.values()) {
+    for (const key of siblingDayKeys(s)) {
+      const list = siblingsByDay.get(key) ?? [];
+      list.push(s);
+      siblingsByDay.set(key, list);
+    }
+  }
+
+  return days.map((dayKey) =>
+    buildArrivalWindowOptions({
+      dayKey,
+      availability: availabilityByWeekday.get(dayOfWeekForKey(dayKey)) ?? null,
+      siblings: siblingsByDay.get(dayKey) ?? [],
+      now,
+    }),
+  );
+}
+
+/**
  * Fetch the mechanic's saved hours for the booking's weekday and their other
  * jobs on that UK calendar day, then build the options.
  */
@@ -220,30 +327,6 @@ export async function loadArrivalWindowOptions(
   now: Date = new Date(),
 ): Promise<ArrivalWindowOptions> {
   const dayKey = londonDateKey(new Date(booking.scheduled_at));
-  const dayStart = londonInstant(dayKey, 0).toISOString();
-  const dayEnd = londonInstant(addDaysToKey(dayKey, 1), 0).toISOString();
-
-  const [{ data: availability }, { data: siblings }] = await Promise.all([
-    db
-      .from("mechanic_availability")
-      .select("is_active, start_time, end_time")
-      .eq("mechanic_id", mechanicId)
-      .eq("day_of_week", dayOfWeekForKey(dayKey))
-      .maybeSingle(),
-    db
-      .from("bookings")
-      .select("id, job_number, scheduled_at, slot_window, service_duration_hours, status")
-      .eq("mechanic_id", mechanicId)
-      .neq("id", booking.id)
-      .in("status", [...OCCUPYING_STATUSES])
-      .gte("scheduled_at", dayStart)
-      .lt("scheduled_at", dayEnd),
-  ]);
-
-  return buildArrivalWindowOptions({
-    dayKey,
-    availability: (availability as AvailabilityRow | null) ?? null,
-    siblings: (siblings ?? []) as SiblingBooking[],
-    now,
-  });
+  const [options] = await loadArrivalWindowOptionsForDays(db, mechanicId, booking, [dayKey], now);
+  return options;
 }

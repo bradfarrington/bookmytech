@@ -17,6 +17,7 @@ import { Pill } from "@/components/ui/pill";
 import { Stars } from "@/components/ui/stars";
 import { Overline } from "@/components/ui/overline";
 import { cn, formatPrice, formatJobNumber } from "@/lib/utils";
+import { formatBookingWhen } from "@/lib/slots";
 import { availableCreditPence } from "@/lib/credits/credits";
 
 // A single customer: contact, spend, every job they've booked, every dispute
@@ -76,17 +77,6 @@ const CREDIT_SOURCE_LABEL: Record<string, string> = {
   redemption: "Applied to a booking",
 };
 
-function formatDateTime(iso: string | null): string {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleString("en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
 function formatDate(iso: string | null): string {
   if (!iso) return "—";
   return new Date(iso).toLocaleDateString("en-GB", {
@@ -131,7 +121,7 @@ export default async function CustomerDetailPage({
     .from("bookings")
     .select(
       `id, job_number, status, total_pence, credit_applied_pence, repair_description,
-       vehicle_reg, vehicle_make, vehicle_model, postcode, scheduled_at, slot_window,
+       vehicle_reg, vehicle_make, vehicle_model, postcode, scheduled_at, slot_window, candidate_days,
        created_at, completed_at, mechanic_id`,
     )
     .or(orFilter)
@@ -406,7 +396,7 @@ export default async function CustomerDetailPage({
                         </Pill>
                       </td>
                       <td className="px-5 py-3 text-text-secondary">
-                        {formatDateTime(b.scheduled_at)}
+                        {b.scheduled_at ? formatBookingWhen(b) : "—"}
                       </td>
                       <td className="px-5 py-3">
                         <span className="font-semibold text-text-primary">

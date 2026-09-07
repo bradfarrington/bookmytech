@@ -18,6 +18,7 @@ import { Pill } from "@/components/ui/pill";
 import { Stars } from "@/components/ui/stars";
 import { Overline } from "@/components/ui/overline";
 import { cn, formatPrice } from "@/lib/utils";
+import { formatBookingWhen } from "@/lib/slots";
 import { specialismName } from "@/lib/specialisms";
 import { SuspensionControls } from "@/components/admin/suspension-controls";
 import { mechanicBalanceSummary } from "@/lib/mechanics/balance";
@@ -72,17 +73,6 @@ const JOB_STATUS_LABEL: Record<string, string> = {
 
 function jobStatusLabel(status: string): string {
   return JOB_STATUS_LABEL[status] ?? status.replace(/_/g, " ");
-}
-
-function formatDateTime(iso: string | null): string {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleString("en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
 }
 
 function formatDate(iso: string): string {
@@ -155,7 +145,7 @@ export default async function MechanicDetailPage({
       supabase
         .from("bookings")
         .select(
-          "id, status, area, total_pence, customer_name, repair_description, scheduled_at, created_at",
+          "id, status, area, total_pence, customer_name, repair_description, scheduled_at, slot_window, candidate_days, created_at",
         )
         .eq("mechanic_id", id)
         .order("created_at", { ascending: false }),
@@ -541,7 +531,7 @@ export default async function MechanicDetailPage({
                           </Pill>
                         </td>
                         <td className="px-5 py-3 text-text-secondary">
-                          {formatDateTime(j.scheduled_at)}
+                          {j.scheduled_at ? formatBookingWhen(j) : "—"}
                         </td>
                         <td className="px-5 py-3 font-semibold text-text-primary">
                           {formatPrice(j.total_pence ?? 0)}

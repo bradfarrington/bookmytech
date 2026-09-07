@@ -19,6 +19,7 @@ import { Card } from "@/components/ui/card";
 import { Pill } from "@/components/ui/pill";
 import { Overline } from "@/components/ui/overline";
 import { formatPrice, formatJobNumber } from "@/lib/utils";
+import { formatBookingWhen, formatCandidateDays, isFlexibleBooking } from "@/lib/slots";
 import { calcEarnings } from "@/lib/earnings";
 import { repairLinesFor, type BookingRepairRow } from "@/lib/bookings/repair-lines";
 import { Timeline, type TimelineEvent } from "./_components/timeline";
@@ -100,7 +101,7 @@ export default async function BookingDetailPage({ params }: PageProps) {
        customer_name, customer_email,
        vehicle_reg, vehicle_make, vehicle_model, mechanic_id,
        repair_description,
-       scheduled_at, created_at, address_line_1, address_line_2, parking_type,
+       scheduled_at, slot_window, candidate_days, created_at, address_line_1, address_line_2, parking_type,
        special_instructions, stripe_payment_intent_id`,
     )
     .eq("id", id)
@@ -285,15 +286,15 @@ export default async function BookingDetailPage({ params }: PageProps) {
             <Row
               icon={CalendarClock}
               label="Scheduled"
-              value={
-                booking.scheduled_at
-                  ? new Date(booking.scheduled_at).toLocaleString("en-GB", {
-                      dateStyle: "full",
-                      timeStyle: "short",
-                    })
-                  : "—"
-              }
+              value={booking.scheduled_at ? formatBookingWhen(booking) : "—"}
             />
+            {isFlexibleBooking(booking) && (
+              <Row
+                icon={CalendarClock}
+                label="Days offered"
+                value={`${formatCandidateDays([...(booking.candidate_days as string[])].sort())} — the mechanic picks one and a 2-hour window`}
+              />
+            )}
           </Card>
 
           <Card className="space-y-4 p-6">
