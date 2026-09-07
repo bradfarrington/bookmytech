@@ -1,6 +1,6 @@
 # Task 29 — Publish Brad's legal documents; cookie consent; acceptance links
 
-**Status:** ✅ Complete (2026-09-07) — on branch `task-29-legal-documents`. No migration, no mobile API change. `tsc` clean, 259 unit tests (unchanged), lint clean on every touched file, rendered pages word-diffed against the source documents. Deviations from the spec: none beyond the owner decisions listed below.
+**Status:** ✅ Complete (2026-09-07) — merged to `main` 2026-09-07 (branch `task-29-legal-documents`). No migration, no mobile API change. `tsc` clean, 259 unit tests (unchanged), lint clean on every touched file, rendered pages word-diffed against the source documents. Deviations from the spec: none beyond the owner decisions listed below.
 
 ## Why this exists
 

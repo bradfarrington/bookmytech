@@ -1,6 +1,6 @@
 # Task 28 — Customer offers several all-day dates; mechanic picks one day + a 2-hour window
 
-**Status:** ✅ Complete (2026-09-07) — code complete on branch `task-28-flexible-days`. `tsc` clean, 259 unit tests (17 new), lint unchanged from baseline, production build compiles. **Migration `0057` is NOT yet applied** (no SQL access from this checkout — Brad applies it; it must be in before this deploys, see "Storage"). **Not yet exercised in a browser** — the manual script is under "How to verify". Deviations from the plan: none.
+**Status:** ✅ Complete (2026-09-07) — merged to `main` 2026-09-07 (branch `task-28-flexible-days`). `tsc` clean, 259 unit tests (17 new), lint unchanged from baseline, production build compiles. **Migrations `0057` and `0058` applied** (Brad, 2026-09-07). **Not yet exercised in a browser** — the manual script is under "How to verify". Deviations from the plan: none.
 
 ## Why this exists
 
@@ -48,7 +48,7 @@ Under the All day button: **"Flexible? Offer more than one day"**. In flexible m
 - `setArrivalWindow(bookingId, window, dayKey?)`: a flexible booking requires `dayKey` ∈ `candidate_days` ("Pick one of the days the customer offered."); an ordinary one refuses a `dayKey` that isn't its own day (stale form). Lead time and clash are recomputed on the target day. Event `reason`: "Arrival window set to Wed 10 Sep 10am–12pm (customer offered 3 days)". Notifications unchanged — `arrival_window_confirmed` already names the day.
 - Day view: a flexible job shows "Any of 3 days" with a **"Pick a day"** pill. Admin job detail gains a "Days offered" row; the live feed's `arrival_window_set` line names the day when the payload carries `candidate_days`; the admin jobs list, customer and mechanic detail tables now use the UK-zoned `formatBookingWhen` instead of an unzoned `toLocaleString`.
 
-## How to verify (once `0057` is applied)
+## How to verify
 
 1. As a customer, book any repair; click **Flexible? Offer more than one day**, tick three days → the window grid hides, the panel reads "3 days offered · All day (8am–8pm)", the recap reads "Any of … · All day". Untick down to one → CTA disabled. Complete checkout (test card). Confirmation email says "Any of …".
 2. Customer dashboard and `/book/confirmed/[id]` show "Any of … · All day".
@@ -71,7 +71,7 @@ Under the All day button: **"Flexible? Offer more than one day"**. In flexible m
 - [x] A customer reschedule or accepted proposal withdraws the offered days
 - [x] Audit: `arrival_window_set` payload carries `candidate_days`
 - [x] Unit tests: slot helpers, flexible-sibling bucketing
-- [ ] Exercised end-to-end in a browser — **deferred until `0057` is applied**; script above
+- [ ] Exercised end-to-end in a browser — `0057` is applied now (2026-09-07); script above still to be run
 
 ## Follow-ups
 
