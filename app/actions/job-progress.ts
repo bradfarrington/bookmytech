@@ -13,7 +13,8 @@ import { completedBookingCount, grantCredit } from "@/lib/credits/credits";
 import { REFERRAL_BONUS_PENCE } from "@/lib/credits/constants";
 import { mechanicBalancePence, recordEarning, recordPayout } from "@/lib/mechanics/balance";
 import { recomputeMechanicAggregates } from "@/lib/mechanics/aggregates";
-import { nettedPayout } from "@/lib/earnings";
+import { allocateTransfers, nettedPayout } from "@/lib/earnings";
+import { loadQuotesForBooking, quoteMoney } from "@/lib/quotes/load";
 import { sendPushToCustomer } from "@/lib/push/send";
 import { shortPersonName } from "@/lib/utils";
 import { repairLinesFor, type BookingRepairRow } from "@/lib/bookings/repair-lines";
@@ -242,12 +243,23 @@ export async function completeAndCharge(bookingId: string): Promise<JobProgressR
   if (!sigCount)
     return { ok: false, error: "Get the customer to sign off before completing the job." };
 
+  // --- Quotes (Task 33) ----------------------------------------------------
+  // A quote still waiting on the customer blocks completion: charging for
+  // work the customer hasn't approved is the thing the T&Cs forbid.
+  const quotes = quoteMoney(await loadQuotesForBooking(admin, bookingId));
+  if (quotes.pendingNow)
+    return {
+      ok: false,
+      error: "A quote is still waiting on the customer — withdraw it or wait for their answer before completing.",
+    };
+
   // --- Capture the pre-authorisation ---------------------------------------
   let captured = false;
-  // The charge created by the capture; used as the transfer's source_transaction
-  // so Stripe releases the mechanic's payout from these exact funds as they
-  // settle — no need for the platform balance to be topped up manually.
-  let chargeId: string | null = null;
+  // The charges created by the captures (base hold, then each approved
+  // quote's hold); each becomes a transfer's source_transaction so Stripe
+  // releases the mechanic's payout from these exact funds as they settle — no
+  // need for the platform balance to be topped up manually.
+  const charges: Array<{ id: string; capturedPence: number }> = [];
   // Hoisted so the same client drives the payout transfer below.
   let stripe: typeof import("@/lib/stripe/server").stripe | null = null;
   try {
@@ -257,21 +269,64 @@ export async function completeAndCharge(bookingId: string): Promise<JobProgressR
     stripe = null;
   }
   // What the customer actually owes = total minus any account credit applied.
-  // The pre-auth was held for exactly this amount at booking, so a full capture
-  // takes the right figure.
+  // The base hold covers that minus whatever approved quotes hold separately;
+  // a reduction has already lowered total_pence, so the base capture is for
+  // LESS than was authorised and Stripe releases the rest.
   const chargePence = Math.max(0, (booking.total_pence ?? 0) - (booking.credit_applied_pence ?? 0));
+  const baseChargePence = Math.max(0, chargePence - quotes.approvedNowPence);
+
+  // Every capture is idempotent: an intent already captured (a retry after a
+  // later step failed) is read back rather than captured again.
+  const captureIntent = async (
+    intentId: string,
+    amountToCapture: number,
+  ): Promise<{ ok: true; chargeId: string | null; amount: number } | { ok: false; error: string }> => {
+    try {
+      const current = await stripe!.paymentIntents.retrieve(intentId);
+      const chargeOf = (pi: typeof current) =>
+        typeof pi.latest_charge === "string" ? pi.latest_charge : (pi.latest_charge?.id ?? null);
+      if (current.status === "succeeded") return { ok: true, chargeId: chargeOf(current), amount: current.amount_received };
+      if (amountToCapture <= 0) {
+        await stripe!.paymentIntents.cancel(intentId);
+        return { ok: true, chargeId: null, amount: 0 };
+      }
+      const intent = await stripe!.paymentIntents.capture(intentId, {
+        amount_to_capture: Math.min(amountToCapture, current.amount),
+      });
+      return { ok: true, chargeId: chargeOf(intent), amount: intent.amount_received };
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : "Payment capture failed" };
+    }
+  };
 
   if (booking.stripe_payment_intent_id && stripe) {
-    try {
-      const intent = await stripe.paymentIntents.capture(booking.stripe_payment_intent_id);
+    const base = await captureIntent(booking.stripe_payment_intent_id, baseChargePence);
+    if (!base.ok) return { ok: false, error: `Couldn't take payment: ${base.error}. The job stays open — try again.` };
+    captured = true;
+    if (base.chargeId) charges.push({ id: base.chargeId, capturedPence: base.amount });
+  }
+  // Approved quotes for this visit: capture each hold in full.
+  if (stripe) {
+    for (const quote of quotes.approvedNow) {
+      if (!quote.stripePaymentIntentId || quote.capturedAt) {
+        if (quote.stripeChargeId) charges.push({ id: quote.stripeChargeId, capturedPence: quote.totalPence });
+        continue;
+      }
+      const q = await captureIntent(quote.stripePaymentIntentId, quote.totalPence);
+      if (!q.ok) return { ok: false, error: `Couldn't take the payment for the approved quote: ${q.error}. The job stays open — try again.` };
       captured = true;
-      chargeId =
-        typeof intent.latest_charge === "string"
-          ? intent.latest_charge
-          : (intent.latest_charge?.id ?? null);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Payment capture failed";
-      return { ok: false, error: `Couldn't take payment: ${message}. The job stays open — try again.` };
+      if (q.chargeId) charges.push({ id: q.chargeId, capturedPence: q.amount });
+      await admin
+        .from("job_quotes")
+        .update({ stripe_charge_id: q.chargeId, captured_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+        .eq("id", quote.id);
+      await admin.from("booking_events").insert({
+        booking_id: bookingId,
+        event_type: "payment_captured",
+        actor_id: guard.mechanicId,
+        actor_role: "mechanic",
+        payload: { amount_pence: q.amount, quote_id: quote.id },
+      });
     }
   }
   // 'free' bookings (credit covered the whole total) have no hold to capture.
@@ -401,31 +456,53 @@ export async function completeAndCharge(bookingId: string): Promise<JobProgressR
 
     if (transferPence > 0 && stripe && mechanicAccount?.stripe_account_id) {
       try {
-        const transfer = await stripe.transfers.create({
-          amount: transferPence,
-          currency: "gbp",
-          destination: mechanicAccount.stripe_account_id,
-          // Release the payout from the funds of this booking's own charge as they
-          // settle — keeps payouts automatic without managing the platform balance.
-          ...(chargeId ? { source_transaction: chargeId } : {}),
-          transfer_group: bookingId,
-          metadata: { booking_id: bookingId, mechanic_id: guard.mechanicId },
-        });
-        // 3) Record the cash actually transferred (−) so the ledger settles back
-        //    toward zero (or repays the debt).
-        await recordPayout(admin, booking.mechanic_id, bookingId, transferPence, transfer.id, `Job ${ref} payout`);
-        await admin.from("booking_events").insert({
-          booking_id: bookingId,
-          event_type: "payout_transferred",
-          actor_id: guard.mechanicId,
-          actor_role: "mechanic",
-          payload: {
-            amount_pence: transferPence,
-            gross_payout_pence: payoutPence,
-            recovered_pence: recoveredPence,
-            transfer_id: transfer.id,
-          },
-        });
+        // One transfer per charge (Task 33): a transfer sourced from a charge
+        // can't exceed it, so a job paid with a base hold plus approved-quote
+        // holds is paid out from each in turn. With nothing captured (a 'free'
+        // booking) one unsourced transfer draws on the platform balance, which
+        // funded the credit.
+        const plan =
+          charges.length > 0
+            ? allocateTransfers(charges, transferPence).allocations.map((a) => ({ pence: a.pence, chargeId: a.id as string | null }))
+            : [{ pence: transferPence, chargeId: null as string | null }];
+        let transferred = 0;
+        for (const leg of plan) {
+          const transfer = await stripe.transfers.create({
+            amount: leg.pence,
+            currency: "gbp",
+            destination: mechanicAccount.stripe_account_id,
+            // Release the payout from the funds of this booking's own charge as they
+            // settle — keeps payouts automatic without managing the platform balance.
+            ...(leg.chargeId ? { source_transaction: leg.chargeId } : {}),
+            transfer_group: bookingId,
+            metadata: { booking_id: bookingId, mechanic_id: guard.mechanicId },
+          });
+          transferred += leg.pence;
+          // 3) Record the cash actually transferred (−) so the ledger settles back
+          //    toward zero (or repays the debt).
+          await recordPayout(admin, booking.mechanic_id, bookingId, leg.pence, transfer.id, `Job ${ref} payout`);
+          await admin.from("booking_events").insert({
+            booking_id: bookingId,
+            event_type: "payout_transferred",
+            actor_id: guard.mechanicId,
+            actor_role: "mechanic",
+            payload: {
+              amount_pence: leg.pence,
+              gross_payout_pence: payoutPence,
+              recovered_pence: recoveredPence,
+              transfer_id: transfer.id,
+              source_charge: leg.chargeId,
+            },
+          });
+        }
+        if (transferred < transferPence) {
+          await admin.from("booking_events").insert({
+            booking_id: bookingId,
+            event_type: "note",
+            actor_role: "system",
+            payload: { note: `Payout short by ${formatPrice(transferPence - transferred)}: less was captured than the payout needs.`, amount_pence: transferPence - transferred },
+          });
+        }
       } catch (err) {
         const message = err instanceof Error ? err.message : "transfer failed";
         console.error("Mechanic payout transfer failed for booking", bookingId, message);

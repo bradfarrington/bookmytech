@@ -88,6 +88,25 @@ export const CUSTOM_RENDERERS: Record<string, CustomRenderer> = {
     return `<mj-text color="#64748B" font-size="13px" padding-top="4px">${escapeHtml(line)}</mj-text>`;
   },
 
+  // quote_sent — the quote's lines as a small table (Task 33).
+  quote_lines(vars) {
+    const items = packedList(vars.quote_lines);
+    if (items.length === 0) return "";
+    return `<mj-table font-size="13px" color="#0F172A" padding="4px 0 8px 0">
+      ${items
+        .map((line) => {
+          const at = line.lastIndexOf(" · ");
+          const label = at > 0 ? line.slice(0, at) : line;
+          const figure = at > 0 ? line.slice(at + 3) : "";
+          return `<tr style="border-bottom:1px solid #E2E8F0;">
+            <td style="padding:6px 0;">${escapeHtml(label)}</td>
+            <td style="padding:6px 0;text-align:right;white-space:nowrap;">${escapeHtml(figure)}</td>
+          </tr>`;
+        })
+        .join("")}
+    </mj-table>`;
+  },
+
   // job_complete — the service / inspection report (Task 32); nothing when
   // the job had no checklist.
   report_link(vars) {

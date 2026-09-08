@@ -24,6 +24,7 @@ import {
   Receipt,
   Scale,
   Flag,
+  Wrench,
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -41,6 +42,8 @@ import { ArrivalWindowPicker } from "./arrival-window-picker";
 import { MileageField } from "./mileage-field";
 import { ChecklistPanel } from "./checklist-panel";
 import type { LoadedChecklist } from "@/lib/checklists/load";
+import { JobExtras } from "./job-extras";
+import type { FaultView, QuoteView } from "@/lib/quotes/load";
 
 export interface JobDetailProps {
   bookingId: string;
@@ -59,6 +62,10 @@ export interface JobDetailProps {
   mileageRequired?: boolean;
   /** The checklists this job carries (Task 32); empty on a plain repair. */
   checklists?: LoadedChecklist[];
+  /** Faults noted and quotes sent on this job (Task 33). */
+  faults?: FaultView[];
+  quotes?: QuoteView[];
+  hourlyRatePence?: number;
   whenLabel: string;
   distanceLabel: string;
   durationLabel: string;
@@ -338,6 +345,21 @@ export function JobDetail(props: JobDetailProps) {
             </Card>
           )}
 
+          {/* Faults, quotes for extra work, price changes (Task 33) */}
+          {!["sourcing_mechanic", "cancelled"].includes(status) && (
+            <Card className="space-y-4 p-6">
+              <CardTitle icon={Wrench}>Extra work &amp; faults</CardTitle>
+              <JobExtras
+                bookingId={bookingId}
+                status={status}
+                faults={props.faults ?? []}
+                quotes={props.quotes ?? []}
+                hourlyRatePence={props.hourlyRatePence ?? 6000}
+                commissionRate={props.commissionRate}
+              />
+            </Card>
+          )}
+
           {/* Job photos — mechanic-captured evidence of the work */}
           <Card className="space-y-3 p-6">
             <CardTitle icon={ImageIcon}>Job photos</CardTitle>
@@ -389,6 +411,8 @@ export function JobDetail(props: JobDetailProps) {
               commissionRate={props.commissionRate}
               partsPence={props.partsPence}
               bmtPartsPence={props.bmtPartsPence}
+              approvedExtrasPence={(props.quotes ?? []).filter((q) => q.kind === "now" && q.status === "approved").reduce((s, q) => s + q.totalPence, 0)}
+              reductionsPence={(props.quotes ?? []).filter((q) => q.kind === "reduction").reduce((s, q) => s + -q.totalPence, 0)}
             />
           </Card>
 

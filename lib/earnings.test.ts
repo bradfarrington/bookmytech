@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { calcEarnings, nettedPayout } from "./earnings";
+import { calcEarnings, nettedPayout, allocateTransfers } from "./earnings";
 
 describe("calcEarnings", () => {
   it("takes commission on the whole total, mechanic keeps the rest", () => {
@@ -42,5 +42,24 @@ describe("nettedPayout", () => {
   it("rounds fractional pence inputs", () => {
     // round(-100.4) = -100, round(2000.6) = 2001 → transfer 1901, recover 100.
     expect(nettedPayout(-100.4, 2_000.6)).toEqual({ transferPence: 1_901, recoveredPence: 100 });
+  });
+});
+
+describe("allocateTransfers (Task 33)", () => {
+  it("draws a payout from each charge in order, capped at its capture", () => {
+    expect(allocateTransfers([{ id: "ch_base", capturedPence: 5100 }, { id: "ch_quote", capturedPence: 8700 }], 11730)).toEqual({
+      allocations: [
+        { id: "ch_base", pence: 5100 },
+        { id: "ch_quote", pence: 6630 },
+      ],
+      unallocated: 0,
+    });
+  });
+  it("reports what it couldn't source and skips empty charges", () => {
+    expect(allocateTransfers([{ id: "a", capturedPence: 0 }, { id: "b", capturedPence: 1000 }], 1500)).toEqual({
+      allocations: [{ id: "b", pence: 1000 }],
+      unallocated: 500,
+    });
+    expect(allocateTransfers([], 0)).toEqual({ allocations: [], unallocated: 0 });
   });
 });

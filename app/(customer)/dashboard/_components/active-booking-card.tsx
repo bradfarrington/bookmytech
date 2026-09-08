@@ -6,6 +6,7 @@ import { Phone, MessageSquare, Star, MapPin, Clock } from "lucide-react";
 import { useStayFresh } from "@/lib/use-stay-fresh";
 import { MessagesThread } from "@/components/messages/messages-thread";
 import { RescheduleProposal } from "@/components/customer/reschedule-proposal";
+import { QuoteProposal } from "@/components/customer/quote-proposal";
 import {
   STATUS_LABELS,
   formatSlot,
@@ -62,6 +63,9 @@ export function ActiveBookingCard({ booking, mechanic }: ActiveBookingCardProps)
             note={booking.rescheduleNote}
           />
         )}
+
+        {/* A quote from the mechanic waiting on the customer (Task 33) */}
+        {booking.pendingQuote && <QuoteProposal quote={booking.pendingQuote} />}
 
         {/* Every job of a multi-job booking (the header shows the summary). */}
         {booking.repairLines.length > 1 && (

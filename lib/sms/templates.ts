@@ -205,7 +205,53 @@ export const SMS_TEMPLATE_DEFS: readonly SmsTemplateDef[] = [
     defaultBody: "{{label}} for {{vehicle_reg}}: {{cta}} — {{url}}",
   },
 
+  // --- Quotes (Task 33) --------------------------------------------------------
+  {
+    key: "quote_sent",
+    label: "Mechanic sent a quote",
+    description: "Sent to the customer when their mechanic quotes for extra work or a return visit.",
+    audience: "customer",
+    variables: [
+      { name: "total", description: "Quote total", example: "£87.00" },
+      { name: "url", description: "Link to review it", example: "https://bookmytech.co.uk/dashboard/quotes/…" },
+    ],
+    defaultBody: "Book My Tech: your mechanic has sent a quote for {{total}}. Nothing is charged until you approve: {{url}}",
+  },
+  {
+    key: "price_reduced",
+    label: "Mechanic reduced the price",
+    description: "Sent to the customer when their mechanic takes money off the job.",
+    audience: "customer",
+    variables: [
+      { name: "amount", description: "Amount taken off", example: "£10.00" },
+      { name: "ref", description: "Job number", example: "00123" },
+    ],
+    defaultBody: "Book My Tech: your mechanic has taken {{amount}} off job {{ref}}. Only the new total is charged when it's complete.",
+  },
+
   // --- Mechanic ---------------------------------------------------------------
+  {
+    key: "mech_quote_approved",
+    label: "Customer approved your quote",
+    description: "Sent to the mechanic when the customer approves and authorises a quote.",
+    audience: "mechanic",
+    variables: [
+      { name: "ref", description: "Job number", example: "00123" },
+      { name: "total", description: "Quote total", example: "£87.00" },
+    ],
+    defaultBody: "Book My Tech: the customer approved your {{total}} quote on job {{ref}} — go ahead. It's paid with the job.",
+  },
+  {
+    key: "mech_quote_declined",
+    label: "Customer declined your quote",
+    description: "Sent to the mechanic when the customer declines a quote.",
+    audience: "mechanic",
+    variables: [
+      { name: "ref", description: "Job number", example: "00123" },
+      { name: "total", description: "Quote total", example: "£87.00" },
+    ],
+    defaultBody: "Book My Tech: the customer declined your {{total}} quote on job {{ref}}. Don't carry out that work.",
+  },
   {
     key: "mech_job_cancelled",
     label: "Customer cancelled the job",

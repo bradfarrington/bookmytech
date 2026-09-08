@@ -10,6 +10,8 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { BookingTracker, type BookingMechanic } from "./_components/booking-tracker";
 import { RescheduleProposal } from "@/components/customer/reschedule-proposal";
+import { QuoteProposal } from "@/components/customer/quote-proposal";
+import { loadQuotesForBooking, quoteMoney } from "@/lib/quotes/load";
 
 interface ConfirmedPageProps {
   params: Promise<{ id: string }>;
@@ -46,6 +48,8 @@ export default async function ConfirmedPage({ params }: ConfirmedPageProps) {
     .order("position");
   const lines = repairLinesFor(booking, (lineRows ?? null) as BookingRepairRow[] | null);
   const lineGroups = groupRepairLines(lines);
+  // A quote from the mechanic waiting on the customer (Task 33).
+  const pendingQuote = quoteMoney(await loadQuotesForBooking(supabase, id)).pendingNow;
 
   // Is the viewer already signed in? If so, route them to their dashboard
   // instead of nudging them to create an account.
@@ -108,6 +112,10 @@ export default async function ConfirmedPage({ params }: ConfirmedPageProps) {
           currentLabel={slotDate}
           note={booking.reschedule_note}
         />
+      )}
+
+      {pendingQuote && (
+        <QuoteProposal quote={{ id: pendingQuote.id, totalPence: pendingQuote.totalPence, kind: pendingQuote.kind, title: pendingQuote.title }} />
       )}
 
       {/* Live status tracker */}

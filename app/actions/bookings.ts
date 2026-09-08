@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { refundPayment } from "@/lib/stripe/refund";
+import { refundAcrossIntents } from "@/lib/stripe/refund";
 import { recordRefundClawback } from "@/lib/mechanics/balance";
 import { formatPrice, formatJobNumber, shortPersonName } from "@/lib/utils";
 import { sendPushToCustomer } from "@/lib/push/send";
@@ -186,19 +186,58 @@ export async function refundBooking(
       error: `Only ${formatPrice(refundable)} is left to refund on this booking.`,
     };
 
-  // 1) Refund the customer's card from BMT's Stripe balance.
-  const r = await refundPayment(booking.stripe_payment_intent_id, amount);
-  if (!r.ok) return { ok: false, error: `Refund failed: ${r.error}. Nothing was changed — try again.` };
-
-  // 2) Audit the refund on the booking timeline.
-  await admin.from("booking_events").insert({
-    booking_id: id,
-    event_type: "payment_refunded",
-    actor_id: actorId,
-    actor_role: "admin",
-    reason: trimmed,
-    payload: { amount_pence: amount, refund_id: r.refundId },
-  });
+  // 1) Refund the customer's card from BMT's Stripe balance — base hold first,
+  //    then any approved-quote holds (Task 33), each up to what it captured.
+  const { data: quoteRows } = await admin
+    .from("job_quotes")
+    .select("stripe_payment_intent_id, total_pence")
+    .eq("booking_id", id)
+    .eq("kind", "now")
+    .eq("status", "approved")
+    .not("captured_at", "is", null);
+  const quoteCaptured = (quoteRows ?? []).reduce((s, q) => s + (q.total_pence ?? 0), 0);
+  const perIntentRefunded = new Map<string, number>();
+  for (const e of priorRefunds ?? []) {
+    const p = e.payload as { amount_pence?: number; payment_intent_id?: string } | null;
+    const key = p?.payment_intent_id ?? booking.stripe_payment_intent_id;
+    perIntentRefunded.set(key, (perIntentRefunded.get(key) ?? 0) + (p?.amount_pence ?? 0));
+  }
+  const intents = [
+    {
+      paymentIntentId: booking.stripe_payment_intent_id,
+      capturedPence: Math.max(0, chargedPence - quoteCaptured),
+      alreadyRefundedPence: perIntentRefunded.get(booking.stripe_payment_intent_id) ?? 0,
+    },
+    ...(quoteRows ?? [])
+      .filter((q) => q.stripe_payment_intent_id)
+      .map((q) => ({
+        paymentIntentId: q.stripe_payment_intent_id as string,
+        capturedPence: q.total_pence ?? 0,
+        alreadyRefundedPence: perIntentRefunded.get(q.stripe_payment_intent_id as string) ?? 0,
+      })),
+  ];
+  const r = await refundAcrossIntents(intents, amount);
+  // 2) Audit every refund that went through on the booking timeline (even on a
+  //    partial failure — money that moved must be recorded).
+  for (const done of r.refunds) {
+    await admin.from("booking_events").insert({
+      booking_id: id,
+      event_type: "payment_refunded",
+      actor_id: actorId,
+      actor_role: "admin",
+      reason: trimmed,
+      payload: { amount_pence: done.amountPence, refund_id: done.refundId, payment_intent_id: done.paymentIntentId },
+    });
+  }
+  if (!r.ok) {
+    const moved = r.refunds.reduce((s, x) => s + x.amountPence, 0);
+    return {
+      ok: false,
+      error: moved > 0
+        ? `Refund failed part-way: ${formatPrice(moved)} was refunded before the error (${r.error}). Check the timeline before trying again.`
+        : `Refund failed: ${r.error}. Nothing was changed — try again.`,
+    };
+  }
 
   // 3) Recover it from the mechanic — their balance goes negative and is netted
   //    off their next payout. No mechanic (e.g. never assigned) → BMT absorbs it.
@@ -209,7 +248,7 @@ export async function refundBooking(
       booking.mechanic_id,
       id,
       amount,
-      r.refundId,
+      r.refunds[0]?.refundId ?? null,
       actorId,
       `Refund on job ${bref}: ${trimmed}`,
     );

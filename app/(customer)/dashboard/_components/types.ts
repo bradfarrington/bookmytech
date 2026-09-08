@@ -34,6 +34,8 @@ export interface DashboardBooking {
   repairLines: string[];
   /** True when the booking carries a service / inspection checklist (Task 32) — there is a report to view. */
   hasReport: boolean;
+  /** A quote from the mechanic waiting on the customer (Task 33), if any. */
+  pendingQuote: { id: string; totalPence: number; kind: "now" | "follow_on" | "reduction"; title: string | null } | null;
 }
 
 export interface MechanicLite {

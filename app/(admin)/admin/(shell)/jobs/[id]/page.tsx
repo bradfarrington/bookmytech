@@ -25,6 +25,8 @@ import { calcEarnings } from "@/lib/earnings";
 import { repairLinesFor, type BookingRepairRow } from "@/lib/bookings/repair-lines";
 import { loadBookingChecklists, productIdsInLines } from "@/lib/checklists/load";
 import { resultLabel } from "@/lib/checklists/checklists";
+import { loadFaultsForBooking, loadQuotesForBooking, quoteMoney } from "@/lib/quotes/load";
+import { QUOTE_KIND_LABEL, QUOTE_STATUS_LABEL } from "@/lib/quotes/status";
 import { Timeline, type TimelineEvent } from "./_components/timeline";
 import { BookingActions } from "./_components/booking-actions";
 
@@ -127,6 +129,9 @@ export default async function BookingDetailPage({ params }: PageProps) {
   // The service / inspection checklists on this booking (Task 32), with the
   // mechanic's answers so far. Admin RLS reads everything.
   const checklists = await loadBookingChecklists(supabase, id, productIdsInLines(repairLines));
+  // Faults and quotes (Task 33).
+  const [faults, quotes] = await Promise.all([loadFaultsForBooking(supabase, id), loadQuotesForBooking(supabase, id)]);
+  const quoteTotals = quoteMoney(quotes);
   const combineSource: string | null = combineRow?.combine_source ?? null;
 
   const [{ data: events }, { data: mechRows }, paymentStatus] =
@@ -314,6 +319,54 @@ export default async function BookingDetailPage({ params }: PageProps) {
             />
           </Card>
 
+          {/* Faults and quotes (Task 33) */}
+          {(faults.length > 0 || quotes.length > 0) && (
+            <Card className="space-y-4 p-6">
+              <CardTitle icon={Wrench}>Faults &amp; quotes</CardTitle>
+              {faults.length > 0 && (
+                <ul className="divide-y divide-border-subtle rounded-xl border border-border">
+                  {faults.map((f) => (
+                    <li key={f.id} className="px-3 py-2 text-sm">
+                      <span className={f.severity === "urgent" ? "font-semibold text-red-700" : "text-amber-700"}>
+                        {f.severity === "urgent" ? "Urgent" : "Advisory"}
+                      </span>
+                      <span className="text-text-primary"> · {f.description}</span>
+                      {f.quoteId && <span className="text-xs text-text-muted"> · quoted</span>}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {quotes.map((q) => (
+                <div key={q.id} className="rounded-xl border border-border px-3.5 py-3 text-sm">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-semibold text-text-primary">{q.title ?? QUOTE_KIND_LABEL[q.kind]}</p>
+                      <p className="text-xs text-text-muted">
+                        {QUOTE_KIND_LABEL[q.kind]} · {q.kind === "reduction" ? "Applied" : QUOTE_STATUS_LABEL[q.status]}
+                        {q.stripePaymentIntentId && ` · ${q.stripePaymentIntentId}`}
+                        {q.capturedAt && " · captured"}
+                      </p>
+                    </div>
+                    <span className={`font-bold tabular-nums ${q.totalPence < 0 ? "text-red-700" : "text-text-primary"}`}>
+                      {q.totalPence < 0 ? `−${formatPrice(-q.totalPence)}` : formatPrice(q.totalPence)}
+                    </span>
+                  </div>
+                  {q.kind !== "reduction" && (
+                    <ul className="mt-1.5 space-y-0.5 text-xs text-text-secondary">
+                      {q.lines.map((l) => (
+                        <li key={l.id}>
+                          {l.description}
+                          {l.kind === "labour" ? ` · ${l.hours} h` : l.quantity > 1 ? ` × ${l.quantity}` : ""} · {formatPrice(l.linePence)}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {q.note && <p className="mt-1.5 text-xs text-text-muted">“{q.note}”</p>}
+                </div>
+              ))}
+            </Card>
+          )}
+
           {/* Checklist / inspection report (Task 32) */}
           {checklists.map((list) => (
             <Card key={list.checklist.id} className="space-y-4 p-6">
@@ -439,6 +492,18 @@ export default async function BookingDetailPage({ params }: PageProps) {
               <div className="flex items-center justify-between gap-3">
                 <span className="text-sm text-text-secondary">of which parts</span>
                 <span className="text-sm text-text-muted">{formatPrice(split.partsPence)}</span>
+              </div>
+            )}
+            {quoteTotals.approvedNowPence > 0 && (
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-sm text-text-secondary">of which approved extra work</span>
+                <span className="text-sm text-text-muted">{formatPrice(quoteTotals.approvedNowPence)}</span>
+              </div>
+            )}
+            {quoteTotals.reductionsPence > 0 && (
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-sm text-text-secondary">after price reductions</span>
+                <span className="text-sm text-text-muted">− {formatPrice(quoteTotals.reductionsPence)}</span>
               </div>
             )}
             <div className="flex items-center justify-between gap-3">

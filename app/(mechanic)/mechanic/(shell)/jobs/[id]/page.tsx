@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { loadBookingChecklists, productIdsInLines } from "@/lib/checklists/load";
+import { loadFaultsForBooking, loadQuotesForBooking } from "@/lib/quotes/load";
 import { geocodePostcode, haversineMiles, type LatLng } from "@/lib/geo/postcodes";
 import { mechanicSharePence } from "@/lib/earnings";
 import { isHaynesProConfigured } from "@/lib/haynespro/client";
@@ -43,7 +44,7 @@ export default async function MechanicJobDetailPage({ params }: PageProps) {
        address_line_1, address_line_2,
        customer_name, customer_phone, special_instructions,
        cancellation_reason, reschedule_status, reschedule_proposed_at,
-       repair_description, service_duration_hours, mileage`,
+       repair_description, service_duration_hours, mileage, hourly_rate_pence`,
     )
     .eq("id", id)
     .maybeSingle();
@@ -66,6 +67,8 @@ export default async function MechanicJobDetailPage({ params }: PageProps) {
   // client — safe, the booking itself was just proved visible to this
   // mechanic by the RLS read above.
   const checklists = await loadBookingChecklists(createAdminClient(), id, productIdsInLines(repairLines));
+  // Faults noted and quotes sent (Task 33), under the mechanic's own RLS.
+  const [faults, quotes] = await Promise.all([loadFaultsForBooking(supabase, id), loadQuotesForBooking(supabase, id)]);
 
   const { data: mechanic } = await supabase
     .from("mechanics")
@@ -217,6 +220,9 @@ export default async function MechanicJobDetailPage({ params }: PageProps) {
     mileage: booking.mileage ?? null,
     mileageRequired: checklists.length > 0,
     checklists,
+    faults,
+    quotes,
+    hourlyRatePence: booking.hourly_rate_pence ?? undefined,
     whenLabel,
     distanceLabel,
     // Every booking carries its exact billed duration (book time).

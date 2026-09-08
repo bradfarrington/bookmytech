@@ -65,6 +65,31 @@ export function calcEarnings(
  * A positive prior balance (BMT owes the mechanic — e.g. an earlier transfer
  * failed) is carried forward untouched here; recoveredPence stays 0.
  */
+/**
+ * Split one payout across the charges it can be drawn from (Task 33). A
+ * Stripe transfer with `source_transaction` can't exceed that charge, so a
+ * job paid with a base hold plus an approved-quote hold needs one transfer
+ * per charge. Greedy in order, each capped at its capture; `unallocated` is
+ * whatever couldn't be sourced (only when the payout exceeds what was
+ * captured — a free booking, or nothing captured at all).
+ */
+export function allocateTransfers(
+  charges: ReadonlyArray<{ id: string; capturedPence: number }>,
+  transferPence: number,
+): { allocations: Array<{ id: string; pence: number }>; unallocated: number } {
+  let remaining = Math.max(0, Math.round(transferPence || 0));
+  const allocations: Array<{ id: string; pence: number }> = [];
+  for (const charge of charges) {
+    if (remaining <= 0) break;
+    const cap = Math.max(0, Math.round(charge.capturedPence || 0));
+    const pence = Math.min(cap, remaining);
+    if (pence <= 0) continue;
+    allocations.push({ id: charge.id, pence });
+    remaining -= pence;
+  }
+  return { allocations, unallocated: remaining };
+}
+
 export function nettedPayout(
   priorBalancePence: number,
   grossPayoutPence: number,

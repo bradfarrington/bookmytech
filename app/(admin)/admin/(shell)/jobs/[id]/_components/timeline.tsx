@@ -30,6 +30,16 @@ const META: Record<string, { label: string; icon: LucideIcon; tone: string }> = 
   payment_authorised: { label: "Payment pre-authorised", icon: CreditCard, tone: "text-brand-blue" },
   payment_captured: { label: "Payment captured", icon: CheckCircle2, tone: "text-green-600" },
   arrival_window_set: { label: "Arrival window set", icon: CalendarClock, tone: "text-brand-blue" },
+  // Task 33
+  fault_added: { label: "Fault noted", icon: AlertTriangle, tone: "text-amber-600" },
+  quote_sent: { label: "Quote sent", icon: CreditCard, tone: "text-brand-blue" },
+  quote_approved: { label: "Quote approved", icon: CheckCircle2, tone: "text-green-600" },
+  quote_declined: { label: "Quote declined", icon: XCircle, tone: "text-text-muted" },
+  quote_withdrawn: { label: "Quote withdrawn", icon: XCircle, tone: "text-text-muted" },
+  quote_expired: { label: "Quote expired", icon: XCircle, tone: "text-text-muted" },
+  price_reduced: { label: "Price reduced", icon: ArrowRightLeft, tone: "text-amber-600" },
+  payment_refunded: { label: "Payment refunded", icon: CreditCard, tone: "text-red-600" },
+  payout_transferred: { label: "Payout transferred", icon: CheckCircle2, tone: "text-green-600" },
   note: { label: "Note", icon: StickyNote, tone: "text-text-muted" },
 };
 

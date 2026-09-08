@@ -101,6 +101,24 @@ export default async function DashboardPage() {
     for (const p of products ?? []) if (p.checklist_id) productsWithReports.add(p.id);
   }
 
+  // Quotes waiting on the customer (Task 33), one per booking at most.
+  const pendingQuoteByBooking = new Map<string, DashboardBooking["pendingQuote"]>();
+  if (bookingIds.length) {
+    // Unexpired only — the lapse is decided in the query so this render stays pure.
+    const { data: quoteRows } = await admin
+      .from("job_quotes")
+      .select("id, booking_id, total_pence, kind, title, expires_at")
+      .in("booking_id", bookingIds)
+      .eq("status", "sent")
+      .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`)
+      .order("created_at", { ascending: false });
+    for (const q of quoteRows ?? []) {
+      if (!pendingQuoteByBooking.has(q.booking_id)) {
+        pendingQuoteByBooking.set(q.booking_id, { id: q.id, totalPence: q.total_pence, kind: q.kind, title: q.title ?? null });
+      }
+    }
+  }
+
   // "Book again" carries what the customer CHOSE — a combined repair as one
   // id — and the card lists it once by its name.
   const uniq = (values: string[]) => [...new Set(values)];
@@ -135,6 +153,7 @@ export default async function DashboardPage() {
       ? uniq(linesByBooking.get(b.id)!.map((line) => line.itemLabel ?? line.description))
       : [b.repair_description ?? "Vehicle repair"],
     hasReport: (productIdsByBooking.get(b.id) ?? []).some((pid) => productsWithReports.has(pid)),
+    pendingQuote: pendingQuoteByBooking.get(b.id) ?? null,
   }));
 
   // Resolve the assigned mechanics in one round-trip each (profile + rating).
