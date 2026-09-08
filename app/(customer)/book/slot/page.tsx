@@ -5,8 +5,9 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { vehicleLabel } from "@/lib/utils";
 import { ProgressStepper } from "@/components/customer/progress-stepper";
-import { quoteRepairs } from "@/lib/haynespro/repair-booking";
+import { quoteRepairs, type RepairsQuote } from "@/lib/haynespro/repair-booking";
 import { parseRepairIds, repairsQuery } from "@/lib/bookings/repair-ids";
+import { quoteFollowOn } from "@/lib/quotes/book-follow-on";
 import { SlotPicker } from "./_components/slot-picker";
 
 interface SlotPageProps {
@@ -19,6 +20,8 @@ interface SlotPageProps {
     model?: string;
     postcode?: string;
     pref?: string;
+    /** A follow-on quote (Task 34): the price and the vehicle come from it. */
+    quote?: string;
     /** Set by Stripe when it returns a customer from a 3-D Secure challenge —
      *  the picker completes the booking from it. See slot-picker.tsx. */
     payment_intent_client_secret?: string;
@@ -27,18 +30,41 @@ interface SlotPageProps {
 
 export default async function SlotPage({ searchParams }: SlotPageProps) {
   const params = await searchParams;
-  const reg = params.reg ?? "";
-  const ids = parseRepairIds(params);
+  // A return visit from a follow-on quote (Task 34): the price, the vehicle and
+  // the mechanic all come from the quote, not the URL. Signed-in only.
+  const quoteId = params.quote?.trim() || "";
+  let reg = params.reg ?? "";
+  let make = params.make;
+  let model = params.model;
+  let postcode = params.postcode;
+  let pref = params.pref;
+  let quote: RepairsQuote | null = null;
 
-  if (!reg.trim() || ids.length === 0) {
-    redirect("/book");
-  }
-
-  // Re-quote server-side (never trust the URL) — the same (reg, nodes) inputs
-  // price identically at checkout and booking create.
-  const quote = await quoteRepairs(reg, ids, createAdminClient());
-  if (!quote) {
-    redirect(`/book/repairs?reg=${encodeURIComponent(reg)}`);
+  if (quoteId) {
+    const session = await createClient();
+    const {
+      data: { user: viewer },
+    } = await session.auth.getUser();
+    if (!viewer) redirect(`/login?next=${encodeURIComponent(`/book/slot?quote=${quoteId}`)}`);
+    const followOn = await quoteFollowOn(quoteId, { userId: viewer.id, email: viewer.email ?? null }, createAdminClient());
+    if (!followOn.ok) redirect(`/dashboard/quotes/${quoteId}`);
+    quote = followOn.quote;
+    reg = followOn.origin.vehicle_reg;
+    make = followOn.origin.vehicle_make ?? undefined;
+    model = followOn.origin.vehicle_model ?? undefined;
+    postcode = followOn.origin.postcode ?? undefined;
+    pref = followOn.origin.mechanic_id ?? undefined;
+  } else {
+    const ids = parseRepairIds(params);
+    if (!reg.trim() || ids.length === 0) {
+      redirect("/book");
+    }
+    // Re-quote server-side (never trust the URL) — the same (reg, nodes) inputs
+    // price identically at checkout and booking create.
+    quote = await quoteRepairs(reg, ids, createAdminClient());
+    if (!quote) {
+      redirect(`/book/repairs?reg=${encodeURIComponent(reg)}`);
+    }
   }
 
   const multi = quote.items.length > 1;
@@ -77,14 +103,16 @@ export default async function SlotPage({ searchParams }: SlotPageProps) {
   const bookingAsCustomer = Boolean(user) && sessionRole === "customer";
 
   const vehicleParams = [
-    params.make ? `make=${encodeURIComponent(params.make)}` : null,
-    params.model ? `model=${encodeURIComponent(params.model)}` : null,
-    params.postcode ? `postcode=${encodeURIComponent(params.postcode)}` : null,
+    make ? `make=${encodeURIComponent(make)}` : null,
+    model ? `model=${encodeURIComponent(model)}` : null,
+    postcode ? `postcode=${encodeURIComponent(postcode)}` : null,
   ]
     .filter(Boolean)
     .join("&");
 
-  const backHref = `/book/match?reg=${encodeURIComponent(reg)}&${repairsQuery(quote.itemIds)}${vehicleParams ? `&${vehicleParams}` : ""}${params.pref ? `&pref=${encodeURIComponent(params.pref)}` : ""}`;
+  const backHref = quoteId
+    ? `/dashboard/quotes/${quoteId}`
+    : `/book/match?reg=${encodeURIComponent(reg)}&${repairsQuery(quote.itemIds)}${vehicleParams ? `&${vehicleParams}` : ""}${pref ? `&pref=${encodeURIComponent(pref)}` : ""}`;
 
   return (
     <div className="flex flex-col gap-6">
@@ -99,20 +127,23 @@ export default async function SlotPage({ searchParams }: SlotPageProps) {
           <ArrowLeft size={18} />
         </Link>
         <div>
-          <h1 className="text-2xl font-bold text-text-primary">Pick a time</h1>
+          <h1 className="text-2xl font-bold text-text-primary">
+            {quoteId ? "Pick a time for your return visit" : "Pick a time"}
+          </h1>
           <p className="text-sm text-text-secondary">
             {multi ? `${quote.items.length} jobs` : quote.description} ·{" "}
-            {vehicleLabel(reg, params.make, params.model)}
+            {vehicleLabel(reg, make, model)}
           </p>
         </div>
       </div>
 
       <SlotPicker
         reg={reg}
-        make={(params.make ?? "").toUpperCase()}
-        model={params.model}
-        defaultPostcode={(params.postcode ?? "").toUpperCase()}
-        repairNodeIds={quote.itemIds}
+        make={(make ?? "").toUpperCase()}
+        model={model}
+        defaultPostcode={(postcode ?? "").toUpperCase()}
+        quoteId={quoteId || undefined}
+        repairNodeIds={quoteId ? [] : quote.itemIds}
         repairLines={quote.lines.map(({ nodeId, description, chargedHours, itemId, itemLabel }) => ({
           nodeId,
           description,
@@ -121,7 +152,7 @@ export default async function SlotPage({ searchParams }: SlotPageProps) {
           itemLabel,
         }))}
         pricePence={pricePence}
-        preferredMechanicId={params.pref}
+        preferredMechanicId={pref}
         availableCreditPence={bookingAsCustomer ? availableCreditPence : 0}
         signedIn={bookingAsCustomer}
         wrongRole={Boolean(user) && !bookingAsCustomer ? (sessionRole ?? "admin") : undefined}

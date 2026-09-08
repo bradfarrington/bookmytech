@@ -39,6 +39,12 @@ interface PrepareBody {
   vehicleReg?: unknown;
   repairNodeId?: unknown;
   repairNodeIds?: unknown;
+  /**
+   * A follow-on quote (Task 34, additive): the price and the vehicle come from
+   * the quote, so `vehicleReg` and the repair ids may be omitted. The quote
+   * must be the caller's; see /bookings/:id/quotes/:quoteId/respond.
+   */
+  quoteId?: unknown;
 }
 
 const asString = (value: unknown): string => (typeof value === "string" ? value.trim() : "");
@@ -58,18 +64,21 @@ export async function POST(request: Request): Promise<Response> {
   const vehicleReg = asString(parsed.body.vehicleReg);
   const repairNodeId = asString(parsed.body.repairNodeId);
   const repairNodeIds = readRepairIdList(parsed.body.repairNodeIds);
+  const quoteId = asString(parsed.body.quoteId);
 
-  if (!vehicleReg) {
-    return apiError("We need your registration number to price this repair.", 400);
-  }
-  if (repairNodeIds === null) {
-    return apiError("Choose the repairs you need first.", 400);
-  }
-  if (!repairNodeId && repairNodeIds.length === 0) {
-    return apiError("Choose the repair you need first.", 400);
-  }
-  if (repairNodeIds.length > MAX_REPAIRS_PER_BOOKING) {
-    return apiError(`You can book up to ${MAX_REPAIRS_PER_BOOKING} jobs in one visit.`, 400);
+  if (!quoteId) {
+    if (!vehicleReg) {
+      return apiError("We need your registration number to price this repair.", 400);
+    }
+    if (repairNodeIds === null) {
+      return apiError("Choose the repairs you need first.", 400);
+    }
+    if (!repairNodeId && repairNodeIds.length === 0) {
+      return apiError("Choose the repair you need first.", 400);
+    }
+    if (repairNodeIds.length > MAX_REPAIRS_PER_BOOKING) {
+      return apiError(`You can book up to ${MAX_REPAIRS_PER_BOOKING} jobs in one visit.`, 400);
+    }
   }
   if (!postcode) {
     return apiError("Enter the postcode we're coming to.", 400);
@@ -83,7 +92,8 @@ export async function POST(request: Request): Promise<Response> {
       postcode,
       vehicleReg,
       repairNodeId: repairNodeId || undefined,
-      repairNodeIds: repairNodeIds.length ? repairNodeIds : undefined,
+      repairNodeIds: repairNodeIds && repairNodeIds.length ? repairNodeIds : undefined,
+      quoteId: quoteId || undefined,
     },
     caller.userId,
   );

@@ -16,8 +16,10 @@ import {
   slotIso,
 } from "@/lib/slots";
 import { dispatchBooking } from "@/lib/dispatch/dispatch";
-import { quoteRepairs } from "@/lib/haynespro/repair-booking";
+import { quoteRepairs, type RepairsQuote } from "@/lib/haynespro/repair-booking";
 import { MAX_REPAIRS_PER_BOOKING, repairIdsFromInput } from "@/lib/bookings/repair-ids";
+import { quoteFollowOn, type FollowOnOrigin } from "@/lib/quotes/book-follow-on";
+import type { QuoteView } from "@/lib/quotes/load";
 import { trackEvent } from "@/app/actions/track-event";
 import { FUNNEL_EVENTS } from "@/lib/analytics/events";
 import { availableCreditPence, redeemCreditForBooking } from "@/lib/credits/credits";
@@ -92,6 +94,51 @@ export interface CreateBookingInput {
   paymentMode?: PaymentMode;
   /** Credit the held amount was reduced by at prepare time (clamped on redeem). */
   creditAppliedPence?: number;
+  /**
+   * A follow-on quote from the mechanic (Task 34). When set, the price and the
+   * lines come from the quote (what the customer approved), the vehicle from
+   * the job it was raised on, and the quoting mechanic is offered the job
+   * first. `repairNodeId(s)` and the vehicle fields are ignored. Signed-in only.
+   */
+  quoteId?: string;
+}
+
+type ResolvedQuote =
+  | { ok: true; quote: RepairsQuote; followOn: { source: QuoteView; origin: FollowOnOrigin } | null }
+  | { ok: false; error: string };
+
+/**
+ * Where a booking's price comes from: the HaynesPro catalogue for the chosen
+ * ids, or — for a return visit — the mechanic's follow-on quote. Shared by
+ * prepare and create so the hold and the row can't disagree.
+ */
+async function resolveBookingQuote(
+  input: { vehicleReg: string; repairNodeId?: string; repairNodeIds?: string[]; quoteId?: string },
+  customerId: string | null,
+): Promise<ResolvedQuote> {
+  if (input.quoteId) {
+    if (!customerId) return { ok: false, error: "Please sign in to book from a quote." };
+    const admin = createAdminClient();
+    // The caller's email, for a guest-booked original job matched on email.
+    const { data: userData } = await admin.auth.admin.getUserById(customerId);
+    const followOn = await quoteFollowOn(input.quoteId, { userId: customerId, email: userData?.user?.email ?? null }, admin);
+    if (!followOn.ok) return followOn;
+    return { ok: true, quote: followOn.quote, followOn: { source: followOn.source, origin: followOn.origin } };
+  }
+  const ids = repairIdsFromInput(input);
+  if (ids.length === 0) return { ok: false, error: "Choose the repairs you need first." };
+  if (ids.length > MAX_REPAIRS_PER_BOOKING)
+    return { ok: false, error: `You can book up to ${MAX_REPAIRS_PER_BOOKING} jobs in one visit.` };
+  const quote = await quoteRepairs(input.vehicleReg, ids, createAdminClient());
+  if (!quote)
+    return {
+      ok: false,
+      error:
+        ids.length > 1
+          ? "We couldn't price these repairs. Please start the booking again."
+          : "We couldn't price this repair. Please start the booking again.",
+    };
+  return { ok: true, quote, followOn: null };
 }
 
 export type CreateBookingResult =
@@ -198,30 +245,18 @@ export async function createBooking(
   const passedCredit = customerId ? Math.max(0, Math.round(input.creditAppliedPence ?? 0)) : 0;
 
   // Recompute the canonical price server-side — never trust a client-supplied
-  // total. The same (reg, repair nodes) inputs produced the prepare amount
-  // moments earlier. The full breakdown is snapshotted onto the row so later
-  // pricing changes never apply retroactively.
-  const ids = repairIdsFromInput(input);
-  if (ids.length === 0) {
-    return { ok: false, error: "Choose the repairs you need first." };
-  }
-  if (ids.length > MAX_REPAIRS_PER_BOOKING) {
-    return {
-      ok: false,
-      error: `You can book up to ${MAX_REPAIRS_PER_BOOKING} jobs in one visit.`,
-    };
-  }
-  const quote = await quoteRepairs(input.vehicleReg, ids, createAdminClient());
-  if (!quote) {
-    return {
-      ok: false,
-      error:
-        ids.length > 1
-          ? "We couldn't price these repairs. Please start the booking again."
-          : "We couldn't price this repair. Please start the booking again.",
-    };
-  }
+  // total. The same (reg, repair nodes) inputs — or the same follow-on quote —
+  // produced the prepare amount moments earlier. The full breakdown is
+  // snapshotted onto the row so later pricing changes never apply retroactively.
+  const resolved = await resolveBookingQuote(input, customerId);
+  if (!resolved.ok) return resolved;
+  const { quote, followOn } = resolved;
   const price = quote.breakdown;
+  // A return visit is for the car and the mechanic the quote was raised on.
+  const vehicleReg = followOn ? followOn.origin.vehicle_reg : input.vehicleReg;
+  const vehicleMake = followOn ? (followOn.origin.vehicle_make ?? input.vehicleMake) : input.vehicleMake;
+  const vehicleModel = followOn ? (followOn.origin.vehicle_model ?? input.vehicleModel ?? null) : (input.vehicleModel ?? null);
+  const preferredMechanicId = followOn ? followOn.origin.mechanic_id : (input.preferredMechanicId ?? null);
   // The summary ("Renew the alternator + 2 more jobs") — what every one-line
   // reader shows. The individual lines go to booking_repairs below.
   const repairDescription = quote.description;
@@ -240,15 +275,19 @@ export async function createBooking(
     .insert({
       customer_id: customerId,
       // The first line as the customer chose it — a HaynesPro job id, or
-      // "p:<uuid>" for a product (Task 31).
+      // "p:<uuid>" for a product (Task 31), or "q:<uuid>" for a line of a
+      // follow-on quote that has no HaynesPro job behind it (Task 34).
       repair_node_id: quote.lines[0].nodeId,
       repair_description: repairDescription,
       // Only named on a multi-job booking: the column arrives with migration
       // 0055, and a single-job insert must keep working before it is applied.
       ...(multiJob ? { combine_source: quote.combineSource } : {}),
-      vehicle_reg: input.vehicleReg,
-      vehicle_make: input.vehicleMake,
-      vehicle_model: input.vehicleModel ?? null,
+      vehicle_reg: vehicleReg,
+      vehicle_make: vehicleMake,
+      vehicle_model: vehicleModel,
+      // Booked from a follow-on quote (Task 34): only named when so — the
+      // column arrives with 0062.
+      ...(followOn ? { source_quote_id: followOn.source.id } : {}),
       scheduled_at: scheduledAt,
       slot_window: input.slotWindow ?? null,
       // Only named when set: the column arrives with migration 0057, and an
@@ -286,7 +325,7 @@ export async function createBooking(
       parking_type: input.parkingType,
       special_instructions: input.specialInstructions ?? null,
       postcode: input.postcode,
-      preferred_mechanic_id: input.preferredMechanicId ?? null,
+      preferred_mechanic_id: preferredMechanicId,
       payment_mode: mode,
     })
     .select("id, job_number")
@@ -328,6 +367,42 @@ export async function createBooking(
         error: "We couldn't save the jobs on this booking. Please try again.",
       };
     }
+  }
+
+  // A return visit booked from a follow-on quote (Task 34): the quote's parts
+  // become the booking's parts (self-sourced — the mechanic supplies them; the
+  // first rows this table has had since Task 17), the quote is marked booked,
+  // and the original job's timeline records it.
+  if (followOn) {
+    const parts = followOn.source.lines.filter((l) => l.kind === "part");
+    if (parts.length) {
+      const { error: partsError } = await db.from("booking_parts").insert(
+        parts.map((p) => ({
+          booking_id: data.id,
+          part_id: p.partId,
+          part_name: p.description,
+          quantity: p.quantity,
+          unit_price_pence: p.unitPence,
+          total_pence: p.linePence,
+          sourcing: "self",
+          status: "pending",
+        })),
+      );
+      if (partsError) console.error("[booking] follow-on parts insert failed", data.id, partsError);
+    }
+    const now = new Date().toISOString();
+    await db
+      .from("job_quotes")
+      .update({ status: "approved", responded_at: followOn.source.respondedAt ?? now, follow_on_booking_id: data.id, updated_at: now })
+      .eq("id", followOn.source.id);
+    await db.from("booking_events").insert({
+      booking_id: followOn.origin.id,
+      event_type: "quote_approved",
+      actor_id: customerId,
+      actor_role: "customer",
+      reason: "Return visit booked from the quote",
+      payload: { quote_id: followOn.source.id, follow_on_booking_id: data.id, amount_pence: followOn.source.totalPence },
+    });
   }
 
   // Redeem the customer's account credit against this booking (service-role —
@@ -383,8 +458,8 @@ export async function createBooking(
               timeZone: BOOKING_TIME_ZONE,
             })}`
       }`;
-  const vehicleLabel = `${input.vehicleReg ? `${input.vehicleReg} — ` : ""}${input.vehicleMake}${
-    input.vehicleModel ? ` ${input.vehicleModel}` : ""
+  const vehicleLabel = `${vehicleReg ? `${vehicleReg} — ` : ""}${vehicleMake}${
+    vehicleModel ? ` ${vehicleModel}` : ""
   }`;
   renderTemplateEmail("booking_confirmed", {
     name: input.customerName,
@@ -428,6 +503,8 @@ export interface PrepareCheckoutInput {
   repairNodeId?: string;
   /** Every repair in the booking (Task 24); wins over `repairNodeId` when non-empty. */
   repairNodeIds?: string[];
+  /** A follow-on quote (Task 34) — priced from the quote instead of the catalogue. Signed-in only. */
+  quoteId?: string;
 }
 
 export type PrepareCheckoutResult =
@@ -461,26 +538,10 @@ export async function prepareCheckoutFor(
   input: PrepareCheckoutInput,
   customerId: string | null,
 ): Promise<PrepareCheckoutResult> {
-  const ids = repairIdsFromInput(input);
-  if (ids.length === 0) {
-    return { ok: false, error: "Choose the repairs you need first." };
-  }
-  if (ids.length > MAX_REPAIRS_PER_BOOKING) {
-    return {
-      ok: false,
-      error: `You can book up to ${MAX_REPAIRS_PER_BOOKING} jobs in one visit.`,
-    };
-  }
-  const quote = await quoteRepairs(input.vehicleReg, ids, createAdminClient());
-  if (!quote) {
-    return {
-      ok: false,
-      error:
-        ids.length > 1
-          ? "We couldn't price these repairs. Please start the booking again."
-          : "We couldn't price this repair. Please start the booking again.",
-    };
-  }
+  const resolved = await resolveBookingQuote(input, customerId);
+  if (!resolved.ok) return resolved;
+  const { quote } = resolved;
+  const ids = quote.itemIds;
   // The combined total — one hold for the whole visit.
   const totalPence = quote.breakdown.totalPence;
 

@@ -67,6 +67,12 @@ interface BookingBody {
   creditAppliedPence?: unknown;
   /** Rebook "same mechanic if available" — optional, a mechanic id. */
   preferredMechanicId?: unknown;
+  /**
+   * A follow-on quote (Task 34, additive). When set, the price, lines and
+   * vehicle come from the quote and the quoting mechanic is offered the job
+   * first; `vehicleReg`, `vehicleMake` and the repair ids may be omitted.
+   */
+  quoteId?: unknown;
 }
 
 const asString = (value: unknown): string => (typeof value === "string" ? value.trim() : "");
@@ -108,15 +114,19 @@ export async function POST(request: Request): Promise<Response> {
   const paymentMode = asString(body.paymentMode);
   const stripePaymentIntentId = asString(body.stripePaymentIntentId);
   const preferredMechanicId = asString(body.preferredMechanicId);
+  const quoteId = asString(body.quoteId);
 
-  if (!vehicleReg) return apiError("We need your registration number to book this repair.", 400);
-  if (!vehicleMake) return apiError("We need your vehicle's make to book this repair.", 400);
-  if (repairNodeIds === null) return apiError("Choose the repairs you need first.", 400);
-  if (!repairNodeId && repairNodeIds.length === 0) {
-    return apiError("Choose the repair you need first.", 400);
-  }
-  if (repairNodeIds.length > MAX_REPAIRS_PER_BOOKING) {
-    return apiError(`You can book up to ${MAX_REPAIRS_PER_BOOKING} jobs in one visit.`, 400);
+  if (quoteId && !isUuid(quoteId)) return apiError("We couldn't find that quote.", 400);
+  if (!quoteId) {
+    if (!vehicleReg) return apiError("We need your registration number to book this repair.", 400);
+    if (!vehicleMake) return apiError("We need your vehicle's make to book this repair.", 400);
+    if (repairNodeIds === null) return apiError("Choose the repairs you need first.", 400);
+    if (!repairNodeId && repairNodeIds.length === 0) {
+      return apiError("Choose the repair you need first.", 400);
+    }
+    if (repairNodeIds.length > MAX_REPAIRS_PER_BOOKING) {
+      return apiError(`You can book up to ${MAX_REPAIRS_PER_BOOKING} jobs in one visit.`, 400);
+    }
   }
   if (!customerName) return apiError("Enter the name we should put on the booking.", 400);
   if (!addressLine1) return apiError("Enter the address we're coming to.", 400);
@@ -154,7 +164,8 @@ export async function POST(request: Request): Promise<Response> {
     vehicleMake,
     vehicleModel: vehicleModel || undefined,
     repairNodeId: repairNodeId || undefined,
-    repairNodeIds: repairNodeIds.length ? repairNodeIds : undefined,
+    repairNodeIds: repairNodeIds && repairNodeIds.length ? repairNodeIds : undefined,
+    quoteId: quoteId || undefined,
     scheduledAt,
     slotWindow: slotWindow || undefined,
     candidateDays: candidateDays.length ? candidateDays : undefined,

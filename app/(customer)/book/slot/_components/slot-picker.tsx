@@ -131,12 +131,13 @@ function readDraft(intentId: string): CheckoutDraft | null {
         },
       ];
     }
-    // A draft missing any of these can't produce a bookable row.
+    // A draft missing any of these can't produce a bookable row. A follow-on
+    // quote (Task 34) carries no repair ids — the quote is the price.
     if (
       !parsed?.common?.selectedSlot ||
       !parsed.common.addressLine1 ||
       !Array.isArray(parsed.common.repairNodeIds) ||
-      parsed.common.repairNodeIds.length === 0
+      (parsed.common.repairNodeIds.length === 0 && !parsed.common.quoteId)
     ) {
       return null;
     }
@@ -182,6 +183,9 @@ const NOTHING_HELD = new Set([
 ]);
 
 function returnParams(c: ConfirmCommon): Record<string, string> {
+  // A follow-on quote (Task 34) is the whole address of the page; the rest is
+  // derived from it server-side.
+  if (c.quoteId) return { quote: c.quoteId };
   const params: Record<string, string> = { reg: c.reg, repairs: c.repairNodeIds.join(",") };
   if (c.make) params.make = c.make;
   if (c.model) params.model = c.model;
@@ -194,12 +198,14 @@ interface SlotPickerProps {
   make: string;
   model?: string;
   defaultPostcode?: string;
-  /** HaynesPro repair node ids, in the customer's order — the server re-quotes from (reg, nodes). */
+  /** HaynesPro repair node ids, in the customer's order — the server re-quotes from (reg, nodes). Empty for a follow-on quote. */
   repairNodeIds: string[];
   /** The same jobs with their names and charged hours, for the recap (Task 24). */
   repairLines: RepairLineLite[];
   pricePence: number;
   preferredMechanicId?: string;
+  /** A follow-on quote (Task 34): the server prices from it instead of the catalogue. */
+  quoteId?: string;
   /** Signed-in customer's spendable account credit (0 for guests). */
   availableCreditPence?: number;
   /** Whether the visitor is signed in AS A CUSTOMER — hides the account block. */
@@ -233,6 +239,7 @@ export function SlotPicker({
   repairLines,
   pricePence,
   preferredMechanicId,
+  quoteId,
   availableCreditPence = 0,
   signedIn = false,
   wrongRole,
@@ -554,6 +561,7 @@ export function SlotPicker({
         vehicleReg: reg,
         repairNodeId: repairNodeIds[0],
         repairNodeIds,
+        quoteId,
       });
       if (!result.ok) {
         setStripeError(result.error);
@@ -589,6 +597,7 @@ export function SlotPicker({
     repairNodeIds,
     repairLines,
     preferredMechanicId,
+    quoteId,
     // Identity is settled before this step — the checkout no longer asks.
     customerName: signedIn ? customerName : name.trim(),
     customerEmail: signedIn ? customerEmail : email.trim(),
@@ -1048,6 +1057,8 @@ interface ConfirmCommon {
   repairNodeIds: string[];
   repairLines: RepairLineLite[];
   preferredMechanicId?: string;
+  /** A follow-on quote (Task 34). */
+  quoteId?: string;
   /** Resolved before this step — the customer always has an account by now. */
   customerName: string;
   customerEmail: string;
@@ -1075,6 +1086,7 @@ function bookingInputFrom(
     parkingType: c.parkingType,
     specialInstructions: c.instructions || undefined,
     preferredMechanicId: c.preferredMechanicId || undefined,
+    quoteId: c.quoteId || undefined,
     ...extra,
   };
 }
