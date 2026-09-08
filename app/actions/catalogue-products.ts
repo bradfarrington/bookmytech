@@ -42,6 +42,9 @@ export interface ProductInput {
   durationHours: number;
   includesEngineOil: boolean;
   isActive: boolean;
+  /** The checklist the mechanic fills in on this product (Task 32), and its tier for an inspection. */
+  checklistId?: string | null;
+  checklistTier?: string | null;
 }
 
 type Cleaned = {
@@ -54,7 +57,11 @@ type Cleaned = {
   duration_hours: number;
   includes_engine_oil: boolean;
   is_active: boolean;
+  checklist_id: string | null;
+  checklist_tier: string | null;
 };
+
+const TIERS = ["bronze", "silver", "gold"];
 
 function clean(input: ProductInput): { ok: true; row: Cleaned } | { ok: false; error: string } {
   if (!CATEGORIES.includes(input.category as ProductCategory))
@@ -81,6 +88,10 @@ function clean(input: ProductInput): { ok: true; row: Cleaned } | { ok: false; e
   const d = Number(input.durationHours);
   if (!Number.isFinite(d) || d <= 0 || d > 24) return { ok: false, error: "Enter how long the visit takes (more than 0, up to 24 hours)." };
 
+  const checklist_id = (input.checklistId ?? "").trim() || null;
+  const tierRaw = (input.checklistTier ?? "").trim().toLowerCase();
+  const checklist_tier = checklist_id && TIERS.includes(tierRaw) ? tierRaw : null;
+
   return {
     ok: true,
     row: {
@@ -93,6 +104,8 @@ function clean(input: ProductInput): { ok: true; row: Cleaned } | { ok: false; e
       duration_hours: Math.round(d * 100) / 100,
       includes_engine_oil: Boolean(input.includesEngineOil),
       is_active: Boolean(input.isActive),
+      checklist_id,
+      checklist_tier,
     },
   };
 }

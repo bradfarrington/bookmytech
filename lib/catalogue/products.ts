@@ -85,6 +85,9 @@ export interface CatalogueProductRow {
   includes_engine_oil: boolean;
   display_order: number | null;
   is_active: boolean;
+  /** 0061 (Task 32) — the checklist the mechanic fills in on this product, and the tier of it. */
+  checklist_id?: string | null;
+  checklist_tier?: string | null;
 }
 
 function num(value: number | string | null | undefined): number | null {

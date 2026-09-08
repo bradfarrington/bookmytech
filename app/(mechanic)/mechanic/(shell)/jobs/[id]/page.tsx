@@ -1,5 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { loadBookingChecklists, productIdsInLines } from "@/lib/checklists/load";
 import { geocodePostcode, haversineMiles, type LatLng } from "@/lib/geo/postcodes";
 import { mechanicSharePence } from "@/lib/earnings";
 import { isHaynesProConfigured } from "@/lib/haynespro/client";
@@ -58,6 +60,12 @@ export default async function MechanicJobDetailPage({ params }: PageProps) {
     .eq("booking_id", id)
     .order("position");
   const repairLines = repairLinesFor(booking, (lineRows ?? null) as BookingRepairRow[] | null);
+
+  // The checklists a service / inspection carries (Task 32). The products
+  // table is admin-only under RLS, so this reads through the service-role
+  // client — safe, the booking itself was just proved visible to this
+  // mechanic by the RLS read above.
+  const checklists = await loadBookingChecklists(createAdminClient(), id, productIdsInLines(repairLines));
 
   const { data: mechanic } = await supabase
     .from("mechanics")
@@ -207,6 +215,8 @@ export default async function MechanicJobDetailPage({ params }: PageProps) {
     vehicle: [booking.vehicle_make, booking.vehicle_model].filter(Boolean).join(" ") || "Vehicle",
     reg: booking.vehicle_reg,
     mileage: booking.mileage ?? null,
+    mileageRequired: checklists.length > 0,
+    checklists,
     whenLabel,
     distanceLabel,
     // Every booking carries its exact billed duration (book time).

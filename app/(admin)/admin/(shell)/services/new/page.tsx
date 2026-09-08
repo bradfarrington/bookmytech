@@ -2,9 +2,15 @@ import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { Icon } from "@/components/ui/icon";
 import { Overline } from "@/components/ui/overline";
+import { createClient } from "@/lib/supabase/server";
+import type { ChecklistRow } from "@/lib/checklists/checklists";
 import { ProductForm } from "../_components/product-form";
 
-export default function AdminServiceNewPage() {
+export const dynamic = "force-dynamic";
+
+export default async function AdminServiceNewPage() {
+  const supabase = await createClient();
+  const { data: checklists } = await supabase.from("checklists").select("id, key, name, kind").order("name");
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <div>
@@ -20,7 +26,7 @@ export default function AdminServiceNewPage() {
         <Overline>Commercial · Services</Overline>
         <h1 className="mt-1 text-3xl font-bold tracking-tight text-text-primary">Add product</h1>
       </header>
-      <ProductForm mode="create" />
+      <ProductForm mode="create" checklists={(checklists ?? []) as ChecklistRow[]} />
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Star, ShieldAlert, Scale } from "lucide-react";
+import { Star, ShieldAlert, Scale, ClipboardList } from "lucide-react";
 import { formatPrice } from "@/lib/utils";
 import { RebookControl } from "./rebook-control";
 import { SectionHeading } from "./section-heading";
@@ -83,6 +83,16 @@ export function PastJobs({ jobs, mechanics, ratedByBooking, disputes }: PastJobs
                     {job.vehicleReg}
                   </p>
 
+                  {/* The service / inspection report (Task 32) */}
+                  {job.hasReport && job.status === "completed" && (
+                    <Link
+                      href={`/dashboard/bookings/${job.id}/report`}
+                      className="mt-2 mr-4 inline-flex items-center gap-1.5 text-sm font-semibold text-brand-blue hover:underline"
+                    >
+                      <ClipboardList size={14} />
+                      View report
+                    </Link>
+                  )}
                   {rating ? (
                     <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800">
                       <Star size={12} className="fill-amber-400 text-amber-400" />

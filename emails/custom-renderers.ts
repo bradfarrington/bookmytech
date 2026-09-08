@@ -88,6 +88,19 @@ export const CUSTOM_RENDERERS: Record<string, CustomRenderer> = {
     return `<mj-text color="#64748B" font-size="13px" padding-top="4px">${escapeHtml(line)}</mj-text>`;
   },
 
+  // job_complete — the service / inspection report (Task 32); nothing when
+  // the job had no checklist.
+  report_link(vars) {
+    const url = vars.report_url ? String(vars.report_url) : "";
+    if (!url) return "";
+    return `<mj-text padding-top="4px" color="#64748B" font-size="13px">
+      Your mechanic filled in a checklist as they worked — every item, with their notes.
+    </mj-text>
+    <mj-button href="${escapeHtml(url)}" background-color="#2563EB" color="#ffffff" font-weight="700" border-radius="8px" padding="8px 0 12px 0">
+      View your report
+    </mj-button>`;
+  },
+
   // job_complete — the odometer reading the mechanic recorded (Task 30); the
   // block renders nothing when they didn't.
   mileage_line(vars) {

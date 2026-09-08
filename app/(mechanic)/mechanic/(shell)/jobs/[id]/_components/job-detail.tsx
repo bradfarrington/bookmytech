@@ -39,6 +39,8 @@ import { PhotoUploader, type JobPhoto } from "./photo-uploader";
 import { PartsOrder, type JobPart } from "./parts-order";
 import { ArrivalWindowPicker } from "./arrival-window-picker";
 import { MileageField } from "./mileage-field";
+import { ChecklistPanel } from "./checklist-panel";
+import type { LoadedChecklist } from "@/lib/checklists/load";
 
 export interface JobDetailProps {
   bookingId: string;
@@ -55,6 +57,8 @@ export interface JobDetailProps {
   mileage: number | null;
   /** Task 32: a servicing / inspection job can't complete without a reading. */
   mileageRequired?: boolean;
+  /** The checklists this job carries (Task 32); empty on a plain repair. */
+  checklists?: LoadedChecklist[];
   whenLabel: string;
   distanceLabel: string;
   durationLabel: string;
@@ -315,6 +319,22 @@ export function JobDetail(props: JobDetailProps) {
                   </Link>
                 ))}
               </div>
+            </Card>
+          )}
+
+          {/* Checklist — a service or inspection's items, answered on the job (Task 32) */}
+          {props.checklists && props.checklists.length > 0 && (
+            <Card className="space-y-4 p-6">
+              <CardTitle icon={ListChecks}>
+                {props.checklists.length > 1 ? "Checklists" : "Checklist"}
+              </CardTitle>
+              <ChecklistPanel bookingId={bookingId} checklists={props.checklists} status={status} />
+              {status === "in_progress" && (
+                <p className="text-xs text-text-muted">
+                  Every item needs an answer, and the mileage recorded, before you can complete the job.
+                  The customer sees this as their report.
+                </p>
+              )}
             </Card>
           )}
 

@@ -32,6 +32,8 @@ export interface DashboardBooking {
   repairNodeIds: string[];
   /** Every job's name, in order. One entry for a single-job booking. */
   repairLines: string[];
+  /** True when the booking carries a service / inspection checklist (Task 32) — there is a report to view. */
+  hasReport: boolean;
 }
 
 export interface MechanicLite {

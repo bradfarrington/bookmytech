@@ -154,6 +154,10 @@ Fixed-price products beside the HaynesPro repair tree: diagnostics, servicing an
 
 `booking_repairs.kind` (`0060`): `job` (default) or `product` — a product line's `node_id` is `p:<uuid>` and its `line_pence` its price; hours are 0 on a fixed product. `repairLinesFor` exposes it as `product: boolean`.
 
+### `checklists` / `checklist_items` / `booking_checklist_results` — `0061` (Task 32)
+
+What the mechanic ticks through on a service or a pre-purchase inspection, and what the customer gets back as their report. `checklists` (`key`, `name`, `kind` = `service` | `inspection` — the kind decides the answer scale); `checklist_items` (`checklist_id`, `section`, `label`, `position`, `tiers text[]` — null = every tier, else the Bronze/Silver/Gold subset; `is_active` — soft removal so old reports keep their items; unique on checklist+section+label); `booking_checklist_results` (`booking_id`, `item_id`, `result` ∈ `checked`/`na` on a service, `pass`/`advisory`/`fail`/`not_checked` on an inspection, `comment`, `updated_by`; unique per booking+item). A product links to its checklist with `catalogue_products.checklist_id` + `checklist_tier`; a booking's checklists are its products' (`lib/checklists/load.ts`). Seeded from Gareth's documents (`docs/checklists/`): Interim 46 / Full 56 / Major 66; inspection 173 (Bronze 64, Silver 116, Gold 173). RLS: checklists + items SELECT for any signed-in user; results SELECT for the booking's customer (id or guest email), the assigned mechanic, admins; no write policies (the mechanic's `saveChecklistResult` writes via service role). Completion refuses until every item is answered and `bookings.mileage` is set.
+
 ### The repair catalogue overlay — `0056` (Task 26)
 
 Our layer over HaynesPro's repair tree; HaynesPro stays the source of every job and time. Keyed on HaynesPro node ids, which mean the same job on every make, so one overlay applies to every vehicle. `parent_id` values are `'root'`, a HaynesPro group id, or `g:<uuid>` (one of our categories).

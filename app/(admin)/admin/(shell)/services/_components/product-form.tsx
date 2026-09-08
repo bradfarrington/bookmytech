@@ -9,6 +9,7 @@ import { Card } from "@/components/ui/card";
 import { Select } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { PRODUCT_CATEGORIES, type CatalogueProductRow, type ProductCategory } from "@/lib/catalogue/products";
+import type { ChecklistRow } from "@/lib/checklists/checklists";
 import { createProduct, updateProduct, type ProductInput } from "@/app/actions/catalogue-products";
 
 const FIELD_LABEL = "flex flex-col gap-1.5 text-sm font-semibold text-text-primary";
@@ -22,10 +23,29 @@ function poundsToPence(v: string): number {
 
 type Pricing = "fixed" | "hourly";
 
-export function ProductForm({ mode, product }: { mode: "create" | "edit"; product?: CatalogueProductRow }) {
+const TIER_OPTIONS = [
+  { value: "", label: "Every item (no tier)" },
+  { value: "bronze", label: "Bronze" },
+  { value: "silver", label: "Silver" },
+  { value: "gold", label: "Gold" },
+];
+
+export function ProductForm({
+  mode,
+  product,
+  checklists = [],
+}: {
+  mode: "create" | "edit";
+  product?: CatalogueProductRow;
+  /** The checklists a product can carry (Task 32); empty before 0061. */
+  checklists?: ChecklistRow[];
+}) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [checklistId, setChecklistId] = useState(product?.checklist_id ?? "");
+  const [checklistTier, setChecklistTier] = useState(product?.checklist_tier ?? "");
+  const chosenChecklist = checklists.find((c) => c.id === checklistId) ?? null;
 
   const [category, setCategory] = useState<ProductCategory>(product?.category ?? "diagnostics");
   const [name, setName] = useState(product?.name ?? "");
@@ -51,6 +71,8 @@ export function ProductForm({ mode, product }: { mode: "create" | "edit"; produc
       durationHours: Number(durationInput),
       includesEngineOil: includesOil,
       isActive,
+      checklistId: checklistId || null,
+      checklistTier: chosenChecklist?.kind === "inspection" ? checklistTier || null : null,
     };
     startTransition(async () => {
       const result = mode === "create" ? await createProduct(input) : await updateProduct(product!.id, input);
@@ -186,6 +208,33 @@ export function ProductForm({ mode, product }: { mode: "create" | "edit"; produc
             />
             <span className="text-xs font-normal text-text-muted">How long the mechanic&apos;s calendar is blocked for.</span>
           </label>
+        </div>
+
+        {/* Checklist (Task 32) */}
+        <div className="grid gap-5 sm:grid-cols-2">
+          <label className={FIELD_LABEL}>
+            <span>Checklist</span>
+            <Select
+              value={checklistId}
+              onChange={setChecklistId}
+              options={[
+                { value: "", label: "None" },
+                ...checklists.map((c) => ({ value: c.id, label: c.name })),
+              ]}
+              aria-label="Checklist"
+            />
+            <span className="text-xs font-normal text-text-muted">
+              What the mechanic ticks through on the job; the customer gets it back as a report.
+              {checklists.length === 0 && " No checklists exist yet — apply migration 0061."}
+            </span>
+          </label>
+          {chosenChecklist?.kind === "inspection" && (
+            <label className={FIELD_LABEL}>
+              <span>Tier</span>
+              <Select value={checklistTier} onChange={setChecklistTier} options={TIER_OPTIONS} aria-label="Checklist tier" />
+              <span className="text-xs font-normal text-text-muted">Which of the inspection&apos;s items this product covers.</span>
+            </label>
+          )}
         </div>
 
         <div className="flex flex-col gap-4 rounded-button border border-border bg-surface p-4 sm:flex-row sm:items-center sm:justify-between">

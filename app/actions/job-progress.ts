@@ -16,6 +16,9 @@ import { recomputeMechanicAggregates } from "@/lib/mechanics/aggregates";
 import { nettedPayout } from "@/lib/earnings";
 import { sendPushToCustomer } from "@/lib/push/send";
 import { shortPersonName } from "@/lib/utils";
+import { repairLinesFor, type BookingRepairRow } from "@/lib/bookings/repair-lines";
+import { unfinishedMessage } from "@/lib/checklists/checklists";
+import { loadBookingChecklists, productIdsInLines } from "@/lib/checklists/load";
 
 export type JobProgressResult = { ok: true } | { ok: false; error: string };
 
@@ -197,7 +200,7 @@ export async function completeAndCharge(bookingId: string): Promise<JobProgressR
     .select(
       `id, job_number, status, mechanic_id, customer_id, customer_email, customer_name, customer_phone, total_pence,
        mechanic_payout_pence, credit_applied_pence, payment_mode,
-       stripe_payment_intent_id, repair_description, mileage`,
+       stripe_payment_intent_id, repair_description, repair_node_id, mileage`,
     )
     .eq("id", bookingId)
     .single();
@@ -207,6 +210,27 @@ export async function completeAndCharge(bookingId: string): Promise<JobProgressR
     return { ok: false, error: "This isn't your job." };
   if (booking.status !== "in_progress")
     return { ok: false, error: "This job has already moved on — refresh the page." };
+
+  // Checklist gate (Task 32): a service or inspection can't complete until
+  // every item has an answer and the mileage is recorded — the report is what
+  // the customer paid for. Runs before anything touches Stripe.
+  const { data: lineRows } = await admin
+    .from("booking_repairs")
+    .select("*")
+    .eq("booking_id", bookingId)
+    .order("position");
+  const checklists = await loadBookingChecklists(
+    admin,
+    bookingId,
+    productIdsInLines(repairLinesFor(booking, (lineRows ?? null) as BookingRepairRow[] | null)),
+  );
+  for (const list of checklists) {
+    const unfinished = unfinishedMessage(list.name, list.progress);
+    if (unfinished) return { ok: false, error: unfinished };
+  }
+  if (checklists.length > 0 && booking.mileage == null)
+    return { ok: false, error: "Enter the vehicle's mileage before completing the job." };
+  const reportUrl = checklists.length > 0 ? `${siteUrl()}/dashboard/bookings/${bookingId}/report` : "";
 
   // Sign-off gate: a job can't be completed (and charged) until the customer
   // has signed on the mechanic's screen — see saveSignature in job-media.ts.
@@ -268,7 +292,24 @@ export async function completeAndCharge(bookingId: string): Promise<JobProgressR
     actor_role: "mechanic",
     // The odometer reading as recorded at completion, so the audit trail has
     // it even if the column is later edited.
-    payload: { status_from: "in_progress", status_to: "completed", mileage: booking.mileage ?? null },
+    payload: {
+      status_from: "in_progress",
+      status_to: "completed",
+      mileage: booking.mileage ?? null,
+      // What was answered on each checklist, as it stood at completion.
+      ...(checklists.length > 0
+        ? {
+            checklists: checklists.map((c) => ({
+              key: c.checklist.key,
+              tier: c.tier,
+              answered: c.progress.answered,
+              total: c.progress.total,
+              advisories: c.progress.advisory,
+              fails: c.progress.fail,
+            })),
+          }
+        : {}),
+    },
   });
   if (captured) {
     await admin.from("booking_events").insert({
@@ -445,6 +486,7 @@ export async function completeAndCharge(bookingId: string): Promise<JobProgressR
       charge_line: chargeLine,
       settle_line: settleLine,
       review_url: `${siteUrl()}/review/${bookingId}`,
+      report_url: reportUrl,
     })
       .then(({ subject, html }) => sendEmail({ to: receiptEmail, subject, html }))
       .catch(console.error);

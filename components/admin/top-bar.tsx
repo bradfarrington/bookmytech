@@ -29,6 +29,8 @@ const CRUMBS: Record<string, readonly [string, string]> = {
   "/admin/services": ["Commercial", "Services"],
   "/admin/services/new": ["Services", "New product"],
   "/admin/services/[id]/edit": ["Services", "Edit product"],
+  "/admin/services/checklists": ["Services", "Checklists"],
+  "/admin/services/checklists/[id]": ["Checklists", "Edit checklist"],
   "/admin/parts": ["Commercial", "Parts catalogue"],
   "/admin/parts/new": ["Parts", "New part"],
   "/admin/parts/[id]/edit": ["Parts", "Edit part"],

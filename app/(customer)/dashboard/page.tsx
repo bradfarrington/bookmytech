@@ -79,6 +79,28 @@ export default async function DashboardPage() {
       linesByBooking.set(line.booking_id, list);
     }
   }
+  // Which products carry a checklist (Task 32) — those bookings have a
+  // report. One query for every "p:" id across the list; an error (before
+  // 0060/0061) just means no reports.
+  const productIdOf = (nodeId: string | null | undefined) =>
+    typeof nodeId === "string" && nodeId.startsWith("p:") ? nodeId.slice(2) : null;
+  const productIdsByBooking = new Map<string, string[]>();
+  for (const b of rows ?? []) {
+    const ids = (linesByBooking.get(b.id)?.map((l) => productIdOf(l.nodeId)) ?? [productIdOf(b.repair_node_id)]).filter(
+      (v): v is string => v != null,
+    );
+    if (ids.length) productIdsByBooking.set(b.id, ids);
+  }
+  const productsWithReports = new Set<string>();
+  const allProductIds = [...new Set([...productIdsByBooking.values()].flat())];
+  if (allProductIds.length) {
+    const { data: products } = await admin
+      .from("catalogue_products")
+      .select("id, checklist_id")
+      .in("id", allProductIds);
+    for (const p of products ?? []) if (p.checklist_id) productsWithReports.add(p.id);
+  }
+
   // "Book again" carries what the customer CHOSE — a combined repair as one
   // id — and the card lists it once by its name.
   const uniq = (values: string[]) => [...new Set(values)];
@@ -112,6 +134,7 @@ export default async function DashboardPage() {
     repairLines: linesByBooking.get(b.id)
       ? uniq(linesByBooking.get(b.id)!.map((line) => line.itemLabel ?? line.description))
       : [b.repair_description ?? "Vehicle repair"],
+    hasReport: (productIdsByBooking.get(b.id) ?? []).some((pid) => productsWithReports.has(pid)),
   }));
 
   // Resolve the assigned mechanics in one round-trip each (profile + rating).

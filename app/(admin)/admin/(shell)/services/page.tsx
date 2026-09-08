@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Plus, PoundSterling } from "lucide-react";
+import { ListChecks, Plus, PoundSterling } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { Overline } from "@/components/ui/overline";
@@ -42,6 +42,11 @@ export default async function AdminServicesPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Link href="/admin/services/checklists">
+            <Button variant="ghost" iconLeft={ListChecks}>
+              Checklists
+            </Button>
+          </Link>
           <Link href="/admin/pricing">
             <Button variant="ghost" iconLeft={PoundSterling}>
               Oil price
