@@ -41,7 +41,7 @@ export default async function MechanicJobDetailPage({ params }: PageProps) {
        address_line_1, address_line_2,
        customer_name, customer_phone, special_instructions,
        cancellation_reason, reschedule_status, reschedule_proposed_at,
-       repair_description, service_duration_hours`,
+       repair_description, service_duration_hours, mileage`,
     )
     .eq("id", id)
     .maybeSingle();
@@ -205,6 +205,7 @@ export default async function MechanicJobDetailPage({ params }: PageProps) {
         : undefined,
     vehicle: [booking.vehicle_make, booking.vehicle_model].filter(Boolean).join(" ") || "Vehicle",
     reg: booking.vehicle_reg,
+    mileage: booking.mileage ?? null,
     whenLabel,
     distanceLabel,
     // Every booking carries its exact billed duration (book time).

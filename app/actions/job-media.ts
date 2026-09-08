@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireMechanic } from "@/lib/mechanics/require-mechanic";
+import { ownedBooking } from "@/lib/mechanics/owned-booking";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export type JobMediaResult =
@@ -11,7 +12,8 @@ export type JobMediaResult =
 // Mechanic-captured job evidence — photos + a sign-off signature — for the
 // responsive desktop job view (delivered ahead of the mobile PWA). Same trust
 // model as job-progress.ts: verify the caller owns the job in an RLS-aware
-// client, then write the Storage object + booking_media row via service-role.
+// client, then write the Storage object + booking_media row via service-role
+// (the ownership re-read is the shared `ownedBooking`).
 
 const ALLOWED_PHOTO_TYPES: Record<string, string> = {
   "image/jpeg": "jpg",
@@ -23,20 +25,6 @@ const MAX_SIGNATURE_BYTES = 2 * 1024 * 1024;
 // Photos can be taken before and during the visit; the signature is part of
 // completing the job.
 const PHOTO_STATUSES = ["confirmed", "en_route", "in_progress"];
-
-// Re-read the booking under service-role and confirm the caller owns it.
-async function ownedBooking(bookingId: string, mechanicId: string) {
-  const admin = createAdminClient();
-  const { data: booking } = await admin
-    .from("bookings")
-    .select("id, status, mechanic_id")
-    .eq("id", bookingId)
-    .single();
-  if (!booking) return { ok: false as const, error: "That job no longer exists." };
-  if (booking.mechanic_id !== mechanicId)
-    return { ok: false as const, error: "This isn't your job." };
-  return { ok: true as const, booking, admin };
-}
 
 function revalidate(bookingId: string) {
   revalidatePath(`/mechanic/jobs/${bookingId}`);

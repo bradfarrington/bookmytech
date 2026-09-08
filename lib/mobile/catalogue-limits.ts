@@ -21,12 +21,66 @@ import {
   enforceRateLimits,
 } from "@/lib/rate-limit/limiter";
 
+/** Who is asking: a signed-in user (their own bucket) and/or an address. */
+export interface CatalogueCaller {
+  userId: string | null;
+  ip: string;
+}
+
 /**
- * Count this request against the catalogue buckets. Returns a ready-to-return
- * 429 when it should be refused, or null to carry on.
+ * The buckets a catalogue call counts against. Most specific first, so the
+ * refusal we report is the one that actually applies to this caller rather
+ * than a shared bucket they can't influence.
  *
  * `search` adds the tighter search-only buckets on top, because one search can
  * walk dozens of tree levels where a browse costs one.
+ *
+ * Shared with the website's search box (Task 30): the same person hitting the
+ * same HaynesPro spend from a browser counts against the same IP buckets.
+ */
+export function catalogueLimitRules(
+  { userId, ip }: CatalogueCaller,
+  { search = false }: { search?: boolean } = {},
+): RateLimitRule[] {
+  const rules: RateLimitRule[] = [];
+
+  if (search) {
+    if (userId) {
+      rules.push(
+        { key: "mobile_search_user_burst", subject: `user:${userId}`, windowSeconds: MINUTE_SECONDS },
+        { key: "mobile_search_user_daily", subject: `user:${userId}`, windowSeconds: DAY_SECONDS },
+      );
+    }
+    rules.push(
+      { key: "mobile_search_ip_burst", subject: `ip:${ip}`, windowSeconds: MINUTE_SECONDS },
+      { key: "mobile_search_ip_daily", subject: `ip:${ip}`, windowSeconds: DAY_SECONDS },
+    );
+  }
+
+  if (userId) {
+    rules.push(
+      { key: "mobile_catalogue_user_burst", subject: `user:${userId}`, windowSeconds: MINUTE_SECONDS },
+      { key: "mobile_catalogue_user_daily", subject: `user:${userId}`, windowSeconds: DAY_SECONDS },
+    );
+  }
+  rules.push(
+    { key: "mobile_catalogue_ip_burst", subject: `ip:${ip}`, windowSeconds: MINUTE_SECONDS },
+    { key: "mobile_catalogue_ip_daily", subject: `ip:${ip}`, windowSeconds: DAY_SECONDS },
+    { key: "mobile_catalogue_global_daily", subject: "global", windowSeconds: DAY_SECONDS },
+  );
+  return rules;
+}
+
+/** The customer-facing sentence for a refused catalogue call. */
+export function catalogueLimitMessage(key: string | null): string {
+  return key === "mobile_catalogue_global_daily"
+    ? "Repair prices are temporarily unavailable. Please try again later."
+    : "You've made a lot of requests just now. Please wait a moment and try again.";
+}
+
+/**
+ * Count this request against the catalogue buckets. Returns a ready-to-return
+ * 429 when it should be refused, or null to carry on.
  */
 export async function enforceCatalogueLimits(
   request: Request,
@@ -37,59 +91,9 @@ export async function enforceCatalogueLimits(
   // their own bucket, which is fairer than per-IP when a mobile carrier puts
   // many customers behind one CGNAT address.
   const caller = await optionalMobileUser(request);
-  const ip = clientIp(request);
-
-  // Most specific first, so the refusal we report is the one that actually
-  // applies to this caller rather than a shared bucket they can't influence.
-  const rules: RateLimitRule[] = [];
-
-  if (search) {
-    if (caller) {
-      rules.push(
-        {
-          key: "mobile_search_user_burst",
-          subject: `user:${caller.userId}`,
-          windowSeconds: MINUTE_SECONDS,
-        },
-        {
-          key: "mobile_search_user_daily",
-          subject: `user:${caller.userId}`,
-          windowSeconds: DAY_SECONDS,
-        },
-      );
-    }
-    rules.push(
-      { key: "mobile_search_ip_burst", subject: `ip:${ip}`, windowSeconds: MINUTE_SECONDS },
-      { key: "mobile_search_ip_daily", subject: `ip:${ip}`, windowSeconds: DAY_SECONDS },
-    );
-  }
-
-  if (caller) {
-    rules.push(
-      {
-        key: "mobile_catalogue_user_burst",
-        subject: `user:${caller.userId}`,
-        windowSeconds: MINUTE_SECONDS,
-      },
-      {
-        key: "mobile_catalogue_user_daily",
-        subject: `user:${caller.userId}`,
-        windowSeconds: DAY_SECONDS,
-      },
-    );
-  }
-  rules.push(
-    { key: "mobile_catalogue_ip_burst", subject: `ip:${ip}`, windowSeconds: MINUTE_SECONDS },
-    { key: "mobile_catalogue_ip_daily", subject: `ip:${ip}`, windowSeconds: DAY_SECONDS },
-    { key: "mobile_catalogue_global_daily", subject: "global", windowSeconds: DAY_SECONDS },
+  const verdict = await enforceRateLimits(
+    catalogueLimitRules({ userId: caller?.userId ?? null, ip: clientIp(request) }, { search }),
   );
-
-  const verdict = await enforceRateLimits(rules);
   if (verdict.allowed) return null;
-
-  const message =
-    verdict.key === "mobile_catalogue_global_daily"
-      ? "Repair prices are temporarily unavailable. Please try again later."
-      : "You've made a lot of requests just now. Please wait a moment and try again.";
-  return apiRateLimited(message, verdict.retryAfterSeconds);
+  return apiRateLimited(catalogueLimitMessage(verdict.key), verdict.retryAfterSeconds);
 }

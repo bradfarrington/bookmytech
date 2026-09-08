@@ -16,6 +16,7 @@ import {
   MessageSquare,
   ImageIcon,
   PenLine,
+  Gauge,
   Package,
   Sparkles,
   ListChecks,
@@ -37,6 +38,7 @@ import { JobActions } from "./job-actions";
 import { PhotoUploader, type JobPhoto } from "./photo-uploader";
 import { PartsOrder, type JobPart } from "./parts-order";
 import { ArrivalWindowPicker } from "./arrival-window-picker";
+import { MileageField } from "./mileage-field";
 
 export interface JobDetailProps {
   bookingId: string;
@@ -49,6 +51,10 @@ export interface JobDetailProps {
   serviceLines?: Array<{ description: string; chargedHours: number | null }>;
   vehicle: string; // "VW Golf"
   reg: string | null;
+  /** Odometer reading the mechanic recorded (Task 30); null until they do. */
+  mileage: number | null;
+  /** Task 32: a servicing / inspection job can't complete without a reading. */
+  mileageRequired?: boolean;
   whenLabel: string;
   distanceLabel: string;
   durationLabel: string;
@@ -371,6 +377,17 @@ export function JobDetail(props: JobDetailProps) {
               <PartsOrder parts={props.parts} canEdit={canEditPhotos} />
             </Card>
           )}
+
+          {/* Mileage — typed by the mechanic when they're with the car */}
+          <Card className="space-y-3 p-6">
+            <CardTitle icon={Gauge}>Mileage</CardTitle>
+            <MileageField
+              bookingId={bookingId}
+              mileage={props.mileage}
+              canEdit={canEditPhotos}
+              required={props.mileageRequired}
+            />
+          </Card>
 
           {/* Why you're a great match */}
           <Card className="space-y-3 p-6">

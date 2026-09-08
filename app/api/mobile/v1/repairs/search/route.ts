@@ -1,4 +1,8 @@
-import { searchRepairCatalogue, type CatalogueSearch } from "@/lib/haynespro/catalogue";
+import {
+  MIN_SEARCH_QUERY_LENGTH,
+  searchRepairCatalogue,
+  type CatalogueSearch,
+} from "@/lib/haynespro/catalogue";
 import { enforceCatalogueLimits } from "@/lib/mobile/catalogue-limits";
 import { apiError, apiOk } from "@/lib/mobile/respond";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -16,12 +20,10 @@ import { createAdminClient } from "@/lib/supabase/admin";
 //
 // Because a search can cost dozens of upstream calls where a browse costs one,
 // it carries its own tighter rate-limit buckets on top of the catalogue ones.
-// A query shorter than MIN_QUERY_LENGTH is refused rather than answered: it is
-// too broad to be useful and would spend the walk for nothing. The app debounces
-// and enforces the same minimum, so a well-behaved client never sees this.
-
-/** Keep in sync with MIN_QUERY_LENGTH in the app's book/repairs screen. */
-const MIN_QUERY_LENGTH = 3;
+// A query shorter than MIN_SEARCH_QUERY_LENGTH is refused rather than answered:
+// it is too broad to be useful and would spend the walk for nothing. The app
+// debounces and enforces the same minimum, so a well-behaved client never sees
+// this. The website's search box (Task 30) shares the constant.
 
 export async function GET(request: Request): Promise<Response> {
   const url = new URL(request.url);
@@ -31,7 +33,7 @@ export async function GET(request: Request): Promise<Response> {
   if (!reg) {
     return apiError("Enter your registration number.", 400);
   }
-  if (q.length < MIN_QUERY_LENGTH) {
+  if (q.length < MIN_SEARCH_QUERY_LENGTH) {
     return apiError("Type a little more to search for a repair.", 400);
   }
 

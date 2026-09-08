@@ -338,6 +338,7 @@ export const EMAIL_TEMPLATE_DEFS: readonly EmailTemplateDef[] = [
     variables: [
       { name: "name", description: "Customer's name", example: "Alex" },
       { name: "service", description: "Service completed", example: "Full service" },
+      { name: "mileage_line", description: "Optional odometer line (empty when the mechanic didn't record it)", example: "Mileage recorded: 62,410 miles" },
       { name: "credit_line", description: "Optional total·credit line", example: "Service total £120.00 · account credit −£20.00" },
       { name: "charge_line", description: "Headline charge line", example: "Total charged: £100.00" },
       { name: "settle_line", description: "Settlement status line", example: "Your card has now been charged." },
@@ -347,6 +348,7 @@ export const EMAIL_TEMPLATE_DEFS: readonly EmailTemplateDef[] = [
       { id: "heading", type: "heading", text: "All done — thanks for using Book My Tech" },
       { id: "greeting", type: "paragraph", text: "Hi {{name}}," },
       { id: "body", type: "paragraph", text: "Your mechanic has marked **{{service}}** complete." },
+      { id: "mileage", type: "custom", render: "mileage_line" },
       { id: "credit", type: "custom", render: "receipt_credit" },
       { id: "charge", type: "paragraph", text: "**{{charge_line}}**" },
       { id: "settle", type: "note", text: "{{settle_line}}" },

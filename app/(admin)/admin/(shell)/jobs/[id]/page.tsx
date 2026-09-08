@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   Car,
   Wrench,
+  Gauge,
   MapPin,
   CalendarClock,
   User,
@@ -102,7 +103,7 @@ export default async function BookingDetailPage({ params }: PageProps) {
        vehicle_reg, vehicle_make, vehicle_model, mechanic_id,
        repair_description,
        scheduled_at, slot_window, candidate_days, created_at, address_line_1, address_line_2, parking_type,
-       special_instructions, stripe_payment_intent_id`,
+       special_instructions, stripe_payment_intent_id, mileage`,
     )
     .eq("id", id)
     .single();
@@ -295,6 +296,15 @@ export default async function BookingDetailPage({ params }: PageProps) {
                 value={`${formatCandidateDays([...(booking.candidate_days as string[])].sort())} — the mechanic picks one and a 2-hour window`}
               />
             )}
+            <Row
+              icon={Gauge}
+              label="Mileage"
+              value={
+                booking.mileage != null
+                  ? `${Number(booking.mileage).toLocaleString("en-GB")} miles (recorded by the mechanic)`
+                  : "Not recorded"
+              }
+            />
           </Card>
 
           <Card className="space-y-4 p-6">

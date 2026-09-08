@@ -69,6 +69,7 @@ The core transaction record. The columns below the first divider were added in `
 | en_route_at                | timestamptz | when the mechanic started travelling                                  |
 | started_at                 | timestamptz | when the mechanic arrived / began work                                |
 | completed_at               | timestamptz | when the mechanic marked the job done                                 |
+| mileage                    | integer     | 0059 (Task 30) — odometer reading in miles, typed by the mechanic on the job page (`setJobMileage`, any active status). NULL = not recorded. Shown to admin, on the receipt email; carried in the completion `status_changed` payload. Task 32 requires it before a servicing / inspection job completes |
 
 **Status lifecycle:** CHECK constraint pins `status` to one of:
 

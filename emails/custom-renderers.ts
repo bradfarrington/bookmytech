@@ -88,6 +88,14 @@ export const CUSTOM_RENDERERS: Record<string, CustomRenderer> = {
     return `<mj-text color="#64748B" font-size="13px" padding-top="4px">${escapeHtml(line)}</mj-text>`;
   },
 
+  // job_complete — the odometer reading the mechanic recorded (Task 30); the
+  // block renders nothing when they didn't.
+  mileage_line(vars) {
+    const line = vars.mileage_line ? String(vars.mileage_line) : "";
+    if (!line) return "";
+    return `<mj-text color="#64748B" font-size="13px" padding-top="4px">${escapeHtml(line)}</mj-text>`;
+  },
+
   // job_complete — one-tap star rating widget + leave-a-review link.
   review_stars(vars) {
     const url = escapeHtml(String(vars.review_url ?? "#"));

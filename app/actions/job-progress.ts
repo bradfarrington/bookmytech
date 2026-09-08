@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireMechanic } from "@/lib/mechanics/require-mechanic";
+import { ownedBooking } from "@/lib/mechanics/owned-booking";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendEmail } from "@/lib/email/send";
 import { renderTemplateEmail } from "@/emails/resolve";
@@ -135,6 +136,46 @@ export async function beginWork(bookingId: string): Promise<JobProgressResult> {
   return { ok: true };
 }
 
+// Mileage can be typed from acceptance until the job is complete — most
+// mechanics will read the odometer once they're with the car, but there's
+// no reason to refuse it earlier if the customer told them.
+const MILEAGE_STATUSES = ["confirmed", "en_route", "in_progress"];
+/** Matches the CHECK in 0059. */
+const MAX_MILEAGE = 1_500_000;
+
+/**
+ * Record the vehicle's odometer reading on the job (Task 30). Not a
+ * transition, so no `booking_events` row of its own — `completeAndCharge`
+ * carries the final figure in its `status_changed` payload. Servicing and
+ * inspection jobs REQUIRE it before completion (Task 32).
+ */
+export async function setJobMileage(
+  bookingId: string,
+  mileage: number,
+): Promise<JobProgressResult> {
+  const guard = await requireMechanic();
+  if (!guard.ok) return guard;
+
+  if (!Number.isFinite(mileage) || !Number.isInteger(mileage) || mileage < 0 || mileage > MAX_MILEAGE)
+    return { ok: false, error: "Enter the mileage as a whole number of miles." };
+
+  const res = await ownedBooking(bookingId, guard.mechanicId);
+  if (!res.ok) return res;
+  if (!MILEAGE_STATUSES.includes(res.booking.status))
+    return { ok: false, error: "Mileage can only be recorded on an active job." };
+
+  const { error } = await res.admin
+    .from("bookings")
+    .update({ mileage })
+    .eq("id", bookingId)
+    .eq("mechanic_id", guard.mechanicId);
+  if (error) return { ok: false, error: error.message };
+
+  revalidate(bookingId);
+  revalidatePath(`/admin/jobs/${bookingId}`);
+  return { ok: true };
+}
+
 /**
  * in_progress → completed. Captures the Stripe pre-authorisation (manual capture
  * from booking creation), stamps completed_at, and sends the customer a receipt.
@@ -156,7 +197,7 @@ export async function completeAndCharge(bookingId: string): Promise<JobProgressR
     .select(
       `id, job_number, status, mechanic_id, customer_id, customer_email, customer_name, customer_phone, total_pence,
        mechanic_payout_pence, credit_applied_pence, payment_mode,
-       stripe_payment_intent_id, repair_description`,
+       stripe_payment_intent_id, repair_description, mileage`,
     )
     .eq("id", bookingId)
     .single();
@@ -225,7 +266,9 @@ export async function completeAndCharge(bookingId: string): Promise<JobProgressR
     event_type: "status_changed",
     actor_id: guard.mechanicId,
     actor_role: "mechanic",
-    payload: { status_from: "in_progress", status_to: "completed" },
+    // The odometer reading as recorded at completion, so the audit trail has
+    // it even if the column is later edited.
+    payload: { status_from: "in_progress", status_to: "completed", mileage: booking.mileage ?? null },
   });
   if (captured) {
     await admin.from("booking_events").insert({
@@ -396,6 +439,8 @@ export async function completeAndCharge(bookingId: string): Promise<JobProgressR
     renderTemplateEmail("job_complete", {
       name: booking.customer_name ?? "there",
       service: serviceName,
+      mileage_line:
+        booking.mileage != null ? `Mileage recorded: ${booking.mileage.toLocaleString("en-GB")} miles` : "",
       credit_line: creditLine,
       charge_line: chargeLine,
       settle_line: settleLine,

@@ -387,6 +387,8 @@ const SEARCH_MAX_EXPANSIONS = 40;
 const SEARCH_MAX_HITS = 50;
 const SEARCH_CONCURRENCY = 8;
 
+export { MIN_SEARCH_QUERY_LENGTH } from "./search-query";
+
 /** A group waiting to be expanded, with what earned it its place in the queue. */
 interface PendingGroup {
   id: string;
