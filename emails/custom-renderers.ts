@@ -88,6 +88,21 @@ export const CUSTOM_RENDERERS: Record<string, CustomRenderer> = {
     return `<mj-text color="#64748B" font-size="13px" padding-top="4px">${escapeHtml(line)}</mj-text>`;
   },
 
+  // promo_code_offer — the code in a panel, with what it's worth (Task 35).
+  promo_code_panel(vars) {
+    const code = escapeHtml(String(vars.code ?? ""));
+    if (!code) return "";
+    const description = vars.description ? String(vars.description) : "";
+    const expires = vars.expires ? String(vars.expires) : "";
+    return `<mj-text align="center" padding="8px 0">
+      <div style="background:#EFF6FF;border:1px dashed #2563EB;border-radius:12px;padding:20px;text-align:center;">
+        <div style="font-size:28px;font-weight:800;color:#1D4ED8;letter-spacing:2px;font-family:monospace;">${code}</div>
+        ${description ? `<div style="font-size:13px;color:#334155;margin-top:8px;">${escapeHtml(description)}</div>` : ""}
+        ${expires ? `<div style="font-size:12px;color:#64748B;margin-top:6px;">Use it by ${escapeHtml(expires)}</div>` : ""}
+      </div>
+    </mj-text>`;
+  },
+
   // quote_sent — the quote's lines as a small table (Task 33).
   quote_lines(vars) {
     const items = packedList(vars.quote_lines);

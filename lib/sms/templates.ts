@@ -205,6 +205,20 @@ export const SMS_TEMPLATE_DEFS: readonly SmsTemplateDef[] = [
     defaultBody: "{{label}} for {{vehicle_reg}}: {{cta}} — {{url}}",
   },
 
+  // --- Discount codes (Task 35) -----------------------------------------------
+  {
+    key: "promo_code_offer",
+    label: "Discount code offer",
+    description: "Sent to a customer when the admin sends them a discount code.",
+    audience: "customer",
+    variables: [
+      { name: "code", description: "The code", example: "WELCOME10" },
+      { name: "offer", description: "What it's worth", example: "10% off" },
+      { name: "url", description: "Link to book", example: "https://bookmytech.co.uk/book" },
+    ],
+    defaultBody: "Book My Tech: here's {{offer}} your next booking — use code {{code}} at checkout. {{url}}",
+  },
+
   // --- Quotes (Task 33) --------------------------------------------------------
   {
     key: "quote_sent",

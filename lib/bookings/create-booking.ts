@@ -23,6 +23,8 @@ import type { QuoteView } from "@/lib/quotes/load";
 import { trackEvent } from "@/app/actions/track-event";
 import { FUNNEL_EVENTS } from "@/lib/analytics/events";
 import { availableCreditPence, redeemCreditForBooking } from "@/lib/credits/credits";
+import { attachPromoRedemption, claimPromoForBooking, reservePromo, resolvePromoCode } from "@/lib/promos/apply";
+import { chargeAfterDiscounts } from "@/lib/promos/validate";
 
 // The one implementation of "price this booking" and "write this booking".
 //
@@ -95,6 +97,11 @@ export interface CreateBookingInput {
   /** Credit the held amount was reduced by at prepare time (clamped on redeem). */
   creditAppliedPence?: number;
   /**
+   * A discount code the customer typed (Task 35). Re-validated and redeemed
+   * server-side; the figure is never taken from the client. Signed-in only.
+   */
+  promoCode?: string;
+  /**
    * A follow-on quote from the mechanic (Task 34). When set, the price and the
    * lines come from the quote (what the customer approved), the vehicle from
    * the job it was raised on, and the quoting mechanic is offered the job
@@ -151,8 +158,13 @@ export type CreateBookingResult =
        * was written and any pre-auth hold is untouched and still usable — the
        * client should have the customer pick another time and call again with
        * the same intent, not report the hold as stranded.
+       *
+       * `promo_unavailable` (Task 35): the discount code was taken by someone
+       * else, or its reservation lapsed, between the hold and the booking.
+       * Nothing was written and the hold is untouched — the client should
+       * re-prepare (without the code, or with it re-checked).
        */
-      code?: "slot_passed";
+      code?: "slot_passed" | "promo_unavailable";
     };
 
 /**
@@ -257,6 +269,30 @@ export async function createBooking(
   const vehicleMake = followOn ? (followOn.origin.vehicle_make ?? input.vehicleMake) : input.vehicleMake;
   const vehicleModel = followOn ? (followOn.origin.vehicle_model ?? input.vehicleModel ?? null) : (input.vehicleModel ?? null);
   const preferredMechanicId = followOn ? followOn.origin.mechanic_id : (input.preferredMechanicId ?? null);
+
+  // The discount code (Task 35), re-validated and CLAIMED before anything is
+  // written: a code that ran out while the customer was at the card step must
+  // refuse with nothing written and the hold still theirs, which is what
+  // `promo_unavailable` tells the client to recover from.
+  const promoResolution = await resolvePromoCode(createAdminClient(), input.promoCode, {
+    customerId,
+    totalPence: price.totalPence,
+  });
+  if (!promoResolution.ok) return { ok: false, code: "promo_unavailable", error: promoResolution.error };
+  let discountPence = 0;
+  let promoClaim: { redemptionId: string; code: string } | null = null;
+  if (promoResolution.promo && customerId) {
+    const claim = await claimPromoForBooking(
+      createAdminClient(),
+      promoResolution.promo,
+      customerId,
+      input.stripePaymentIntentId ?? null,
+    );
+    if (!claim.ok) return { ok: false, code: "promo_unavailable", error: claim.error };
+    discountPence = Math.min(claim.discountPence, price.totalPence);
+    promoClaim = { redemptionId: claim.redemptionId, code: promoResolution.promo.code.code };
+  }
+
   // The summary ("Renew the alternator + 2 more jobs") — what every one-line
   // reader shows. The individual lines go to booking_repairs below.
   const repairDescription = quote.description;
@@ -304,6 +340,10 @@ export async function createBooking(
             engine_oil_source: quote.oil.source,
           }
         : {}),
+      // The discount code's saving (Task 35). Only named when there is one:
+      // the columns arrive with 0063, and a booking without a code must keep
+      // working before it is applied.
+      ...(promoClaim ? { discount_pence: discountPence, promo_code: promoClaim.code } : {}),
       status: "sourcing_mechanic",
       total_pence: price.totalPence,
       area_id: price.areaId,
@@ -405,6 +445,9 @@ export async function createBooking(
     });
   }
 
+  // Tie the claimed discount to the booking that used it.
+  if (promoClaim) await attachPromoRedemption(createAdminClient(), promoClaim.redemptionId, data.id);
+
   // Redeem the customer's account credit against this booking (service-role —
   // customer_credits has no browser write policy). Clamp to what the charge was
   // actually reduced by so the ledger can't diverge from what Stripe took, and
@@ -436,11 +479,15 @@ export async function createBooking(
   }
 
   // Fire and forget — don't block the redirect on email.
-  const chargedPence = Math.max(0, price.totalPence - passedCredit);
+  const chargedPence = Math.max(0, price.totalPence - discountPence - passedCredit);
+  const reductions = [
+    discountPence > 0 ? `${formatPrice(discountPence)} discount` : null,
+    passedCredit > 0 ? `${formatPrice(passedCredit)} credit` : null,
+  ].filter(Boolean);
   const payLine =
     mode === "free"
-      ? `Covered in full by your account credit (${formatPrice(price.totalPence)}). Nothing to pay.`
-      : `Amount pre-authorised${passedCredit > 0 ? ` (after ${formatPrice(passedCredit)} credit)` : ""}: ${formatPrice(chargedPence)}`;
+      ? `Covered in full (${formatPrice(price.totalPence)}${reductions.length ? ` — ${reductions.join(" and ")}` : ""}). Nothing to pay.`
+      : `Amount pre-authorised${reductions.length ? ` (after ${reductions.join(" and ")})` : ""}: ${formatPrice(chargedPence)}`;
   // UK time explicitly — this runs on a UTC server, and "6pm" in BST is 17:00Z.
   const whenLabel = candidateDays
     ? `Any of ${formatCandidateDays(candidateDays)} · All day — your mechanic will confirm the day`
@@ -505,6 +552,8 @@ export interface PrepareCheckoutInput {
   repairNodeIds?: string[];
   /** A follow-on quote (Task 34) — priced from the quote instead of the catalogue. Signed-in only. */
   quoteId?: string;
+  /** A discount code the customer typed (Task 35). Validated server-side. Signed-in only. */
+  promoCode?: string;
 }
 
 export type PrepareCheckoutResult =
@@ -515,8 +564,20 @@ export type PrepareCheckoutResult =
       totalPence: number;
       creditAppliedPence: number;
       chargePence: number;
+      /** ADDITIVE (Task 35): the promo-code discount inside `chargePence`. */
+      discountPence: number;
+      /** The code as stored, when one applied. */
+      promoCode: string | null;
     }
-  | { ok: true; mode: "free"; totalPence: number; creditAppliedPence: number; chargePence: 0 }
+  | {
+      ok: true;
+      mode: "free";
+      totalPence: number;
+      creditAppliedPence: number;
+      chargePence: 0;
+      discountPence: number;
+      promoCode: string | null;
+    }
   | { ok: false; error: string };
 
 /**
@@ -545,17 +606,32 @@ export async function prepareCheckoutFor(
   // The combined total — one hold for the whole visit.
   const totalPence = quote.breakdown.totalPence;
 
-  // Account credit (signed-in only) reduces the amount held — never the payout.
-  let creditApplied = 0;
-  if (customerId) {
-    const admin = createAdminClient();
-    creditApplied = Math.min(await availableCreditPence(admin, customerId), totalPence);
-  }
-  const chargePence = Math.max(0, totalPence - creditApplied);
+  // A discount code, then account credit on what's left (Task 35). Both are
+  // BMT-funded: they reduce the amount held, never the mechanic's payout.
+  const admin = createAdminClient();
+  const resolvedPromo = await resolvePromoCode(admin, input.promoCode, { customerId, totalPence });
+  if (!resolvedPromo.ok) return resolvedPromo;
+  const promo = resolvedPromo.promo;
 
-  // Fully credit-covered → nothing to authorise, no card needed.
+  const { discountPence, creditPence: creditApplied, chargePence } = chargeAfterDiscounts(
+    totalPence,
+    promo?.discountPence ?? 0,
+    customerId ? await availableCreditPence(admin, customerId) : 0,
+  );
+
+  // Fully covered by the discount and credit → nothing to authorise, no card.
+  // The redemption is taken at booking time, where there is a booking to tie
+  // it to (there is no PaymentIntent to reserve against here).
   if (chargePence === 0) {
-    return { ok: true, mode: "free", totalPence, creditAppliedPence: creditApplied, chargePence: 0 };
+    return {
+      ok: true,
+      mode: "free",
+      totalPence,
+      creditAppliedPence: creditApplied,
+      chargePence: 0,
+      discountPence,
+      promoCode: promo?.code.code ?? null,
+    };
   }
 
   // Lazy Stripe import — friendly error if keys aren't configured.
@@ -588,6 +664,19 @@ export async function prepareCheckoutFor(
       ...(customerId ? { metadata: { customer_id: customerId } } : {}),
     });
     if (!intent.client_secret) return { ok: false, error: "Couldn't start the payment. Please try again." };
+
+    // Hold the code's redemption against this intent, so the last one can't be
+    // handed to someone else while this customer is at the card step. If the
+    // caps have already been reached, the hold we just opened is cancelled
+    // rather than left to expire on its own.
+    if (promo && customerId) {
+      const reserved = await reservePromo(admin, promo, customerId, intent.id);
+      if (!reserved.ok) {
+        await stripe.paymentIntents.cancel(intent.id).catch(() => {});
+        return reserved;
+      }
+    }
+
     return {
       ok: true,
       mode: "preauth",
@@ -595,6 +684,8 @@ export async function prepareCheckoutFor(
       totalPence,
       creditAppliedPence: creditApplied,
       chargePence,
+      discountPence,
+      promoCode: promo?.code.code ?? null,
     };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Payment error" };

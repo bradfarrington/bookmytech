@@ -621,6 +621,31 @@ export const EMAIL_TEMPLATE_DEFS: readonly EmailTemplateDef[] = [
       { id: "cta", type: "button", text: "Buy more credits", hrefVar: "settings_url" },
     ],
   },
+  // ─── Discount codes (Task 35) ───────────────────────────────────────────
+  {
+    key: "promo_code_offer",
+    label: "Discount code offer",
+    description: "Sent to a customer when the admin sends them a discount code.",
+    category: "customer",
+    subject: "A discount on your next booking",
+    preheader: "Here's a code for money off your next booking with us.",
+    variables: [
+      { name: "name", description: "Customer's name", example: "Alex" },
+      { name: "code", description: "The code they type at checkout", example: "WELCOME10" },
+      { name: "offer", description: "What it's worth", example: "10% off" },
+      { name: "description", description: "Optional line about the offer", example: "Thanks for being a regular." },
+      { name: "expires", description: "When it runs out (empty = never)", example: "1 December 2026" },
+      { name: "url", description: "Link to book", example: "https://bookmytech.co.uk/book" },
+    ],
+    blocks: [
+      { id: "heading", type: "heading", text: "{{offer}} your next booking" },
+      { id: "greeting", type: "paragraph", text: "Hi {{name}}," },
+      { id: "body", type: "paragraph", text: "Here's a code for **{{offer}}** your next booking with Book My Tech. Enter it when you pick your time." },
+      { id: "code", type: "custom", render: "promo_code_panel" },
+      { id: "cta", type: "button", text: "Book a repair", hrefVar: "url" },
+      { id: "footnote", type: "note", text: "One use per customer. The discount comes off before any account credit." },
+    ],
+  },
   // ─── Quotes for extra work (Task 33) ────────────────────────────────────
   {
     key: "quote_sent",

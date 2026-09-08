@@ -155,7 +155,7 @@ export async function refundBooking(
   const { data: booking } = await admin
     .from("bookings")
     .select(
-      "id, job_number, status, mechanic_id, total_pence, credit_applied_pence, stripe_payment_intent_id",
+      "id, job_number, status, mechanic_id, total_pence, credit_applied_pence, discount_pence, stripe_payment_intent_id",
     )
     .eq("id", id)
     .single();
@@ -166,7 +166,7 @@ export async function refundBooking(
   // Refundable = what the customer actually paid, minus anything already refunded.
   const chargedPence = Math.max(
     0,
-    (booking.total_pence ?? 0) - (booking.credit_applied_pence ?? 0),
+    (booking.total_pence ?? 0) - (booking.credit_applied_pence ?? 0) - (booking.discount_pence ?? 0),
   );
   const { data: priorRefunds } = await admin
     .from("booking_events")

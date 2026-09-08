@@ -2,6 +2,7 @@ import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { trackEvent } from "@/app/actions/track-event";
+import { releasePromoForIntent } from "@/lib/promos/apply";
 
 // Release a pre-authorisation the customer gave up on.
 //
@@ -111,6 +112,10 @@ export async function releaseStrandedHold(
       error: "This payment is for a booking you've already made. Cancel the booking instead.",
     };
   }
+
+  // Give back the discount code's reservation too (Task 35) — the abandoned
+  // hold was holding one of its redemptions.
+  await releasePromoForIntent(createAdminClient(), paymentIntentId);
 
   try {
     await stripe.paymentIntents.cancel(paymentIntentId, { cancellation_reason: "abandoned" });

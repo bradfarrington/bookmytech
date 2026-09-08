@@ -73,6 +73,13 @@ interface BookingBody {
    * first; `vehicleReg`, `vehicleMake` and the repair ids may be omitted.
    */
   quoteId?: unknown;
+  /**
+   * The discount code used at `prepare` (Task 35, additive). Re-validated and
+   * redeemed server-side; the saving is never taken from the body. A code that
+   * has since run out returns `{ ok: false, code: "promo_unavailable", error }`
+   * with NOTHING written and the hold untouched — re-prepare and try again.
+   */
+  promoCode?: unknown;
 }
 
 const asString = (value: unknown): string => (typeof value === "string" ? value.trim() : "");
@@ -166,6 +173,7 @@ export async function POST(request: Request): Promise<Response> {
     repairNodeId: repairNodeId || undefined,
     repairNodeIds: repairNodeIds && repairNodeIds.length ? repairNodeIds : undefined,
     quoteId: quoteId || undefined,
+    promoCode: asString(body.promoCode) || undefined,
     scheduledAt,
     slotWindow: slotWindow || undefined,
     candidateDays: candidateDays.length ? candidateDays : undefined,

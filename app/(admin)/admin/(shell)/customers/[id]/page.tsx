@@ -18,6 +18,7 @@ import { Stars } from "@/components/ui/stars";
 import { Overline } from "@/components/ui/overline";
 import { cn, formatPrice, formatJobNumber } from "@/lib/utils";
 import { formatBookingWhen } from "@/lib/slots";
+import { CreditActions } from "./_components/credit-actions";
 import { availableCreditPence } from "@/lib/credits/credits";
 
 // A single customer: contact, spend, every job they've booked, every dispute
@@ -491,6 +492,7 @@ export default async function CustomerDetailPage({
           </div>
         ))}
 
+      {tab === "credit" && <CreditActions customerId={id} />}
       {tab === "credit" &&
         (credits.length === 0 ? (
           <EmptyState

@@ -201,7 +201,7 @@ export async function completeAndCharge(bookingId: string): Promise<JobProgressR
     .select(
       `id, job_number, status, mechanic_id, customer_id, customer_email, customer_name, customer_phone, total_pence,
        mechanic_payout_pence, credit_applied_pence, payment_mode,
-       stripe_payment_intent_id, repair_description, repair_node_id, mileage`,
+       stripe_payment_intent_id, repair_description, repair_node_id, mileage, discount_pence`,
     )
     .eq("id", bookingId)
     .single();
@@ -272,7 +272,12 @@ export async function completeAndCharge(bookingId: string): Promise<JobProgressR
   // The base hold covers that minus whatever approved quotes hold separately;
   // a reduction has already lowered total_pence, so the base capture is for
   // LESS than was authorised and Stripe releases the rest.
-  const chargePence = Math.max(0, (booking.total_pence ?? 0) - (booking.credit_applied_pence ?? 0));
+  // …minus the promo-code discount too (Task 35) — both it and credit are
+  // BMT-funded, so they reduce what is captured, never the payout.
+  const chargePence = Math.max(
+    0,
+    (booking.total_pence ?? 0) - (booking.credit_applied_pence ?? 0) - (booking.discount_pence ?? 0),
+  );
   const baseChargePence = Math.max(0, chargePence - quotes.approvedNowPence);
 
   // Every capture is idempotent: an intent already captured (a retry after a
@@ -372,7 +377,11 @@ export async function completeAndCharge(bookingId: string): Promise<JobProgressR
       event_type: "payment_captured",
       actor_id: guard.mechanicId,
       actor_role: "mechanic",
-      payload: { amount_pence: chargePence, credit_applied_pence: booking.credit_applied_pence ?? 0 },
+      payload: {
+        amount_pence: chargePence,
+        credit_applied_pence: booking.credit_applied_pence ?? 0,
+        discount_pence: booking.discount_pence ?? 0,
+      },
     });
   }
 
@@ -540,17 +549,22 @@ export async function completeAndCharge(bookingId: string): Promise<JobProgressR
   const serviceName = booking.repair_description ?? "Vehicle repair";
   const receiptEmail = booking.customer_email;
   if (receiptEmail) {
-    const creditLine =
+    const reductions = [
+      (booking.discount_pence ?? 0) > 0 ? `discount −${formatPrice(booking.discount_pence ?? 0)}` : null,
       (booking.credit_applied_pence ?? 0) > 0
-        ? `Repair total ${formatPrice(booking.total_pence ?? 0)} · account credit −${formatPrice(booking.credit_applied_pence ?? 0)}`
-        : "";
+        ? `account credit −${formatPrice(booking.credit_applied_pence ?? 0)}`
+        : null,
+    ].filter(Boolean);
+    const creditLine = reductions.length
+      ? `Repair total ${formatPrice(booking.total_pence ?? 0)} · ${reductions.join(" · ")}`
+      : "";
     const chargeLine =
       chargePence > 0
         ? `Total charged: ${formatPrice(chargePence)}`
-        : "Paid in full with your account credit — nothing to pay";
+        : "Nothing left to pay on this booking";
     const settleLine =
       chargePence === 0
-        ? "Your account credit covered this booking."
+        ? "Your discount and account credit covered this booking."
         : captured
           ? "Your card has now been charged."
           : "Payment will be settled shortly.";

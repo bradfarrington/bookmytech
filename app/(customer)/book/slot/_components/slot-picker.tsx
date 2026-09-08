@@ -87,6 +87,10 @@ interface CheckoutDraft {
   checkout?: ReadyCheckout;
 }
 
+/** Shown when a discount code ran out between the hold and the booking. */
+const PROMO_GONE_NOTICE =
+  "That discount code was used up while you were checking out, so we couldn't apply it. Your card wasn't charged and we've released the hold — please book again.";
+
 /** Shown on the picker when the customer is sent back to choose again. */
 const SLOT_PASSED_NOTICE =
   "That arrival window has passed while you were checking out. Pick another time — your card is already authorised, so you won't need to enter it again.";
@@ -254,6 +258,11 @@ export function SlotPicker({
   // windows close rather than booking one that has quietly passed. All the
   // date/window maths is UK time (lib/slots) — a device in another zone, or
   // the UTC server rendering this, sees the same days and the same cut-offs.
+  // Discount code (Task 35): what they've typed, and what the server accepted.
+  const [promoInput, setPromoInput] = useState("");
+  const [appliedPromo, setAppliedPromo] = useState<string | null>(null);
+  const [promoOpen, setPromoOpen] = useState(false);
+
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 60_000);
@@ -360,6 +369,19 @@ export function SlotPicker({
     setSelectedWindow(null);
     setFlexDays([]);
     setSlotNotice(SLOT_PASSED_NOTICE);
+  }
+
+  // The discount code ran out between the hold and the booking (Task 35).
+  // Nothing was written, but the hold is live for the discounted amount and
+  // can't be reused for the full one — ops releases it (reportOrphanedHold
+  // ran at the call site) and the customer starts the payment again without
+  // the code.
+  function handlePromoUnavailable() {
+    setAppliedPromo(null);
+    setPromoInput("");
+    setCheckout(null);
+    setConfirmedIntentId(null);
+    setSlotNotice(PROMO_GONE_NOTICE);
   }
 
   // Where we are in the return-from-redirect path (see the draft helpers above).
@@ -562,11 +584,13 @@ export function SlotPicker({
         repairNodeId: repairNodeIds[0],
         repairNodeIds,
         quoteId,
+        promoCode: promoInput.trim() || undefined,
       });
       if (!result.ok) {
         setStripeError(result.error);
         return;
       }
+      setAppliedPromo(result.promoCode);
       setCheckout(result);
     });
   }
@@ -598,6 +622,7 @@ export function SlotPicker({
     repairLines,
     preferredMechanicId,
     quoteId,
+    promoCode: appliedPromo ?? undefined,
     // Identity is settled before this step — the checkout no longer asks.
     customerName: signedIn ? customerName : name.trim(),
     customerEmail: signedIn ? customerEmail : email.trim(),
@@ -657,7 +682,14 @@ export function SlotPicker({
   if (checkout && selectedSlot) {
     // Fully credit-covered — no card needed.
     if (checkout.mode === "free") {
-      return <FreeCheckoutForm {...common} checkout={checkout} onSlotPassed={handleSlotPassed} />;
+      return (
+        <FreeCheckoutForm
+          {...common}
+          checkout={checkout}
+          onSlotPassed={handleSlotPassed}
+          onPromoUnavailable={handlePromoUnavailable}
+        />
+      );
     }
     // Pre-auth: place the manual-capture hold via Stripe Elements.
     return (
@@ -671,6 +703,7 @@ export function SlotPicker({
           confirmedIntentId={confirmedIntentId}
           onConfirmed={setConfirmedIntentId}
           onSlotPassed={handleSlotPassed}
+          onPromoUnavailable={handlePromoUnavailable}
         />
       </Elements>
     );
@@ -1012,6 +1045,41 @@ export function SlotPicker({
         </p>
       )}
 
+      {/* Discount code (Task 35). Applying re-prepares the checkout, so the
+          server is the only thing that ever decides what a code is worth. */}
+      {appliedPromo ? (
+          <p className="flex items-center gap-2 rounded-lg bg-green-50 px-4 py-3 text-sm font-medium text-success">
+            <CheckCircle2 size={16} />
+            Code {appliedPromo} applied — the saving shows at the next step.
+          </p>
+      ) : promoOpen ? (
+          <div className="flex gap-2">
+            <input
+              value={promoInput}
+              onChange={(e) => setPromoInput(e.target.value.toUpperCase())}
+              placeholder="Discount code"
+              aria-label="Discount code"
+              autoCapitalize="characters"
+              className={cn(inputClass, "flex-1 font-mono uppercase")}
+            />
+            <Button
+              variant="secondary"
+              disabled={!canProceed || pending || !promoInput.trim()}
+              onClick={handleProceedToPayment}
+            >
+              Apply
+            </Button>
+          </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setPromoOpen(true)}
+          className="self-start text-sm font-semibold text-brand-blue hover:underline"
+        >
+          Have a discount code?
+        </button>
+      )}
+
       {stripeError && (
         <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-danger">{stripeError}</p>
       )}
@@ -1059,6 +1127,8 @@ interface ConfirmCommon {
   preferredMechanicId?: string;
   /** A follow-on quote (Task 34). */
   quoteId?: string;
+  /** A discount code the customer applied (Task 35) — re-validated server-side. */
+  promoCode?: string;
   /** Resolved before this step — the customer always has an account by now. */
   customerName: string;
   customerEmail: string;
@@ -1087,6 +1157,7 @@ function bookingInputFrom(
     specialInstructions: c.instructions || undefined,
     preferredMechanicId: c.preferredMechanicId || undefined,
     quoteId: c.quoteId || undefined,
+    promoCode: c.promoCode || undefined,
     ...extra,
   };
 }
@@ -1102,11 +1173,16 @@ function PriceSummary({
   totalPence,
   creditAppliedPence,
   chargePence,
+  discountPence = 0,
+  promoCode,
   lines,
 }: {
   totalPence: number;
   creditAppliedPence: number;
   chargePence: number;
+  /** The promo-code saving (Task 35). */
+  discountPence?: number;
+  promoCode?: string | null;
   lines?: RepairLineLite[];
 }) {
   const multi = (lines?.length ?? 0) > 1;
@@ -1141,6 +1217,12 @@ function PriceSummary({
         <span>{multi ? "Jobs total" : "Repair total"}</span>
         <span>{formatPrice(totalPence)}</span>
       </div>
+      {discountPence > 0 && (
+        <div className="mt-1 flex items-center justify-between font-medium text-success">
+          <span>Discount{promoCode ? ` (${promoCode})` : ""}</span>
+          <span>−{formatPrice(discountPence)}</span>
+        </div>
+      )}
       {creditAppliedPence > 0 && (
         <div className="mt-1 flex items-center justify-between font-medium text-success">
           <span>Account credit</span>
@@ -1217,6 +1299,7 @@ function CheckoutForm({
   confirmedIntentId,
   onConfirmed,
   onSlotPassed,
+  onPromoUnavailable,
   ...c
 }: ConfirmCommon & {
   checkout: Extract<ReadyCheckout, { mode: "preauth" }>;
@@ -1224,6 +1307,7 @@ function CheckoutForm({
   confirmedIntentId: string | null;
   onConfirmed: (intentId: string) => void;
   onSlotPassed: () => void;
+  onPromoUnavailable: () => void;
 }) {
   const stripe = useStripe();
   const elements = useElements();
@@ -1302,6 +1386,11 @@ function CheckoutForm({
         onSlotPassed();
         return;
       }
+      if (result.code === "promo_unavailable") {
+        void reportOrphanedHold(piId, `discount code no longer available: ${result.error}`);
+        onPromoUnavailable();
+        return;
+      }
       // The hold is already live here, so this is the same orphaned hold the
       // redirect path can produce — tell ops either way. The customer keeps
       // their filled-in form and sees the real error; pressing the button
@@ -1320,6 +1409,8 @@ function CheckoutForm({
       <PriceSummary
         totalPence={checkout.totalPence}
         creditAppliedPence={checkout.creditAppliedPence}
+        discountPence={checkout.discountPence}
+        promoCode={checkout.promoCode}
         chargePence={checkout.chargePence}
         lines={c.repairLines}
       />
@@ -1384,10 +1475,12 @@ function CheckoutForm({
 function FreeCheckoutForm({
   checkout,
   onSlotPassed,
+  onPromoUnavailable,
   ...c
 }: ConfirmCommon & {
   checkout: Extract<ReadyCheckout, { mode: "free" }>;
   onSlotPassed: () => void;
+  onPromoUnavailable: () => void;
 }) {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -1409,6 +1502,10 @@ function FreeCheckoutForm({
         onSlotPassed();
         return;
       }
+      if (result.code === "promo_unavailable") {
+        onPromoUnavailable();
+        return;
+      }
       setError(result.error);
       return;
     }
@@ -1422,6 +1519,8 @@ function FreeCheckoutForm({
       <PriceSummary
         totalPence={checkout.totalPence}
         creditAppliedPence={checkout.creditAppliedPence}
+        discountPence={checkout.discountPence}
+        promoCode={checkout.promoCode}
         chargePence={0}
         lines={c.repairLines}
       />

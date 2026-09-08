@@ -45,6 +45,12 @@ interface PrepareBody {
    * must be the caller's; see /bookings/:id/quotes/:quoteId/respond.
    */
   quoteId?: unknown;
+  /**
+   * A discount code the customer typed (Task 35, additive). Validated
+   * server-side; an invalid one comes back as `{ ok: false, error }` with the
+   * sentence to show. The success arms gain `discountPence` and `promoCode`.
+   */
+  promoCode?: unknown;
 }
 
 const asString = (value: unknown): string => (typeof value === "string" ? value.trim() : "");
@@ -94,6 +100,7 @@ export async function POST(request: Request): Promise<Response> {
       repairNodeId: repairNodeId || undefined,
       repairNodeIds: repairNodeIds && repairNodeIds.length ? repairNodeIds : undefined,
       quoteId: quoteId || undefined,
+      promoCode: asString(parsed.body.promoCode) || undefined,
     },
     caller.userId,
   );
