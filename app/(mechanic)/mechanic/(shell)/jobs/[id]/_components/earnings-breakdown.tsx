@@ -16,7 +16,6 @@ export function EarningsBreakdown({
   partsPence = 0,
   bmtPartsPence = 0,
   approvedExtrasPence = 0,
-  reductionsPence = 0,
 }: {
   totalPence: number;
   commissionRate: number;
@@ -26,8 +25,6 @@ export function EarningsBreakdown({
   bmtPartsPence?: number;
   /** Approved quotes for extra work on this visit (Task 33) — already inside totalPence. */
   approvedExtrasPence?: number;
-  /** Price reductions the mechanic applied (Task 33) — already taken off totalPence. */
-  reductionsPence?: number;
 }) {
   const e = calcEarnings(totalPence, commissionRate);
   const ratePct = Math.round(e.commissionRate * 1000) / 10; // 0.15 → 15
@@ -39,9 +36,6 @@ export function EarningsBreakdown({
       <BreakdownRow label="Customer pays" value={formatPrice(e.customerPence)} />
       {approvedExtrasPence > 0 && (
         <BreakdownRow label="of which approved extra work" value={`+ ${formatPrice(approvedExtrasPence)}`} muted />
-      )}
-      {reductionsPence > 0 && (
-        <BreakdownRow label="after price reductions" value={`– ${formatPrice(reductionsPence)}`} muted />
       )}
       <BreakdownRow
         label={`Platform fee (${ratePct}%)`}

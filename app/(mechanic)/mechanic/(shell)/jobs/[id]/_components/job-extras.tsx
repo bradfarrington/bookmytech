@@ -6,9 +6,7 @@ import { toast } from "sonner";
 import {
   AlertTriangle,
   BadgePoundSterling,
-  ChevronDown,
   Loader2,
-  MinusCircle,
   Plus,
   Search,
   Send,
@@ -26,7 +24,6 @@ import { addFaultAction, deleteFaultAction } from "@/app/actions/booking-faults"
 import {
   createQuoteAction,
   listQuotePartsAction,
-  reducePriceAction,
   searchJobRepairTimesAction,
   withdrawQuoteAction,
 } from "@/app/actions/job-quotes";
@@ -90,7 +87,6 @@ export function JobExtras({ bookingId, status, faults, quotes, hourlyRatePence, 
   const canNote = ["confirmed", "en_route", "in_progress"].includes(status);
   const canQuoteNow = QUOTABLE_STATUSES.now.includes(status);
   const canQuoteFollowOn = QUOTABLE_STATUSES.follow_on.includes(status);
-  const canReduce = QUOTABLE_STATUSES.reduction.includes(status);
   const pendingNow = quotes.find((q) => q.kind === "now" && q.status === "sent") ?? null;
 
   const [builderOpen, setBuilderOpen] = useState(false);
@@ -218,19 +214,17 @@ export function JobExtras({ bookingId, status, faults, quotes, hourlyRatePence, 
                           (q.status === "declined" || q.status === "expired" || q.status === "withdrawn") && "text-text-muted",
                         )}
                       >
-                        {q.kind === "reduction" ? "Applied" : QUOTE_STATUS_LABEL[q.status]}
+                        {QUOTE_STATUS_LABEL[q.status]}
                       </span>
                     </p>
-                    {q.kind !== "reduction" && (
-                      <ul className="mt-1.5 space-y-0.5 text-xs text-text-secondary">
-                        {q.lines.map((l) => (
-                          <li key={l.id}>
-                            {l.description}
-                            {l.kind === "labour" ? ` · ${l.hours} h` : l.quantity > 1 ? ` × ${l.quantity}` : ""} · {formatPrice(l.linePence)}
-                          </li>
-                        ))}
-                      </ul>
-                    )}
+                    <ul className="mt-1.5 space-y-0.5 text-xs text-text-secondary">
+                      {q.lines.map((l) => (
+                        <li key={l.id}>
+                          {l.description}
+                          {l.kind === "labour" ? ` · ${l.hours} h` : l.quantity > 1 ? ` × ${l.quantity}` : ""} · {formatPrice(l.linePence)}
+                        </li>
+                      ))}
+                    </ul>
                     {q.status === "approved" && q.kind === "now" && (
                       <p className="mt-1.5 text-xs font-semibold text-success">Approved and authorised — go ahead. Paid with the job.</p>
                     )}
@@ -239,9 +233,7 @@ export function JobExtras({ bookingId, status, faults, quotes, hourlyRatePence, 
                     )}
                   </div>
                   <div className="flex shrink-0 flex-col items-end gap-1.5">
-                    <span className={cn("text-sm font-bold tabular-nums", q.totalPence < 0 ? "text-red-700" : "text-text-primary")}>
-                      {q.totalPence < 0 ? `−${formatPrice(-q.totalPence)}` : formatPrice(q.totalPence)}
-                    </span>
+                    <span className="text-sm font-bold tabular-nums text-text-primary">{formatPrice(q.totalPence)}</span>
                     {q.status === "sent" && (
                       <button
                         type="button"
@@ -373,9 +365,6 @@ export function JobExtras({ bookingId, status, faults, quotes, hourlyRatePence, 
           </div>
         )}
       </section>
-
-      {/* Reduce the price */}
-      {canReduce && <ReducePrice bookingId={bookingId} pending={pending} run={run} />}
     </div>
   );
 }
@@ -596,49 +585,3 @@ function PartPicker({ line, onChange }: { line: DraftLine; onChange: (next: Draf
   );
 }
 
-function ReducePrice({
-  bookingId,
-  pending,
-  run,
-}: {
-  bookingId: string;
-  pending: boolean;
-  run: (action: () => Promise<{ ok: boolean; error?: string }>, success?: string, after?: () => void) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const [amount, setAmount] = useState("");
-  const [reason, setReason] = useState("");
-  return (
-    <section className="rounded-xl border border-border">
-      <button type="button" onClick={() => setOpen((o) => !o)} className="flex w-full items-center justify-between gap-3 px-3.5 py-3 text-left text-sm font-semibold text-text-primary">
-        <span className="flex items-center gap-2"><MinusCircle size={15} className="text-text-muted" />Reduce the price</span>
-        <ChevronDown size={14} className={cn("text-text-muted transition-transform", open && "rotate-180")} />
-      </button>
-      {open && (
-        <form
-          className="space-y-2 border-t border-border px-3.5 py-3"
-          onSubmit={(e) => {
-            e.preventDefault();
-            run(() => reducePriceAction({ bookingId, amountPence: poundsToPence(amount), reason }), "Price reduced — the customer's been told.", () => {
-              setAmount("");
-              setReason("");
-              setOpen(false);
-            });
-          }}
-        >
-          <p className="text-xs text-text-muted">Took less time, or a part wasn&apos;t needed? Take it off — no approval needed, the customer just pays less.</p>
-          <div className="grid gap-2 sm:grid-cols-[140px_1fr]">
-            <label className="flex items-center gap-2 text-xs text-text-muted">
-              £
-              <input value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="decimal" placeholder="10.00" aria-label="Amount to take off in pounds" className={`${INPUT} w-full`} />
-            </label>
-            <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Why — the customer sees this" aria-label="Reason" className={INPUT} maxLength={300} />
-          </div>
-          <Button type="submit" size="sm" variant="secondary" disabled={pending || !amount.trim() || !reason.trim()}>
-            Apply reduction
-          </Button>
-        </form>
-      )}
-    </section>
-  );
-}

@@ -156,24 +156,3 @@ export function safePriceQuoteLines(
     throw err;
   }
 }
-
-/**
- * A reduction (Task 33): the mechanic lowers the price. Negative figures, the
- * same split, clamped so the customer can never be owed more than was held.
- */
-export function priceReduction(
-  amountPence: number,
-  settings: { commissionRate: number; maxPence: number },
-): { ok: true; totalPence: number; platformFeePence: number; mechanicPayoutPence: number } | { ok: false; error: string } {
-  const amount = Math.round(amountPence);
-  if (!Number.isFinite(amount) || amount <= 0) return { ok: false, error: "Enter the amount to take off." };
-  if (amount > settings.maxPence)
-    return { ok: false, error: `You can take off up to £${(settings.maxPence / 100).toFixed(2)} on this job.` };
-  const split = splitCommission(amount, settings.commissionRate);
-  return {
-    ok: true,
-    totalPence: -amount,
-    platformFeePence: -split.platformFeePence,
-    mechanicPayoutPence: -split.mechanicPayoutPence,
-  };
-}

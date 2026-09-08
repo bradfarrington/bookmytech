@@ -105,31 +105,3 @@ export async function notifyMechanicQuoteOutcome(
     }
   }
 }
-
-export async function notifyCustomerPriceReduced(
-  booking: QuoteBookingContact,
-  amountPence: number,
-  reason: string | null,
-  newTotalPence: number,
-): Promise<void> {
-  const ref = formatJobNumber(booking.job_number);
-  const amount = formatPrice(amountPence);
-  if (booking.customer_email) {
-    const to = booking.customer_email;
-    renderTemplateEmail("price_reduced", {
-      name: booking.customer_name ?? "there",
-      ref,
-      amount,
-      new_total: formatPrice(newTotalPence),
-      optional_note: reason ? `Your mechanic's note: "${reason}"` : "",
-    })
-      .then(({ subject, html }) => sendEmail({ to, subject, html }))
-      .catch(console.error);
-  }
-  if (booking.customer_phone) {
-    const phone = booking.customer_phone;
-    renderSmsTemplate("price_reduced", { amount, ref })
-      .then((body) => sendSms({ to: phone, body }))
-      .catch(() => {});
-  }
-}

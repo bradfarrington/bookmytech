@@ -7,9 +7,8 @@ import { apiError, apiOk } from "@/lib/mobile/respond";
 //
 // 200: { ok: true, quotes: QuoteView[] } | { ok: false, error }
 //   quote.kind:   "now" (extra work on this visit — approving takes a second
-//                 card authorisation), "follow_on" (a return visit — approving
-//                 leads into booking, Task 34), "reduction" (the mechanic
-//                 lowered the price; already applied; total_pence negative)
+//                 card authorisation) or "follow_on" (a return visit —
+//                 approving leads into booking, Task 34)
 //   quote.status: "sent" is the one waiting on the customer.
 //   lines[]:      { kind: "labour"|"part"|"other", description, hours,
 //                   quantity, unitPence, linePence }

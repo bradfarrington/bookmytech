@@ -173,18 +173,16 @@ export async function loadFaultsForBooking(db: SupabaseClient, bookingId: string
   }
 }
 
-/** Approved `now` quotes still to be captured, and the sum of every approved reduction. */
+/** Approved `now` quotes still to be captured, and the one still waiting on the customer. */
 export function quoteMoney(quotes: readonly QuoteView[]): {
   approvedNow: QuoteView[];
   approvedNowPence: number;
-  reductionsPence: number;
   pendingNow: QuoteView | null;
 } {
   const approvedNow = quotes.filter((q) => q.kind === "now" && q.status === "approved");
   return {
     approvedNow,
     approvedNowPence: approvedNow.reduce((s, q) => s + q.totalPence, 0),
-    reductionsPence: quotes.filter((q) => q.kind === "reduction" && q.status === "approved").reduce((s, q) => s + -q.totalPence, 0),
     pendingNow: quotes.find((q) => q.kind === "now" && q.status === "sent") ?? null,
   };
 }

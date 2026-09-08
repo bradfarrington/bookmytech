@@ -396,7 +396,6 @@ export function JobDetail(props: JobDetailProps) {
               partsPence={props.partsPence}
               bmtPartsPence={props.bmtPartsPence}
               approvedExtrasPence={(props.quotes ?? []).filter((q) => q.kind === "now" && q.status === "approved").reduce((s, q) => s + q.totalPence, 0)}
-              reductionsPence={(props.quotes ?? []).filter((q) => q.kind === "reduction").reduce((s, q) => s + -q.totalPence, 0)}
             />
           </Card>
 

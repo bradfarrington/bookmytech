@@ -10,7 +10,7 @@ import { formatPrice } from "@/lib/utils";
 export interface PendingQuoteSummary {
   id: string;
   totalPence: number;
-  kind: "now" | "follow_on" | "reduction";
+  kind: "now" | "follow_on";
   title: string | null;
 }
 

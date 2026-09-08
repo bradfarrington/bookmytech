@@ -680,28 +680,6 @@ export const EMAIL_TEMPLATE_DEFS: readonly EmailTemplateDef[] = [
     ],
   },
   {
-    key: "price_reduced",
-    label: "Mechanic reduced the price",
-    description: "Sent to the customer when their mechanic takes money off the job.",
-    category: "customer",
-    subject: "Your mechanic has reduced the price",
-    preheader: "Good news — the job will cost less than quoted.",
-    variables: [
-      { name: "name", description: "Customer's name", example: "Alex" },
-      { name: "ref", description: "Job number", example: "00123" },
-      { name: "amount", description: "Amount taken off", example: "£10.00" },
-      { name: "new_total", description: "New total", example: "£50.00" },
-      { name: "optional_note", description: "Mechanic's reason (if any)", example: 'Your mechanic\'s note: "Took less time than expected."' },
-    ],
-    blocks: [
-      { id: "heading", type: "heading", text: "The price has come down" },
-      { id: "greeting", type: "paragraph", text: "Hi {{name}}," },
-      { id: "body", type: "paragraph", text: "Your mechanic has taken **{{amount}}** off job {{ref}}. The new total is **{{new_total}}**." },
-      { id: "note", type: "custom", render: "optional_note" },
-      { id: "footnote", type: "note", text: "Only the new total is charged when the job is complete; the rest of your pre-authorisation is released." },
-    ],
-  },
-  {
     key: "quote_approved_mechanic",
     label: "Quote approved (to mechanic)",
     description: "Sent to the mechanic when the customer approves their quote.",

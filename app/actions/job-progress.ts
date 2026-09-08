@@ -259,9 +259,7 @@ export async function completeAndCharge(bookingId: string): Promise<JobProgressR
     stripe = null;
   }
   // What the customer actually owes = total minus any account credit applied.
-  // The base hold covers that minus whatever approved quotes hold separately;
-  // a reduction has already lowered total_pence, so the base capture is for
-  // LESS than was authorised and Stripe releases the rest.
+  // The base hold covers that minus whatever approved quotes hold separately.
   // …minus the promo-code discount too (Task 35) — both it and credit are
   // BMT-funded, so they reduce what is captured, never the payout.
   const chargePence = Math.max(

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MAX_QUOTE_PENCE, priceReduction, safePriceQuoteLines, splitCommission } from "./pricing";
+import { MAX_QUOTE_PENCE, safePriceQuoteLines, splitCommission } from "./pricing";
 import { QUOTE_EXPIRY_DAYS, isQuoteExpired, quoteExpiry, respondRefusal } from "./status";
 
 const SETTINGS = { hourlyRatePence: 6000, commissionRate: 0.15 };
@@ -43,17 +43,10 @@ describe("priceQuoteLines", () => {
   });
 });
 
-describe("priceReduction + splitCommission", () => {
-  it("is the same split, negative, and clamped to what was held", () => {
+describe("splitCommission", () => {
+  it("splits the quote subtotal at the booking's rate", () => {
     expect(splitCommission(10000, 0.15)).toEqual({ platformFeePence: 1500, mechanicPayoutPence: 8500 });
-    expect(priceReduction(1000, { commissionRate: 0.15, maxPence: 5000 })).toEqual({
-      ok: true,
-      totalPence: -1000,
-      platformFeePence: -150,
-      mechanicPayoutPence: -850,
-    });
-    expect(priceReduction(6000, { commissionRate: 0.15, maxPence: 5000 }).ok).toBe(false);
-    expect(priceReduction(0, { commissionRate: 0.15, maxPence: 5000 }).ok).toBe(false);
+    expect(splitCommission(5999, 0.15)).toEqual({ platformFeePence: 900, mechanicPayoutPence: 5099 });
   });
 });
 

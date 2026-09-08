@@ -342,25 +342,21 @@ export default async function BookingDetailPage({ params }: PageProps) {
                     <div>
                       <p className="font-semibold text-text-primary">{q.title ?? QUOTE_KIND_LABEL[q.kind]}</p>
                       <p className="text-xs text-text-muted">
-                        {QUOTE_KIND_LABEL[q.kind]} · {q.kind === "reduction" ? "Applied" : QUOTE_STATUS_LABEL[q.status]}
+                        {QUOTE_KIND_LABEL[q.kind]} · {QUOTE_STATUS_LABEL[q.status]}
                         {q.stripePaymentIntentId && ` · ${q.stripePaymentIntentId}`}
                         {q.capturedAt && " · captured"}
                       </p>
                     </div>
-                    <span className={`font-bold tabular-nums ${q.totalPence < 0 ? "text-red-700" : "text-text-primary"}`}>
-                      {q.totalPence < 0 ? `−${formatPrice(-q.totalPence)}` : formatPrice(q.totalPence)}
-                    </span>
+                    <span className="font-bold tabular-nums text-text-primary">{formatPrice(q.totalPence)}</span>
                   </div>
-                  {q.kind !== "reduction" && (
-                    <ul className="mt-1.5 space-y-0.5 text-xs text-text-secondary">
-                      {q.lines.map((l) => (
-                        <li key={l.id}>
-                          {l.description}
-                          {l.kind === "labour" ? ` · ${l.hours} h` : l.quantity > 1 ? ` × ${l.quantity}` : ""} · {formatPrice(l.linePence)}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
+                  <ul className="mt-1.5 space-y-0.5 text-xs text-text-secondary">
+                    {q.lines.map((l) => (
+                      <li key={l.id}>
+                        {l.description}
+                        {l.kind === "labour" ? ` · ${l.hours} h` : l.quantity > 1 ? ` × ${l.quantity}` : ""} · {formatPrice(l.linePence)}
+                      </li>
+                    ))}
+                  </ul>
                   {q.note && <p className="mt-1.5 text-xs text-text-muted">“{q.note}”</p>}
                 </div>
               ))}
@@ -498,12 +494,6 @@ export default async function BookingDetailPage({ params }: PageProps) {
               <div className="flex items-center justify-between gap-3">
                 <span className="text-sm text-text-secondary">of which approved extra work</span>
                 <span className="text-sm text-text-muted">{formatPrice(quoteTotals.approvedNowPence)}</span>
-              </div>
-            )}
-            {quoteTotals.reductionsPence > 0 && (
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-sm text-text-secondary">after price reductions</span>
-                <span className="text-sm text-text-muted">− {formatPrice(quoteTotals.reductionsPence)}</span>
               </div>
             )}
             <div className="flex items-center justify-between gap-3">

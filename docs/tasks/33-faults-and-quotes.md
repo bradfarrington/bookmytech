@@ -1,6 +1,6 @@
 # Task 33 — Faults on the job; mechanic quotes for extra labour and parts, customer-approved and paid
 
-**Status:** ✅ Complete (2026-09-08) — on branch `task-33-faults-and-quotes` (stacked on 30–32). **Migration `0062` must be applied** (three new tables, `bookings.source_quote_id`, seven new `booking_events` types, `job_quotes` on Realtime). `tsc` clean, 306 unit tests (8 new), lint unchanged from baseline, production build compiles. **Not exercised in a browser or against Stripe** — the tables don't exist until `0062` is applied; the manual script is under "How to verify". Deviations from the plan: none; the follow-on kind is stored here and completed in Task 34.
+**Status:** ✅ Complete (2026-09-08) — on branch `task-33-faults-and-quotes` (stacked on 30–32). **Migration `0062` must be applied** (three new tables, `bookings.source_quote_id`, six new `booking_events` types, `job_quotes` on Realtime). `tsc` clean, 306 unit tests (8 new), lint unchanged from baseline, production build compiles. **Amended 2026-09-08:** the mechanic price reduction was removed before anything was applied or merged — see "Parked: the mechanic price reduction" below. **Not exercised in a browser or against Stripe** — the tables don't exist until `0062` is applied; the manual script is under "How to verify". Deviations from the plan: none; the follow-on kind is stored here and completed in Task 34.
 
 ## Why this exists
 
@@ -23,14 +23,14 @@ the software behind that clause.
 - **An increase needs the customer's approval and an authorised payment before the work.** The
   approval page shows every line and the total above the Approve button; the mechanic's screen
   says "Don't start until it shows Approved".
-- **A reduction needs no approval** — the customer already authorised more than they'll pay.
-  It is applied at once and realised at completion by capturing less than was held.
+- **Every quote raises the price.** There is no mechanic-side reduction — see the parked
+  section below.
 - **Same take rate**, split fee / payout exactly like the base booking, using the **booking's
   snapshotted `commission_rate`** (a Pro-tier mechanic keeps theirs). Labour is priced at the
   platform hourly rate at the time of the quote, snapshotted on it.
 - **Booking figures move in place.** On approval `total_pence`, `base_price_pence`,
-  `parts_price_pence`, `platform_fee_pence` and `mechanic_payout_pence` are incremented (a
-  reduction decrements). The mobile app shows `total_pence` as "what you pay", and after
+  `parts_price_pence`, `platform_fee_pence` and `mechanic_payout_pence` are incremented. The
+  mobile app shows `total_pence` as "what you pay", and after
   approving a quote the true figure IS the new one; the quote rows and a `quote_approved`
   event (before / after) are the audit trail. `service_duration_hours` is untouched.
 - **Stripe: one new manual-capture PaymentIntent per approved quote.** A manual-capture hold
@@ -46,41 +46,39 @@ the software behind that clause.
 
 - **`booking_faults`** — `description` (1–500), `severity` (`advisory` | `urgent`), `quote_id`
   (set when a quote line was raised for it).
-- **`job_quotes`** — `kind` (`now` = this visit, `follow_on` = a return visit [Task 34],
-  `reduction` = negative total, born approved), `status` (`draft` | `sent` | `approved` |
+- **`job_quotes`** — `kind` (`now` = this visit, `follow_on` = a return visit [Task 34]),
+  `status` (`draft` | `sent` | `approved` |
   `declined` | `withdrawn` | `expired`), `title`, `note`, the snapshot (`hourly_rate_pence`,
   `commission_rate`, `labour_pence`, `parts_pence`, `total_pence`, `platform_fee_pence`,
   `mechanic_payout_pence`), `stripe_payment_intent_id` / `stripe_charge_id` / `captured_at`,
-  `sent_at` / `responded_at` / `expires_at`, `follow_on_booking_id`. CHECK: reductions are
-  exactly the negative-total rows.
+  `sent_at` / `responded_at` / `expires_at`, `follow_on_booking_id`. CHECK: `total_pence >= 0`.
 - **`job_quote_lines`** — `kind` (`labour` | `part` | `other`), `description`, `hours`,
   `quantity`, `unit_pence`, `line_pence`, `node_id` (the HaynesPro job whose book time filled
   the hours), `part_id`, `fault_id`.
 - `bookings.source_quote_id` (for Task 34). RLS: SELECT for the booking's customer (id or guest
   email), the mechanic, admins; no write policies. `job_quotes` published over Realtime.
 - `booking_events` CHECK gains `fault_added`, `quote_sent`, `quote_approved`, `quote_declined`,
-  `quote_withdrawn`, `quote_expired`, `price_reduced`; `payment_captured` is reused with
+  `quote_withdrawn`, `quote_expired`; `payment_captured` is reused with
   `payload.quote_id` for a quote's capture.
 
 ### Pure logic (tested)
 
 - `lib/quotes/pricing.ts` — `priceQuoteLines` (labour = hours × rate; part / other = qty ×
-  unit; validation with customer-readable sentences; a £5,000 sanity ceiling), `priceReduction`
-  (negative, same split, clamped to what the base hold can still cover), `splitCommission`.
-- `lib/quotes/status.ts` — `QUOTABLE_STATUSES` (`now` and `reduction`: `in_progress`;
-  `follow_on`: `in_progress` or `completed`), 7-day expiry, `isQuoteExpired`, `respondRefusal`.
+  unit; validation with customer-readable sentences; a £5,000 sanity ceiling),
+  `splitCommission`.
+- `lib/quotes/status.ts` — `QUOTABLE_STATUSES` (`now`: `in_progress`; `follow_on`:
+  `in_progress` or `completed`), 7-day expiry, `isQuoteExpired`, `respondRefusal`.
 - `lib/earnings.ts` `allocateTransfers` — one payout drawn from several charges, each capped
   at its capture (a Stripe transfer sourced from a charge can't exceed it).
 
 ### Core — `lib/quotes/`
 
 - `load.ts` — `loadQuotesForBooking` / `loadQuote` / `loadFaultsForBooking` into plain views;
-  `quoteMoney` (approved-now total, reductions, the one pending quote).
+  `quoteMoney` (approved-now total, the one pending quote).
 - `mechanic.ts` (mechanic actions only): `addFault` / `deleteFault`; `createQuote` (prices and
   sends in one go; catalogue parts take the BMT price and name — `supplier_cost_pence` never
   leaves the admin; one open `now` quote per booking at a time; links faults; event; email +
-  SMS + push to the customer); `withdrawQuote` (releases a started hold); `reduceJobPrice`
-  (born approved, booking figures decremented at once, customer emailed + texted);
+  SMS + push to the customer); `withdrawQuote` (releases a started hold);
   `searchJobRepairTimes` — **the "automatic" part**: `searchRepairCatalogue` on the job's own
   reg, so picking a job fills the hours in from HaynesPro's book time; `listQuoteParts`.
 - `customer.ts` (shared by web and mobile, caller as parameter): `listQuotesFor`,
@@ -97,9 +95,8 @@ the software behind that clause.
 ### `completeAndCharge` (`app/actions/job-progress.ts`)
 
 1. Refused while a `now` quote is still `sent`.
-2. Base hold captured for `total − credit − Σ approved-now quotes` (so a reduction captures
-   less than was authorised and Stripe releases the rest). Every capture is idempotent (an
-   already-captured intent is read back). Then each approved quote's hold is captured in full,
+2. Base hold captured for `total − credit − discount − Σ approved-now quotes`. Every capture
+   is idempotent (an already-captured intent is read back). Then each approved quote's hold is captured in full,
    stamping `stripe_charge_id` / `captured_at` and a `payment_captured` event with `quote_id`.
 3. Payout: one `nettedPayout`, then `allocateTransfers` over the captured charges → one Stripe
    transfer per charge (`source_transaction` = that charge, `transfer_group` = the booking),
@@ -122,8 +119,7 @@ the software behind that clause.
   with a combobox over the catalogue (picking fills the BMT price) or a typed part and price;
   **Add other**; note; live totals ("Customer pays" / "You receive after 15%") from the same
   pure arithmetic; Send. Disabled with the reason when the status doesn't allow it.
-- **Reduce the price**: amount + reason → applied at once.
-- Earnings breakdown shows "of which approved extra work" / "after price reductions".
+- Earnings breakdown shows "of which approved extra work".
 
 ### Customer
 
@@ -136,13 +132,12 @@ the software behind that clause.
 - `components/customer/quote-proposal.tsx` — "Your mechanic has sent a quote for £X — review"
   on the active booking card, every upcoming row and the confirmation page; the dashboard loads
   the one unexpired `sent` quote per booking.
-- Email `quote_sent` (lines table + button), SMS `quote_sent`, push; `price_reduced` email + SMS.
+- Email `quote_sent` (lines table + button), SMS `quote_sent`, push.
 
 ### Admin
 
 `/admin/jobs/[id]`: "Faults & quotes" card (kind, status, lines, PI id, captured); the Split
-card gains "of which approved extra work" / "after price reductions"; the timeline labels the
-seven new events (and `payment_refunded` / `payout_transferred`, which had no label).
+card gains "of which approved extra work"; the timeline labels the six new events (and `payment_refunded` / `payout_transferred`, which had no label).
 
 ### Mobile — three additive routes, all thin wrappers over `lib/quotes/customer.ts`
 
@@ -169,15 +164,13 @@ seven new events (and `payment_refunded` / `payout_transferred`, which had no la
    `stripe_payment_intent_id` at `requires_capture`; `bookings.total_pence` rose by the quote;
    `quote_approved` event with before / after; mechanic emailed + texted; the job page reads
    "Approved and authorised — go ahead".
-5. Mechanic: Reduce the price £10 "took less time" → total falls by £10; customer emailed +
-   texted; `price_reduced` event.
-6. Complete job → Stripe: base intent captured for (authorised − £10), quote intent captured
+5. Complete job → Stripe: base intent captured for the base amount, quote intent captured
    in full; two transfers with `transfer_group` = booking id; `mechanic_ledger` one earning,
    two payouts; timeline shows both captures and both transfers.
-7. Admin: refund more than the base charge → two refunds, two `payment_refunded` events.
-8. Cron: set a `sent` quote's `expires_at` into the past → `curl /api/cron/expire-quotes` →
+6. Admin: refund more than the base charge → two refunds, two `payment_refunded` events.
+7. Cron: set a `sent` quote's `expires_at` into the past → `curl /api/cron/expire-quotes` →
    `expired`, its intent cancelled, mechanic emailed.
-9. Mobile: `GET …/quotes` lists them; `respond` with `approve` → `outcome: "pay"` + a
+8. Mobile: `GET …/quotes` lists them; `respond` with `approve` → `outcome: "pay"` + a
    `clientSecret`; another customer's token → "This isn't your booking."
 
 ## Acceptance criteria
@@ -186,17 +179,54 @@ seven new events (and `payment_refunded` / `payout_transferred`, which had no la
 - [x] Mechanic can build a quote of labour (book time auto-filled from HaynesPro) and parts (catalogue-priced) and send it
 - [x] Customer must see every line and the total before approving; approval authorises a second hold
 - [x] Completion refused while a quote is pending; captures base + approved quotes; pays out per charge
-- [x] Mechanic can reduce the price without approval; customer told; less captured
 - [x] Withdraw, decline, expiry (cron) all release any started hold and tell the other side
 - [x] Admin sees faults, quotes and the money split; refunds work across several intents
 - [x] Mobile: additive endpoints and tables; app's `total_pence` stays truthful
-- [x] Unit tests: pricing, reductions, expiry / refusal, transfer allocation
+- [x] Unit tests: pricing, commission split, expiry / refusal, transfer allocation
 - [ ] Exercised end-to-end in a browser and against Stripe test mode — script above
+
+
+## Parked: the mechanic price reduction (2026-09-08)
+
+**Removed before this branch was applied or merged.** The mechanic could lower a job's price
+without anyone's approval: a `reduction` quote born `approved`, the booking's figures
+decremented at once, the customer emailed and texted, and less captured than was held.
+
+**Gareth never asked for it.** His item 9 is *"allow mechanics to adjust the labour and parts
+if need be with a button to add labour and parts"* — the concrete instruction is to **add**. The
+reduction came out of the design pass, was raised as an open question in the approved plan
+(*"happy for a mechanic to lower the price unilaterally? Cap per job?"*), was never answered,
+and shipped anyway. Brad has put it to Gareth and is holding until he answers.
+
+The risk that makes it worth a decision rather than a default: a mechanic can discount away
+Book My Tech's commission on the driveway to settle a complaint, with no approval step and no
+cap.
+
+### What came out
+
+| Where | What |
+|---|---|
+| `supabase/migrations/0062_faults_and_quotes.sql` | `'reduction'` off the `job_quotes.kind` CHECK; the negative-total CHECK is now `total_pence >= 0`; `'price_reduced'` off the `booking_events` CHECK |
+| `lib/quotes/mechanic.ts` | `reduceJobPrice` |
+| `lib/quotes/pricing.ts` | `priceReduction` (and its test) |
+| `lib/quotes/status.ts` | the `reduction` kind, its `QUOTABLE_STATUSES` entry and its label |
+| `lib/quotes/load.ts` | `quoteMoney().reductionsPence` |
+| `lib/quotes/notify.ts` | `notifyCustomerPriceReduced` |
+| `app/actions/job-quotes.ts` | `reducePriceAction` |
+| mechanic job page | the `ReducePrice` panel; the negative-total rendering; the earnings row |
+| admin job page | the reduction branches and the "after price reductions" split row |
+| `emails/registry.ts`, `lib/sms/templates.ts` | the `price_reduced` email and SMS |
+
+### To bring it back
+
+Revert the removal commit (a follow-up commit on the tip of the stack,
+`task-36-remove-signature`, so Task 33's own branch was left alone). If `0062` has been
+applied by then it is no longer an edit to that file: a new migration must drop and recreate
+the two CHECK constraints and widen the `booking_events` one. Whatever Gareth decides, ask him
+for the cap before rebuilding it.
 
 ## Follow-ups / open questions for Gareth
 
-- **Reductions without approval** — happy for a mechanic to lower the price unilaterally? A cap
-  (e.g. not below 50%) is a one-liner in `priceReduction` if wanted.
 - **Saved cards**: set `setup_future_usage` at booking so a quote can be authorised without
   re-entering the card. Needs a Stripe Customer per profile and consent copy — its own task.
 - **Parts on quotes are self-sourced** (the mechanic supplies them); the "Order via BMT" toggle
@@ -213,10 +243,10 @@ seven new events (and `payment_refunded` / `payout_transferred`, which had no la
    row has `status = 'sent'` (unexpired), leading to an approval screen: list the lines and
    the total, then Approve / Decline via the endpoints above. Approve → `outcome: "pay"` →
    PaymentSheet with the `clientSecret` (manual capture, like the booking) → `confirm`.
-3. **`bookings.total_pence` may rise (approved quote) or fall (reduction) while `in_progress`.**
+3. **`bookings.total_pence` may rise while `in_progress`** when the customer approves a quote.
    Not a reschedule; treat the Realtime UPDATE as a display refresh.
-4. New `booking_events.event_type` values (`fault_added`, `quote_*`, `price_reduced`) — keep a
-   fallback label for unknown types.
+4. New `booking_events.event_type` values (`fault_added`, `quote_*`) — keep a fallback label
+   for unknown types.
 5. Push "Your mechanic has sent a quote" deep-links on `bookingId` only.
 
 ## When complete

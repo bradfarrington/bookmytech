@@ -1,14 +1,13 @@
 // Quote lifecycle rules (Task 33). Pure — unit-tested — shared by the
 // mechanic's builder, the customer's approval, the cron and the mobile routes.
 
-export type QuoteKind = "now" | "follow_on" | "reduction";
+export type QuoteKind = "now" | "follow_on";
 export type QuoteStatus = "draft" | "sent" | "approved" | "declined" | "withdrawn" | "expired";
 
 /** Booking statuses a quote of each kind may be raised from. */
 export const QUOTABLE_STATUSES: Record<QuoteKind, readonly string[]> = {
   now: ["in_progress"],
   follow_on: ["in_progress", "completed"],
-  reduction: ["in_progress"],
 };
 
 /** A sent quote lapses after this many days unanswered. */
@@ -58,5 +57,4 @@ export const QUOTE_STATUS_LABEL: Record<string, string> = {
 export const QUOTE_KIND_LABEL: Record<string, string> = {
   now: "Extra work on this visit",
   follow_on: "Return visit",
-  reduction: "Price reduction",
 };

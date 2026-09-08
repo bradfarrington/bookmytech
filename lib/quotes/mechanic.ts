@@ -5,9 +5,9 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getHourlyRatePence, getTakeRateBase } from "@/lib/pricing/calculate";
 import { searchRepairCatalogue } from "@/lib/haynespro/catalogue";
 import { loadQuote, loadQuotesForBooking, quoteMoney, type QuoteView } from "./load";
-import { priceReduction, safePriceQuoteLines, type QuoteLineInput } from "./pricing";
+import { safePriceQuoteLines, type QuoteLineInput } from "./pricing";
 import { QUOTABLE_STATUSES, quoteExpiry, type QuoteKind } from "./status";
-import { notifyCustomerPriceReduced, notifyCustomerQuoteSent, type QuoteBookingContact } from "./notify";
+import { notifyCustomerQuoteSent, type QuoteBookingContact } from "./notify";
 
 // The mechanic's side of quotes and faults (Task 33). Called only from the
 // mechanic Server Actions (app/actions/job-quotes.ts, booking-faults.ts),
@@ -248,103 +248,6 @@ export async function withdrawQuote(mechanicId: string, quoteId: string): Promis
     payload: { quote_id: quoteId, total_pence: quote.totalPence },
   });
   revalidate(quote.bookingId);
-  return { ok: true };
-}
-
-/**
- * Lower the price of the job (Task 33). No approval — the customer already
- * authorised more than they'll pay; the difference is left uncaptured at
- * completion. Recorded as a `reduction` quote and applied to the booking's
- * figures at once, so every reader shows the new total.
- */
-export async function reduceJobPrice(
-  mechanicId: string,
-  input: { bookingId: string; amountPence: number; reason: string },
-): Promise<QuoteResult> {
-  const owned = await ownedBooking(input.bookingId, mechanicId);
-  if (!owned.ok) return owned;
-  const { booking, admin } = owned;
-  if (!QUOTABLE_STATUSES.reduction.includes(booking.status))
-    return { ok: false, error: "The price can only be reduced while the job is in progress." };
-  const reason = (input.reason ?? "").trim().slice(0, 300);
-  if (!reason) return { ok: false, error: "Say why you're reducing the price — the customer sees it." };
-
-  // Never below what the base hold can still cover: the base charge is
-  // total − credit − approved extras (which are held separately).
-  const existing = quoteMoney(await loadQuotesForBooking(admin, booking.id));
-  const baseCharge = (booking.total_pence ?? 0) - (booking.credit_applied_pence ?? 0) - existing.approvedNowPence;
-  const priced = priceReduction(input.amountPence, {
-    commissionRate: booking.commission_rate ?? (await getTakeRateBase(admin)),
-    maxPence: Math.max(0, baseCharge),
-  });
-  if (!priced.ok) return priced;
-
-  const now = new Date().toISOString();
-  const { data: current } = await admin
-    .from("bookings")
-    .select("total_pence, base_price_pence, platform_fee_pence, mechanic_payout_pence, hourly_rate_pence")
-    .eq("id", booking.id)
-    .single();
-  if (!current) return { ok: false, error: "That job no longer exists." };
-
-  const { data: quote, error } = await admin
-    .from("job_quotes")
-    .insert({
-      booking_id: booking.id,
-      mechanic_id: mechanicId,
-      kind: "reduction",
-      status: "approved",
-      title: reason,
-      hourly_rate_pence: current.hourly_rate_pence ?? 0,
-      commission_rate: booking.commission_rate ?? 0.15,
-      labour_pence: priced.totalPence,
-      parts_pence: 0,
-      total_pence: priced.totalPence,
-      platform_fee_pence: priced.platformFeePence,
-      mechanic_payout_pence: priced.mechanicPayoutPence,
-      sent_at: now,
-      responded_at: now,
-    })
-    .select("id")
-    .single();
-  if (error || !quote) return { ok: false, error: error?.message ?? "Couldn't record the reduction." };
-  await admin.from("job_quote_lines").insert({
-    quote_id: quote.id,
-    position: 0,
-    kind: "other",
-    description: reason,
-    quantity: 1,
-    unit_pence: priced.totalPence,
-    line_pence: priced.totalPence,
-  });
-
-  const totalAfter = (current.total_pence ?? 0) + priced.totalPence;
-  const { error: updateError } = await admin
-    .from("bookings")
-    .update({
-      total_pence: totalAfter,
-      base_price_pence: (current.base_price_pence ?? 0) + priced.totalPence,
-      platform_fee_pence: (current.platform_fee_pence ?? 0) + priced.platformFeePence,
-      mechanic_payout_pence: (current.mechanic_payout_pence ?? 0) + priced.mechanicPayoutPence,
-    })
-    .eq("id", booking.id);
-  if (updateError) return { ok: false, error: updateError.message };
-
-  await admin.from("booking_events").insert({
-    booking_id: booking.id,
-    event_type: "price_reduced",
-    actor_id: mechanicId,
-    actor_role: "mechanic",
-    reason,
-    payload: {
-      quote_id: quote.id,
-      amount_pence: -priced.totalPence,
-      total_before: current.total_pence,
-      total_after: totalAfter,
-    },
-  });
-  void notifyCustomerPriceReduced(booking, -priced.totalPence, reason, totalAfter);
-  revalidate(booking.id);
   return { ok: true };
 }
 

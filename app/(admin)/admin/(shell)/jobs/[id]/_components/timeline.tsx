@@ -37,7 +37,6 @@ const META: Record<string, { label: string; icon: LucideIcon; tone: string }> = 
   quote_declined: { label: "Quote declined", icon: XCircle, tone: "text-text-muted" },
   quote_withdrawn: { label: "Quote withdrawn", icon: XCircle, tone: "text-text-muted" },
   quote_expired: { label: "Quote expired", icon: XCircle, tone: "text-text-muted" },
-  price_reduced: { label: "Price reduced", icon: ArrowRightLeft, tone: "text-amber-600" },
   payment_refunded: { label: "Payment refunded", icon: CreditCard, tone: "text-red-600" },
   payout_transferred: { label: "Payout transferred", icon: CheckCircle2, tone: "text-green-600" },
   note: { label: "Note", icon: StickyNote, tone: "text-text-muted" },

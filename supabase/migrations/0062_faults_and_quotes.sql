@@ -18,10 +18,6 @@
 --                                    second Stripe hold, captured at completion
 --                        follow_on = a return visit; approval leads into the
 --                                    booking funnel (Task 34)
---                        reduction = the mechanic lowered the price (no
---                                    approval needed — the customer pays less);
---                                    total_pence is NEGATIVE and is realised
---                                    at capture
 --                      with the platform figures snapshotted the way a
 --                      booking's are (hourly rate, commission, fee, payout).
 --   job_quote_lines  — labour (hours × the platform rate, optionally a
@@ -47,7 +43,7 @@ create table if not exists public.job_quotes (
   id                       uuid primary key default gen_random_uuid(),
   booking_id               uuid not null references public.bookings (id) on delete cascade,
   mechanic_id              uuid not null references public.profiles (id),
-  kind                     text not null check (kind in ('now', 'follow_on', 'reduction')),
+  kind                     text not null check (kind in ('now', 'follow_on')),
   status                   text not null default 'sent'
                              check (status in ('draft', 'sent', 'approved', 'declined', 'withdrawn', 'expired')),
   title                    text,
@@ -68,7 +64,7 @@ create table if not exists public.job_quotes (
   follow_on_booking_id     uuid references public.bookings (id) on delete set null,
   created_at               timestamptz not null default now(),
   updated_at               timestamptz not null default now(),
-  check ((kind = 'reduction') = (total_pence < 0))
+  check (total_pence >= 0)
 );
 create index if not exists job_quotes_booking_idx on public.job_quotes (booking_id, created_at);
 create index if not exists job_quotes_sent_idx on public.job_quotes (status) where status = 'sent';
@@ -209,12 +205,11 @@ alter table public.booking_events
     'quote_approved',
     'quote_declined',
     'quote_withdrawn',
-    'quote_expired',
-    'price_reduced'
+    'quote_expired'
   ));
 
 comment on table public.job_quotes is
-  'Quotes for extra work (Task 33): now = this visit (second Stripe hold, captured at completion); follow_on = a return visit (Task 34); reduction = the mechanic lowered the price (negative total, realised at capture).';
+  'Quotes for extra work (Task 33): now = this visit (second Stripe hold, captured at completion); follow_on = a return visit (Task 34). Every quote raises the price and needs the customer''s approval; there is no mechanic-side reduction (parked 2026-09-08, awaiting Gareth).';
 comment on table public.job_quote_lines is
   'A quote''s lines: labour (hours × platform rate, node_id when HaynesPro book time filled it in), part (catalogue or typed), other.';
 comment on table public.booking_faults is

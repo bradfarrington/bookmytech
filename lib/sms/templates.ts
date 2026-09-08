@@ -231,17 +231,6 @@ export const SMS_TEMPLATE_DEFS: readonly SmsTemplateDef[] = [
     ],
     defaultBody: "Book My Tech: your mechanic has sent a quote for {{total}}. Nothing is charged until you approve: {{url}}",
   },
-  {
-    key: "price_reduced",
-    label: "Mechanic reduced the price",
-    description: "Sent to the customer when their mechanic takes money off the job.",
-    audience: "customer",
-    variables: [
-      { name: "amount", description: "Amount taken off", example: "£10.00" },
-      { name: "ref", description: "Job number", example: "00123" },
-    ],
-    defaultBody: "Book My Tech: your mechanic has taken {{amount}} off job {{ref}}. Only the new total is charged when it's complete.",
-  },
 
   // --- Mechanic ---------------------------------------------------------------
   {

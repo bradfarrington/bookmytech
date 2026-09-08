@@ -4,7 +4,6 @@ import { requireMechanic } from "@/lib/mechanics/require-mechanic";
 import {
   createQuote,
   listQuoteParts,
-  reduceJobPrice,
   searchJobRepairTimes,
   withdrawQuote,
   type CreateQuoteInput,
@@ -24,12 +23,6 @@ export async function withdrawQuoteAction(quoteId: string) {
   const guard = await requireMechanic();
   if (!guard.ok) return guard;
   return withdrawQuote(guard.mechanicId, quoteId);
-}
-
-export async function reducePriceAction(input: { bookingId: string; amountPence: number; reason: string }) {
-  const guard = await requireMechanic();
-  if (!guard.ok) return guard;
-  return reduceJobPrice(guard.mechanicId, input);
 }
 
 export async function searchJobRepairTimesAction(input: { bookingId: string; query: string }) {
