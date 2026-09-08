@@ -66,7 +66,7 @@ export default async function ReviewPage({ params, searchParams }: ReviewPagePro
           <h1 className="text-2xl font-bold text-text-primary">Not quite yet</h1>
           <p className="text-text-secondary">
             You can leave a review once your job has been completed. Come back
-            after your mechanic has signed off the work.
+            once your mechanic has completed the work.
           </p>
         </div>
       </Shell>

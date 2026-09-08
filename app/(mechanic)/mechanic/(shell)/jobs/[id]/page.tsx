@@ -44,7 +44,8 @@ export default async function MechanicJobDetailPage({ params }: PageProps) {
        address_line_1, address_line_2,
        customer_name, customer_phone, special_instructions,
        cancellation_reason, reschedule_status, reschedule_proposed_at,
-       repair_description, service_duration_hours, mileage, hourly_rate_pence`,
+       repair_description, service_duration_hours, mileage, hourly_rate_pence,
+       credit_applied_pence, discount_pence`,
     )
     .eq("id", id)
     .maybeSingle();
@@ -101,7 +102,7 @@ export default async function MechanicJobDetailPage({ params }: PageProps) {
     createdAt: e.created_at,
   }));
 
-  // --- Job evidence (mechanic photos + sign-off signature) -----------------
+  // --- Job evidence (mechanic photos) --------------------------------------
   const { data: mediaRows } = await supabase
     .from("booking_media")
     .select("id, kind, storage_path, created_at")
@@ -114,8 +115,6 @@ export default async function MechanicJobDetailPage({ params }: PageProps) {
   const photos = (mediaRows ?? [])
     .filter((m) => m.kind === "photo")
     .map((m) => ({ id: m.id, url: publicUrl(m.storage_path) }));
-  const signatureRow = (mediaRows ?? []).find((m) => m.kind === "signature");
-  const signatureUrl = signatureRow ? publicUrl(signatureRow.storage_path) : null;
 
   // --- Parts on this job (mechanic reads via RLS; only BMT-price columns) ----
   const { data: partRows } = await supabase
@@ -249,8 +248,12 @@ export default async function MechanicJobDetailPage({ params }: PageProps) {
     arrivalWindows,
     events,
     photos,
-    signatureUrl,
-    hasSignature: signatureUrl != null,
+    // What "Complete job & charge" will take: the same figure completeAndCharge
+    // captures (total − credit − discount).
+    chargePence: Math.max(
+      0,
+      (booking.total_pence ?? 0) - (booking.credit_applied_pence ?? 0) - (booking.discount_pence ?? 0),
+    ),
     disputeId: disputeRow?.id ?? null,
     // In-app manuals + technical data (Task 27) need the Data Exchange
     // credentials, not the SSO ones.

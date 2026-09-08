@@ -8,8 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { cancelOwnJob, proposeReschedule } from "@/app/actions/mechanic-jobs";
 import { startJourney, beginWork, completeAndCharge } from "@/app/actions/job-progress";
-import { saveSignature } from "@/app/actions/job-media";
-import { SignaturePad } from "./signature-pad";
+import { formatPrice } from "@/lib/utils";
 
 interface JobActionsProps {
   bookingId: string;
@@ -17,7 +16,8 @@ interface JobActionsProps {
   scheduledAt: string | null;
   rescheduleStatus: string | null;
   rescheduleProposedAt: string | null;
-  hasSignature: boolean;
+  /** What completing will take off the customer's card, for the confirm step. */
+  chargePence: number;
 }
 
 const CANCEL_REASONS = [
@@ -46,11 +46,11 @@ export function JobActions({
   scheduledAt,
   rescheduleStatus,
   rescheduleProposedAt,
-  hasSignature,
+  chargePence,
 }: JobActionsProps) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [signing, setSigning] = useState(false);
+  const [confirming, setConfirming] = useState(false);
 
   const [reason, setReason] = useState("");
   const [reasonDetails, setReasonDetails] = useState("");
@@ -63,11 +63,13 @@ export function JobActions({
   function runLive(
     action: (id: string) => Promise<{ ok: boolean; error?: string }>,
     success: string,
+    onSuccess?: () => void,
   ) {
     startTransition(async () => {
       const res = await action(bookingId);
       if (res.ok) {
         toast.success(success);
+        onSuccess?.();
         router.refresh();
       } else {
         toast.error(res.error ?? "Something went wrong.");
@@ -97,70 +99,57 @@ export function JobActions({
   }
 
   if (status === "in_progress") {
-    // Capture the customer's signature, then complete + charge in one go. If a
-    // signature already exists (e.g. a previous capture attempt failed), we can
-    // complete directly without making them sign again.
-    function handleSignAndComplete(blob: Blob) {
-      const fd = new FormData();
-      fd.append("file", new File([blob], "signature.png", { type: "image/png" }));
-      startTransition(async () => {
-        const sig = await saveSignature(bookingId, fd);
-        if (!sig.ok) {
-          toast.error(sig.error);
-          return;
-        }
-        const done = await completeAndCharge(bookingId);
-        if (done.ok) {
-          toast.success("Job complete — payment captured.");
-          setSigning(false);
-          router.refresh();
-        } else {
-          // Signature is saved; surface the error and refresh so a retry can
-          // skip re-signing.
-          toast.error(done.error);
-          router.refresh();
-        }
-      });
-    }
-
+    // Completing captures the customer's pre-authorisation, so it asks once
+    // before it does. (There is no customer signature: the mechanic's own
+    // confirmation is the record, and it goes into the completion event.)
     return (
       <div className="space-y-3">
         <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-3 text-sm text-amber-700">
           <Wrench size={16} className="mt-0.5 shrink-0 text-amber-600" />
-          Work is <strong>in progress</strong>. When you&apos;re finished, get the
-          customer to sign off — that completes the job and captures payment.
+          Work is <strong>in progress</strong>. When you&apos;re finished, confirm below — that
+          completes the job and captures payment.
         </div>
 
-        {signing ? (
-          <div className="space-y-2">
-            <SignaturePad
-              onSave={handleSignAndComplete}
-              saving={pending}
-              saveLabel="Sign off, complete & charge"
-            />
-            <Button variant="ghost" size="sm" fullWidth disabled={pending} onClick={() => setSigning(false)}>
+        {confirming ? (
+          <div className="space-y-2 rounded-xl border border-border bg-surface px-3.5 py-3">
+            <p className="text-sm text-text-primary">
+              Charge <strong>{formatPrice(chargePence)}</strong> to the customer&apos;s card and mark
+              this job complete?
+            </p>
+            <p className="text-xs text-text-muted">
+              Check the work is finished and you&apos;ve added any photos — this can&apos;t be undone
+              from here.
+            </p>
+            <Button
+              size="sm"
+              fullWidth
+              iconLeft={BadgePoundSterling}
+              disabled={pending}
+              onClick={() =>
+                runLive(completeAndCharge, "Job complete — payment captured.", () =>
+                  setConfirming(false),
+                )
+              }
+            >
+              Confirm &amp; charge {formatPrice(chargePence)}
+            </Button>
+            <Button variant="ghost" size="sm" fullWidth disabled={pending} onClick={() => setConfirming(false)}>
               Cancel
             </Button>
           </div>
         ) : (
           <>
-            <Button size="sm" fullWidth iconLeft={BadgePoundSterling} disabled={pending} onClick={() => setSigning(true)}>
+            <Button
+              size="sm"
+              fullWidth
+              iconLeft={BadgePoundSterling}
+              disabled={pending}
+              onClick={() => setConfirming(true)}
+            >
               Complete job &amp; charge customer
             </Button>
-            {hasSignature && (
-              <Button
-                variant="secondary"
-                size="sm"
-                fullWidth
-                disabled={pending}
-                onClick={() => runLive(completeAndCharge, "Job complete — payment captured.")}
-              >
-                Use saved signature — complete &amp; charge
-              </Button>
-            )}
             <p className="text-xs text-text-muted">
-              Completing captures the pre-authorised amount. You&apos;re paid out
-              24h after sign-off.
+              Completing captures the pre-authorised amount. You&apos;re paid out 24h after that.
             </p>
           </>
         )}

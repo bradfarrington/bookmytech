@@ -179,10 +179,10 @@ safe either way; it just isn't useful until the migration is in.
 ## Follow-ups / open questions for Gareth
 
 - **Service prices** for Interim / Full / Major — the rows are inactive until given.
-- **Commission on oil**: today's rule takes 15% of the whole total, so the mechanic nets £12.75 of
-  every £15 litre. Pass oil through at cost instead? One-line change in `buildRepairsQuote`.
-- **Rounding**: litres are charged exactly (4.3 l = £64.50). Round up to the next 0.5 l for the
-  pack the mechanic buys? A one-line change behind a setting.
+- ~~**Commission on oil**~~ **Answered (Brad, 2026-09-08): commission applies**, as it does to
+  the rest of the total — the mechanic nets £12.75 of every £15 litre. This is what shipped.
+- ~~**Rounding**~~ **Answered (Brad, 2026-09-08): charge the exact litres.** 4.3 l = £64.50, to
+  one decimal, as HaynesPro states it. This is what shipped.
 - **Diagnostic fee credited against a repair** — the old FAQ promised it; nothing implements it.
   If he wants it, Task 33's quote flow is the place (a `now` quote could deduct the diagnostic).
 - The inspection **visit durations** (1 / 1.5 / 2 h) are guesses; editable per product.

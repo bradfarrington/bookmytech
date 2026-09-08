@@ -204,8 +204,8 @@ export function PriceHero({
         </ul>
 
         <p className="mt-4 rounded-xl bg-white/15 px-4 py-3 text-[13px] leading-relaxed text-blue-100">
-          Your card is pre-authorised now. No money leaves your account until the job
-          is complete and you&apos;ve signed off.
+          Your card is pre-authorised now. No money leaves your account until your
+          mechanic has completed the job.
         </p>
       </div>
 

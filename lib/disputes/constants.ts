@@ -14,7 +14,9 @@ export const CUSTOMER_REASONS = [
 ] as const;
 
 export const MECHANIC_REASONS = [
-  { value: "refused_signoff", label: "Customer refuses to sign off" },
+  // Value kept (it is stored on existing rows); relabelled when the customer
+  // signature was removed in Task 36.
+  { value: "refused_signoff", label: "Customer disputes that the work was done" },
   { value: "abusive", label: "Customer abusive" },
   { value: "scope", label: "Disputed scope of work" },
   { value: "other", label: "Other" },

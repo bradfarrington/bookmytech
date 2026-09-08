@@ -52,7 +52,7 @@ const BANNERS: Record<string, { title: string; body: string; icon: LucideIcon }>
   },
   in_progress: {
     title: "Work in progress",
-    body: "Your mechanic is on site and working on your vehicle. You'll be asked to sign off once it's done.",
+    body: "Your mechanic is on site and working on your vehicle. We'll email your receipt as soon as it's done.",
     icon: Wrench,
   },
   completed: {

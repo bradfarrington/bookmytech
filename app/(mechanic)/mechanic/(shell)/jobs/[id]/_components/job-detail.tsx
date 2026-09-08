@@ -15,7 +15,6 @@ import {
   StickyNote,
   MessageSquare,
   ImageIcon,
-  PenLine,
   Gauge,
   Package,
   Sparkles,
@@ -99,8 +98,8 @@ export interface JobDetailProps {
   events: TimelineEvent[];
   // Job evidence (mechanic-captured)
   photos: JobPhoto[];
-  signatureUrl: string | null;
-  hasSignature: boolean;
+  /** What completing will capture: total − credit − discount. */
+  chargePence: number;
   // Dispute (Task 12): id of an existing dispute on this job, if any.
   disputeId: string | null;
   // Technical data (Task 16): HaynesPro SSO configured → show the deep links.
@@ -146,8 +145,6 @@ export function JobDetail(props: JobDetailProps) {
     cancellationReason,
     events,
     photos,
-    signatureUrl,
-    hasSignature,
     disputeId,
     technicalDataEnabled,
   } = props;
@@ -372,19 +369,6 @@ export function JobDetail(props: JobDetailProps) {
             )}
           </Card>
 
-          {/* Sign-off — the captured customer signature, once the job is done */}
-          {signatureUrl && (
-            <Card className="space-y-3 p-6">
-              <CardTitle icon={PenLine}>Customer sign-off</CardTitle>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={signatureUrl}
-                alt="Customer signature"
-                className="h-32 w-full rounded-xl border border-border bg-white object-contain"
-              />
-            </Card>
-          )}
-
           {/* Parts allocated to this job (the side column lists them in full
               once any are added). */}
           <Card className="space-y-3 p-6">
@@ -462,7 +446,7 @@ export function JobDetail(props: JobDetailProps) {
               scheduledAt={props.scheduledAt}
               rescheduleStatus={props.rescheduleStatus}
               rescheduleProposedAt={props.rescheduleProposedAt}
-              hasSignature={hasSignature}
+              chargePence={props.chargePence}
             />
           </Card>
         </div>

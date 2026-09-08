@@ -69,7 +69,7 @@ export function EarningsBreakdown({
         </p>
       )}
       <p className="text-xs text-text-muted">
-        Paid out after the customer signs off the completed job.
+        Paid out after you complete the job.
       </p>
     </div>
   );

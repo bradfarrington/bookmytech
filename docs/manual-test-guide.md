@@ -108,8 +108,9 @@ Two caveats apply wherever automation touches money or messages:
 ### 3.3 Walk the job through to completion
 - [ ] Click **Start journey** → **Expect:** *"you're on the way"*, the customer gets an email/SMS, and their phone number is now revealed.
 - [ ] Click **I've arrived — begin work** → **Expect:** status becomes *in progress*.
-- [ ] Click **Complete job & charge customer** → a **signature pad** opens → sign → **Expect:** *"Job complete — payment captured."*
-  - **Sign-off gate test:** the job will **not** complete without a signature — if you somehow skip it you'll be told to capture the signature first.
+- [ ] Click **Complete job & charge customer** → a confirm panel names the amount → **Confirm & charge** → **Expect:** *"Job complete — payment captured."*
+  - The customer signature that used to gate this was removed (Task 36, owner instruction). The mechanic's confirmation is recorded on the completion event (`mechanic_confirmed`, `charge_pence`).
+  - On a **service or inspection** (Task 32) completion is refused until every checklist item is answered and the mileage is recorded.
 - [ ] **Check Stripe → Payments** → **Expect:** the previously-uncaptured hold is now a **captured charge** (money actually taken).
 - [ ] **Check Stripe → Connect → Transfers** → **Expect:** a transfer to the mechanic's connected account for their share (full price minus the platform fee).
 - [ ] **Check the customer's email** → **Expect:** a receipt + a "rate your mechanic" prompt with star links.

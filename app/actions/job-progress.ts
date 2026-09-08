@@ -233,16 +233,6 @@ export async function completeAndCharge(bookingId: string): Promise<JobProgressR
     return { ok: false, error: "Enter the vehicle's mileage before completing the job." };
   const reportUrl = checklists.length > 0 ? `${siteUrl()}/dashboard/bookings/${bookingId}/report` : "";
 
-  // Sign-off gate: a job can't be completed (and charged) until the customer
-  // has signed on the mechanic's screen — see saveSignature in job-media.ts.
-  const { count: sigCount } = await admin
-    .from("booking_media")
-    .select("id", { count: "exact", head: true })
-    .eq("booking_id", bookingId)
-    .eq("kind", "signature");
-  if (!sigCount)
-    return { ok: false, error: "Get the customer to sign off before completing the job." };
-
   // --- Quotes (Task 33) ----------------------------------------------------
   // A quote still waiting on the customer blocks completion: charging for
   // work the customer hasn't approved is the thing the T&Cs forbid.
@@ -355,6 +345,11 @@ export async function completeAndCharge(bookingId: string): Promise<JobProgressR
     payload: {
       status_from: "in_progress",
       status_to: "completed",
+      // The mechanic's own confirmation is the record that the work was
+      // finished — the customer signature this used to require was removed on
+      // the owner's instruction (2026-09-08).
+      mechanic_confirmed: true,
+      charge_pence: chargePence,
       mileage: booking.mileage ?? null,
       // What was answered on each checklist, as it stood at completion.
       ...(checklists.length > 0
@@ -390,7 +385,7 @@ export async function completeAndCharge(bookingId: string): Promise<JobProgressR
   // now it was only ever written when someone left a review, which most jobs
   // never get, so it read 0 on four surfaces that display it as fact.
   // Non-fatal: the money has already moved and the job is complete, so a failed
-  // recount must not fail sign-off. It self-repairs on the next completion.
+  // recount must not fail completion. It self-repairs on the next one.
   if (booking.mechanic_id) {
     try {
       await recomputeMechanicAggregates(admin, booking.mechanic_id);
@@ -434,7 +429,7 @@ export async function completeAndCharge(bookingId: string): Promise<JobProgressR
   // retains the fee. The transfer goes to whoever currently holds the job, so a
   // replacement mechanic is paid correctly. A failed transfer is NON-fatal —
   // the money is already captured and the job is complete — so we log it for
-  // reconciliation/retry rather than blocking sign-off.
+  // reconciliation/retry rather than blocking completion.
   // The mechanic's connected-account id lives on the `mechanics` table. There's
   // no PostgREST-resolvable FK from bookings → mechanics, so fetch it directly
   // rather than as an embedded join — embedding it errors the whole booking

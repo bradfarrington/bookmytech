@@ -9,11 +9,16 @@ export type JobMediaResult =
   | { ok: true; url?: string }
   | { ok: false; error: string };
 
-// Mechanic-captured job evidence — photos + a sign-off signature — for the
-// responsive desktop job view (delivered ahead of the mobile PWA). Same trust
-// model as job-progress.ts: verify the caller owns the job in an RLS-aware
-// client, then write the Storage object + booking_media row via service-role
-// (the ownership re-read is the shared `ownedBooking`).
+// Mechanic-captured job evidence — photos of the work. Same trust model as
+// job-progress.ts: verify the caller owns the job in an RLS-aware client, then
+// write the Storage object + booking_media row via service-role (the ownership
+// re-read is the shared `ownedBooking`).
+//
+// There was a customer signature here too, captured on the mechanic's screen
+// and gating completion. Removed on the owner's instruction (Gareth via Brad,
+// 2026-09-08): the mechanic's own confirmation is the record now, and it goes
+// into the completion event. `booking_media.kind` still allows 'signature' so
+// the PNGs already captured stay readable.
 
 const ALLOWED_PHOTO_TYPES: Record<string, string> = {
   "image/jpeg": "jpg",
@@ -21,9 +26,7 @@ const ALLOWED_PHOTO_TYPES: Record<string, string> = {
   "image/webp": "webp",
 };
 const MAX_PHOTO_BYTES = 10 * 1024 * 1024; // 10 MB
-const MAX_SIGNATURE_BYTES = 2 * 1024 * 1024;
-// Photos can be taken before and during the visit; the signature is part of
-// completing the job.
+// Photos can be taken before and during the visit.
 const PHOTO_STATUSES = ["confirmed", "en_route", "in_progress"];
 
 function revalidate(bookingId: string) {
@@ -95,56 +98,5 @@ export async function deleteJobPhoto(mediaId: string): Promise<JobMediaResult> {
   if (error) return { ok: false, error: error.message };
 
   revalidate(media.booking_id);
-  return { ok: true };
-}
-
-/**
- * Save the customer's sign-off signature (a PNG exported from the on-screen
- * signature pad). Only valid while the job is in progress — it's the gate for
- * completion. One signature per job: we overwrite any previous one.
- */
-export async function saveSignature(
-  bookingId: string,
-  formData: FormData,
-): Promise<JobMediaResult> {
-  const guard = await requireMechanic();
-  if (!guard.ok) return guard;
-
-  const file = formData.get("file");
-  if (!(file instanceof File) || file.size === 0)
-    return { ok: false, error: "No signature captured." };
-  if (file.type !== "image/png")
-    return { ok: false, error: "Signature must be a PNG." };
-  if (file.size > MAX_SIGNATURE_BYTES)
-    return { ok: false, error: "Signature image is too large." };
-
-  const res = await ownedBooking(bookingId, guard.mechanicId);
-  if (!res.ok) return res;
-  const { booking, admin } = res;
-  if (booking.status !== "in_progress")
-    return { ok: false, error: "Capture the signature once work is in progress." };
-
-  const path = `${bookingId}/signature.png`;
-  const bytes = new Uint8Array(await file.arrayBuffer());
-  const { error: upErr } = await admin.storage
-    .from("job-media")
-    .upload(path, bytes, { contentType: "image/png", upsert: true });
-  if (upErr) return { ok: false, error: upErr.message };
-
-  // One sign-off per job — replace any prior signature row.
-  await admin
-    .from("booking_media")
-    .delete()
-    .eq("booking_id", bookingId)
-    .eq("kind", "signature");
-  const { error: rowErr } = await admin.from("booking_media").insert({
-    booking_id: bookingId,
-    mechanic_id: guard.mechanicId,
-    kind: "signature",
-    storage_path: path,
-  });
-  if (rowErr) return { ok: false, error: rowErr.message };
-
-  revalidate(bookingId);
   return { ok: true };
 }

@@ -1,5 +1,10 @@
 # Task 06 — Mechanic mobile PWA
 
+> **Superseded in part (2026-09-08, Task 36):** the customer **signature** described
+> below is gone — the pad, the action and the completion gate were removed on the
+> owner's instruction. Completing a job is now the mechanic's own confirm step, recorded
+> on the completion event. Job photos are unchanged.
+
 **Status:** ✅ Complete (2026-06-04) — web-buildable scope shipped. PWA shell (Stage 1), responsive mobile + day view (Stage 2), offer-screen UI (Stage 3), live job lifecycle + photos/signature + Stripe capture (Stage 4, on the responsive desktop view), and reviews (Stage 5). **Deliberately deferred to the native-app build** (not done here, by decision): push notifications / FCM, offline IndexedDB sync, GPS live-location, the bottom-tab app shell, and the Me tab. The mobile experience is a responsive website, not an app shell. Notifications are email + SMS, not push. See the per-stage "deviation" notes below and the Interim-delivery block.
 
 Build the phone-optimised mobile experience the mechanic uses in the field. Brief covers this in section 4 (second half). Delivered as a Progressive Web App — installable to home screen, push notifications, offline-capable for the in-progress checklist.

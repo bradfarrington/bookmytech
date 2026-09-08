@@ -70,6 +70,7 @@ The core transaction record. The columns below the first divider were added in `
 | started_at                 | timestamptz | when the mechanic arrived / began work                                |
 | completed_at               | timestamptz | when the mechanic marked the job done                                 |
 | engine_oil_litres / engine_oil_price_per_litre_pence / engine_oil_source | numeric(4,1) / integer / text | 0060 (Task 31) — the engine-oil line a servicing product added: litres charged, £/litre at the time, and `haynespro` (the manufacturer's stated capacity) or `default` (the admin fallback). The money is in `parts_price_pence`. All null when no oil line |
+| discount_pence / promo_code | integer / text | 0063 (Task 35) — a discount code's saving and the code that gave it. BMT-funded: `mechanic_payout_pence` is untouched, so `charge = total − discount − credit` |
 | mileage                    | integer     | 0059 (Task 30) — odometer reading in miles, typed by the mechanic on the job page (`setJobMileage`, any active status). NULL = not recorded. Shown to admin, on the receipt email; carried in the completion `status_changed` payload. Task 32 requires it before a servicing / inspection job completes |
 
 **Status lifecycle:** CHECK constraint pins `status` to one of:
@@ -80,7 +81,7 @@ The core transaction record. The columns below the first divider were added in `
 | `confirmed`          | Mechanic accepted the job                                              |
 | `en_route`           | Mechanic on the way                                                    |
 | `in_progress`        | Mechanic on site, working                                              |
-| `completed`          | Mechanic marked complete, customer signed off                          |
+| `completed`          | Mechanic confirmed the work was done and charged the customer          |
 | `cancelled`          | Cancelled (by customer, admin, or PI auto-released)                    |
 | `disputed`           | Flagged by customer for admin review                                   |
 

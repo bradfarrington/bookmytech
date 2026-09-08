@@ -296,7 +296,7 @@ export const EMAIL_TEMPLATE_DEFS: readonly EmailTemplateDef[] = [
       {
         id: "holdnote",
         type: "note",
-        text: "No money has left your account yet. Your payment will only be captured once the job is complete and you've signed off.",
+        text: "No money has left your account yet. Your payment will only be captured once your mechanic has completed the job.",
       },
       {
         id: "help",
