@@ -1,0 +1,228 @@
+{
+  "name": "Capacities",
+  "order": 0,
+  "remark": null,
+  "unit": null,
+  "value": null,
+  "subAdjustments": [
+    {
+      "name": "Electrical system",
+      "order": 0,
+      "remark": null,
+      "unit": null,
+      "value": null,
+      "subAdjustments": null,
+      "imageName": null,
+      "descriptionId": 307149,
+      "status": null,
+      "extraInfoId": null,
+      "smartLinks": null
+    },
+    {
+      "name": "Cooling system, high-voltage battery",
+      "order": 0,
+      "remark": null,
+      "unit": "(l)",
+      "value": "15.0",
+      "subAdjustments": null,
+      "imageName": null,
+      "descriptionId": 319000500,
+      "status": null,
+      "extraInfoId": null,
+      "smartLinks": null
+    },
+    {
+      "name": "Brake system : General data",
+      "order": 1,
+      "remark": null,
+      "unit": null,
+      "value": null,
+      "subAdjustments": null,
+      "imageName": null,
+      "descriptionId": 305381,
+      "status": null,
+      "extraInfoId": null,
+      "smartLinks": null
+    },
+    {
+      "name": "Brake system",
+      "order": 0,
+      "remark": null,
+      "unit": "(l)",
+      "value": "1.0",
+      "subAdjustments": null,
+      "imageName": null,
+      "descriptionId": 102000067,
+      "status": null,
+      "extraInfoId": null,
+      "smartLinks": null
+    },
+    {
+      "name": "Rear electric drive unit, 3DU",
+      "order": 2,
+      "remark": null,
+      "unit": null,
+      "value": null,
+      "subAdjustments": null,
+      "imageName": null,
+      "descriptionId": 1199359,
+      "status": null,
+      "extraInfoId": null,
+      "smartLinks": null
+    },
+    {
+      "name": "Electric drive unit",
+      "order": 0,
+      "remark": null,
+      "unit": "(l)",
+      "value": "2.1",
+      "subAdjustments": [
+        {
+          "name": "Plug location",
+          "order": 0,
+          "remark": "Filler plug",
+          "unit": null,
+          "value": null,
+          "subAdjustments": null,
+          "imageName": "https://www.haynespro-assets.com/workshop/images/319034662.svgz",
+          "descriptionId": 465,
+          "status": null,
+          "extraInfoId": null,
+          "smartLinks": null
+        }
+      ],
+      "imageName": null,
+      "descriptionId": 319001394,
+      "status": null,
+      "extraInfoId": null,
+      "smartLinks": null
+    },
+    {
+      "name": "Air conditioning : General data",
+      "order": 3,
+      "remark": null,
+      "unit": null,
+      "value": null,
+      "subAdjustments": null,
+      "imageName": null,
+      "descriptionId": 300306,
+      "status": null,
+      "extraInfoId": null,
+      "smartLinks": null
+    },
+    {
+      "name": "Air conditioning",
+      "order": 0,
+      "remark": "Vehicles without heat pump",
+      "unit": null,
+      "value": null,
+      "subAdjustments": [
+        {
+          "name": "Plug location",
+          "order": 0,
+          "remark": "High-pressure connecting pipe (H); low-pressure connecting pipe (L)",
+          "unit": null,
+          "value": null,
+          "subAdjustments": null,
+          "imageName": "https://www.haynespro-assets.com/workshop/images/319142133.svgz",
+          "descriptionId": 465,
+          "status": null,
+          "extraInfoId": null,
+          "smartLinks": null
+        }
+      ],
+      "imageName": null,
+      "descriptionId": 507,
+      "status": null,
+      "extraInfoId": null,
+      "smartLinks": null
+    },
+    {
+      "name": "Air conditioning",
+      "order": 1,
+      "remark": "Vehicles with heat pump",
+      "unit": null,
+      "value": null,
+      "subAdjustments": [
+        {
+          "name": "Plug location",
+          "order": 0,
+          "remark": "High-pressure connecting pipe (H); low-pressure connecting pipe (L)",
+          "unit": null,
+          "value": null,
+          "subAdjustments": null,
+          "imageName": "https://www.haynespro-assets.com/workshop/images/319141968.svgz",
+          "descriptionId": 465,
+          "status": null,
+          "extraInfoId": null,
+          "smartLinks": null
+        }
+      ],
+      "imageName": null,
+      "descriptionId": 507,
+      "status": null,
+      "extraInfoId": null,
+      "smartLinks": null
+    },
+    {
+      "name": "Refrigerant",
+      "order": 2,
+      "remark": "Vehicles without heat pump",
+      "unit": "(g)",
+      "value": "660 ± 20",
+      "subAdjustments": null,
+      "imageName": null,
+      "descriptionId": 479,
+      "status": null,
+      "extraInfoId": null,
+      "smartLinks": null
+    },
+    {
+      "name": "Refrigerant",
+      "order": 3,
+      "remark": "Vehicles with heat pump",
+      "unit": "(g)",
+      "value": "1020 ± 20",
+      "subAdjustments": null,
+      "imageName": null,
+      "descriptionId": 479,
+      "status": null,
+      "extraInfoId": null,
+      "smartLinks": null
+    },
+    {
+      "name": "Air-conditioning compressor oil, system total",
+      "order": 4,
+      "remark": "Vehicles without heat pump",
+      "unit": "(ml)",
+      "value": "150 ± 10",
+      "subAdjustments": null,
+      "imageName": null,
+      "descriptionId": 482,
+      "status": null,
+      "extraInfoId": null,
+      "smartLinks": null
+    },
+    {
+      "name": "Air-conditioning compressor oil, system total",
+      "order": 5,
+      "remark": "Vehicles with heat pump",
+      "unit": "(ml)",
+      "value": "256 ± 6",
+      "subAdjustments": null,
+      "imageName": null,
+      "descriptionId": 482,
+      "status": null,
+      "extraInfoId": null,
+      "smartLinks": null
+    }
+  ],
+  "imageName": null,
+  "descriptionId": 111,
+  "status": {
+    "statusCode": 0,
+    "confirmationLink": null
+  },
+  "extraInfoId": null,
+  "smartLinks": null
+}

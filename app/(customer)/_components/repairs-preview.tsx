@@ -16,22 +16,23 @@ import { Pill } from "@/components/ui/pill";
 import { Reveal } from "@/components/ui/reveal";
 import { cn } from "@/lib/utils";
 
-// Static marketing preview of what can be booked. There's no services
-// catalogue any more — every booking is a HaynesPro repair priced from the
-// manufacturer's book time for the exact car — so this shows popular repair
-// areas and sends people into the funnel, where real per-vehicle prices live.
+// Static marketing preview of what can be booked. Repairs are HaynesPro jobs
+// priced from the manufacturer's book time for the exact car; diagnostics,
+// servicing and pre-purchase inspections are set-price products (Task 31).
+// This shows the headline areas and sends people into the funnel, where the
+// real per-vehicle prices live.
 const POPULAR_REPAIRS: {
   name: string;
   blurb: string;
   icon: LucideIcon;
   featured?: boolean;
 }[] = [
-  { name: "Diagnostics", blurb: "Warning lights and faults, found fast", icon: Search, featured: true },
+  { name: "Diagnostics", blurb: "Warning lights, won't start, strange noises — from £59.99", icon: Search, featured: true },
+  { name: "Servicing", blurb: "Interim, full and major services with the right oil", icon: Wrench },
+  { name: "Pre-purchase inspection", blurb: "Bronze, Silver or Gold check before you buy", icon: ShieldCheck },
   { name: "Brakes", blurb: "Pads, discs and everything between", icon: Disc },
   { name: "Battery & charging", blurb: "Testing, replacement and alternators", icon: BatteryCharging },
   { name: "Clutch & transmission", blurb: "Clutches, gearboxes and drivetrain", icon: Settings },
-  { name: "Servicing & maintenance", blurb: "Oil, filters and scheduled work", icon: Wrench },
-  { name: "MOT prep", blurb: "Checks and fixes before the test", icon: ShieldCheck },
 ];
 
 export function RepairsPreview() {
@@ -39,13 +40,14 @@ export function RepairsPreview() {
     <section id="repairs" className="bg-surface">
       <div className="mx-auto max-w-content px-4 py-14 sm:px-8 lg:py-[56px]">
         <Reveal className="mx-auto mb-9 max-w-[600px] text-center">
-          <Overline className="mb-2 text-brand-blue">Repairs</Overline>
+          <Overline className="mb-2 text-brand-blue">What we do</Overline>
           <h2 className="mb-2 text-[32px] font-extrabold leading-tight tracking-[-0.025em] text-text-primary sm:text-[40px]">
-            Priced for your exact car.
+            Repairs, servicing and inspections — priced for your exact car.
           </h2>
           <p className="text-base text-text-secondary">
-            Enter your reg and browse every repair we can do on your car — each
-            one priced up front from the manufacturer&apos;s own repair times.
+            Enter your reg and browse every repair we can do on your car, each priced up
+            front from the manufacturer&apos;s own repair times — or book a diagnostic,
+            a service or a pre-purchase inspection at a set price.
           </p>
         </Reveal>
 

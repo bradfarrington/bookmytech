@@ -200,6 +200,9 @@ const SETTING_KEYS = [
   "cancel_fee_before_24h",
   "cancel_fee_within_24h",
   "cancel_fee_mechanic_en_route",
+  // Engine oil on a servicing product (Task 31).
+  "engine_oil_price_per_litre_pence",
+  "engine_oil_default_litres",
 ] as const;
 type SettingKey = (typeof SETTING_KEYS)[number];
 
@@ -211,13 +214,18 @@ export async function updatePlatformSetting(
   if (!guard.ok) return guard;
   if (!SETTING_KEYS.includes(key)) return { ok: false, error: "Unknown setting." };
 
-  // Commission keys are decimals 0–0.9; everything else is pence (non-negative
-  // ints): the hourly rate and the cancellation fees.
+  // Commission keys are decimals 0–0.9; the default oil quantity is litres to
+  // one decimal; everything else is pence (non-negative ints): the hourly
+  // rate, the per-litre oil price and the cancellation fees.
   const isRate = key === "take_rate_base" || key === "take_rate_pro";
   if (isRate) {
     const r = parseRate(value, 0, 0.9);
     if (!r.ok) return { ok: false, error: "Rate must be between 0% and 90%." };
     value = r.value;
+  } else if (key === "engine_oil_default_litres") {
+    if (!Number.isFinite(value) || value < 0 || value > 30)
+      return { ok: false, error: "Enter the litres as a number between 0 and 30." };
+    value = Math.round(value * 10) / 10;
   } else {
     const p = parsePence(value);
     if (!p.ok) return { ok: false, error: "Enter a whole number of pence." };

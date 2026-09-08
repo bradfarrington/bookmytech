@@ -149,6 +149,7 @@ export default async function OfferPage({ params }: PageProps) {
             ? repairLines.map((line) => ({
                 description: line.itemLabel ? `${line.description} · ${line.itemLabel}` : line.description,
                 chargedHours: line.chargedHours,
+                product: line.product,
               }))
             : undefined
         }

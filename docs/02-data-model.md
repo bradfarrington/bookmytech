@@ -69,6 +69,7 @@ The core transaction record. The columns below the first divider were added in `
 | en_route_at                | timestamptz | when the mechanic started travelling                                  |
 | started_at                 | timestamptz | when the mechanic arrived / began work                                |
 | completed_at               | timestamptz | when the mechanic marked the job done                                 |
+| engine_oil_litres / engine_oil_price_per_litre_pence / engine_oil_source | numeric(4,1) / integer / text | 0060 (Task 31) — the engine-oil line a servicing product added: litres charged, £/litre at the time, and `haynespro` (the manufacturer's stated capacity) or `default` (the admin fallback). The money is in `parts_price_pence`. All null when no oil line |
 | mileage                    | integer     | 0059 (Task 30) — odometer reading in miles, typed by the mechanic on the job page (`setJobMileage`, any active status). NULL = not recorded. Shown to admin, on the receipt email; carried in the completion `status_changed` payload. Task 32 requires it before a servicing / inspection job completes |
 
 **Status lifecycle:** CHECK constraint pins `status` to one of:
@@ -146,6 +147,12 @@ Three kinds of row: `('*', '*', node, 'hide')` hides the node for **every vehicl
 The job lines of a booking with several HaynesPro repairs (Task 24). Columns: `booking_id` (→ `bookings`, cascade), `position`, `node_id`, `description` (snapshot of the HaynesPro name at booking time, like `booking_parts.part_name`), `raw_hours` (the job's own book time), `charged_hours` (what it was charged at — equal to `raw_hours` in the default "add each job" mode; after overlap removal, 0 = covered by another job, in the HaynesPro mode), `line_pence` (`charged_hours × rate`, informational: lines need not sum to `total_pence` because the 1-hour minimum applies once to the visit), `created_at`; from `0056`, `item_id` / `item_label` — the combined repair (Task 26) a job came from, null for a job booked on its own. Unique on `(booking_id, node_id)`; index on `(booking_id, position)`.
 
 **No rows = a single-job booking** (every booking before this task, and every one-job booking after it): its job is on the `bookings` row as before. Readers go through `lib/bookings/repair-lines.ts` `repairLinesFor()`, which returns the rows or one synthetic line. `bookings.service_duration_hours` holds the billed hours for the **whole visit** (arrival-window clash detection reads it). RLS: SELECT only — the booking's customer (id or guest email), the assigned mechanic, a mechanic holding a live `job_offers` row (the offer screen lists the jobs before acceptance), admins; written only by the service-role client in `lib/bookings/create-booking.ts`.
+
+### `catalogue_products` — `0060` (Task 31)
+
+Fixed-price products beside the HaynesPro repair tree: diagnostics, servicing and pre-purchase inspections — the things HaynesPro can't price. **Not** the Task 17 catalogue: repairs stay HaynesPro-priced. Columns: `category` (`diagnostics` | `servicing` | `inspection`), `name`, `summary`, `description` (what's included, one per line), `price_pence` **or** `labour_hours` (fixed wins), `duration_hours` (visit occupancy → `bookings.service_duration_hours`), `includes_engine_oil`, `display_order`, `is_active`. Unique on (category, lower(name)). Customers see a product as id `p:<uuid>` under a category node `c:<category>`; "Repairs" is HaynesPro's root (`root`). Read server-side by `lib/catalogue/load-products.ts` (empty on any error); composed by `lib/catalogue/products.ts`; written only by `app/actions/catalogue-products.ts`. RLS: admin SELECT (parity with the overlay); no other policies.
+
+`booking_repairs.kind` (`0060`): `job` (default) or `product` — a product line's `node_id` is `p:<uuid>` and its `line_pence` its price; hours are 0 on a fixed product. `repairLinesFor` exposes it as `product: boolean`.
 
 ### The repair catalogue overlay — `0056` (Task 26)
 

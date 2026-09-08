@@ -143,7 +143,7 @@ export async function RepairBrowser({
         {/* Breadcrumbs */}
         <nav className="flex flex-wrap items-center gap-1.5 text-sm text-text-secondary">
           <Link href={hrefs.crumbHref(-1)} className="font-semibold text-brand-blue hover:underline">
-            All repairs
+            Start
           </Link>
           {trail.map((c, i) => (
             <span key={`${c.id}-${i}`} className="flex items-center gap-1.5">
@@ -170,8 +170,8 @@ export async function RepairBrowser({
       </RepairSearch>
 
       <p className="text-xs text-text-muted">
-        Prices cover labour for the selected repair{adding ? "s" : ""}, based on the
-        manufacturer&apos;s book time for your exact vehicle.
+        Repairs are priced on labour from the manufacturer&apos;s book time for your exact
+        vehicle; diagnostics, servicing and inspections are set prices.
         {adding && " Jobs booked together are done in one visit."}
       </p>
 

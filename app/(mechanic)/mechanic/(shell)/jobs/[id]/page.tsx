@@ -201,6 +201,7 @@ export default async function MechanicJobDetailPage({ params }: PageProps) {
             // The real job first; the combined repair it came from after it.
             description: line.itemLabel ? `${line.description} · ${line.itemLabel}` : line.description,
             chargedHours: line.chargedHours,
+            product: line.product,
           }))
         : undefined,
     vehicle: [booking.vehicle_make, booking.vehicle_model].filter(Boolean).join(" ") || "Vehicle",

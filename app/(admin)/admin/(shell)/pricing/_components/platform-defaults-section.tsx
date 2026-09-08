@@ -17,7 +17,20 @@ export interface PlatformSettings {
   cancel_fee_mechanic_en_route: number;
   /** How several repairs booked together are timed (Task 24). */
   repair_combine_mode: RepairCombineMode;
+  /** Engine oil on a servicing product (Task 31): £/litre and the litres assumed when HaynesPro has no figure. */
+  engine_oil_price_per_litre_pence: number;
+  engine_oil_default_litres: number;
 }
+
+const litres = {
+  toInput: (l: number) => String(Math.round(l * 10) / 10),
+  toDisplay: (l: number | null) => (l == null ? "—" : `${Math.round(l * 10) / 10} L`),
+  parse: (raw: string): number | null => {
+    const n = Number(raw.replace(/l$/i, "").trim());
+    if (!Number.isFinite(n) || n < 0 || n > 30) return null;
+    return Math.round(n * 10) / 10;
+  },
+};
 
 const COMBINE_OPTIONS: ReadonlyArray<SelectOption<RepairCombineMode>> = [
   { value: "sum", label: "Add each job's book time" },
@@ -114,6 +127,36 @@ export function PlatformDefaultsSection({ settings }: { settings: PlatformSettin
             hint="Add every job's book time, or let HaynesPro remove the overlap (e.g. pads add nothing once the discs are off)"
           >
             <CombineModeSelect initial={settings.repair_combine_mode} />
+          </Row>
+        </div>
+      </section>
+
+      {/* Engine oil on a service (Task 31) */}
+      <section className="space-y-3">
+        <div>
+          <h2 className="text-lg font-bold tracking-tight text-text-primary">Engine oil</h2>
+          <p className="text-sm text-text-muted">
+            A service adds engine oil at this price per litre × the manufacturer&apos;s
+            stated capacity for the customer&apos;s car (from HaynesPro). Fixed-price
+            products themselves are set under Services.
+          </p>
+        </div>
+        <div className="overflow-hidden rounded-2xl border border-border bg-surface-card">
+          <Row label="Engine oil per litre" hint="Charged on every servicing product that includes oil">
+            <InlineNumber
+              value={settings.engine_oil_price_per_litre_pence}
+              {...pounds}
+              ariaLabel="Engine oil price per litre"
+              onSave={(v) => updatePlatformSetting("engine_oil_price_per_litre_pence", v ?? 0)}
+            />
+          </Row>
+          <Row label="Default quantity" hint="Used when HaynesPro has no oil capacity for the car (never on an electric car)">
+            <InlineNumber
+              value={settings.engine_oil_default_litres}
+              {...litres}
+              ariaLabel="Default engine oil litres"
+              onSave={(v) => updatePlatformSetting("engine_oil_default_litres", v ?? 0)}
+            />
           </Row>
         </div>
       </section>

@@ -30,6 +30,16 @@ import { createAdminClient } from "@/lib/supabase/admin";
 //                     the overlap between jobs (an admin setting)
 // The 1-hour minimum applies once to the whole visit, not per job.
 //
+// Since Task 31 an id may also be a PRODUCT ("p:<uuid>" — a diagnostic, a
+// service, an inspection; see /repairs/tree). ADDITIVE on both shapes:
+//   oil:          { litres, pencePerLitre, pence, source, label } | null —
+//                 the engine-oil line a servicing product adds; it is what
+//                 `partsPence` now holds (0 and null on anything else)
+//   products:     [{ id, name, pricePence, labourHours, durationHours }]
+//   labourPence / fixedPence / visitHours
+// and each line may carry kind: "product" + productId. `nodeId` may be a
+// "p:" id when the first thing chosen was a product.
+//
 // Thin wrapper over quoteRepairs, which is the SAME function the web funnel
 // prices with — match, slot, checkout hold and booking create each re-derive
 // the quote from (reg, nodes) server-side. The figure returned here is
@@ -97,6 +107,19 @@ export async function POST(request: Request): Promise<Response> {
     hourlyRatePence: quote.breakdown.hourlyRatePence,
     partsPence: quote.breakdown.partsPence,
     totalPence: quote.breakdown.totalPence,
+    // ADDITIVE (Task 31): the engine-oil line and the products in the visit.
+    oil: quote.oil,
+    products: quote.products.map((p) => ({
+      id: p.id,
+      name: p.name,
+      pricePence: p.pricePence,
+      labourHours: p.labourHours,
+      durationHours: p.durationHours,
+      category: p.category,
+    })),
+    labourPence: quote.labourPence,
+    fixedPence: quote.fixedPence,
+    visitHours: quote.visitHours,
   };
 
   return apiOk({

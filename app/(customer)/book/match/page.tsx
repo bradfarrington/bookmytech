@@ -13,6 +13,7 @@ import {
 import { TrackOnMount } from "@/components/analytics/track-on-mount";
 import { FUNNEL_EVENTS } from "@/lib/analytics/events";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { productIncludes } from "@/lib/catalogue/products";
 import { PriceHero } from "./_components/price-hero";
 
 // Step 3: the price. One job, or several priced as one visit (Task 24) — the
@@ -70,17 +71,20 @@ export default async function MatchPage({ searchParams }: MatchPageProps) {
       : browserHref;
   };
   const multiJobs = quote.lines.length > 1;
-  const canAdd = quote.items.length < MAX_REPAIRS_PER_BOOKING;
+  const canAdd = quote.itemIds.length < MAX_REPAIRS_PER_BOOKING;
+  // A booking of fixed-price products only (Task 31) has no book time to talk about.
+  const productsOnly = quote.lines.every((line) => line.kind === "product");
+  const singleProduct = !multiJobs && quote.products.length === 1 ? quote.products[0] : null;
 
   return (
     <div className="flex flex-col gap-6">
       <TrackOnMount
         event={FUNNEL_EVENTS.priceViewed}
         properties={{
-          service: `repair:${quote.nodeIds[0]}`,
+          service: `repair:${quote.lines[0].nodeId}`,
           repairNodeIds: quote.nodeIds,
           itemIds: quote.itemIds,
-          repairCount: quote.nodeIds.length,
+          repairCount: quote.lines.length,
         }}
       />
       <ProgressStepper currentStep={3} />
@@ -103,11 +107,15 @@ export default async function MatchPage({ searchParams }: MatchPageProps) {
         serviceName={quote.description}
         pricePence={quote.breakdown.totalPence}
         description={
-          multiJobs
-            ? quote.combineSource === "haynespro"
-              ? "Priced as one visit from the manufacturer's book times for your exact vehicle — work that overlaps isn't charged twice."
-              : "Each job priced from the manufacturer's book time for your exact vehicle, done in one visit."
-            : "Priced from the manufacturer's book time for your exact vehicle."
+          productsOnly
+            ? multiJobs
+              ? "Set prices, done in one visit at your door."
+              : singleProduct?.summary ?? "A set price, done at your door."
+            : multiJobs
+              ? quote.combineSource === "haynespro"
+                ? "Priced as one visit from the manufacturer's book times for your exact vehicle — work that overlaps isn't charged twice."
+                : "Each job priced from the manufacturer's book time for your exact vehicle, done in one visit."
+              : "Priced from the manufacturer's book time for your exact vehicle."
         }
         estimatedHours={quote.billedHours}
         vehicleName={[params.make, params.model].filter(Boolean).join(" ") || null}
@@ -121,11 +129,17 @@ export default async function MatchPage({ searchParams }: MatchPageProps) {
                 itemId: line.itemId,
                 itemLabel: line.itemLabel,
                 removeHref: removeHref(line.itemId),
+                product: line.kind === "product",
+                linePence: line.kind === "product" ? line.linePence : undefined,
               }))
             : undefined
         }
         combinedRawHours={multiJobs ? quote.combinedRawHours : undefined}
         combineSource={multiJobs ? quote.combineSource : null}
+        oil={quote.oil}
+        includes={singleProduct ? productIncludes(singleProduct.description) : undefined}
+        visitHours={quote.visitHours}
+        productsOnly={productsOnly}
       />
 
       <div className="flex flex-col gap-3">

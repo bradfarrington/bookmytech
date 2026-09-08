@@ -285,8 +285,9 @@ export interface CatalogueItem {
 
 /**
  * Expand chosen ids into the HaynesPro jobs they stand for. Null when an id
- * is a category or an unknown / switched-off / empty combined repair — the
- * quote refuses rather than guessing.
+ * is a category, a product (Task 31 — those are resolved separately, see
+ * lib/catalogue/products.ts) or an unknown / switched-off / empty combined
+ * repair — the quote refuses rather than guessing.
  */
 export function expandCatalogueItems(
   ids: readonly string[],
@@ -294,7 +295,7 @@ export function expandCatalogueItems(
 ): CatalogueItem[] | null {
   const items: CatalogueItem[] = [];
   for (const id of uniqueIds(ids)) {
-    if (isCustomGroupId(id)) return null;
+    if (isCustomGroupId(id) || id.startsWith("p:") || id.startsWith("c:")) return null;
     if (!isBundleOptionId(id)) {
       items.push({ id, label: null, nodeIds: [id] });
       continue;

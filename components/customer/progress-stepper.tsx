@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 
 const STEPS = [
   { label: "Your vehicle" },
-  { label: "Repairs" },
+  { label: "What you need" },
   { label: "Price" },
   { label: "Date & time" },
 ];

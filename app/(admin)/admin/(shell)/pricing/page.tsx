@@ -21,6 +21,8 @@ const SETTING_DEFAULTS: PlatformSettings = {
   cancel_fee_within_24h: 3000,
   cancel_fee_mechanic_en_route: 5000,
   repair_combine_mode: DEFAULT_REPAIR_COMBINE_MODE,
+  engine_oil_price_per_litre_pence: 1500,
+  engine_oil_default_litres: 5,
 };
 
 export default async function AdminPricingPage() {

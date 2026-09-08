@@ -109,15 +109,19 @@ export function RepairRows({
       <ul className="divide-y divide-border-subtle">
         {rows.map((row) => {
           if (row.kind === "group") {
-            const caption = groupCaption?.(row.node);
+            const caption = groupCaption?.(row.node) ?? row.node.summary;
+            // The top of the catalogue (Repairs, Diagnostics, Servicing,
+            // Pre-purchase inspection — Task 31) reads as cards: a bigger
+            // title with the blurb under it.
+            const top = row.node.summary != null;
             return (
               <li key={row.node.id}>
                 <Link
                   href={groupHref(row.node.id, row.node.description)}
-                  className="flex items-center justify-between gap-3 px-4 py-3.5 text-sm font-semibold text-text-primary transition-colors hover:bg-surface"
+                  className={`flex items-center justify-between gap-3 px-4 text-sm font-semibold text-text-primary transition-colors hover:bg-surface ${top ? "py-4" : "py-3.5"}`}
                 >
                   <span className="min-w-0">
-                    {row.node.description}
+                    <span className={top ? "text-base font-bold" : ""}>{row.node.description}</span>
                     {caption && <span className="mt-0.5 block text-xs font-normal text-text-muted">{caption}</span>}
                   </span>
                   <ChevronRight size={16} className="shrink-0 text-text-muted" />
@@ -152,6 +156,31 @@ export function RepairRows({
                     ))}
                   </div>
                 )}
+              </li>
+            );
+          }
+          // A product (Task 31): its summary, then whether the price is set or
+          // by the hour, and the engine-oil line a service includes.
+          if (row.node.productId) {
+            const { node } = row;
+            const hours = node.durationHours ?? node.billedHours ?? 1;
+            return (
+              <li key={node.id} className="flex items-center justify-between gap-3 px-4 py-3.5">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-text-primary">{node.description}</p>
+                  {node.summary && <p className="mt-0.5 text-xs text-text-secondary">{node.summary}</p>}
+                  <p className="mt-0.5 text-xs text-text-muted">
+                    {node.fixedPrice
+                      ? `Fixed price · about ${hours} hour${hours === 1 ? "" : "s"}`
+                      : `Estimated ${node.billedHours} hour${node.billedHours === 1 ? "" : "s"} at our hourly rate`}
+                    {node.oil && node.oil.pence > 0 && (
+                      <>
+                        {" · "}includes engine oil, {node.oil.litres} L × {formatPrice(node.oil.pencePerLitre)}
+                      </>
+                    )}
+                  </p>
+                </div>
+                {bookButton(node)}
               </li>
             );
           }

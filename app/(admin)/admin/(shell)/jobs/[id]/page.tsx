@@ -255,13 +255,15 @@ export default async function BookingDetailPage({ params }: PageProps) {
                           <span className="text-xs font-normal text-brand-blue">{line.itemLabel}</span>
                         )}
                         <span className="text-xs font-normal text-text-muted">
-                          {line.rawHours != null && line.chargedHours != null
-                            ? line.chargedHours === 0
-                              ? `${line.rawHours} h book time · no extra time`
-                              : line.chargedHours < line.rawHours
-                                ? `${line.rawHours} h → ${line.chargedHours} h charged`
-                                : `${line.chargedHours} h`
-                            : ""}
+                          {line.product
+                            ? "Fixed price"
+                            : line.rawHours != null && line.chargedHours != null
+                              ? line.chargedHours === 0
+                                ? `${line.rawHours} h book time · no extra time`
+                                : line.chargedHours < line.rawHours
+                                  ? `${line.rawHours} h → ${line.chargedHours} h charged`
+                                  : `${line.chargedHours} h`
+                              : ""}
                           {line.linePence != null && ` · ${formatPrice(line.linePence)}`}
                         </span>
                       </li>

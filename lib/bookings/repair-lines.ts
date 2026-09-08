@@ -28,6 +28,13 @@ export interface BookingRepairRow {
   /** 0056 — absent on rows read before that migration. */
   item_id?: string | null;
   item_label?: string | null;
+  /** 0060 — "product" for a fixed-price product line (Task 31); absent/"job" for a HaynesPro job. */
+  kind?: string | null;
+}
+
+/** A product line's id is "p:<uuid>" (Task 31) — the same test the catalogue uses. */
+export function isProductLineId(nodeId: string | null | undefined): boolean {
+  return typeof nodeId === "string" && nodeId.startsWith("p:");
 }
 
 export interface RepairLineView {
@@ -44,6 +51,8 @@ export interface RepairLineView {
   itemLabel: string | null;
   /** True when the line was derived from the booking row rather than booking_repairs. */
   synthetic: boolean;
+  /** True for a fixed-price product (Task 31): hours mean the visit, not book time. */
+  product: boolean;
 }
 
 /** Lines grouped as the customer chose them: one entry per combined repair, one per plain job. */
@@ -117,6 +126,7 @@ export function repairLinesFor(
         itemId: r.item_id ?? null,
         itemLabel: r.item_label?.trim() || null,
         synthetic: false,
+        product: r.kind === "product" || isProductLineId(r.node_id),
       }))
       .sort((a, b) => a.position - b.position);
   }
@@ -131,6 +141,7 @@ export function repairLinesFor(
       itemId: null,
       itemLabel: null,
       synthetic: true,
+      product: isProductLineId(booking.repair_node_id),
     },
   ];
 }

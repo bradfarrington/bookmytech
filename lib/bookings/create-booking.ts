@@ -239,7 +239,9 @@ export async function createBooking(
     .from("bookings")
     .insert({
       customer_id: customerId,
-      repair_node_id: quote.nodeIds[0],
+      // The first line as the customer chose it — a HaynesPro job id, or
+      // "p:<uuid>" for a product (Task 31).
+      repair_node_id: quote.lines[0].nodeId,
       repair_description: repairDescription,
       // Only named on a multi-job booking: the column arrives with migration
       // 0055, and a single-job insert must keep working before it is applied.
@@ -252,6 +254,17 @@ export async function createBooking(
       // Only named when set: the column arrives with migration 0057, and an
       // ordinary insert must keep working before it is applied.
       ...(candidateDays ? { candidate_days: candidateDays } : {}),
+      // Engine oil on a servicing product (Task 31). Only named when there is
+      // an oil line: the columns arrive with 0060, and a booking without one
+      // must keep working before it is applied. The money is in
+      // parts_price_pence below.
+      ...(quote.oil
+        ? {
+            engine_oil_litres: quote.oil.litres,
+            engine_oil_price_per_litre_pence: quote.oil.pencePerLitre,
+            engine_oil_source: quote.oil.source,
+          }
+        : {}),
       status: "sourcing_mechanic",
       total_pence: price.totalPence,
       area_id: price.areaId,
@@ -302,6 +315,9 @@ export async function createBooking(
         charged_hours: line.chargedHours,
         line_pence: line.linePence,
         ...(line.itemLabel ? { item_id: line.itemId, item_label: line.itemLabel } : {}),
+        // kind (0060) — only named on a product line, so a plain multi-job
+        // insert never names the column.
+        ...(line.kind === "product" ? { kind: "product" } : {}),
       })),
     );
     if (linesError) {
@@ -329,7 +345,7 @@ export async function createBooking(
   // Record the final funnel step (server-side so it's never lost to navigation).
   void trackEvent(FUNNEL_EVENTS.bookingConfirmed, {
     bookingId: data.id,
-    repairNodeId: quote.nodeIds[0],
+    repairNodeId: quote.lines[0].nodeId,
     repairNodeIds: quote.nodeIds,
     itemIds: quote.itemIds,
     repairCount: quote.nodeIds.length,

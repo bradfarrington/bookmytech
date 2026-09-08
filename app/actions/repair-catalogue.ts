@@ -131,7 +131,9 @@ async function upsertOverride(
   node: { nodeId: string; kind: "group" | "repair"; description?: string | null },
 ): Promise<CatalogueResult> {
   const nodeId = node.nodeId.trim();
-  if (!nodeId || isCustomGroupId(nodeId)) return { ok: false, error: "Missing repair." };
+  // Only a HaynesPro node can be renamed or moved — never one of ours ("g:",
+  // "b:", or since Task 31 a product "p:" / category "c:").
+  if (!nodeId || isCustomGroupId(nodeId) || nodeId.includes(":")) return { ok: false, error: "Missing repair." };
   const admin = createAdminClient();
   const { data: existing } = await admin
     .from("repair_catalogue_overrides")
@@ -239,7 +241,8 @@ export async function addNodeToBundle(input: { bundleId: string; nodeId: string 
   const gate = await requireAdmin();
   if (!gate.ok) return gate;
   const nodeId = input.nodeId.trim();
-  if (!nodeId || isCustomGroupId(nodeId)) return { ok: false, error: "Only a timed repair can be combined." };
+  if (!nodeId || isCustomGroupId(nodeId) || nodeId.includes(":"))
+    return { ok: false, error: "Only a timed repair can be combined." };
 
   const admin = createAdminClient();
   const [{ data: bundle, error: readError }, { data: options }] = await Promise.all([

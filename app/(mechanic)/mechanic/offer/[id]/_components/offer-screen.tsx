@@ -15,7 +15,7 @@ interface OfferScreenProps {
   /** One line for the booking — a summary ("X + 2 more jobs") when there are several. */
   serviceName: string;
   /** Every job of a multi-job booking (Task 24); absent for one job. */
-  serviceLines?: Array<{ description: string; chargedHours: number | null }>;
+  serviceLines?: Array<{ description: string; chargedHours: number | null; product?: boolean }>;
   vehicle: string;
   reg: string | null;
   whenLabel: string;
@@ -137,11 +137,13 @@ export function OfferScreen(props: OfferScreenProps) {
                 <li key={`${index}-${line.description}`} className="flex items-start justify-between gap-3">
                   <span className="leading-relaxed text-text-primary">{line.description}</span>
                   <span className="shrink-0 text-xs text-text-muted">
-                    {line.chargedHours == null
-                      ? ""
-                      : line.chargedHours === 0
-                        ? "no extra time"
-                        : `${Number(line.chargedHours.toFixed(2))} h`}
+                    {line.product
+                      ? "Fixed price"
+                      : line.chargedHours == null
+                        ? ""
+                        : line.chargedHours === 0
+                          ? "no extra time"
+                          : `${Number(line.chargedHours.toFixed(2))} h`}
                   </span>
                 </li>
               ))}

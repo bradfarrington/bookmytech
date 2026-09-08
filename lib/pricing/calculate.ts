@@ -208,6 +208,40 @@ export async function getHourlyRatePence(client?: DbClient): Promise<number> {
   }
 }
 
+// --- Engine oil on a servicing product (Task 31) ---------------------------
+// Gareth: "£15.00 per litre and get HaynesPro to work out what litres go in."
+// The per-litre price and the litres to assume when HaynesPro has no figure
+// for a car. Both editable on /admin/pricing; seeded by 0060.
+
+export const ENGINE_OIL_PRICE_KEY = "engine_oil_price_per_litre_pence";
+export const ENGINE_OIL_DEFAULT_LITRES_KEY = "engine_oil_default_litres";
+export const DEFAULT_ENGINE_OIL_PRICE_PENCE = 1500;
+export const DEFAULT_ENGINE_OIL_LITRES = 5;
+
+export async function getEngineOilPricePerLitrePence(client?: DbClient): Promise<number> {
+  const db = client ?? (await import("@/lib/supabase/admin")).createAdminClient();
+  try {
+    const { data } = await db.from("platform_settings").select("value").eq("key", ENGINE_OIL_PRICE_KEY).maybeSingle();
+    const raw = data?.value;
+    const n = typeof raw === "number" ? raw : Number(raw);
+    return Number.isFinite(n) && n >= 0 ? Math.round(n) : DEFAULT_ENGINE_OIL_PRICE_PENCE;
+  } catch {
+    return DEFAULT_ENGINE_OIL_PRICE_PENCE;
+  }
+}
+
+export async function getEngineOilDefaultLitres(client?: DbClient): Promise<number> {
+  const db = client ?? (await import("@/lib/supabase/admin")).createAdminClient();
+  try {
+    const { data } = await db.from("platform_settings").select("value").eq("key", ENGINE_OIL_DEFAULT_LITRES_KEY).maybeSingle();
+    const raw = data?.value;
+    const n = typeof raw === "number" ? raw : Number(raw);
+    return Number.isFinite(n) && n >= 0 ? Math.round(n * 10) / 10 : DEFAULT_ENGINE_OIL_LITRES;
+  } catch {
+    return DEFAULT_ENGINE_OIL_LITRES;
+  }
+}
+
 /**
  * How several repairs booked together are timed (Task 24):
  *   "sum"       — each job's own book time, added up. The owner's choice

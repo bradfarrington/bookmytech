@@ -24,6 +24,18 @@ import {
   bundleOptionId,
   type CatalogueOverlay,
 } from "@/lib/catalogue/overlay";
+import { loadCatalogueProducts } from "@/lib/catalogue/load-products";
+import {
+  composeTopLevel,
+  isProductCategoryId,
+  productCategoryOf,
+  productsInCategory,
+  toProductNode,
+  toQuotableProduct,
+  type CatalogueProductRow,
+  type OilQuote,
+} from "@/lib/catalogue/products";
+import { engineOilForVehicle } from "./engine-oil";
 import { isHaynesProConfigured } from "./client";
 import { excludedRepairNodeIdsForVehicle } from "./exclusions";
 import { isCatalogueOutage, readHaynesProHealth } from "./health";
@@ -82,6 +94,28 @@ export interface CatalogueNode {
   optionLabel?: string | null;
   /** ADDITIVE: true for a category the admin created. */
   custom?: true;
+  /**
+   * Fixed-price products (Task 31). ADDITIVE AND OPTIONAL: a product is a
+   * plain bookable `repair` to any client that doesn't know these fields.
+   * `productCategory` is set on the three category nodes at the top of the
+   * catalogue ("c:diagnostics" …) AND on each product under them; `summary`
+   * is the one-liner under a name; `fixedPrice` is true when the price is a
+   * set figure rather than hours × rate; `durationHours` is how long the
+   * visit is blocked out for; `oil` is the engine-oil line included in
+   * `pricePence` on a servicing product, null when there is none.
+   */
+  productId?: string;
+  productCategory?: "diagnostics" | "servicing" | "inspection";
+  summary?: string | null;
+  fixedPrice?: true;
+  durationHours?: number;
+  oil?: {
+    litres: number;
+    pencePerLitre: number;
+    pence: number;
+    source: "haynespro" | "default";
+    label: string | null;
+  } | null;
 }
 
 /**
@@ -169,6 +203,10 @@ interface CatalogueContext {
   overlay: CatalogueOverlay;
   /** Hours for several jobs together — added up, or HaynesPro-combined when the admin opted in. */
   combineHours: (nodeIds: string[], nodeHours: ReadonlyMap<string, number>) => Promise<number | null>;
+  /** Fixed-price products (Task 31) — every row; filtered per category when listed. */
+  products: CatalogueProductRow[];
+  /** The engine-oil line for this vehicle, fetched once and only when a servicing product needs it. */
+  oilFor: () => Promise<OilQuote | null>;
 }
 
 /**
@@ -206,13 +244,23 @@ async function loadContext(
   }
   if (resolved.repairtimeTypeId == null) return NO_REPAIR_DATA;
 
-  const [hourlyRatePence, excluded, overlay, combineMode] = await Promise.all([
+  const [hourlyRatePence, excluded, overlay, combineMode, products] = await Promise.all([
     getHourlyRatePence(db),
     excludedRepairNodeIdsForVehicle(resolved.hpModelLabel, db),
     loadCatalogueOverlay(db),
     getRepairCombineMode(db),
+    loadCatalogueProducts(db),
   ]);
   const repairtimeTypeId = resolved.repairtimeTypeId;
+  const carTypeId = resolved.carTypeId;
+
+  // Priced lazily and once: only a servicing product asks, and a level with
+  // none never pays for the capacities read.
+  let oilPromise: Promise<OilQuote | null> | null = null;
+  const oilFor = () => {
+    if (!oilPromise) oilPromise = engineOilForVehicle(carTypeId, db).catch(() => null);
+    return oilPromise;
+  };
 
   // The same arithmetic quoteRepairs uses for several jobs, so a combined
   // repair's browse price and its quote agree.
@@ -245,8 +293,25 @@ async function loadContext(
       excluded,
       overlay,
       combineHours,
+      products,
+      oilFor,
     },
   };
+}
+
+/**
+ * One product category's level (Task 31): its active products priced for
+ * this vehicle. The oil line is fetched only when a product includes it.
+ */
+async function composeProductLevel(context: CatalogueContext, levelId: string): Promise<CatalogueNode[]> {
+  const category = productCategoryOf(levelId);
+  if (!category) return [];
+  const rows = productsInCategory(context.products, category);
+  const products = rows.map(toQuotableProduct);
+  const oil = products.some((p) => p.includesEngineOil) ? await context.oilFor() : null;
+  return products
+    .map((p) => toProductNode(p, context.vehicle.hourlyRatePence, oil))
+    .filter((n): n is CatalogueNode => n != null);
 }
 
 /**
@@ -323,8 +388,11 @@ export function toCatalogueNode(
 // ---------------------------------------------------------------------------
 
 /**
- * One level of the catalogue for `reg`. Pass a group's id to drill in; omit it
- * (or pass "root") for the top-level groups.
+ * One level of the catalogue for `reg`. Pass a group's id to drill in. Omit
+ * it (or pass "") for the TOP of the catalogue — since Task 31 that is
+ * "Repairs" (HaynesPro's root, id "root") beside the product categories
+ * (Diagnostics, Servicing, Pre-purchase inspection); pass "root" for
+ * HaynesPro's top-level groups exactly as before.
  */
 export async function getRepairCatalogueLevel(
   reg: string,
@@ -335,21 +403,32 @@ export async function getRepairCatalogueLevel(
   if (!loaded.ok) return loaded;
   const { context } = loaded;
 
-  const level = nodeId?.trim() || ROOT_NODE_ID;
-  // A category the admin created has no HaynesPro node behind it: its
-  // contents are entirely what the overlay put there.
-  const raw = isCustomGroupId(level)
-    ? []
-    : await getRepairtimeSubnodes(context.repairtimeTypeId, level);
+  const requested = nodeId?.trim() ?? "";
+  const level = requested || ROOT_NODE_ID;
+  // A category the admin created, or a product category, has no HaynesPro
+  // node behind it: its contents are entirely ours.
+  const raw =
+    isCustomGroupId(level) || isProductCategoryId(level)
+      ? []
+      : await getRepairtimeSubnodes(context.repairtimeTypeId, level);
 
   // getRepairtimeSubnodes swallows upstream failures as []. At the root that is
   // indistinguishable from "HaynesPro is down", and every vehicle with a
   // repair-time type has root groups — so an empty root is reported as missing
   // data rather than as an empty but working catalogue. Inside a group, empty
-  // is a legitimate answer and stays one.
+  // is a legitimate answer and stays one. The top of the catalogue asks for
+  // the root too (a memo hit one click later) so the outage still shows at the
+  // entry screen rather than one level down.
   if (level === ROOT_NODE_ID && raw.length === 0) return NO_REPAIR_DATA;
 
-  const nodes = await composeLevelFor(context, level, raw);
+  // The top: Repairs + the product categories that have something in them.
+  if (!requested) {
+    return { ok: true, vehicle: context.vehicle, nodes: composeTopLevel(context.products) };
+  }
+
+  const nodes = isProductCategoryId(level)
+    ? await composeProductLevel(context, level)
+    : await composeLevelFor(context, level, raw);
 
   return { ok: true, vehicle: context.vehicle, nodes };
 }
@@ -432,8 +511,31 @@ export async function searchJobsForCarType(
     excluded: new Set(),
     overlay,
     combineHours: async () => null,
+    products: [],
+    oilFor: async () => null,
   };
   return runSearch(context, query, { bundles: false });
+}
+
+/**
+ * Products whose name or summary matches the query (Task 31), priced for
+ * this vehicle. Like combined repairs, they aren't in HaynesPro's tree, so
+ * the walk can't find them.
+ */
+async function productSearchHits(context: CatalogueContext, needle: string, tokens: string[]): Promise<CatalogueNode[]> {
+  const matching = context.products
+    .filter((row) => row.is_active)
+    .filter(
+      (row) =>
+        matchRank(row.name, needle, tokens) != null ||
+        (row.summary != null && matchRank(row.summary, needle, tokens) != null),
+    );
+  if (matching.length === 0) return [];
+  const products = matching.map(toQuotableProduct);
+  const oil = products.some((p) => p.includesEngineOil) ? await context.oilFor() : null;
+  return products
+    .map((p) => toProductNode(p, context.vehicle.hourlyRatePence, oil))
+    .filter((n): n is CatalogueNode => n != null);
 }
 
 async function runSearch(
@@ -460,8 +562,11 @@ async function runSearch(
   // find them. Match them by name up front — cheap, and exactly what someone
   // typing "pads discs" is after.
   if (options.bundles) {
-    const bundleHits = await bundleSearchHits(context, needle, tokens);
-    for (const node of bundleHits) {
+    const [bundleHits, productHits] = await Promise.all([
+      bundleSearchHits(context, needle, tokens),
+      productSearchHits(context, needle, tokens),
+    ]);
+    for (const node of [...productHits, ...bundleHits]) {
       seen.add(`${node.kind}:${node.description.toLowerCase()}`);
       hits.push({ node, rank: matchRank(node.description, needle, tokens) ?? 2, order: seq++ });
     }

@@ -33,7 +33,7 @@ const FAQS: FaqItem[] = [
   {
     question: "What if the mechanic can't fix the problem?",
     answer:
-      "If a diagnostic visit doesn't lead to a repair, you only pay the diagnostic fee (£45). If it does, that fee is refunded against the cost of the work.",
+      "A diagnostic inspection is a set price (from £59.99). Your mechanic finds the fault, tells you what it needs and quotes for the repair — you decide whether to go ahead.",
   },
   {
     question: "Is the price I see the price I pay?",

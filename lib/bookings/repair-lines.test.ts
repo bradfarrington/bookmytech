@@ -50,11 +50,21 @@ describe("repairLinesFor", () => {
         itemId: null,
         itemLabel: null,
         synthetic: true,
+        product: false,
       },
     ]);
     expect(repairLinesFor(booking, null)).toHaveLength(1);
     expect(repairLinesFor({}, undefined)[0].description).toBe("Vehicle repair");
     expect(isMultiJob(lines)).toBe(false);
+  });
+
+  it("flags a fixed-price product line (Task 31) from its kind or its p: id", () => {
+    expect(repairLinesFor({ repair_node_id: "p:abc", repair_description: "Full service" }, [])[0].product).toBe(true);
+    const lines = repairLinesFor(booking, [
+      { position: 0, node_id: "p:abc", description: "Plug-in diagnostic", raw_hours: "0", charged_hours: "0", line_pence: 5999, kind: "product" },
+      { position: 1, node_id: "1M01510000WV0", description: "Renew the front brake pads", raw_hours: "0.80", charged_hours: "0.80", line_pence: 4800 },
+    ]);
+    expect(lines.map((l) => l.product)).toEqual([true, false]);
   });
 
   it("returns the rows sorted by position, coercing numerics", () => {

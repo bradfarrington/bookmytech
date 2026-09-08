@@ -47,8 +47,8 @@ export interface JobDetailProps {
   createdAt: string | null;
   /** One line for the booking — a summary ("X + 2 more jobs") when there are several. */
   serviceName: string;
-  /** Every job of a multi-job booking (Task 24); absent for one job. */
-  serviceLines?: Array<{ description: string; chargedHours: number | null }>;
+  /** Every job of a multi-job booking (Task 24); absent for one job. `product` = a fixed-price product (Task 31). */
+  serviceLines?: Array<{ description: string; chargedHours: number | null; product?: boolean }>;
   vehicle: string; // "VW Golf"
   reg: string | null;
   /** Odometer reading the mechanic recorded (Task 30); null until they do. */
@@ -167,11 +167,13 @@ export function JobDetail(props: JobDetailProps) {
                 <li key={`${index}-${line.description}`} className="flex items-start justify-between gap-3">
                   <span className="text-text-primary">{line.description}</span>
                   <span className="shrink-0 text-xs text-text-muted">
-                    {line.chargedHours == null
-                      ? ""
-                      : line.chargedHours === 0
-                        ? "no extra time"
-                        : `${Number(line.chargedHours.toFixed(2))} h`}
+                    {line.product
+                      ? "Fixed price"
+                      : line.chargedHours == null
+                        ? ""
+                        : line.chargedHours === 0
+                          ? "no extra time"
+                          : `${Number(line.chargedHours.toFixed(2))} h`}
                   </span>
                 </li>
               ))}
