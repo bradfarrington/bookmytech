@@ -21,7 +21,8 @@ import {
   slotIso,
   twoHourSlotByWindow,
 } from "@/lib/slots";
-import { formatJobNumber, shortPersonName, siteUrl } from "@/lib/utils";
+import { formatJobNumber, shortPersonName } from "@/lib/utils";
+import { proposeRescheduleFor } from "@/lib/bookings/propose-reschedule";
 
 export type MechanicJobResult = { ok: true } | { ok: false; error: string };
 
@@ -145,82 +146,45 @@ export async function proposeReschedule(
   newIso: string,
   note: string,
 ): Promise<MechanicJobResult> {
-  const when = new Date(newIso);
-  if (!newIso || Number.isNaN(when.getTime()))
-    return { ok: false, error: "Pick a valid new date and time." };
-  if (when.getTime() < Date.now())
-    return { ok: false, error: "The new time must be in the future." };
-
   const guard = await requireMechanic();
   if (!guard.ok) return guard;
-
-  const admin = createAdminClient();
-
-  const { data: booking } = await admin
-    .from("bookings")
-    .select("id, status, mechanic_id, scheduled_at, customer_email, customer_name, customer_phone")
-    .eq("id", bookingId)
-    .single();
-
-  if (!booking) return { ok: false, error: "That job no longer exists." };
-  if (booking.mechanic_id !== guard.mechanicId)
-    return { ok: false, error: "This isn't your job." };
-  if (!CANCELLABLE.includes(booking.status))
-    return { ok: false, error: "Only confirmed jobs that haven't started can be rescheduled." };
-
-  const trimmedNote = note.trim() || null;
-  const { error } = await admin
-    .from("bookings")
-    .update({
-      reschedule_proposed_at: when.toISOString(),
-      reschedule_note: trimmedNote,
-      reschedule_status: "proposed",
-    })
-    .eq("id", bookingId)
-    .eq("mechanic_id", guard.mechanicId);
-  if (error) return { ok: false, error: error.message };
-
-  await admin.from("booking_events").insert({
-    booking_id: bookingId,
-    event_type: "reschedule_proposed",
-    actor_id: guard.mechanicId,
-    actor_role: "mechanic",
-    reason: trimmedNote,
-    payload: {
-      from: booking.scheduled_at,
-      proposed: when.toISOString(),
-    },
-  });
-
-  // UK-time label ("Thu 4 Sep · 14:00") — a proposal is an exact time, not a window.
-  const slotLabel = formatBookingSlot(when.toISOString());
-
-  // Notify the customer of the proposed slot. Email and SMS both point at the
-  // confirmation page, which carries the accept/decline banner and works for
-  // guests too (it's keyed on the booking's full UUID).
-  const proposeEmail = booking.customer_email;
-  if (proposeEmail) {
-    renderTemplateEmail("mechanic_proposed_time", {
-      name: booking.customer_name ?? "there",
-      slot: slotLabel,
-      optional_note: trimmedNote ? `Note from your mechanic: "${trimmedNote}"` : "",
-    })
-      .then(({ subject, html }) => sendEmail({ to: proposeEmail, subject, html }))
-      .catch(console.error);
-  }
-  if (booking.customer_phone) {
-    const phone = booking.customer_phone;
-    renderSmsTemplate("mechanic_proposed_time", {
-      slot: slotLabel,
-      url: `${siteUrl()}/book/confirmed/${bookingId}`,
-    })
-      .then((body) => sendSms({ to: phone, body }))
-      .catch(() => {});
-  }
-
+  // The core lives in lib/bookings/propose-reschedule.ts (Task 38), shared
+  // with "Running late?" on the day view, which proposes for several jobs.
+  const res = await proposeRescheduleFor(guard.mechanicId, bookingId, newIso, note);
+  if (!res.ok) return res;
   revalidatePath("/mechanic/jobs");
   revalidatePath(`/mechanic/jobs/${bookingId}`);
   return { ok: true };
+}
+
+/**
+ * Running late (Task 38): propose a new time for several of today's later
+ * jobs in one go — each customer gets the same email/SMS and the same
+ * accept/decline banner as a single proposal. One guard, N proposals; a job
+ * that can't be moved (already en route, not yours, in the past) is reported
+ * by id and the others still go through.
+ */
+export async function proposeReschedules(
+  items: Array<{ bookingId: string; newIso: string }>,
+  note: string,
+): Promise<{ ok: true; proposed: number; failed: Array<{ bookingId: string; error: string }> } | { ok: false; error: string }> {
+  const guard = await requireMechanic();
+  if (!guard.ok) return guard;
+  const list = Array.isArray(items) ? items.slice(0, 20) : [];
+  if (list.length === 0) return { ok: false, error: "Pick at least one job to move." };
+  const admin = createAdminClient();
+  let proposed = 0;
+  const failed: Array<{ bookingId: string; error: string }> = [];
+  for (const item of list) {
+    if (typeof item?.bookingId !== "string" || typeof item?.newIso !== "string") continue;
+    const res = await proposeRescheduleFor(guard.mechanicId, item.bookingId, item.newIso, note ?? "", admin);
+    if (res.ok) {
+      proposed += 1;
+      revalidatePath(`/mechanic/jobs/${item.bookingId}`);
+    } else failed.push({ bookingId: item.bookingId, error: res.error });
+  }
+  revalidatePath("/mechanic/jobs");
+  return { ok: true, proposed, failed };
 }
 
 /**

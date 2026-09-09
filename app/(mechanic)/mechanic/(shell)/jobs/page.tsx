@@ -9,6 +9,7 @@ import { OfferFeed, type OfferView } from "./_components/offer-feed";
 import { Schedule, type ScheduleItem } from "./_components/schedule";
 import { AreaMap, type AreaPin } from "./_components/area-map";
 import { DayViewHeader } from "./_components/day-view-header";
+import { RunningLate, type LateCandidate } from "./_components/running-late";
 
 // Daily earnings goal for the day-view ring. A fixed default for now; making it
 // editable per-mechanic in the profile is a small follow-up (needs a column).
@@ -155,6 +156,8 @@ export default async function MechanicJobsPage() {
 
   const scheduleItems: ScheduleItem[] = [];
   const pins: AreaPin[] = [];
+  // Today's jobs that haven't started — what "Running late?" can move (Task 38).
+  const lateCandidates: LateCandidate[] = [];
   let nextAssigned = true; // first upcoming item is "next up"
   let jobsToday = 0; // upcoming jobs scheduled for today
   let bookedTodayPence = 0; // mechanic's share of today's upcoming jobs
@@ -199,6 +202,9 @@ export default async function MechanicJobsPage() {
         needsWindow: isAllDay && status === "confirmed",
         needsDay: isFlexible && status === "confirmed",
       });
+      if (status === "confirmed" && b.scheduled_at && !isFlexible) {
+        lateCandidates.push({ bookingId: b.id, title, scheduledAt: b.scheduled_at, slotWindow: isAllDay ? "All day" : b.slot_window });
+      }
     }
 
     // Map pins: upcoming (not completed) jobs anywhere from today forward.
@@ -229,7 +235,8 @@ export default async function MechanicJobsPage() {
     if (t >= weekStartMs) jobsThisWeek += 1;
   }
 
-  const thirtyDaysAgo = new Date(Date.now() - 30 * 86_400_000).toISOString();
+  // From midnight 30 days ago (a pure derivation of the day already computed above).
+  const thirtyDaysAgo = new Date(todayStartMs - 30 * 86_400_000).toISOString();
   const { data: responded } = await supabase
     .from("job_offers")
     .select("response")
@@ -269,6 +276,7 @@ export default async function MechanicJobsPage() {
         <div className="space-y-6 lg:col-span-2">
           <OfferFeed mechanicId={user.id} offers={offers} />
           <Schedule items={scheduleItems} />
+          <RunningLate jobs={lateCandidates} />
         </div>
         <div className="lg:col-span-1">
           <AreaMap

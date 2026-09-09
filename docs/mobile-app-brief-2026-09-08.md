@@ -362,6 +362,10 @@ The `job_complete` receipt email already links to the web report.
 - `payment_captured` payloads may now carry `quote_id` and `discount_pence`;
   `payout_transferred` may carry `source_charge`; the completion `status_changed` payload
   carries `mileage`, `checklists[]`, `mechanic_confirmed` and `charge_pence`.
+- **Mechanics can now propose new times for several jobs at once** ("Running late?", Task
+  38). Nothing new for the app: each one is the existing `reschedule_status = 'proposed'` +
+  `reschedule_proposed_at` + `reschedule_note` on the booking, the `reschedule_proposed` event,
+  and the existing `reschedule-response` endpoint. Expect them to arrive in bursts.
 - **The customer signature is gone.** It was never visible to the app (`booking_media` has no
   customer RLS policy), so there is nothing to change — but if any copy in the app says the
   customer will be asked to sign off at the end, remove it. Completion is now the mechanic's

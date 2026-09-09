@@ -3,7 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { loadBookingChecklists, productIdsInLines } from "@/lib/checklists/load";
 import { loadFaultsForBooking, loadQuotesForBooking } from "@/lib/quotes/load";
-import { loadRevisionsForBooking } from "@/lib/revisions/load";
+import { loadRevisionsForBooking, revisionMoney } from "@/lib/revisions/load";
+import { diffRevision, followOnLinesFromRevision } from "@/lib/revisions/diff";
 import { cancelFeeTiers } from "@/lib/bookings/manage-booking";
 import { geocodePostcode, haversineMiles, type LatLng } from "@/lib/geo/postcodes";
 import { mechanicSharePence } from "@/lib/earnings";
@@ -78,6 +79,25 @@ export default async function MechanicJobDetailPage({ params }: PageProps) {
     loadRevisionsForBooking(supabase, id),
     cancelFeeTiers(createAdminClient()),
   ]);
+  // Task 38: once the job is complete, what an approved revision took off is
+  // offered as a follow-on quote for a return visit.
+  const approvedRevision = revisionMoney(revisions).approved;
+  const followOnPrefill =
+    booking.status === "completed" && approvedRevision
+      ? followOnLinesFromRevision(diffRevision(approvedRevision.before, approvedRevision.after))
+      : [];
+  // …and while it's in progress, how many later jobs "Running late?" could move today.
+  let laterJobsToday = 0;
+  if (booking.status === "in_progress" && booking.scheduled_at) {
+    const dayKey = londonDateKey(new Date(booking.scheduled_at));
+    const { data: later } = await supabase
+      .from("bookings")
+      .select("id, scheduled_at")
+      .eq("mechanic_id", user.id)
+      .eq("status", "confirmed")
+      .neq("id", id);
+    laterJobsToday = (later ?? []).filter((b) => b.scheduled_at && londonDateKey(new Date(b.scheduled_at)) === dayKey).length;
+  }
 
   const { data: mechanic } = await supabase
     .from("mechanics")
@@ -240,6 +260,8 @@ export default async function MechanicJobDetailPage({ params }: PageProps) {
       product: line.product,
     })),
     onSiteFees: { diagnosticPence: feeTiers.diagnostic, enRoutePence: feeTiers.enRoute },
+    followOnPrefill,
+    laterJobsToday,
     hourlyRatePence: booking.hourly_rate_pence ?? undefined,
     whenLabel,
     distanceLabel,

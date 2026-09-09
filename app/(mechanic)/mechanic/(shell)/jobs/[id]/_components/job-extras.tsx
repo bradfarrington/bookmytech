@@ -36,6 +36,17 @@ import {
 // price filled in. Everything is priced server-side again on send; the totals
 // here are the same pure arithmetic, for display.
 
+/** A line to pre-fill a follow-on quote with (Task 38): the work an approved revision took off today's job. */
+export interface FollowOnPrefillLine {
+  kind: "labour" | "part";
+  description: string;
+  hours: number | null;
+  quantity: number;
+  unitPence: number | null;
+  nodeId: string | null;
+  partId: string | null;
+}
+
 interface JobExtrasProps {
   bookingId: string;
   status: string;
@@ -43,6 +54,8 @@ interface JobExtrasProps {
   quotes: QuoteView[];
   hourlyRatePence: number;
   commissionRate: number;
+  /** Task 38: offered as "Quote the rest of the work" once the job is complete. */
+  followOnPrefill?: FollowOnPrefillLine[];
 }
 
 interface DraftLine {
@@ -81,7 +94,7 @@ function toInputs(lines: DraftLine[]): QuoteLineInput[] {
 const INPUT =
   "h-10 rounded-button border border-border bg-surface-card px-3 text-sm text-text-primary placeholder:text-text-muted focus:border-brand-blue focus:outline-none";
 
-export function JobExtras({ bookingId, status, faults, quotes, hourlyRatePence, commissionRate }: JobExtrasProps) {
+export function JobExtras({ bookingId, status, faults, quotes, hourlyRatePence, commissionRate, followOnPrefill = [] }: JobExtrasProps) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const canNote = ["confirmed", "en_route", "in_progress"].includes(status);
@@ -119,6 +132,31 @@ export function JobExtras({ bookingId, status, faults, quotes, hourlyRatePence, 
     } else if (lines.length === 0) {
       setLines([{ key: newKey(), kind: "labour", description: "", hours: "", quantity: "1", unitPounds: "", nodeId: null, partId: null, faultId: null }]);
     }
+  }
+
+  // Task 38: the work an approved revision took off today's job, as a return
+  // visit — labour with the HaynesPro node and its book time, parts as parts —
+  // so the quote comes to what was taken off. Offered until a follow-on has
+  // been sent.
+  const hasFollowOn = quotes.some((q) => q.kind === "follow_on" && q.status !== "withdrawn" && q.status !== "declined" && q.status !== "expired");
+  const canPrefillFollowOn = canQuoteFollowOn && followOnPrefill.length > 0 && !hasFollowOn;
+  function openBuilderForTheRest() {
+    setKind("follow_on");
+    setBuilderOpen(true);
+    if (!title) setTitle("The rest of the work from your visit");
+    setLines(
+      followOnPrefill.map((p) => ({
+        key: newKey(),
+        kind: p.kind,
+        description: p.description.slice(0, 200),
+        hours: p.hours != null ? String(p.hours) : "",
+        quantity: String(p.quantity || 1),
+        unitPounds: p.unitPence != null ? (p.unitPence / 100).toFixed(2) : "",
+        nodeId: p.nodeId,
+        partId: p.partId,
+        faultId: null,
+      })),
+    );
   }
 
   const priced = useMemo(() => safePriceQuoteLines(toInputs(lines), { hourlyRatePence, commissionRate }), [lines, hourlyRatePence, commissionRate]);
@@ -251,6 +289,17 @@ export function JobExtras({ bookingId, status, faults, quotes, hourlyRatePence, 
           </ul>
         )}
 
+        {canPrefillFollowOn && !builderOpen && (
+          <div className="space-y-2 rounded-xl border border-brand-blue/30 bg-blue-50/50 px-3.5 py-3">
+            <p className="text-sm font-semibold text-text-primary">Send a follow-on quote for the rest</p>
+            <p className="text-xs text-text-secondary">
+              {followOnPrefill.length} item{followOnPrefill.length === 1 ? " was" : "s were"} taken off today&apos;s job when it was revised. Quote {followOnPrefill.length === 1 ? "it" : "them"} for a return visit — the customer books it from the quote and you&apos;re offered the job first.
+            </p>
+            <Button size="sm" iconLeft={Plus} onClick={openBuilderForTheRest} disabled={pending}>
+              Quote the rest of the work
+            </Button>
+          </div>
+        )}
         {(canQuoteNow || canQuoteFollowOn) && !builderOpen && (
           <Button size="sm" variant="secondary" iconLeft={Plus} onClick={() => openBuilderFor()} disabled={pending}>
             Add labour or parts

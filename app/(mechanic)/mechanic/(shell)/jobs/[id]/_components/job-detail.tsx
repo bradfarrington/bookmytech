@@ -41,7 +41,7 @@ import { ArrivalWindowPicker } from "./arrival-window-picker";
 import { MileageField } from "./mileage-field";
 import { ChecklistPanel } from "./checklist-panel";
 import type { LoadedChecklist } from "@/lib/checklists/load";
-import { JobExtras } from "./job-extras";
+import { JobExtras, type FollowOnPrefillLine } from "./job-extras";
 import type { FaultView, QuoteView } from "@/lib/quotes/load";
 import { ReviseJob, type ReviseJobLine } from "./revise-job";
 import type { RevisionView } from "@/lib/revisions/load";
@@ -71,6 +71,10 @@ export interface JobDetailProps {
   revisions?: RevisionView[];
   /** What the mechanic may charge if the customer declines the revised job (Task 37). */
   onSiteFees?: { diagnosticPence: number; enRoutePence: number };
+  /** Task 38: the work an approved revision took off, ready to quote as a return visit once complete. */
+  followOnPrefill?: FollowOnPrefillLine[];
+  /** Task 38: how many of today's later jobs "Running late?" could move. */
+  laterJobsToday?: number;
   hourlyRatePence?: number;
   whenLabel: string;
   distanceLabel: string;
@@ -349,9 +353,35 @@ export function JobDetail(props: JobDetailProps) {
             </Card>
           )}
 
+          {/* Running over (Task 38): trim today's job, complete it, quote the rest; and move the later jobs. */}
+          {status === "in_progress" && (
+            <Card className="space-y-3 border-amber-200 bg-amber-50/40 p-6">
+              <CardTitle icon={Clock}>Can&apos;t finish today?</CardTitle>
+              <ol className="list-decimal space-y-1 pl-5 text-sm text-text-secondary">
+                <li>
+                  <strong className="text-text-primary">Trim today&apos;s job</strong> — in <em>Change what&apos;s being done</em> below, remove what you won&apos;t get to; the customer approves and pays only for that.
+                </li>
+                <li>
+                  <strong className="text-text-primary">Complete &amp; charge</strong> as normal.
+                </li>
+                <li>
+                  <strong className="text-text-primary">Quote the rest</strong> — the job page then offers a follow-on quote pre-filled with what you took off; the customer books the return visit and you&apos;re offered it first.
+                </li>
+              </ol>
+              <div className="flex flex-wrap gap-2">
+                <a href="#change-job" className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3.5 py-2 text-sm font-semibold text-text-primary transition-colors hover:border-brand-blue/50 hover:text-brand-blue">
+                  Trim today&apos;s job <ChevronRightIcon />
+                </a>
+                <Link href="/mechanic/jobs#running-late" className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3.5 py-2 text-sm font-semibold text-text-primary transition-colors hover:border-brand-blue/50 hover:text-brand-blue">
+                  Move my later jobs{props.laterJobsToday ? ` (${props.laterJobsToday})` : ""} <ChevronRightIcon />
+                </Link>
+              </div>
+            </Card>
+          )}
+
           {/* The booked repair isn't right — change the job (Task 37) */}
           {(status === "in_progress" || (props.revisions ?? []).length > 0) && (
-            <Card className="space-y-4 p-6">
+            <Card className="space-y-4 p-6" id="change-job">
               <CardTitle icon={Wrench}>Change what&apos;s being done</CardTitle>
               <ReviseJob
                 bookingId={bookingId}
@@ -375,6 +405,7 @@ export function JobDetail(props: JobDetailProps) {
                 quotes={props.quotes ?? []}
                 hourlyRatePence={props.hourlyRatePence ?? 6000}
                 commissionRate={props.commissionRate}
+                followOnPrefill={props.followOnPrefill ?? []}
               />
             </Card>
           )}
