@@ -232,7 +232,55 @@ export const SMS_TEMPLATE_DEFS: readonly SmsTemplateDef[] = [
     defaultBody: "Book My Tech: your mechanic has sent a quote for {{total}}. Nothing is charged until you approve: {{url}}",
   },
 
+  // --- Revised job on site (Task 37) ------------------------------------------
+  {
+    key: "revision_sent",
+    label: "Mechanic revised the job",
+    description: "Sent to the customer when their mechanic finds the booked repair isn't what's needed and proposes a different job.",
+    audience: "customer",
+    variables: [
+      { name: "after_total", description: "The revised job's total", example: "£111.00" },
+      { name: "difference", description: "Signed difference from what was booked", example: "+£19.00" },
+      { name: "url", description: "Link to review it", example: "https://bookmytech.co.uk/dashboard/revisions/…" },
+    ],
+    defaultBody: "Book My Tech: your mechanic has revised the job — new total {{after_total}} ({{difference}}). Nothing changes until you approve: {{url}}",
+  },
+  {
+    key: "job_ended_on_site",
+    label: "Job ended on site",
+    description: "Sent to the customer when the mechanic ends the job after they declined the revised work.",
+    audience: "customer",
+    variables: [
+      { name: "ref", description: "Job number", example: "00123" },
+      { name: "fee_line", description: "What was charged", example: "£59.99 charged, the rest released." },
+    ],
+    defaultBody: "Book My Tech: job {{ref}} has ended — the booked repair wasn't what your car needed and the revised job was declined. {{fee_line}}",
+  },
+
   // --- Mechanic ---------------------------------------------------------------
+  {
+    key: "mech_revision_approved",
+    label: "Customer approved your revised job",
+    description: "Sent to the mechanic when the customer approves the revised job.",
+    audience: "mechanic",
+    variables: [
+      { name: "ref", description: "Job number", example: "00123" },
+      { name: "job", description: "The revised job", example: "Renew the front wheel bearing" },
+      { name: "after_total", description: "The revised total", example: "£111.00" },
+    ],
+    defaultBody: "Book My Tech: the customer approved the revised job on {{ref}} — {{job}}, {{after_total}}. Go ahead; it's paid with the job.",
+  },
+  {
+    key: "mech_revision_declined",
+    label: "Customer declined your revised job",
+    description: "Sent to the mechanic when the customer declines the revised job.",
+    audience: "mechanic",
+    variables: [
+      { name: "ref", description: "Job number", example: "00123" },
+      { name: "job", description: "The revised job", example: "Renew the front wheel bearing" },
+    ],
+    defaultBody: "Book My Tech: the customer declined the revised job on {{ref}}. Don't carry out that work — choose how to end the job from the job page.",
+  },
   {
     key: "mech_quote_approved",
     label: "Customer approved your quote",

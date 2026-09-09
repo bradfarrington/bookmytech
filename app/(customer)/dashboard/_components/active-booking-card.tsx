@@ -7,6 +7,7 @@ import { useStayFresh } from "@/lib/use-stay-fresh";
 import { MessagesThread } from "@/components/messages/messages-thread";
 import { RescheduleProposal } from "@/components/customer/reschedule-proposal";
 import { QuoteProposal } from "@/components/customer/quote-proposal";
+import { RevisionProposal } from "@/components/customer/revision-proposal";
 import {
   STATUS_LABELS,
   formatSlot,
@@ -64,7 +65,8 @@ export function ActiveBookingCard({ booking, mechanic }: ActiveBookingCardProps)
           />
         )}
 
-        {/* A quote from the mechanic waiting on the customer (Task 33) */}
+        {/* A revised job (Task 37) or a quote (Task 33) from the mechanic waiting on the customer */}
+        {booking.pendingRevision && <RevisionProposal revision={booking.pendingRevision} />}
         {booking.pendingQuote && <QuoteProposal quote={booking.pendingQuote} />}
 
         {/* Every job of a multi-job booking (the header shows the summary). */}

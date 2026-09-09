@@ -11,7 +11,9 @@ import { Button } from "@/components/ui/button";
 import { BookingTracker, type BookingMechanic } from "./_components/booking-tracker";
 import { RescheduleProposal } from "@/components/customer/reschedule-proposal";
 import { QuoteProposal } from "@/components/customer/quote-proposal";
+import { RevisionProposal } from "@/components/customer/revision-proposal";
 import { loadQuotesForBooking, quoteMoney } from "@/lib/quotes/load";
+import { loadRevisionsForBooking, revisionMoney } from "@/lib/revisions/load";
 
 interface ConfirmedPageProps {
   params: Promise<{ id: string }>;
@@ -48,8 +50,11 @@ export default async function ConfirmedPage({ params }: ConfirmedPageProps) {
     .order("position");
   const lines = repairLinesFor(booking, (lineRows ?? null) as BookingRepairRow[] | null);
   const lineGroups = groupRepairLines(lines);
-  // A quote from the mechanic waiting on the customer (Task 33).
-  const pendingQuote = quoteMoney(await loadQuotesForBooking(supabase, id)).pendingNow;
+  // A quote (Task 33) or a revised job (Task 37) from the mechanic waiting on the customer.
+  const [pendingQuote, pendingRevision] = await Promise.all([
+    loadQuotesForBooking(supabase, id).then((q) => quoteMoney(q).pendingNow),
+    loadRevisionsForBooking(supabase, id).then((r) => revisionMoney(r).pending),
+  ]);
 
   // Is the viewer already signed in? If so, route them to their dashboard
   // instead of nudging them to create an account.
@@ -114,6 +119,16 @@ export default async function ConfirmedPage({ params }: ConfirmedPageProps) {
         />
       )}
 
+      {pendingRevision && (
+        <RevisionProposal
+          revision={{
+            id: pendingRevision.id,
+            afterTotalPence: pendingRevision.after.totalPence,
+            differencePence: pendingRevision.differencePence,
+            repairDescription: pendingRevision.after.repairDescription,
+          }}
+        />
+      )}
       {pendingQuote && (
         <QuoteProposal quote={{ id: pendingQuote.id, totalPence: pendingQuote.totalPence, kind: pendingQuote.kind, title: pendingQuote.title }} />
       )}

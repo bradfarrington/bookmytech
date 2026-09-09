@@ -9,6 +9,8 @@ import { renderSmsTemplate } from "@/lib/sms/render-template";
 import { formatBookingSlot } from "@/lib/slots";
 import { formatJobNumber, formatPrice } from "@/lib/utils";
 import { ownsBooking, type BookingCaller } from "@/lib/bookings/ownership";
+import { splitCommission } from "@/lib/quotes/pricing";
+import { chargeIdOf, payoutToMechanic } from "@/lib/payments/payout";
 
 // The one implementation of "cancel this booking", "move this booking" and
 // "answer the mechanic's proposed move".
@@ -93,7 +95,7 @@ async function requireBookingCustomer(bookingId: string, caller: BookingCaller) 
     .from("bookings")
     .select(
       `id, job_number, status, scheduled_at, slot_window, customer_id, customer_email, customer_name,
-       customer_phone, mechanic_id, total_pence, stripe_payment_intent_id`,
+       customer_phone, mechanic_id, total_pence, stripe_payment_intent_id, commission_rate`,
     )
     .eq("id", bookingId)
     .single();
@@ -117,12 +119,16 @@ export async function cancelFeeTiers(admin: ReturnType<typeof createAdminClient>
       "cancel_fee_before_24h",
       "cancel_fee_within_24h",
       "cancel_fee_mechanic_en_route",
+      "on_site_diagnostic_fee_pence",
     ]);
   const map = new Map((data ?? []).map((r) => [r.key, Number(r.value)]));
   return {
     before24h: map.get("cancel_fee_before_24h") ?? 0,
     within24h: map.get("cancel_fee_within_24h") ?? 3000,
     enRoute: map.get("cancel_fee_mechanic_en_route") ?? 5000,
+    // Task 37: what a mechanic may charge when the customer declines the
+    // revised job on site. Read here so the Terms and the policy page show it.
+    diagnostic: map.get("on_site_diagnostic_fee_pence") ?? 5999,
   };
 }
 
@@ -205,8 +211,9 @@ export async function cancelBookingFor(
   // Settle the pre-authorisation: capture the fee (releases the remainder) or
   // cancel the hold outright when there's no fee. Stripe-less dev just skips it.
   let charged = 0;
+  let chargeId: string | null = null;
+  let stripe: typeof import("@/lib/stripe/server").stripe | null = null;
   if (booking.stripe_payment_intent_id) {
-    let stripe: typeof import("@/lib/stripe/server").stripe | null = null;
     try {
       stripe = (await import("@/lib/stripe/server")).stripe;
     } catch {
@@ -215,10 +222,11 @@ export async function cancelBookingFor(
     if (stripe) {
       try {
         if (feePence > 0) {
-          await stripe.paymentIntents.capture(booking.stripe_payment_intent_id, {
+          const intent = await stripe.paymentIntents.capture(booking.stripe_payment_intent_id, {
             amount_to_capture: feePence,
           });
-          charged = feePence;
+          charged = intent.amount_received;
+          chargeId = chargeIdOf(intent);
         } else {
           await stripe.paymentIntents.cancel(booking.stripe_payment_intent_id);
         }
@@ -266,6 +274,24 @@ export async function cancelBookingFor(
       actor_role: "customer",
       payload: { amount_pence: charged, kind: "cancellation_fee" },
     });
+    // The fee covers the mechanic's committed time and travel (what the
+    // policy page has always said), so it is paid out to them minus the
+    // booking's commission, like any other charge (Task 37 — until then it
+    // was captured and never paid out).
+    if (booking.mechanic_id) {
+      const gross = splitCommission(charged, Number(booking.commission_rate ?? 0.15)).mechanicPayoutPence;
+      await payoutToMechanic({
+        admin,
+        stripe,
+        bookingId,
+        mechanicId: booking.mechanic_id,
+        grossPence: gross,
+        charges: chargeId ? [{ id: chargeId, capturedPence: charged }] : [],
+        description: `Job ${formatJobNumber(booking.job_number)} cancellation fee`,
+        actorId: userId,
+        actorRole: "customer",
+      });
+    }
   }
 
   // Tell the assigned mechanic their job is off — email and text.

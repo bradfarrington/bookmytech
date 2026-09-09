@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getHourlyRatePence, getTakeRateBase } from "@/lib/pricing/calculate";
 import { searchRepairCatalogue } from "@/lib/haynespro/catalogue";
 import { loadQuote, loadQuotesForBooking, quoteMoney, type QuoteView } from "./load";
+import { loadRevisionsForBooking, revisionMoney } from "@/lib/revisions/load";
 import { safePriceQuoteLines, type QuoteLineInput } from "./pricing";
 import { QUOTABLE_STATUSES, quoteExpiry, type QuoteKind } from "./status";
 import { notifyCustomerQuoteSent, type QuoteBookingContact } from "./notify";
@@ -127,11 +128,14 @@ export async function createQuote(mechanicId: string, input: CreateQuoteInput): 
     };
 
   // One open quote for this visit at a time — stacking approvals muddles the
-  // customer and the capture.
+  // customer and the capture. A revised job waiting on the customer (Task 37)
+  // counts too: until they answer, the job it would add to isn't settled.
   if (kind === "now") {
     const existing = await loadQuotesForBooking(admin, booking.id);
     if (quoteMoney(existing).pendingNow)
       return { ok: false, error: "A quote is already waiting on the customer — withdraw it before sending another." };
+    if (revisionMoney(await loadRevisionsForBooking(admin, booking.id)).pending)
+      return { ok: false, error: "The revised job is still waiting on the customer — wait for their answer before quoting extra work." };
   }
 
   // Catalogue parts: name + BMT price from the table.

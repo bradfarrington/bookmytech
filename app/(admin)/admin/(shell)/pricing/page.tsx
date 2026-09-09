@@ -23,6 +23,7 @@ const SETTING_DEFAULTS: PlatformSettings = {
   repair_combine_mode: DEFAULT_REPAIR_COMBINE_MODE,
   engine_oil_price_per_litre_pence: 1500,
   engine_oil_default_litres: 5,
+  on_site_diagnostic_fee_pence: 5999,
 };
 
 export default async function AdminPricingPage() {

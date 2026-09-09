@@ -316,6 +316,12 @@ export async function quoteRepairs(
   reg: string,
   ids: readonly string[],
   db: SupabaseClient,
+  /**
+   * ADDITIVE (Task 37): price at a booking's snapshotted rate and commission
+   * instead of today's settings — a revision of an existing job must not
+   * reprice it because the platform rate moved since it was booked.
+   */
+  overrides: { hourlyRatePence?: number; commissionRate?: number } = {},
 ): Promise<RepairsQuote | null> {
   try {
     const itemIds = dedupeRepairIds(ids);
@@ -362,8 +368,12 @@ export async function quoteRepairs(
     }
 
     const [hourlyRatePence, commissionRate, combineMode] = await Promise.all([
-      getHourlyRatePence(db),
-      getTakeRateBase(db),
+      overrides.hourlyRatePence != null && overrides.hourlyRatePence > 0
+        ? Promise.resolve(Math.round(overrides.hourlyRatePence))
+        : getHourlyRatePence(db),
+      overrides.commissionRate != null && overrides.commissionRate >= 0
+        ? Promise.resolve(overrides.commissionRate)
+        : getTakeRateBase(db),
       getRepairCombineMode(db),
     ]);
 

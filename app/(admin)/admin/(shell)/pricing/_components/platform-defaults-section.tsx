@@ -20,6 +20,8 @@ export interface PlatformSettings {
   /** Engine oil on a servicing product (Task 31): £/litre and the litres assumed when HaynesPro has no figure. */
   engine_oil_price_per_litre_pence: number;
   engine_oil_default_litres: number;
+  /** What a mechanic may charge when the customer declines the revised job on site (Task 37). */
+  on_site_diagnostic_fee_pence: number;
 }
 
 const litres = {
@@ -194,6 +196,17 @@ export function PlatformDefaultsSection({ settings }: { settings: PlatformSettin
               {...pounds}
               ariaLabel="Fee mechanic en route"
               onSave={(v) => updatePlatformSetting("cancel_fee_mechanic_en_route", v ?? 0)}
+            />
+          </Row>
+          <Row
+            label="On-site diagnostic"
+            hint="When the mechanic finds the booked repair isn't what's needed and the customer declines the revised job — the mechanic may charge this or the en-route fee"
+          >
+            <InlineNumber
+              value={settings.on_site_diagnostic_fee_pence}
+              {...pounds}
+              ariaLabel="On-site diagnostic fee"
+              onSave={(v) => updatePlatformSetting("on_site_diagnostic_fee_pence", v ?? 0)}
             />
           </Row>
         </div>

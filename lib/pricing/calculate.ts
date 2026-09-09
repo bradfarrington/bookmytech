@@ -242,6 +242,26 @@ export async function getEngineOilDefaultLitres(client?: DbClient): Promise<numb
   }
 }
 
+// --- The on-site diagnostic fee (Task 37) ------------------------------------
+// Gareth: when the customer declines the revised job, "the mechanic chooses to
+// charge the cancellation fee or a diagnostic (set by you)". Seeded by 0064 to
+// match the catalogue diagnostic; editable on /admin/pricing.
+
+export const ON_SITE_DIAGNOSTIC_FEE_KEY = "on_site_diagnostic_fee_pence";
+export const DEFAULT_ON_SITE_DIAGNOSTIC_FEE_PENCE = 5999;
+
+export async function getOnSiteDiagnosticFeePence(client?: DbClient): Promise<number> {
+  const db = client ?? (await import("@/lib/supabase/admin")).createAdminClient();
+  try {
+    const { data } = await db.from("platform_settings").select("value").eq("key", ON_SITE_DIAGNOSTIC_FEE_KEY).maybeSingle();
+    const raw = data?.value;
+    const n = typeof raw === "number" ? raw : Number(raw);
+    return Number.isFinite(n) && n >= 0 ? Math.round(n) : DEFAULT_ON_SITE_DIAGNOSTIC_FEE_PENCE;
+  } catch {
+    return DEFAULT_ON_SITE_DIAGNOSTIC_FEE_PENCE;
+  }
+}
+
 /**
  * How several repairs booked together are timed (Task 24):
  *   "sum"       — each job's own book time, added up. The owner's choice

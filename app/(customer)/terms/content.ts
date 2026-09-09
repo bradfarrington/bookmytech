@@ -14,7 +14,7 @@ import { formatPrice } from "@/lib/utils";
 //   • §22: rescheduling is always free on the platform, so the document's
 //     "a cancellation charge may apply" sentence is replaced.
 
-export type CancelFeeTiers = { before24h: number; within24h: number; enRoute: number };
+export type CancelFeeTiers = { before24h: number; within24h: number; enRoute: number; diagnostic: number };
 
 export const PREAMBLE: LegalBlock[] = [
   { type: "p", text: "These Terms & Conditions (“Terms”) apply to your use of the Book My Tech website, booking platform and related services." },
@@ -422,9 +422,13 @@ export function buildSections(tiers: CancelFeeTiers): LegalSection[] {
           ["More than 24 hours before appointment", fee(tiers.before24h)],
           ["Within 24 hours of appointment", fee(tiers.within24h)],
           ["Mechanic has already started travelling to customer", fee(tiers.enRoute)],
+          [
+            "Mechanic arrives, finds the booked repair is not what the vehicle needs, and you decline the revised work",
+            `${fee(tiers.diagnostic)} on-site diagnostic fee, or the fee above — whichever the mechanic applies`,
+          ],
         ],
       },
-      { type: "p", text: "These charges reflect time and costs incurred by the mechanic in preparing for or travelling to the appointment." },
+      { type: "p", text: "These charges reflect time and costs incurred by the mechanic in preparing for or travelling to the appointment, or in inspecting the vehicle and identifying what it actually needs." },
       { type: "p", text: "We will consider genuine exceptional circumstances fairly." },
       { type: "p", text: "Our Cancellation Policy explains how a cancellation fee is taken from the amount pre-authorised on your card when you book, and how the rest is released." },
     ],

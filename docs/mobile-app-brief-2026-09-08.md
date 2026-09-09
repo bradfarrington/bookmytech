@@ -1,4 +1,4 @@
-# Mobile app brief — the backend changes of 2026-09-08 (Tasks 30–36)
+# Mobile app brief — the backend changes of 2026-09-08/09 (Tasks 30–37)
 
 Hand this whole file to a Claude session working in `bmt-customer-app`. It is written to be
 pasted as a prompt: it says what changed in the backend, what the app must do, and what it
@@ -7,7 +7,7 @@ must not assume.
 ---
 
 You are working in `bmt-customer-app`, the React Native / Expo customer app for Book My Tech.
-Its backend is the separate Next.js repo (`bookmytech`), which has just shipped seven tasks in
+Its backend is the separate Next.js repo (`bookmytech`), which has just shipped eight tasks in
 one batch. **None of it is deployed yet and none of the migrations are applied** — build
 against the contracts below, and expect to test once the backend team says the migrations are
 in.
@@ -19,7 +19,7 @@ incomplete or slightly wrong if you don't update them.
 
 ## Step 0 — regenerate types
 
-Migrations `0059`–`0063` land together. Once the backend confirms they are applied:
+Migrations `0059`–`0064` land together. Once the backend confirms they are applied:
 
 ```
 npm run db:types
@@ -32,11 +32,12 @@ New columns and tables you will see:
 | `bookings` | `mileage`, `engine_oil_litres`, `engine_oil_price_per_litre_pence`, `engine_oil_source`, `discount_pence`, `promo_code`, `source_quote_id` |
 | `booking_repairs` | `kind` (`'job'` \| `'product'`) |
 | `job_quotes`, `job_quote_lines`, `booking_faults` | new — customer-readable under RLS |
+| `job_revisions` | new — customer-readable under RLS (§3b) |
 | `checklists`, `checklist_items`, `booking_checklist_results` | new — customer-readable under RLS |
 | `catalogue_products`, `promo_codes`, `promo_redemptions`, `promo_code_sends`, the repair-catalogue overlay tables | new but **admin-only** — the app cannot and should not read them |
 
-`job_quotes` has been added to the `supabase_realtime` publication (alongside `bookings`,
-`booking_events`, `mechanic_locations`, `job_offers`).
+`job_quotes` and `job_revisions` have been added to the `supabase_realtime` publication
+(alongside `bookings`, `booking_events`, `mechanic_locations`, `job_offers`).
 
 ---
 
@@ -196,6 +197,97 @@ The original hold could not simply be increased, which is why a card is collecte
 
 ---
 
+## 3b. The mechanic revised the job on site — the second big feature
+
+Distinct from a quote. A mechanic arrives, finds **the repair that was booked isn't what the
+car needs**, and proposes a different job — repairs swapped, parts kept, dropped or added —
+at its new price, which can be **higher or lower**. The customer must approve it either way
+(the work changed, not just the price). If they decline, the mechanic may end the job and
+charge an on-site diagnostic fee or the cancellation fee.
+
+### Reading
+
+`job_revisions` is readable under the customer's own RLS and is on Realtime — subscribe on the
+booking screen like `job_quotes`.
+
+`GET /api/mobile/v1/bookings/:id/revisions` → `{ ok: true, revisions: RevisionView[] }`
+
+```ts
+interface RevisionView {
+  id: string; bookingId: string; mechanicId: string;
+  status: "sent" | "approved" | "declined" | "withdrawn" | "expired";
+  reason: string;            // why the booked repair isn't right — show it prominently
+  note: string | null;
+  before: JobSheet;          // as booked
+  after: JobSheet;           // as revised
+  differencePence: number;   // after.totalPence − before.totalPence, SIGNED
+  holdQuoteId: string | null;
+  sentAt: string | null; respondedAt: string | null; expiresAt: string | null; createdAt: string;
+}
+interface JobSheet {
+  repairIds: string[];
+  lines: Array<{ nodeId: string; description: string; rawHours: number; chargedHours: number;
+                 linePence: number; kind: "job" | "product"; productId: string | null;
+                 itemId: string | null; itemLabel: string | null }>;
+  parts: Array<{ id: string | null; partId: string | null; name: string; quantity: number;
+                 unitPence: number; linePence: number; sourcing: "self" | "bmt" }>;
+  repairDescription: string; serviceDurationHours: number;
+  oil: { litres: number; pencePerLitre: number; pence: number } | null;
+  totalPence: number; basePricePence: number; partsPricePence: number;
+  platformFeePence: number; mechanicPayoutPence: number;
+}
+```
+
+**The one waiting on the customer is `status === "sent"` and not past `expiresAt`** (24 h).
+Render the diff yourself: lines in `before` but not `after` (by `nodeId`) were removed, the
+reverse were added; the same for parts (by `id` for existing ones, otherwise treat as added).
+
+### Answering
+
+`POST /api/mobile/v1/bookings/:id/revisions/:revisionId/respond` with `{ "decision": "approve" | "decline" }`:
+
+| Response | Meaning | What the app does |
+|---|---|---|
+| `{ ok: true, outcome: "declined" }` | Done | Tell them the mechanic was notified and will be in touch about ending the visit |
+| `{ ok: true, outcome: "pay", clientSecret, paymentIntentId, amountPence }` | Dearer job | PaymentSheet on `clientSecret` for **`amountPence` = the difference only**, then `confirm` |
+| `{ ok: true, outcome: "approved" }` | Same price or cheaper — applied at once | Refresh the booking |
+| `{ ok: false, error }` | Expired, withdrawn, not theirs… | Show `error` verbatim |
+
+`POST /api/mobile/v1/bookings/:id/revisions/:revisionId/confirm` with `{ "paymentIntentId" }` →
+`{ ok: true }` or `{ ok: false, error }`. Same rule as quotes: **not approved until `confirm`
+succeeds**; retry it, it is idempotent.
+
+### The screen
+
+- A **"Your mechanic has revised the job"** card (amber, not blue — it is a different thing
+  from a quote) → a screen with the mechanic's `reason` first, then **No longer needed**
+  (struck through) / **Instead** / **Still on the job**, the was → now totals with the signed
+  difference, then **Approve** / **Decline**.
+- Copy for a dearer job: *"Approving authorises £X — the difference — on your card now. Your
+  original pre-authorisation still covers the rest, and the new total is charged when the job
+  is complete."* For a cheaper one: *"Only the new total is charged when the job is complete;
+  the rest of your pre-authorisation is released."*
+- Under the buttons: *"If you decline, your mechanic may charge the on-site diagnostic or
+  cancellation fee for the visit. You're never charged for the revised work itself unless you
+  approve it."*
+- Push arrives as **"Your mechanic has revised the job"** carrying `bookingId`.
+
+### After approval — the booking row changes in place
+
+`repair_node_id`, `repair_description`, `service_duration_hours`, `engine_oil_*` and
+**`total_pence`** all change, and `booking_repairs` / `booking_parts` rows are **replaced**.
+Re-read them on the Realtime UPDATE. "Book again" should carry the *new* job.
+
+### After a decline — the booking may end
+
+The mechanic can end the job: `status` becomes **`cancelled`** (an existing value, no new
+label), the `cancelled` event carries `outcome: "customer_declined_revision"`, `fee_kind`
+(`"diagnostic"` | `"cancellation"` | `"none"`) and `fee_pence`, and a `payment_captured` event
+carries `kind: "on_site_diagnostic"` or `"on_site_cancellation"`. Show the fee on the cancelled
+booking if you show fees anywhere.
+
+---
+
 ## 4. Booking a return visit from a follow-on quote
 
 Approving a `follow_on` quote takes no money. It hands you a `quoteId`, and the ordinary
@@ -259,12 +351,14 @@ The `job_complete` receipt email already links to the web report.
   completed booking when set ("Mileage recorded: 62,410 miles").
 - **`booking_repairs.kind`** — `'product'` lines are fixed-price with 0 hours. Render
   **"Fixed price"**, never "0 h".
-- **`bookings.total_pence` can now rise while `in_progress`**, when the customer approves extra
-  work. It is **not** a reschedule; `reschedule_status` stays null. Treat the Realtime UPDATE as
-  a display refresh.
+- **`bookings.total_pence` can now rise or fall while `in_progress`** — up when the customer
+  approves extra work (§3) or a dearer revised job, down when they approve a cheaper one (§3b).
+  It is **not** a reschedule; `reschedule_status` stays null. Treat the Realtime UPDATE as a
+  display refresh.
 - **New `booking_events.event_type` values**: `fault_added`, `quote_sent`, `quote_approved`,
-  `quote_declined`, `quote_withdrawn`, `quote_expired`. Make sure your history renderer has a
-  safe fallback for unknown types (it did for `arrival_window_set`).
+  `quote_declined`, `quote_withdrawn`, `quote_expired`, `revision_sent`, `revision_approved`,
+  `revision_declined`, `revision_withdrawn`, `revision_expired`. Make sure your history renderer
+  has a safe fallback for unknown types (it did for `arrival_window_set`).
 - `payment_captured` payloads may now carry `quote_id` and `discount_pence`;
   `payout_transferred` may carry `source_charge`; the completion `status_changed` payload
   carries `mileage`, `checklists[]`, `mechanic_confirmed` and `charge_pence`.
@@ -283,9 +377,12 @@ The `job_complete` receipt email already links to the web report.
    price breakdown.
 4. Quotes: the booking screen's faults list and "Quote waiting" card, the approval screen, the
    PaymentSheet + `confirm` handshake, and the Realtime subscription on `job_quotes`.
-5. Follow-on booking with `quoteId`.
-6. The discount-code field and `promo_unavailable` recovery.
-7. Reports, mileage, `kind: 'product'`, the new event labels.
+5. Revised jobs (§3b): the amber "revised the job" card, the diff screen, the PaymentSheet +
+   `confirm` handshake for the difference, the Realtime subscription on `job_revisions`, and
+   re-reading the booking's lines/parts/total after approval.
+6. Follow-on booking with `quoteId`.
+7. The discount-code field and `promo_unavailable` recovery.
+8. Reports, mileage, `kind: 'product'`, the new event labels, the `cancelled` outcome/fee.
 
 If any response shape here disagrees with what the API actually returns, trust the API and tell
 the backend team — these are contracts, and a mismatch is their bug to fix, not something to

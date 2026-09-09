@@ -43,6 +43,8 @@ import { ChecklistPanel } from "./checklist-panel";
 import type { LoadedChecklist } from "@/lib/checklists/load";
 import { JobExtras } from "./job-extras";
 import type { FaultView, QuoteView } from "@/lib/quotes/load";
+import { ReviseJob, type ReviseJobLine } from "./revise-job";
+import type { RevisionView } from "@/lib/revisions/load";
 
 export interface JobDetailProps {
   bookingId: string;
@@ -64,6 +66,11 @@ export interface JobDetailProps {
   /** Faults noted and quotes sent on this job (Task 33). */
   faults?: FaultView[];
   quotes?: QuoteView[];
+  /** Revised jobs (Task 37): every line as booked (with its catalogue ids), and the revisions so far. */
+  revisionLines?: ReviseJobLine[];
+  revisions?: RevisionView[];
+  /** What the mechanic may charge if the customer declines the revised job (Task 37). */
+  onSiteFees?: { diagnosticPence: number; enRoutePence: number };
   hourlyRatePence?: number;
   whenLabel: string;
   distanceLabel: string;
@@ -339,6 +346,21 @@ export function JobDetail(props: JobDetailProps) {
                   The customer sees this as their report.
                 </p>
               )}
+            </Card>
+          )}
+
+          {/* The booked repair isn't right — change the job (Task 37) */}
+          {(status === "in_progress" || (props.revisions ?? []).length > 0) && (
+            <Card className="space-y-4 p-6">
+              <CardTitle icon={Wrench}>Change what&apos;s being done</CardTitle>
+              <ReviseJob
+                bookingId={bookingId}
+                status={status}
+                lines={props.revisionLines ?? []}
+                parts={props.parts.map((p) => ({ id: p.id, name: p.name, quantity: p.quantity, unitPricePence: p.unitPricePence, totalPence: p.totalPence, sourcing: p.sourcing }))}
+                revisions={props.revisions ?? []}
+                fees={props.onSiteFees ?? { diagnosticPence: 5999, enRoutePence: 5000 }}
+              />
             </Card>
           )}
 

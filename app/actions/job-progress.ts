@@ -11,10 +11,10 @@ import { renderSmsTemplate } from "@/lib/sms/render-template";
 import { formatPrice, siteUrl, formatJobNumber } from "@/lib/utils";
 import { completedBookingCount, grantCredit } from "@/lib/credits/credits";
 import { REFERRAL_BONUS_PENCE } from "@/lib/credits/constants";
-import { mechanicBalancePence, recordEarning, recordPayout } from "@/lib/mechanics/balance";
 import { recomputeMechanicAggregates } from "@/lib/mechanics/aggregates";
-import { allocateTransfers, nettedPayout } from "@/lib/earnings";
+import { payoutToMechanic } from "@/lib/payments/payout";
 import { loadQuotesForBooking, quoteMoney } from "@/lib/quotes/load";
+import { loadRevisionsForBooking, revisionMoney } from "@/lib/revisions/load";
 import { sendPushToCustomer } from "@/lib/push/send";
 import { shortPersonName } from "@/lib/utils";
 import { repairLinesFor, type BookingRepairRow } from "@/lib/bookings/repair-lines";
@@ -242,6 +242,13 @@ export async function completeAndCharge(bookingId: string): Promise<JobProgressR
       ok: false,
       error: "A quote is still waiting on the customer — withdraw it or wait for their answer before completing.",
     };
+  // A revised job still waiting on the customer blocks completion too (Task
+  // 37): the job sheet — and the price — isn't settled until they answer.
+  if (revisionMoney(await loadRevisionsForBooking(admin, bookingId)).pending)
+    return {
+      ok: false,
+      error: "The revised job is still waiting on the customer — withdraw it or wait for their answer before completing.",
+    };
 
   // --- Capture the pre-authorisation ---------------------------------------
   let captured = false;
@@ -426,116 +433,27 @@ export async function completeAndCharge(bookingId: string): Promise<JobProgressR
   // the mechanic's snapshotted share to their connected account; the platform
   // retains the fee. The transfer goes to whoever currently holds the job, so a
   // replacement mechanic is paid correctly. A failed transfer is NON-fatal —
-  // the money is already captured and the job is complete — so we log it for
-  // reconciliation/retry rather than blocking completion.
-  // The mechanic's connected-account id lives on the `mechanics` table. There's
-  // no PostgREST-resolvable FK from bookings → mechanics, so fetch it directly
-  // rather than as an embedded join — embedding it errors the whole booking
-  // query (and made completion fail with "That job no longer exists").
-  const { data: mechanicRow } = await admin
-    .from("mechanics")
-    .select("stripe_account_id")
-    .eq("id", booking.mechanic_id)
-    .maybeSingle();
-  const mechanicAccount = mechanicRow as { stripe_account_id: string | null } | null;
+  // the money is already captured and the job is complete — so it is logged
+  // for reconciliation/retry rather than blocking completion. The mechanics
+  // are in lib/payments/payout.ts (Task 37), shared with the on-site and
+  // cancellation fees so every payout is written by one piece of code.
   const payoutPence = booking.mechanic_payout_pence ?? 0;
   // Pay the mechanic when we captured money, or when credit covered the whole
   // total ('free') — in the free case there's no source_transaction, so the
   // payout draws from the platform balance (which funded the credit).
   const shouldPay = payoutPence > 0 && (captured || booking.payment_mode === "free");
   if (shouldPay && booking.mechanic_id) {
-    const ref = formatJobNumber(booking.job_number);
-    // 1) Read the mechanic's balance BEFORE this job (≤ 0 normally; negative when
-    //    a refund BMT fronted on an earlier job is still being recovered).
-    const priorBalance = await mechanicBalancePence(admin, booking.mechanic_id);
-
-    // 2) Record the gross earning — their share regardless of whether cash moves.
-    await recordEarning(admin, booking.mechanic_id, bookingId, payoutPence, `Job ${ref} payout`);
-
-    // 3) Net the payout against any debt: transfer only the surplus, withhold the
-    //    rest to recover what BMT fronted.
-    const { transferPence, recoveredPence } = nettedPayout(priorBalance, payoutPence);
-
-    if (transferPence > 0 && stripe && mechanicAccount?.stripe_account_id) {
-      try {
-        // One transfer per charge (Task 33): a transfer sourced from a charge
-        // can't exceed it, so a job paid with a base hold plus approved-quote
-        // holds is paid out from each in turn. With nothing captured (a 'free'
-        // booking) one unsourced transfer draws on the platform balance, which
-        // funded the credit.
-        const plan =
-          charges.length > 0
-            ? allocateTransfers(charges, transferPence).allocations.map((a) => ({ pence: a.pence, chargeId: a.id as string | null }))
-            : [{ pence: transferPence, chargeId: null as string | null }];
-        let transferred = 0;
-        for (const leg of plan) {
-          const transfer = await stripe.transfers.create({
-            amount: leg.pence,
-            currency: "gbp",
-            destination: mechanicAccount.stripe_account_id,
-            // Release the payout from the funds of this booking's own charge as they
-            // settle — keeps payouts automatic without managing the platform balance.
-            ...(leg.chargeId ? { source_transaction: leg.chargeId } : {}),
-            transfer_group: bookingId,
-            metadata: { booking_id: bookingId, mechanic_id: guard.mechanicId },
-          });
-          transferred += leg.pence;
-          // 3) Record the cash actually transferred (−) so the ledger settles back
-          //    toward zero (or repays the debt).
-          await recordPayout(admin, booking.mechanic_id, bookingId, leg.pence, transfer.id, `Job ${ref} payout`);
-          await admin.from("booking_events").insert({
-            booking_id: bookingId,
-            event_type: "payout_transferred",
-            actor_id: guard.mechanicId,
-            actor_role: "mechanic",
-            payload: {
-              amount_pence: leg.pence,
-              gross_payout_pence: payoutPence,
-              recovered_pence: recoveredPence,
-              transfer_id: transfer.id,
-              source_charge: leg.chargeId,
-            },
-          });
-        }
-        if (transferred < transferPence) {
-          await admin.from("booking_events").insert({
-            booking_id: bookingId,
-            event_type: "note",
-            actor_role: "system",
-            payload: { note: `Payout short by ${formatPrice(transferPence - transferred)}: less was captured than the payout needs.`, amount_pence: transferPence - transferred },
-          });
-        }
-      } catch (err) {
-        const message = err instanceof Error ? err.message : "transfer failed";
-        console.error("Mechanic payout transfer failed for booking", bookingId, message);
-        // No payout row is written, so the earning leaves the balance positive
-        // (BMT owes them) — surfaced for reconciliation/retry.
-        await admin.from("booking_events").insert({
-          booking_id: bookingId,
-          event_type: "note",
-          actor_id: guard.mechanicId,
-          actor_role: "mechanic",
-          payload: { note: `Payout transfer failed: ${message}`, amount_pence: transferPence },
-        });
-      }
-    }
-
-    // 4) If any of this payout was withheld to recover a prior refund, log it so
-    //    the timeline explains the reduced (or zero) transfer. The ledger earning
-    //    row already did the accounting; this is informational.
-    if (recoveredPence > 0 && (transferPence === 0 || (stripe && mechanicAccount?.stripe_account_id))) {
-      await admin.from("booking_events").insert({
-        booking_id: bookingId,
-        event_type: "note",
-        actor_role: "system",
-        reason: `Withheld ${formatPrice(recoveredPence)} from this payout to recover the mechanic's outstanding balance.`,
-        payload: {
-          recovered_pence: recoveredPence,
-          gross_payout_pence: payoutPence,
-          transferred_pence: transferPence,
-        },
-      });
-    }
+    await payoutToMechanic({
+      admin,
+      stripe,
+      bookingId,
+      mechanicId: booking.mechanic_id,
+      grossPence: payoutPence,
+      charges,
+      description: `Job ${formatJobNumber(booking.job_number)} payout`,
+      actorId: guard.mechanicId,
+      actorRole: "mechanic",
+    });
   }
 
   // --- Receipt email --------------------------------------------------------

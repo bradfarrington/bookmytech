@@ -10,7 +10,7 @@ export const metadata: Metadata = {
     "What it costs to cancel or reschedule a Book My Tech booking, when each fee tier applies, and how refunds and pre-authorisations work.",
 };
 
-// The three fee tiers are read LIVE from platform_settings — the same figures
+// The fee tiers (and the on-site diagnostic fee, Task 37) are read LIVE from platform_settings — the same figures
 // cancelBooking actually charges (lib/bookings/manage-booking.ts). They're
 // tunable by an admin on /admin/pricing, so hardcoding them here would let the
 // published policy drift away from what a customer is really charged. That's the
@@ -68,6 +68,13 @@ export default async function CancellationPolicyPage() {
       body: [
         "If a mechanic arrives and the work cannot be carried out for a reason outside your control — the wrong part was supplied, or a fault turns out to need a garage — you are not charged a cancellation fee.",
         "If a mechanic arrives at the booked address and cannot reach the vehicle or nobody is there, that is treated as a late cancellation and the en-route fee applies. Keeping your address and access notes up to date on the booking is the way to avoid this.",
+      ],
+    },
+    {
+      heading: "If the booked repair isn't what your car needs",
+      body: [
+        "Sometimes a mechanic arrives and finds the repair you booked isn't the right one. They will send you a revised job through Book My Tech — what they found, what they'd do instead, and the new price, higher or lower — and nothing changes until you approve it. If the revised job costs more you authorise only the difference on your card; if it costs less, only the new total is charged when the job is complete and the rest of your pre-authorisation is released.",
+        `If you decline the revised job, the mechanic may charge the on-site diagnostic fee — ${formatPrice(tiers.diagnostic)} — or the en-route cancellation fee of ${formatPrice(tiers.enRoute)}, whichever they apply, for having travelled to you and identified what the car actually needs. That fee is taken from your pre-authorisation and the rest is released. You are never charged for the revised work itself unless you approved it.`,
       ],
     },
     {

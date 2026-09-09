@@ -3,6 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { loadBookingChecklists, productIdsInLines } from "@/lib/checklists/load";
 import { loadFaultsForBooking, loadQuotesForBooking } from "@/lib/quotes/load";
+import { loadRevisionsForBooking } from "@/lib/revisions/load";
+import { cancelFeeTiers } from "@/lib/bookings/manage-booking";
 import { geocodePostcode, haversineMiles, type LatLng } from "@/lib/geo/postcodes";
 import { mechanicSharePence } from "@/lib/earnings";
 import { isHaynesProConfigured } from "@/lib/haynespro/client";
@@ -68,8 +70,14 @@ export default async function MechanicJobDetailPage({ params }: PageProps) {
   // client — safe, the booking itself was just proved visible to this
   // mechanic by the RLS read above.
   const checklists = await loadBookingChecklists(createAdminClient(), id, productIdsInLines(repairLines));
-  // Faults noted and quotes sent (Task 33), under the mechanic's own RLS.
-  const [faults, quotes] = await Promise.all([loadFaultsForBooking(supabase, id), loadQuotesForBooking(supabase, id)]);
+  // Faults noted and quotes sent (Task 33), revised jobs (Task 37) — under the
+  // mechanic's own RLS — and the fees they may charge if a revision is declined.
+  const [faults, quotes, revisions, feeTiers] = await Promise.all([
+    loadFaultsForBooking(supabase, id),
+    loadQuotesForBooking(supabase, id),
+    loadRevisionsForBooking(supabase, id),
+    cancelFeeTiers(createAdminClient()),
+  ]);
 
   const { data: mechanic } = await supabase
     .from("mechanics")
@@ -221,6 +229,17 @@ export default async function MechanicJobDetailPage({ params }: PageProps) {
     checklists,
     faults,
     quotes,
+    revisions,
+    revisionLines: repairLines.map((line) => ({
+      nodeId: line.nodeId,
+      description: line.description,
+      chargedHours: line.chargedHours ?? (line.synthetic ? Number(booking.service_duration_hours ?? 1) : null),
+      linePence: line.linePence,
+      itemId: line.itemId,
+      itemLabel: line.itemLabel,
+      product: line.product,
+    })),
+    onSiteFees: { diagnosticPence: feeTiers.diagnostic, enRoutePence: feeTiers.enRoute },
     hourlyRatePence: booking.hourly_rate_pence ?? undefined,
     whenLabel,
     distanceLabel,

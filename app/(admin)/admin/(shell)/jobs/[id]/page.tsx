@@ -27,6 +27,9 @@ import { loadBookingChecklists, productIdsInLines } from "@/lib/checklists/load"
 import { resultLabel } from "@/lib/checklists/checklists";
 import { loadFaultsForBooking, loadQuotesForBooking, quoteMoney } from "@/lib/quotes/load";
 import { QUOTE_KIND_LABEL, QUOTE_STATUS_LABEL } from "@/lib/quotes/status";
+import { loadRevisionsForBooking } from "@/lib/revisions/load";
+import { REVISION_STATUS_LABEL } from "@/lib/revisions/status";
+import { diffRevision, differenceLabel } from "@/lib/revisions/diff";
 import { Timeline, type TimelineEvent } from "./_components/timeline";
 import { BookingActions } from "./_components/booking-actions";
 
@@ -129,8 +132,12 @@ export default async function BookingDetailPage({ params }: PageProps) {
   // The service / inspection checklists on this booking (Task 32), with the
   // mechanic's answers so far. Admin RLS reads everything.
   const checklists = await loadBookingChecklists(supabase, id, productIdsInLines(repairLines));
-  // Faults and quotes (Task 33).
-  const [faults, quotes] = await Promise.all([loadFaultsForBooking(supabase, id), loadQuotesForBooking(supabase, id)]);
+  // Faults and quotes (Task 33); revised jobs (Task 37).
+  const [faults, quotes, revisions] = await Promise.all([
+    loadFaultsForBooking(supabase, id),
+    loadQuotesForBooking(supabase, id),
+    loadRevisionsForBooking(supabase, id),
+  ]);
   const quoteTotals = quoteMoney(quotes);
   const combineSource: string | null = combineRow?.combine_source ?? null;
 
@@ -318,6 +325,45 @@ export default async function BookingDetailPage({ params }: PageProps) {
               }
             />
           </Card>
+
+          {/* Revised jobs (Task 37) */}
+          {revisions.length > 0 && (
+            <Card className="space-y-4 p-6">
+              <CardTitle icon={Wrench}>Revised job</CardTitle>
+              {revisions.map((r) => {
+                const diff = diffRevision(r.before, r.after);
+                return (
+                  <div key={r.id} className="rounded-xl border border-border px-3.5 py-3 text-sm">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="font-semibold text-text-primary">{r.after.repairDescription}</p>
+                        <p className="text-xs text-text-muted">
+                          {REVISION_STATUS_LABEL[r.status]} · was {formatPrice(r.before.totalPence)} → {formatPrice(r.after.totalPence)} ({differenceLabel(r.differencePence)})
+                          {r.holdQuoteId && " · difference held on a second intent"}
+                        </p>
+                      </div>
+                      <span className="shrink-0 font-bold tabular-nums text-text-primary">{formatPrice(r.after.totalPence)}</span>
+                    </div>
+                    <p className="mt-1.5 text-xs text-text-secondary">“{r.reason}”</p>
+                    <ul className="mt-1.5 space-y-0.5 text-xs text-text-secondary">
+                      {diff.lines.removed.map((l) => (
+                        <li key={`r-${l.nodeId}`} className="text-text-muted line-through">{l.description}</li>
+                      ))}
+                      {diff.parts.removed.map((p, i) => (
+                        <li key={`rp-${i}`} className="text-text-muted line-through">{p.name} (part)</li>
+                      ))}
+                      {diff.lines.added.map((l) => (
+                        <li key={`a-${l.nodeId}`}>+ {l.description} · {l.kind === "product" ? "fixed price" : `${l.chargedHours} h`} · {formatPrice(l.linePence)}</li>
+                      ))}
+                      {diff.parts.added.map((p, i) => (
+                        <li key={`ap-${i}`}>+ {p.name}{p.quantity > 1 ? ` × ${p.quantity}` : ""} (part) · {formatPrice(p.linePence)}</li>
+                      ))}
+                    </ul>
+                  </div>
+                );
+              })}
+            </Card>
+          )}
 
           {/* Faults and quotes (Task 33) */}
           {(faults.length > 0 || quotes.length > 0) && (

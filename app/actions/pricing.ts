@@ -203,6 +203,8 @@ const SETTING_KEYS = [
   // Engine oil on a servicing product (Task 31).
   "engine_oil_price_per_litre_pence",
   "engine_oil_default_litres",
+  // What a mechanic may charge when the customer declines the revised job on site (Task 37).
+  "on_site_diagnostic_fee_pence",
 ] as const;
 type SettingKey = (typeof SETTING_KEYS)[number];
 

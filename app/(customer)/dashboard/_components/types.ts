@@ -36,6 +36,8 @@ export interface DashboardBooking {
   hasReport: boolean;
   /** A quote from the mechanic waiting on the customer (Task 33), if any. */
   pendingQuote: { id: string; totalPence: number; kind: "now" | "follow_on"; title: string | null } | null;
+  /** A revised job from the mechanic waiting on the customer (Task 37), if any. */
+  pendingRevision: { id: string; afterTotalPence: number; differencePence: number; repairDescription: string } | null;
 }
 
 export interface MechanicLite {

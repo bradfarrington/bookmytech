@@ -37,6 +37,12 @@ const META: Record<string, { label: string; icon: LucideIcon; tone: string }> = 
   quote_declined: { label: "Quote declined", icon: XCircle, tone: "text-text-muted" },
   quote_withdrawn: { label: "Quote withdrawn", icon: XCircle, tone: "text-text-muted" },
   quote_expired: { label: "Quote expired", icon: XCircle, tone: "text-text-muted" },
+  // Task 37
+  revision_sent: { label: "Revised job sent", icon: ArrowRightLeft, tone: "text-brand-blue" },
+  revision_approved: { label: "Revised job approved", icon: CheckCircle2, tone: "text-green-600" },
+  revision_declined: { label: "Revised job declined", icon: XCircle, tone: "text-amber-600" },
+  revision_withdrawn: { label: "Revised job withdrawn", icon: XCircle, tone: "text-text-muted" },
+  revision_expired: { label: "Revised job expired", icon: XCircle, tone: "text-text-muted" },
   payment_refunded: { label: "Payment refunded", icon: CreditCard, tone: "text-red-600" },
   payout_transferred: { label: "Payout transferred", icon: CheckCircle2, tone: "text-green-600" },
   note: { label: "Note", icon: StickyNote, tone: "text-text-muted" },

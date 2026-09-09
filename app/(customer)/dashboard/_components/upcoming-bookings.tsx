@@ -12,6 +12,7 @@ import {
 } from "@/app/actions/customer-bookings";
 import { RescheduleProposal } from "@/components/customer/reschedule-proposal";
 import { QuoteProposal } from "@/components/customer/quote-proposal";
+import { RevisionProposal } from "@/components/customer/revision-proposal";
 import { SectionHeading } from "./section-heading";
 import { formatPrice } from "@/lib/utils";
 import {
@@ -161,6 +162,11 @@ function UpcomingRow({
             currentLabel={formatSlot(booking)}
             note={booking.rescheduleNote}
           />
+        </div>
+      )}
+      {booking.pendingRevision && !open && (
+        <div className="mt-3">
+          <RevisionProposal compact revision={booking.pendingRevision} />
         </div>
       )}
       {booking.pendingQuote && !open && (

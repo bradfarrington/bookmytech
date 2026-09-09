@@ -119,6 +119,29 @@ export default async function DashboardPage() {
     }
   }
 
+  // Revised jobs waiting on the customer (Task 37), one per booking at most.
+  const pendingRevisionByBooking = new Map<string, DashboardBooking["pendingRevision"]>();
+  if (bookingIds.length) {
+    const { data: revisionRows } = await admin
+      .from("job_revisions")
+      .select("id, booking_id, after_total_pence, difference_pence, after, expires_at")
+      .in("booking_id", bookingIds)
+      .eq("status", "sent")
+      .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`)
+      .order("created_at", { ascending: false });
+    for (const r of revisionRows ?? []) {
+      if (!pendingRevisionByBooking.has(r.booking_id)) {
+        const after = (r.after ?? {}) as { repairDescription?: string };
+        pendingRevisionByBooking.set(r.booking_id, {
+          id: r.id,
+          afterTotalPence: r.after_total_pence,
+          differencePence: r.difference_pence,
+          repairDescription: after.repairDescription ?? "Revised job",
+        });
+      }
+    }
+  }
+
   // "Book again" carries what the customer CHOSE — a combined repair as one
   // id — and the card lists it once by its name.
   const uniq = (values: string[]) => [...new Set(values)];
@@ -154,6 +177,7 @@ export default async function DashboardPage() {
       : [b.repair_description ?? "Vehicle repair"],
     hasReport: (productIdsByBooking.get(b.id) ?? []).some((pid) => productsWithReports.has(pid)),
     pendingQuote: pendingQuoteByBooking.get(b.id) ?? null,
+    pendingRevision: pendingRevisionByBooking.get(b.id) ?? null,
   }));
 
   // Resolve the assigned mechanics in one round-trip each (profile + rating).

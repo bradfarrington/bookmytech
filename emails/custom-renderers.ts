@@ -122,6 +122,28 @@ export const CUSTOM_RENDERERS: Record<string, CustomRenderer> = {
     </mj-table>`;
   },
 
+  // revision_sent — what was taken off, what was added, what stays (Task 37).
+  revision_diff(vars) {
+    const removed = packedList(vars.removed_lines);
+    const added = packedList(vars.added_lines);
+    const kept = packedList(vars.kept_lines);
+    const section = (title: string, colour: string, items: string[], strike = false) =>
+      items.length === 0
+        ? ""
+        : `<mj-text padding-top="8px" font-size="13px" color="${colour}">
+            <strong>${escapeHtml(title)}</strong><br />
+            ${items.map((i) => (strike ? `<span style="text-decoration:line-through;">${escapeHtml(i)}</span>` : escapeHtml(i))).join("<br />")}
+          </mj-text>`;
+    return [
+      section("No longer needed", "#64748B", removed, true),
+      section("Instead", "#0F172A", added),
+      section("Still on the job", "#0F172A", kept),
+      `<mj-text padding-top="8px" font-size="14px" color="#0F172A">
+        Was <strong>${escapeHtml(String(vars.before_total ?? ""))}</strong> · now <strong>${escapeHtml(String(vars.after_total ?? ""))}</strong> (${escapeHtml(String(vars.difference ?? ""))})
+      </mj-text>`,
+    ].join("\n");
+  },
+
   // job_complete — the service / inspection report (Task 32); nothing when
   // the job had no checklist.
   report_link(vars) {
