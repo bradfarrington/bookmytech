@@ -9,6 +9,7 @@
 
 import { billableHours } from "@/lib/pricing/billable";
 import type { CatalogueNode } from "@/lib/haynespro/catalogue";
+import { genartExtra } from "@/lib/haynespro/genarts";
 import type { HpRepairtimeNode } from "@/lib/haynespro/types";
 
 export const ROOT_ID = "root";
@@ -211,6 +212,7 @@ export function composeLevel(input: ComposeInput): CatalogueNode[] {
           description,
           typeof hp.value === "number" ? hp.value / 100 : null,
           hourlyRatePence,
+          genartExtra(hp),
         );
     if (node) {
       nodes.push(node);

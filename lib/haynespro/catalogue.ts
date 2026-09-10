@@ -38,6 +38,7 @@ import {
 import { engineOilForVehicle } from "./engine-oil";
 import { isHaynesProConfigured } from "./client";
 import { excludedRepairNodeIdsForVehicle } from "./exclusions";
+import { genartExtra } from "./genarts";
 import { isCatalogueOutage, readHaynesProHealth } from "./health";
 import {
   combineRepairTimes,
@@ -116,6 +117,14 @@ export interface CatalogueNode {
     source: "haynespro" | "default";
     label: string | null;
   } | null;
+  /**
+   * TecDoc GenArt product-group ids the repair consumes (Task 40) — the key a
+   * parts supplier prices by (82 brake discs, 402 brake pads …). Straight from
+   * HaynesPro's node, only on `repair` nodes that have any. ADDITIVE AND
+   * OPTIONAL: nothing renders it yet; it exists so the parts spike can measure
+   * how much of the catalogue a supplier could price without a mapping table.
+   */
+  genartIds?: number[];
 }
 
 /**
@@ -380,6 +389,7 @@ export function toCatalogueNode(
     // The same arithmetic quoteRepair uses, so the browse price and the quote
     // agree. quoteRepair remains the authority — it re-derives at booking time.
     pricePence: Math.round(billed * hourlyRatePence),
+    ...genartExtra(node),
   };
 }
 

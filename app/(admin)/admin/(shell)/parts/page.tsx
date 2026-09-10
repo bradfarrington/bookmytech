@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Plus, Upload } from "lucide-react";
+import { Plus, Search, Upload } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { Overline } from "@/components/ui/overline";
@@ -36,6 +36,11 @@ export default async function AdminPartsListPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Link href="/admin/parts/aag-check">
+            <Button variant="ghost" iconLeft={Search}>
+              Check AAG prices
+            </Button>
+          </Link>
           <Link href="/admin/parts/import">
             <Button variant="ghost" iconLeft={Upload}>
               Import CSV
