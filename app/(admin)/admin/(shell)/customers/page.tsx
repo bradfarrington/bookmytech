@@ -63,7 +63,8 @@ export default async function AdminCustomersListPage({ searchParams }: Customers
     .from("customer_admin_summary")
     .select(
       `id, full_name, phone, email, joined_at, last_sign_in_at,
-       bookings_count, completed_count, total_spent_pence, last_booking_at, open_disputes`,
+       bookings_count, completed_count, total_spent_pence, last_booking_at, open_disputes,
+       deleted_at`,
       { count: "exact" },
     );
 

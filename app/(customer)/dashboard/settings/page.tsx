@@ -5,10 +5,16 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { DashboardHeader } from "../_components/dashboard-header";
 import { SettingsForm } from "./_components/settings-form";
+import { EmailForm } from "./_components/email-form";
 
 export const dynamic = "force-dynamic";
 
-export default async function SettingsPage() {
+export default async function SettingsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ email?: string }>;
+}) {
+  const { email: emailFlag } = await searchParams;
   const supabase = await createClient();
   const {
     data: { user },
@@ -43,8 +49,18 @@ export default async function SettingsPage() {
           <SettingsForm
             defaultName={profile?.full_name ?? ""}
             defaultPhone={profile?.phone ?? ""}
-            email={user.email ?? ""}
           />
+        </div>
+
+        <div className="rounded-2xl border border-border bg-surface-card p-6">
+          <h2 className="mb-4 text-sm font-bold uppercase tracking-wide text-text-muted">Email address</h2>
+          {emailFlag === "changed" && (
+            <p className="mb-4 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+              Thanks — that confirmation has been received. Once you&apos;ve confirmed from both your
+              old and new addresses, the change is complete and your current address is shown below.
+            </p>
+          )}
+          <EmailForm currentEmail={user.email ?? ""} />
         </div>
 
         <Link

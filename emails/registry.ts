@@ -377,6 +377,34 @@ export const EMAIL_TEMPLATE_DEFS: readonly EmailTemplateDef[] = [
     ],
   },
   {
+    key: "account_deleted",
+    label: "Account deleted (customer)",
+    description:
+      "Sent to the customer's old address when they delete their account from the app. Locked on: it is how someone notices a deletion they did not make.",
+    category: "customer",
+    subject: "Your Book My Tech account has been deleted",
+    preheader: "Your account and its contact details have been removed.",
+    variables: [],
+    blocks: [
+      { id: "heading", type: "heading", text: "Your account has been deleted" },
+      {
+        id: "body",
+        type: "paragraph",
+        text: "Your Book My Tech account has been deleted, as you asked. Your name, phone number and email address have been removed from your account, and you'll no longer receive reminders from us.",
+      },
+      {
+        id: "records",
+        type: "paragraph",
+        text: "Records of any completed jobs are kept for accounting purposes, as our privacy policy explains. They are no longer linked to a usable account.",
+      },
+      {
+        id: "footnote",
+        type: "note",
+        text: "If you didn't ask for this, contact us straight away at [support@bookmytech.co.uk](mailto:support@bookmytech.co.uk).",
+      },
+    ],
+  },
+  {
     key: "booking_rescheduled",
     label: "Booking rescheduled (customer)",
     description: "Sent to the customer confirming a new booking time.",

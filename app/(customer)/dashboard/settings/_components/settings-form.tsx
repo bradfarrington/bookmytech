@@ -10,11 +10,9 @@ const initial: ProfileState = null;
 export function SettingsForm({
   defaultName,
   defaultPhone,
-  email,
 }: {
   defaultName: string;
   defaultPhone: string;
-  email: string;
 }) {
   const [state, formAction, pending] = useActionState(updateCustomerProfile, initial);
 
@@ -35,18 +33,6 @@ export function SettingsForm({
           disabled={pending}
           className="h-11 rounded-button border border-border bg-surface-card px-3.5 text-sm text-text-primary focus:border-brand-blue focus:outline-none focus:ring-2 focus:ring-brand-blue/20 disabled:opacity-50"
         />
-      </label>
-
-      <label className="flex flex-col gap-1.5">
-        <span className="text-sm font-semibold text-text-primary">Email</span>
-        <input
-          type="email"
-          value={email}
-          disabled
-          readOnly
-          className="h-11 cursor-not-allowed rounded-button border border-border bg-surface px-3.5 text-sm text-text-muted"
-        />
-        <span className="text-xs text-text-muted">Email changes aren&apos;t supported yet — contact support to update it.</span>
       </label>
 
       <label className="flex flex-col gap-1.5">

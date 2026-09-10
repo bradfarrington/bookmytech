@@ -20,8 +20,15 @@ Extends Supabase's built-in `auth.users` with role and contact info.
 | phone       | text        | nullable                                        |
 | created_at  | timestamptz | default now()                                   |
 | updated_at  | timestamptz | default now()                                   |
+| deleted_at  | timestamptz | 0065 — set when the customer deleted their account (Task 39). The row is **anonymised in place and kept** (`full_name = 'Deleted customer'`, contact fields null, reminder flags off): messages, reviews, disputes and the payout ledger all reference it with no `on delete` clause, and completed bookings are financial records. The auth row is kept too, with an undeliverable sentinel email and a permanent ban |
+
+Later migrations added `avatar_url` (0010), the `reminders_enabled` / `reminder_via_*` flags (0023, 0050), and `referral_code` / `referred_by` (0024).
 
 A trigger (`handle_new_user`) auto-inserts a profile with role='customer' whenever a new `auth.users` row is created. Admins are promoted manually via SQL.
+
+A second trigger on `auth.users`, `on_auth_user_email_changed` (0065, `after update of email`), rewrites `bookings.customer_email` on the customer's bookings that are not `completed` / `cancelled` and `reminder_schedules.customer_email` on rows not yet sent. Both apps change email client-side with `auth.updateUser({ email })` so Supabase confirms both inboxes; this is how `public` learns the result.
+
+`public.delete_customer_account(uid, email, sentinel, source, ip)` (0065, SECURITY DEFINER, `service_role` only) is the transactional half of account deletion; `account_deletions` (0065, service-role only) is its audit table. See `docs/tasks/39-account-deletion-and-email-change.md`.
 
 ### `services` / `service_categories` — REMOVED (Task 17)
 

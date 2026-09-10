@@ -5,10 +5,12 @@ import { EMAIL_TEMPLATE_BY_KEY } from "@/emails/registry";
 //
 // Locked: anything security-critical or that only ever reaches the ops inbox.
 // Switching off a password reset would lock customers out; switching off an
-// internal alert would hide a problem from the people meant to fix it.
+// internal alert would hide a problem from the people meant to fix it; and
+// the account-deleted confirmation is the one thing that lets someone notice
+// a deletion they did not make.
 
 /** Email templates that stay on no matter what. */
-export const LOCKED_EMAIL_KEYS: ReadonlySet<string> = new Set(["password_reset"]);
+export const LOCKED_EMAIL_KEYS: ReadonlySet<string> = new Set(["password_reset", "account_deleted"]);
 
 export function isEmailTemplateLocked(key: string): boolean {
   if (LOCKED_EMAIL_KEYS.has(key)) return true;

@@ -20,6 +20,7 @@ import { cn, formatPrice, formatJobNumber } from "@/lib/utils";
 import { formatBookingWhen } from "@/lib/slots";
 import { CreditActions } from "./_components/credit-actions";
 import { availableCreditPence } from "@/lib/credits/credits";
+import { isDeletedSentinelEmail } from "@/lib/account/blockers";
 
 // A single customer: contact, spend, every job they've booked, every dispute
 // they're party to, and their credit ledger. Service-role reads throughout —
@@ -102,14 +103,19 @@ export default async function CustomerDetailPage({
 
   const { data: profile } = await admin
     .from("profiles")
-    .select("id, full_name, phone, avatar_url, role, referral_code, referred_by")
+    .select("id, full_name, phone, avatar_url, role, referral_code, referred_by, deleted_at")
     .eq("id", id)
     .maybeSingle();
 
   if (!profile) notFound();
 
   const { data: userData } = await admin.auth.admin.getUserById(id);
-  const email = userData?.user?.email ?? null;
+  // A deleted account's auth row carries an undeliverable sentinel (Task 39);
+  // show the state, not the address.
+  const isDeleted = !!profile.deleted_at;
+  const email = isDeleted || isDeletedSentinelEmail(userData?.user?.email)
+    ? null
+    : (userData?.user?.email ?? null);
   const joinedAt = userData?.user?.created_at ?? null;
   const lastSignInAt = userData?.user?.last_sign_in_at ?? null;
 
@@ -215,6 +221,11 @@ export default async function CustomerDetailPage({
           <h1 className="text-3xl font-bold tracking-tight text-text-primary">
             {profile.full_name ?? "Unnamed customer"}
           </h1>
+          {isDeleted && (
+            <Pill tone="neutral" title="The customer deleted their account; the record is anonymised and kept">
+              Deleted {formatDate(profile.deleted_at)}
+            </Pill>
+          )}
           {profile.role !== "customer" && (
             <Pill tone="info" title="This account also has a staff role">
               {profile.role}
@@ -285,7 +296,7 @@ export default async function CustomerDetailPage({
               <h2 className="text-sm font-bold uppercase tracking-wide text-text-muted">
                 Contact
               </h2>
-              <Row icon={Mail} label="Email" value={email ?? "—"} />
+              <Row icon={Mail} label="Email" value={email ?? (isDeleted ? "Removed on deletion" : "—")} />
               <Row icon={Phone} label="Phone" value={profile.phone ?? "—"} />
               <Row
                 icon={Calendar}

@@ -5,7 +5,7 @@ import "server-only";
 // doing any work: may this caller book at all, and are they going too fast?
 
 import { apiError, apiRateLimited, clientIp } from "@/lib/mobile/respond";
-import type { MobileCaller } from "@/lib/supabase/mobile";
+import { requireMobileUser, type MobileCaller } from "@/lib/supabase/mobile";
 import {
   DAY_SECONDS,
   MINUTE_SECONDS,
@@ -35,6 +35,24 @@ export function staffRefusal(caller: MobileCaller): Response | null {
     );
   }
   return null;
+}
+
+export type MobileCustomerResult =
+  | { ok: true; caller: MobileCaller }
+  | { ok: false; response: Response };
+
+/**
+ * `requireMobileUser` plus `staffRefusal`: the caller of a route that must be
+ * a CUSTOMER account. Booking is one such route; deleting the account is the
+ * other — an admin deleting "their" account through the customer app would
+ * take the admin role with it, so a staff token is a 403 here, not a deletion.
+ */
+export async function requireMobileCustomer(request: Request): Promise<MobileCustomerResult> {
+  const auth = await requireMobileUser(request);
+  if (!auth.ok) return { ok: false, response: apiError(auth.error, auth.status) };
+  const refusal = staffRefusal(auth.caller);
+  if (refusal) return { ok: false, response: refusal };
+  return { ok: true, caller: auth.caller };
 }
 
 /**

@@ -8,6 +8,7 @@ import { Card } from "@/components/ui/card";
 import { Pill } from "@/components/ui/pill";
 import { Select } from "@/components/ui/select";
 import { formatPrice } from "@/lib/utils";
+import { isDeletedSentinelEmail } from "@/lib/account/blockers";
 
 export interface CustomerRow {
   id: string;
@@ -21,6 +22,8 @@ export interface CustomerRow {
   total_spent_pence: number;
   last_booking_at: string | null;
   open_disputes: number;
+  /** Set when the customer deleted their account (Task 39): anonymised, kept. */
+  deleted_at: string | null;
 }
 
 export type SortKey = "recent" | "spend" | "jobs" | "name";
@@ -180,6 +183,11 @@ export function CustomersTable({
                         <span className="font-semibold text-text-primary">
                           {c.full_name ?? "Unnamed"}
                         </span>
+                        {c.deleted_at && (
+                          <Pill tone="neutral" title={`Account deleted ${formatDate(c.deleted_at)}`}>
+                            Deleted
+                          </Pill>
+                        )}
                         {c.open_disputes > 0 && (
                           <Pill tone="error" title={`${c.open_disputes} open dispute(s)`}>
                             <AlertTriangle size={11} className="mr-1 inline" />
@@ -187,7 +195,9 @@ export function CustomersTable({
                           </Pill>
                         )}
                       </div>
-                      <p className="text-xs text-text-muted">{c.email ?? "—"}</p>
+                      <p className="text-xs text-text-muted">
+                        {c.deleted_at || isDeletedSentinelEmail(c.email) ? "Account deleted" : (c.email ?? "—")}
+                      </p>
                     </td>
                     <td className="px-5 py-3 text-text-secondary">{c.phone ?? "—"}</td>
                     <td className="px-5 py-3 text-text-secondary">
