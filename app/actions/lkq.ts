@@ -1,133 +1,132 @@
 "use server";
 
-// Live supplier parts lookup for /admin/parts (Task 42).
+// Supplier parts catalogue for /admin/parts (Task 42).
 //
-// One registration + one product group → both suppliers' prices, side by side.
-// READ-ONLY: nothing is written except the ADS attribute cache, the credit
-// counter and the health rows. Nothing orders. Nothing touches `parts`,
-// `booking_parts`, `bookings` or any pricing row.
+// Pick a vehicle, then pull part types from LKQ's full 2,277-component
+// catalogue. Results accumulate into one browsable list the admin can filter by
+// brand and supplier, in list or card view.
 //
-// Both supplier legs are run in parallel and each already refuses to throw, so a
-// supplier being down degrades its own column and cannot take the page with it.
+// READ-ONLY: nothing is written except the ADS attribute/parts cache, the credit
+// counter and the health rows. Nothing orders.
+//
+// There is no "browse all parts" — LKQ's catalogue only answers "what fits this
+// registration", and each part type costs one metered credit. So the unit of
+// work is (vehicle, component), cached, and the UI shows the running cost.
 
 import { aagQuote, isAagConfigured } from "@/lib/aag/client";
 import { readAagHealth } from "@/lib/aag/health";
 import { flattenQuote } from "@/lib/aag/quote";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { ADS_BUDGET_EXHAUSTED, adsLookupParts, adsLookupVehicle } from "@/lib/lkq/ads";
-import { fitmentLabels } from "@/lib/lkq/fitment";
 import { readAdsUsage } from "@/lib/lkq/ads-cache";
 import { isLkqAdsConfigured, isLkqEcpConfigured, missingLkqEnv } from "@/lib/lkq/config";
 import { componentByNumber, searchComponents } from "@/lib/lkq/components";
 import { getLkqPrices, helloFromLkq } from "@/lib/lkq/ecp";
-import { adHocGroup, groupByKey, type PartGroupMapping } from "@/lib/lkq/mapping";
+import { fitmentLabels } from "@/lib/lkq/fitment";
+import { adHocGroup, genartForComponent } from "@/lib/lkq/mapping";
 import type { AdsAttribute } from "@/lib/lkq/types";
 import { adsRegKey, vehicleSummary, type LkqVehicleSummary } from "@/lib/lkq/vehicle";
-import {
-  aagOffers,
-  bestPriceAcross,
-  cheapestOffer,
-  lkqOffers,
-  type SupplierPanel,
-} from "@/lib/parts/supplier-offer";
+import { buildComparisonRows, type ComparisonRow } from "@/lib/parts/compare-rows";
+import { aagOffers, lkqOffers, type SupplierOffer } from "@/lib/parts/supplier-offer";
 import { createAdminClient } from "@/lib/supabase/admin";
 
-export type SupplierLookupResult =
+/** Why a supplier contributed nothing to this part type. */
+export interface SupplierNote {
+  supplier: "lkq" | "aag";
+  message: string;
+  hint: string | null;
+  href: string | null;
+}
+
+export interface PartTypeResult {
+  component: string;
+  componentName: string;
+  rows: ComparisonRow[];
+  /** Catalogue numbers LKQ priced at £0.00 — surfaced, never silently dropped. */
+  notFound: string[];
+  /** True when nothing was spent because both halves came from cache. */
+  cached: boolean;
+  notes: SupplierNote[];
+}
+
+export type LookupPartTypeResult =
   | {
       ok: true;
       reg: string;
-      group: PartGroupMapping;
       vehicle: LkqVehicleSummary | null;
-      lkq: SupplierPanel;
-      aag: SupplierPanel;
-      best: { supplier: "lkq" | "aag"; partNumber: string; costPence: number } | null;
+      result: PartTypeResult;
       credits: { used: number; cap: number };
     }
   | { ok: false; error: string };
 
-/**
- * The LKQ leg: ADS says what fits, ECP says what it costs. Every failure is
- * returned as a panel state rather than thrown, so the AAG column still renders.
- */
-async function lkqPanel(
+/** The LKQ leg: ADS says what fits, ECP says what it costs. Never throws. */
+async function lkqLeg(
   reg: string,
-  group: PartGroupMapping,
-): Promise<{ panel: SupplierPanel; vehicle: LkqVehicleSummary | null }> {
-  if (!group.component) {
-    return {
-      panel: {
-        state: "not_mapped",
-        message: "We don't have an LKQ component for this product group yet.",
-      },
-      vehicle: null,
-    };
-  }
+  component: string,
+): Promise<{
+  offers: SupplierOffer[];
+  notFound: string[];
+  cached: boolean;
+  vehicle: LkqVehicleSummary | null;
+  note: SupplierNote | null;
+}> {
+  const none = (message: string, hint: string | null = null) => ({
+    offers: [] as SupplierOffer[],
+    notFound: [] as string[],
+    cached: false,
+    vehicle: null,
+    note: { supplier: "lkq" as const, message, hint, href: null },
+  });
 
   if (!isLkqAdsConfigured() || !isLkqEcpConfigured()) {
     const missing = missingLkqEnv();
-    return {
-      panel: {
-        state: "not_connected",
-        message: "LKQ isn't configured on this environment.",
-        hint: `Missing: ${[...missing.ecp, ...missing.ads].join(", ")}`,
-        href: null,
-      },
-      vehicle: null,
-    };
+    return none(
+      "LKQ isn't configured on this environment.",
+      `Missing: ${[...missing.ecp, ...missing.ads].join(", ")}`,
+    );
   }
 
   const vehicleResult = await adsLookupVehicle(reg);
   if (vehicleResult === ADS_BUDGET_EXHAUSTED) {
-    return {
-      panel: {
-        state: "not_connected",
-        message: "The monthly LKQ catalogue budget is spent, so no new lookups can run.",
-        hint: "It resets at the start of next month, or raise LKQ_ADS_MONTHLY_CALL_CAP.",
-        href: null,
-      },
-      vehicle: null,
-    };
+    return none(
+      "The monthly LKQ catalogue budget is spent.",
+      "It resets at the start of next month, or raise LKQ_ADS_MONTHLY_CALL_CAP.",
+    );
   }
   if (!vehicleResult) {
-    return {
-      panel: {
-        state: "error",
-        message: "LKQ's catalogue couldn't identify that registration.",
-      },
-      vehicle: null,
-    };
+    return none("LKQ's catalogue couldn't identify that registration.");
   }
 
   const attributes: AdsAttribute[] = vehicleResult.value;
   const vehicle = vehicleSummary(attributes);
 
-  const partsResult = await adsLookupParts(reg, group.component, attributes);
+  const partsResult = await adsLookupParts(reg, component, attributes);
   if (partsResult === ADS_BUDGET_EXHAUSTED) {
     return {
-      panel: {
-        state: "not_connected",
-        message: "The monthly LKQ catalogue budget is spent, so no new lookups can run.",
-        hint: "It resets at the start of next month, or raise LKQ_ADS_MONTHLY_CALL_CAP.",
-        href: null,
-      },
+      ...none(
+        "The monthly LKQ catalogue budget is spent.",
+        "It resets at the start of next month, or raise LKQ_ADS_MONTHLY_CALL_CAP.",
+      ),
       vehicle,
     };
   }
   if (!partsResult) {
-    return {
-      panel: { state: "error", message: "LKQ's catalogue didn't answer for that product group." },
-      vehicle,
-    };
+    return { ...none("LKQ's catalogue didn't answer for this part."), vehicle };
   }
 
   const parts = partsResult.value.Parts ?? [];
   if (parts.length === 0) {
     return {
-      panel: {
-        state: "empty",
-        message: `LKQ lists no ${group.label.toLowerCase()} for this vehicle.`,
-      },
+      offers: [],
+      notFound: [],
+      cached: vehicleResult.cached && partsResult.cached,
       vehicle,
+      note: {
+        supplier: "lkq",
+        message: "LKQ lists nothing of this type for this vehicle.",
+        hint: null,
+        href: null,
+      },
     };
   }
 
@@ -140,50 +139,61 @@ async function lkqPanel(
 
   if (!priced) {
     return {
-      panel: {
-        state: "error",
-        message:
-          "LKQ listed the parts but wouldn't price them. The status above shows what it last told us.",
-      },
+      ...none(
+        "LKQ listed the parts but wouldn't price them.",
+        "The status above shows what its pricing service last told us.",
+      ),
       vehicle,
     };
   }
 
-  const offers = lkqOffers(group, parts, fitmentLabels(partsResult.value), priced.rows);
-  const cached = vehicleResult.cached && partsResult.cached;
-
+  const group = adHocGroup(component, componentByNumber(component)?.ComponentName ?? component);
   return {
-    panel: {
-      state: "ok",
-      offers,
-      cheapestPartNumber: cheapestOffer(offers)?.partNumber ?? null,
-      notFound: priced.notFound,
-      cached,
-    },
+    offers: lkqOffers(group, parts, fitmentLabels(partsResult.value), priced.rows),
+    notFound: priced.notFound,
+    cached: vehicleResult.cached && partsResult.cached,
     vehicle,
+    note: null,
   };
 }
 
-/** The AAG leg. Currently expected to report "not connected" — see Task 40. */
-async function aagPanel(reg: string, group: PartGroupMapping): Promise<SupplierPanel> {
-  if (!group.genart) {
+/**
+ * The AAG leg. Only possible where we have a TecDoc GenArt for the component —
+ * the two suppliers use unrelated product-group numbering, and only a handful
+ * of pairings are known (lib/lkq/mapping.ts).
+ */
+async function aagLeg(
+  reg: string,
+  component: string,
+  componentName: string,
+): Promise<{ offers: SupplierOffer[]; note: SupplierNote | null }> {
+  const genart = genartForComponent(component);
+
+  if (!genart) {
     return {
-      state: "not_mapped",
-      message:
-        "We don't have an Alliance Automotive product group for this part, so they can't be asked for a like-for-like price.",
+      offers: [],
+      note: {
+        supplier: "aag",
+        message: "No Alliance Automotive equivalent for this part type.",
+        hint: "The two suppliers use unrelated product-group numbering; only a few pairings are mapped.",
+        href: null,
+      },
     };
   }
 
   if (!isAagConfigured()) {
     return {
-      state: "not_connected",
-      message: "Alliance Automotive isn't configured on this environment.",
-      hint: "Add AAG_API_KEY and AAG_CUSTOMER_ID.",
-      href: "/admin/parts/aag-check",
+      offers: [],
+      note: {
+        supplier: "aag",
+        message: "Alliance Automotive isn't configured on this environment.",
+        hint: "Add AAG_API_KEY and AAG_CUSTOMER_ID.",
+        href: "/admin/parts/aag-check",
+      },
     };
   }
 
-  const body = await aagQuote(reg, group.genart);
+  const body = await aagQuote(reg, genart);
   if (!body) {
     let hint: string | null =
       "Their sandbox blocks our server's IP and we're waiting on their allowlist.";
@@ -194,53 +204,44 @@ async function aagPanel(reg: string, group: PartGroupMapping): Promise<SupplierP
       // Keep the default explanation.
     }
     return {
-      state: "not_connected",
-      message: "Alliance Automotive didn't return a price.",
-      hint,
-      href: "/admin/parts/aag-check",
+      offers: [],
+      note: {
+        supplier: "aag",
+        message: "Alliance Automotive didn't return a price.",
+        hint,
+        href: "/admin/parts/aag-check",
+      },
     };
   }
 
-  const offers = aagOffers(group, flattenQuote(body));
-  if (offers.length === 0) {
-    return {
-      state: "empty",
-      message: `Alliance Automotive listed no ${group.label.toLowerCase()} for this vehicle.`,
-    };
-  }
-
-  return {
-    state: "ok",
-    offers,
-    cheapestPartNumber: cheapestOffer(offers)?.partNumber ?? null,
-    notFound: [],
-    cached: false,
-  };
+  const group = adHocGroup(component, componentName);
+  return { offers: aagOffers({ ...group, genart }, flattenQuote(body)), note: null };
 }
 
-export async function lookupSupplierPartsAction(input: {
+/**
+ * Pull one part type for one vehicle. The client accumulates these, so this
+ * deliberately does ONE part type per call — each is a metered credit and the
+ * admin should be able to see what each press cost.
+ */
+export async function lookupPartTypeAction(input: {
   reg: string;
-  groupKey?: string;
-  component?: string;
-}): Promise<SupplierLookupResult> {
+  component: string;
+}): Promise<LookupPartTypeResult> {
   const gate = await requireAdmin();
   if (!gate.ok) return { ok: false, error: gate.error };
 
   const reg = adsRegKey(input.reg ?? "");
   if (!reg) return { ok: false, error: "Enter a registration." };
 
-  // Either a curated group (both suppliers) or a raw LKQ component (LKQ only).
-  let group: PartGroupMapping | null = input.groupKey ? groupByKey(input.groupKey) : null;
-  if (!group && input.component) {
-    const component = componentByNumber(input.component.trim());
-    if (!component) {
-      return { ok: false, error: "That isn't a component LKQ lists. Pick one from the list." };
-    }
-    group = adHocGroup(component.ComponentNumber, component.ComponentName);
+  const component = componentByNumber(String(input.component ?? "").trim());
+  if (!component) {
+    return { ok: false, error: "That isn't a part LKQ lists. Pick one from the list." };
   }
-  if (!group) return { ok: false, error: "Choose a part to look up." };
 
-  const [lkqResult, aag] = await Promise.all([lkqPanel(reg, group), aagPanel(reg, group)]);
+  const [lkq, aag] = await Promise.all([
+    lkqLeg(reg, component.ComponentNumber),
+    aagLeg(reg, component.ComponentNumber, component.ComponentName),
+  ]);
 
   let credits = { used: 0, cap: 0 };
   try {
@@ -250,22 +251,20 @@ export async function lookupSupplierPartsAction(input: {
     // The counter is informational; never fail the lookup on it.
   }
 
-  const best = bestPriceAcross({ lkq: lkqResult.panel, aag });
+  const notes = [lkq.note, aag.note].filter((n): n is SupplierNote => n !== null);
 
   return {
     ok: true,
     reg,
-    group,
-    vehicle: lkqResult.vehicle,
-    lkq: lkqResult.panel,
-    aag,
-    best: best
-      ? {
-          supplier: best.supplier,
-          partNumber: best.offer.partNumber,
-          costPence: best.offer.costPence as number,
-        }
-      : null,
+    vehicle: lkq.vehicle,
+    result: {
+      component: component.ComponentNumber,
+      componentName: component.ComponentName,
+      rows: buildComparisonRows(lkq.offers, aag.offers),
+      notFound: lkq.notFound,
+      cached: lkq.cached,
+      notes,
+    },
     credits,
   };
 }

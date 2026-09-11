@@ -1,6 +1,6 @@
 # Task 42 — Live supplier parts catalogue at `/admin/parts`, with LKQ vs AAG comparison
 
-**Status:** ✅ Complete (2026-09-11) — `/admin/parts` now leads with a registration-driven live supplier lookup showing LKQ's real brand/quality price ladder with live stock, laid out in two columns so AAG sits beside it. The hand-maintained catalogue moved intact to `/admin/parts/manual`. **No migration. No `app/api/mobile/**` change. Nothing orders.** Deviations from the plan: the fitment helpers were split into `lib/lkq/fitment.ts` (the production build caught `lib/parts/supplier-offer.ts` dragging the service-role Supabase client into the browser bundle via `lib/lkq/ads.ts`), and an extra fixture (`ecp-getprice-000027-fleet.xml`) was captured so the ADS↔ECP join is tested against real data from both APIs at once.
+**Status:** ✅ Complete (2026-09-11) — `/admin/parts` is now a supplier-fed parts catalogue: pick a vehicle, add part types from LKQ's full 2,277-component list, and browse the results in list or card view, filtered by brand and supplier, with each supplier's own part number and price in its own column. **The hand-maintained catalogue was removed entirely** (owner decision, same day: "we're not going to be using it — it is all going to come through the suppliers' parts catalogue"). **No migration. No `app/api/mobile/**` change. Nothing orders.** Deviations from the plan: the fitment helpers were split into `lib/lkq/fitment.ts` (the production build caught `lib/parts/supplier-offer.ts` dragging the service-role Supabase client into the browser bundle via `lib/lkq/ads.ts`), and an extra fixture (`ecp-getprice-000027-fleet.xml`) was captured so the ADS↔ECP join is tested against real data from both APIs at once.
 
 Task 41 proved the chain works from a terminal. This puts it in front of Gareth.
 
@@ -91,3 +91,43 @@ node scripts/probe-lkq-price.mjs --part 10459026,000000000
 3. `TecDocReferences` may replace the curated mapping (§8 Q2) — costs a credit to test.
 4. A real `lkq_ads_cache` table if this graduates beyond an admin tool; `platform_settings` is a deliberate compromise for "no migration".
 5. Fix `scripts/probe-ads-parts.mjs`'s numeric component guard — 967 of the 2,277 component numbers are not numeric.
+
+
+---
+
+## Revision, 2026-09-11 (same day, after first review)
+
+Brad reviewed the first cut and asked for three changes. All shipped.
+
+### 1. The eight curated categories are gone
+
+They were never LKQ's — they were my hand-paired list of the only product groups where an AAG GenArt and an LKQ component number were both known, and they read as if they were the catalogue. **The picker now searches all 2,277 LKQ components.** The GenArt mapping survives as internal plumbing (`genartForComponent`) so AAG can still be asked wherever a pairing exists; it is no longer a user-facing gate.
+
+### 2. Part images
+
+`imageUrl` had been carried through the data layer and never rendered — a real gap. Every ADS part has an `ImagePath` (a genuine 600×600 TecDoc JPEG, publicly served, verified loadable). Both views now show it. Served with a plain `<img>` straight from the supplier's image store: `next/image` would need a `remotePatterns` entry for a host only this page touches, and would route supplier artwork through our optimiser for no benefit.
+
+### 3. List and card views, filterable
+
+`_components/catalogue-browser.tsx` — a view toggle, a brand filter, a supplier filter, a sort and a search box. `lib/parts/compare-rows.ts` merges the two suppliers into one row per part.
+
+**The merge is the risky part and is deliberately conservative.** LKQ and AAG number the same physical part differently (LKQ's `10459124A` vs AAG's own id), so a row carries **one column per supplier**, each showing that supplier's own part number beside its own price; a dash means that supplier doesn't offer it. Two offers merge *only* when brand **and** size signature agree, and only when exactly one candidate is unclaimed. A 302 mm Pagid disc and a 278 mm Pagid disc stay as separate rows — an unmatched row is honest, a wrongly-merged one quietly compares two different parts. 17 tests cover exactly that.
+
+### The manual catalogue was removed
+
+`parts/manual`, `parts/new`, `parts/[id]/edit`, `parts/import`, `_components/parts-table.tsx`, `_components/part-form.tsx`, `_components/csv-import.tsx`, `_components/parts-tabs.tsx` and `app/actions/parts.ts` are all deleted. Only `/admin/parts` and `/admin/parts/aag-check` remain.
+
+**The `parts` TABLE stays** — `booking_parts.part_id` and `job_quote_lines.part_id` reference it on historical bookings, and dropping it would break them.
+
+**⚠️ Consequence to be aware of:** `listQuoteParts()` (`lib/quotes/mechanic.ts:300`) and the job-revision flow (`lib/revisions/mechanic.ts`) still read `parts` to populate the **mechanic's on-site quote part picker**. With the admin UI gone, that list is frozen at whatever migration `0021` seeded and **nobody can add, reprice or deactivate a catalogue part**. The picker is a `Combobox` with `allowCustom`, so a mechanic can still type a part as free text and it degrades rather than breaks. **Follow-up: point that picker at the supplier catalogue instead**, which is the stated direction.
+
+### Revised acceptance criteria
+
+- [x] No curated categories; the picker searches all 2,277 components.
+- [x] List and card views with a toggle.
+- [x] Filter by brand and by supplier; also sort and free-text search.
+- [x] Each row carries SKU, brand, name, and a price column per supplier.
+- [x] Part images rendered in both views.
+- [x] Manual catalogue removed; `parts` table and its FK references intact.
+- [x] 460 tests pass (17 new on the merge), typecheck and lint clean, build compiles; only `/admin/parts` and `/admin/parts/aag-check` remain in the route manifest.
+- [ ] Exercised in a browser by a signed-in admin — **owner step.**

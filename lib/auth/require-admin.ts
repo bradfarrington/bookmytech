@@ -10,10 +10,9 @@
 // prices and account numbers are platform secrets, so the role is checked
 // explicitly on every call.
 //
-// Contrast app/actions/parts.ts, which leans on the "Admins manage parts" RLS
-// policy. That is fine for CRUD against a table Postgres is already guarding;
-// it is not enough for an action whose side effect is spending a metered API
-// credit and returning wholesale pricing.
+// Contrast a plain CRUD action leaning on an RLS policy: that is enough for a
+// table Postgres already guards, but not for an action whose side effect is
+// spending a metered supplier credit and returning wholesale pricing.
 
 import { createClient } from "@/lib/supabase/server";
 

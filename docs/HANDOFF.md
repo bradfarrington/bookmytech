@@ -119,7 +119,17 @@ You are working on **Book My Tech**, a UK mobile-mechanic booking platform. This
 
 ## Current task
 
-### 2026-09-11 (later) — Live supplier parts catalogue ✅ (Task 42)
+### 2026-09-11 (later) — Supplier parts catalogue ✅ (Task 42)
+
+**Revised the same day after review.** `/admin/parts` is now a supplier-fed catalogue: pick a vehicle, add part types from LKQ's **full 2,277-component list** (the eight curated categories are gone), and browse the results in **list or card view** with **brand and supplier filters**, part images, and **one price column per supplier** — each showing that supplier's own part number, because LKQ and AAG number the same physical part differently.
+
+**The hand-maintained catalogue was removed entirely** (owner: "we're not going to be using it — it is all going to come through the suppliers' parts catalogue"). `parts/manual`, `new`, `[id]/edit`, `import` and `app/actions/parts.ts` are deleted; only `/admin/parts` and `/admin/parts/aag-check` remain. **The `parts` table stays** — `booking_parts.part_id` and `job_quote_lines.part_id` reference it on historical bookings.
+
+**⚠️ Known consequence:** the **mechanic's on-site quote part picker** (`listQuoteParts`, `lib/quotes/mechanic.ts:300`) and the job-revision flow still read `parts`. With no admin UI, that list is frozen at whatever migration `0021` seeded and nobody can add or reprice a catalogue part. The picker allows free text so it degrades rather than breaks. **Follow-up: point it at the supplier catalogue.**
+
+---
+
+### 2026-09-11 — Live supplier parts catalogue, first cut (Task 42)
 
 **`docs/tasks/42-live-supplier-parts-catalogue.md`.** `/admin/parts` now leads with a **live, registration-driven supplier lookup**: put in a reg and a part, get LKQ's real brand/quality price ladder with five-level stock, laid out in two columns so AAG sits beside it. Against the real Volvo S40, one lookup returns **58 priced variants across 14 catalogue parts**, each carrying ADS fitment (16" Front Vented 300mm) and quantity-of-fit. The hand-maintained catalogue moved **intact** to `/admin/parts/manual` — nothing dropped, `booking_parts.part_id` still resolves. **No migration, no `app/api/mobile/**` change, nothing orders.**
 

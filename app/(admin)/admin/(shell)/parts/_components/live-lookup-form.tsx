@@ -1,90 +1,100 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { Info, Search } from "lucide-react";
+import { useCallback, useState, useTransition } from "react";
+import { Plus } from "lucide-react";
 import { toast } from "sonner";
 
 import {
-  lookupSupplierPartsAction,
+  lookupPartTypeAction,
   searchLkqComponentsAction,
-  type SupplierLookupResult,
+  type PartTypeResult,
 } from "@/app/actions/lkq";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Combobox } from "@/components/ui/combobox";
 import { Pill } from "@/components/ui/pill";
 import { RegPlateInput } from "@/components/ui/reg-plate-input";
-import { Select } from "@/components/ui/select";
-import { PART_GROUPS } from "@/lib/lkq/mapping";
-import { describeVehicle } from "@/lib/lkq/vehicle";
-import { formatPrice } from "@/lib/utils";
-import { SUPPLIER_LABEL } from "@/lib/parts/supplier-offer";
-import { SupplierPanelCard } from "./supplier-panel-card";
+import { describeVehicle, type LkqVehicleSummary } from "@/lib/lkq/vehicle";
+import { CatalogueBrowser } from "./catalogue-browser";
 
-// The live lookup (Task 42).
+// Vehicle + part-type picker feeding the catalogue browser (Task 42).
 //
-// NOTHING FIRES ON MOUNT OR ON KEYSTROKE. Every search can spend a metered
-// catalogue credit, so it takes one deliberate button press. The component
-// search is the exception — it runs against a checked-in list, never the network.
-
-type Mode = "compare" | "lkq";
-
-const MODES: ReadonlyArray<{ value: Mode; label: string }> = [
-  { value: "compare", label: "Compare both suppliers" },
-  { value: "lkq", label: "Any LKQ component (LKQ only)" },
-];
+// There is no "browse every part": LKQ's catalogue only answers "what fits this
+// registration", and each part type is a metered credit. So the shape is —
+// choose a vehicle, then pull part types from the full 2,277-component list one
+// at a time, and they stack up into one filterable list.
+//
+// NOTHING FIRES ON MOUNT OR ON KEYSTROKE against the supplier. The component
+// search runs against a checked-in list and costs nothing; only "Add" spends.
 
 export function LiveLookupForm({ disabled }: { disabled: boolean }) {
   const [reg, setReg] = useState("");
-  const [mode, setMode] = useState<Mode>("compare");
-  const [groupKey, setGroupKey] = useState(PART_GROUPS[0].key);
+  const [lockedReg, setLockedReg] = useState<string | null>(null);
+  const [vehicle, setVehicle] = useState<LkqVehicleSummary | null>(null);
   const [componentLabel, setComponentLabel] = useState("");
   const [componentOptions, setComponentOptions] = useState<string[]>([]);
-  const [result, setResult] = useState<SupplierLookupResult | null>(null);
+  const [results, setResults] = useState<PartTypeResult[]>([]);
+  const [credits, setCredits] = useState<{ used: number; cap: number } | null>(null);
   const [pending, startTransition] = useTransition();
 
-  function onComponentQuery(value: string) {
+  const onComponentQuery = useCallback((value: string) => {
     setComponentLabel(value);
     if (value.trim().length < 2) {
       setComponentOptions([]);
       return;
     }
-    // Pure fixture search on the server — no network call to LKQ, no credit.
+    // Pure fixture search on the server — no supplier call, no credit.
     void searchLkqComponentsAction(value).then((hits) =>
       setComponentOptions(hits.map((h) => `${h.number} — ${h.name}`)),
     );
-  }
+  }, []);
 
-  function onSubmit(event: React.FormEvent) {
+  function onAdd(event: React.FormEvent) {
     event.preventDefault();
     if (disabled || pending) return;
 
-    const component =
-      mode === "lkq" ? (componentLabel.split("—")[0] ?? "").trim() : undefined;
-
-    if (mode === "lkq" && !component) {
-      toast.error("Pick a component from the list.");
+    const component = (componentLabel.split("—")[0] ?? "").trim();
+    if (!reg.trim()) {
+      toast.error("Enter a registration first.");
+      return;
+    }
+    if (!component) {
+      toast.error("Pick a part from the list.");
+      return;
+    }
+    if (results.some((r) => r.component === component)) {
+      toast.error("That part is already in the list.");
       return;
     }
 
     startTransition(async () => {
-      const next = await lookupSupplierPartsAction({
-        reg,
-        groupKey: mode === "compare" ? groupKey : undefined,
-        component,
-      });
-      setResult(next);
-      if (!next.ok) toast.error(next.error);
+      const next = await lookupPartTypeAction({ reg, component });
+      if (!next.ok) {
+        toast.error(next.error);
+        return;
+      }
+      // A different reg starts a fresh list — the parts are vehicle-specific.
+      setResults((prev) => (lockedReg && lockedReg !== next.reg ? [] : prev).concat(next.result));
+      setLockedReg(next.reg);
+      setVehicle(next.vehicle);
+      setCredits(next.credits);
+      setComponentLabel("");
+      setComponentOptions([]);
+      if (next.result.rows.length === 0) {
+        toast.info(`No ${next.result.componentName.toLowerCase()} listed for this vehicle.`);
+      }
     });
   }
 
-  const group = result?.ok ? result.group : null;
+  const onRemove = useCallback((component: string) => {
+    setResults((prev) => prev.filter((r) => r.component !== component));
+  }, []);
 
   return (
     <div className="space-y-6">
       <Card>
-        <form onSubmit={onSubmit} className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-[auto_1fr] sm:items-end">
+        <form onSubmit={onAdd} className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-[auto_1fr_auto] sm:items-end">
             <div>
               <label
                 htmlFor="lkq-reg"
@@ -102,147 +112,60 @@ export function LiveLookupForm({ disabled }: { disabled: boolean }) {
 
             <div>
               <label
-                htmlFor="lkq-mode"
-                className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-text-muted"
-              >
-                Look up
-              </label>
-              <Select<Mode>
-                id="lkq-mode"
-                value={mode}
-                onChange={setMode}
-                options={MODES}
-                disabled={disabled}
-              />
-            </div>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
-            <div>
-              <label
                 htmlFor="lkq-part"
                 className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-text-muted"
               >
-                {mode === "compare" ? "Part" : "LKQ component"}
+                Part
               </label>
-              {mode === "compare" ? (
-                <Select
-                  id="lkq-part"
-                  value={groupKey}
-                  onChange={setGroupKey}
-                  options={PART_GROUPS.map((g) => ({ value: g.key, label: g.label }))}
-                  disabled={disabled}
-                />
-              ) : (
-                <Combobox
-                  id="lkq-part"
-                  value={componentLabel}
-                  onChange={onComponentQuery}
-                  options={componentOptions}
-                  allowCustom={false}
-                  placeholder="Search 2,277 LKQ components…"
-                  disabled={disabled}
-                />
-              )}
+              <Combobox
+                id="lkq-part"
+                value={componentLabel}
+                onChange={onComponentQuery}
+                options={componentOptions}
+                allowCustom={false}
+                placeholder="Search LKQ's 2,277 parts…"
+                disabled={disabled}
+              />
             </div>
 
-            <Button
-              type="submit"
-              variant="primary"
-              iconLeft={Search}
-              disabled={disabled || pending}
-            >
-              {pending ? "Asking suppliers…" : "Get prices"}
+            <Button type="submit" variant="primary" iconLeft={Plus} disabled={disabled || pending}>
+              {pending ? "Fetching…" : "Add to list"}
             </Button>
           </div>
 
-          {mode === "compare" ? (
-            <p className="text-xs text-text-muted">
-              These eight are the parts we can price with{" "}
-              <strong className="font-semibold text-text-primary">both</strong> suppliers —
-              LKQ and Alliance Automotive use different product-group numbering, and these
-              are the pairs we&apos;ve matched up. To search{" "}
-              <button
-                type="button"
-                onClick={() => setMode("lkq")}
-                className="font-semibold text-brand-blue hover:underline"
-              >
-                LKQ&apos;s full catalogue of 2,277 parts
-              </button>
-              , switch &ldquo;Look up&rdquo; above — Alliance can&apos;t be asked about those.
+          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-text-muted">
+            <p>
+              Parts are specific to a vehicle, so pick a registration first, then add as many
+              part types as you need — they stack into one list you can filter.
             </p>
-          ) : (
-            <p className="text-xs text-text-muted">
-              Searching all 2,277 LKQ components. Alliance Automotive has no matching product
-              group for these, so only the LKQ column will fill.
-            </p>
-          )}
-
-          <p className="text-xs text-text-muted">
-            Each new vehicle or new product group spends one catalogue credit. Prices and
-            stock are fetched live every time and cost nothing.
-          </p>
+            {credits ? (
+              <span className="whitespace-nowrap">
+                {credits.used} of {credits.cap} catalogue credits used
+              </span>
+            ) : null}
+          </div>
         </form>
       </Card>
 
-      {result?.ok && group ? (
-        <div className="space-y-4">
-          <Card className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <h2 className="text-base font-semibold text-text-primary">
-                  {result.vehicle ? describeVehicle(result.vehicle) : result.reg}
-                </h2>
-                <Pill tone="neutral">{group.label}</Pill>
-                {group.confidence === "assumed" ? (
-                  <Pill tone="pending">Mapping unconfirmed</Pill>
-                ) : null}
-              </div>
-              {group.note ? (
-                <p className="mt-1 flex items-start gap-1 text-xs text-amber-700">
-                  <Info aria-hidden className="mt-0.5 size-3 shrink-0" />
-                  {group.note}
-                </p>
-              ) : null}
-            </div>
-
-            {result.best ? (
-              <div className="text-right">
-                <div className="text-xs uppercase tracking-wide text-text-muted">
-                  Cheapest across suppliers
-                </div>
-                <div className="text-lg font-bold text-text-primary">
-                  {formatPrice(result.best.costPence)}
-                </div>
-                <div className="text-xs text-text-muted">
-                  {SUPPLIER_LABEL[result.best.supplier]} ·{" "}
-                  <span className="font-mono">{result.best.partNumber}</span>
-                </div>
-              </div>
-            ) : null}
-          </Card>
-
-          <div className="grid items-start gap-6 lg:grid-cols-2">
-            <SupplierPanelCard
-              supplier="lkq"
-              panel={result.lkq}
-              bestPartNumber={result.best?.partNumber ?? null}
-              bestSupplier={result.best?.supplier ?? null}
-            />
-            <SupplierPanelCard
-              supplier="aag"
-              panel={result.aag}
-              bestPartNumber={result.best?.partNumber ?? null}
-              bestSupplier={result.best?.supplier ?? null}
-            />
-          </div>
-
-          <p className="text-xs text-text-muted">
-            Costs are what BMT pays the supplier, passed through with no mark-up. Surcharges
-            are shown separately and are <strong>not</strong> added to the cost — whether
-            LKQ&apos;s price already includes them is still unconfirmed.
-          </p>
+      {lockedReg ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <h2 className="text-base font-semibold text-text-primary">
+            {vehicle ? describeVehicle(vehicle) : lockedReg}
+          </h2>
+          <Pill tone="neutral">{lockedReg}</Pill>
+          {vehicle?.engineCode ? <Pill tone="neutral">{vehicle.engineCode}</Pill> : null}
         </div>
+      ) : null}
+
+      <CatalogueBrowser results={results} onRemove={onRemove} />
+
+      {results.length > 0 ? (
+        <p className="text-xs text-text-muted">
+          Prices are what BMT pays the supplier, passed through with no mark-up. Each supplier
+          numbers the same part differently, so each column shows that supplier&apos;s own part
+          number. Surcharges are listed separately and are <strong>not</strong> added to the
+          cost — whether LKQ&apos;s price already includes them is still unconfirmed.
+        </p>
       ) : null}
     </div>
   );

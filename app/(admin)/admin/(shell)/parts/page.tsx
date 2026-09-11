@@ -10,14 +10,16 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { Button } from "@/components/ui/button";
 import { Overline } from "@/components/ui/overline";
 import { LiveLookupForm } from "./_components/live-lookup-form";
-import { PartsTabs } from "./_components/parts-tabs";
 import { SupplierStatusStrip } from "./_components/supplier-status-strip";
 
-// Live supplier parts lookup (Task 42) — the main Parts view.
+// The parts catalogue (Task 42) — everything our suppliers list for a vehicle.
 //
-// Read-only: the page itself asks no supplier anything. The lookup runs from an
-// explicit button press in the form, because each one can spend a metered
-// catalogue credit. The manual catalogue lives on the second tab.
+// The hand-maintained catalogue this route used to show was removed: parts now
+// come from the supplier APIs only.
+//
+// Read-only: the page itself asks no supplier anything. Every lookup runs from
+// an explicit button press in the form, because each one can spend a metered
+// catalogue credit.
 
 export const dynamic = "force-dynamic";
 
@@ -38,18 +40,17 @@ export default async function AdminPartsLookupPage() {
 
   return (
     <div className="space-y-6">
-      <PartsTabs />
-
       <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <Overline>Commercial</Overline>
           <h1 className="mt-1 text-3xl font-bold tracking-tight text-text-primary">
-            Live parts lookup
+            Parts catalogue
           </h1>
           <p className="mt-1.5 max-w-2xl text-sm text-text-muted">
-            Put in a registration and a part, and see what each supplier actually
-            charges us today — brand by brand, with live stock. Costs are passed
-            through at supplier price with no mark-up. Nothing here orders anything.
+            Every part our suppliers list for a vehicle, with what each of them
+            actually charges us today. Pick a registration, add the part types you
+            want, then filter by brand or supplier. Costs are passed through at
+            supplier price with no mark-up. Nothing here orders anything.
           </p>
         </div>
         <div className="flex items-center gap-2">
