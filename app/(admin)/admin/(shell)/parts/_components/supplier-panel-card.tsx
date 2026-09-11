@@ -119,36 +119,56 @@ function OfferGroup({
   const from = priced.length > 0 ? Math.min(...priced.map((o) => o.costPence as number)) : null;
   const lead = priced.find((o) => o.costPence === from) ?? offers[0];
   const fitment = offers[0]?.fitment ?? [];
+  // The image belongs to the catalogue part, so every variant shares it.
+  // Served straight from the supplier's image store — we don't proxy or cache
+  // supplier artwork, and next/image would need a remotePatterns entry for a
+  // host only this admin page ever touches.
+  const imageUrl = offers.find((o) => o.imageUrl)?.imageUrl ?? null;
   const panelId = `offers-${groupKey}`;
 
   return (
     <>
       <tr className="border-b border-border bg-surface-subtle/40">
         <td colSpan={5} className="px-4 py-2">
-          <button
-            type="button"
-            onClick={() => setOpen((v) => !v)}
-            aria-expanded={open}
-            aria-controls={panelId}
-            className="flex w-full items-center gap-2 text-left"
-          >
-            {open ? (
-              <ChevronDown aria-hidden className="size-4 shrink-0 text-text-muted" />
-            ) : (
-              <ChevronRight aria-hidden className="size-4 shrink-0 text-text-muted" />
-            )}
-            <span className="font-mono text-xs font-semibold text-text-primary">{groupKey}</span>
-            <span className="text-xs text-text-muted">
-              {from != null ? `from ${formatPrice(from)}` : "not priced"}
-              {lead?.brand ? ` · ${lead.brand}` : ""} · {offers.length}{" "}
-              {offers.length === 1 ? "option" : "options"}
-            </span>
-          </button>
-          {fitment.length > 0 ? (
-            <div className="mt-1 pl-6 text-xs text-text-muted">
-              {fitment.map((f) => `${f.label}: ${f.value}`).join(" · ")}
+          <div className="flex items-start gap-3">
+            {imageUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={imageUrl}
+                alt=""
+                loading="lazy"
+                className="size-12 shrink-0 rounded-md border border-border bg-white object-contain"
+              />
+            ) : null}
+            <div className="min-w-0 flex-1">
+              <button
+                type="button"
+                onClick={() => setOpen((v) => !v)}
+                aria-expanded={open}
+                aria-controls={panelId}
+                className="flex w-full items-center gap-2 text-left"
+              >
+                {open ? (
+                  <ChevronDown aria-hidden className="size-4 shrink-0 text-text-muted" />
+                ) : (
+                  <ChevronRight aria-hidden className="size-4 shrink-0 text-text-muted" />
+                )}
+                <span className="font-mono text-xs font-semibold text-text-primary">
+                  {groupKey}
+                </span>
+                <span className="text-xs text-text-muted">
+                  {from != null ? `from ${formatPrice(from)}` : "not priced"}
+                  {lead?.brand ? ` · ${lead.brand}` : ""} · {offers.length}{" "}
+                  {offers.length === 1 ? "option" : "options"}
+                </span>
+              </button>
+              {fitment.length > 0 ? (
+                <div className="mt-1 pl-6 text-xs text-text-muted">
+                  {fitment.map((f) => `${f.label}: ${f.value}`).join(" · ")}
+                </div>
+              ) : null}
             </div>
-          ) : null}
+          </div>
         </td>
       </tr>
       {open

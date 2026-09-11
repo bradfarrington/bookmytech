@@ -156,6 +156,28 @@ export function LiveLookupForm({ disabled }: { disabled: boolean }) {
             </Button>
           </div>
 
+          {mode === "compare" ? (
+            <p className="text-xs text-text-muted">
+              These eight are the parts we can price with{" "}
+              <strong className="font-semibold text-text-primary">both</strong> suppliers —
+              LKQ and Alliance Automotive use different product-group numbering, and these
+              are the pairs we&apos;ve matched up. To search{" "}
+              <button
+                type="button"
+                onClick={() => setMode("lkq")}
+                className="font-semibold text-brand-blue hover:underline"
+              >
+                LKQ&apos;s full catalogue of 2,277 parts
+              </button>
+              , switch &ldquo;Look up&rdquo; above — Alliance can&apos;t be asked about those.
+            </p>
+          ) : (
+            <p className="text-xs text-text-muted">
+              Searching all 2,277 LKQ components. Alliance Automotive has no matching product
+              group for these, so only the LKQ column will fill.
+            </p>
+          )}
+
           <p className="text-xs text-text-muted">
             Each new vehicle or new product group spends one catalogue credit. Prices and
             stock are fetched live every time and cost nothing.
