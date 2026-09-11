@@ -95,39 +95,46 @@ node scripts/probe-lkq-price.mjs --part 10459026,000000000
 
 ---
 
-## Revision, 2026-09-11 (same day, after first review)
+## Revision, 2026-09-11 (same day, after review)
 
-Brad reviewed the first cut and asked for three changes. All shipped.
+Two rounds of feedback. The first attempt at removing the categories replaced the two supplier panels with a filterable list/card browser; Brad rejected that layout and it was reverted. What shipped is the original two-panel comparison with the category restriction removed properly.
 
-### 1. The eight curated categories are gone
+### The categories are gone, and the catalogue now comes from LKQ
 
-They were never LKQ's — they were my hand-paired list of the only product groups where an AAG GenArt and an LKQ component number were both known, and they read as if they were the catalogue. **The picker now searches all 2,277 LKQ components.** The GenArt mapping survives as internal plumbing (`genartForComponent`) so AAG can still be asked wherever a pairing exists; it is no longer a user-facing gate.
+The eight curated categories were never LKQ's — they were my hand-paired list of the only product groups where both an AAG GenArt and an LKQ component number were known, and on screen they read as if they were the whole catalogue.
 
-### 2. Part images
+**The fix was an endpoint, not a bigger list.** The ADS help page documents `ComponentsByVehicleAttributes`, which returns the components that fit a specific vehicle. Verified live on 2026-09-11: a 2007 Volvo S40 returns **211 components** out of the 2,277 in the full catalogue.
 
-`imageUrl` had been carried through the data layer and never rendered — a real gap. Every ADS part has an `ImagePath` (a genuine 600×600 TecDoc JPEG, publicly served, verified loadable). Both views now show it. Served with a plain `<img>` straight from the supplier's image store: `next/image` would need a `remotePatterns` entry for a host only this page touches, and would route supplier artwork through our optimiser for no benefit.
+**Its request body is the bare attribute array**, not the `{UserToken, Attributes, …}` object every other ADS call takes — every documented shape returns HTTP 400. Recorded in `lib/lkq/ads.ts`.
 
-### 3. List and card views, filterable
+So the flow is now two steps, and the first one *is* the catalogue:
 
-`_components/catalogue-browser.tsx` — a view toggle, a brand filter, a supplier filter, a sort and a search box. `lib/parts/compare-rows.ts` merges the two suppliers into one row per part.
+1. **Enter a registration** → everything LKQ lists for that vehicle, filterable. At most two credits (identify the vehicle, fetch its component list), both cached 30 days.
+2. **Click a part** → live prices from both suppliers in the two-panel comparison, one credit the first time for that vehicle+part.
 
-**The merge is the risky part and is deliberately conservative.** LKQ and AAG number the same physical part differently (LKQ's `10459124A` vs AAG's own id), so a row carries **one column per supplier**, each showing that supplier's own part number beside its own price; a dash means that supplier doesn't offer it. Two offers merge *only* when brand **and** size signature agree, and only when exactly one candidate is unclaimed. A 302 mm Pagid disc and a 278 mm Pagid disc stay as separate rows — an unmatched row is honest, a wrongly-merged one quietly compares two different parts. 17 tests cover exactly that.
+Prices are deliberately not fetched for the whole list: at one credit per component, 211 components would be most of a month's budget on a single car.
+
+A small dot marks the parts Alliance Automotive can also be asked about. The GenArt mapping survives as internal plumbing — it narrows the **comparison**, never the catalogue.
+
+### Part images
+
+`imageUrl` had been carried through the data layer and never rendered. Every ADS part has an `ImagePath` (a genuine 600×600 TecDoc JPEG, publicly served, verified loadable), now shown on each catalogue row. Served with a plain `<img>` from the supplier's image store: `next/image` would need a `remotePatterns` entry for a host only this page touches.
 
 ### The manual catalogue was removed
 
-`parts/manual`, `parts/new`, `parts/[id]/edit`, `parts/import`, `_components/parts-table.tsx`, `_components/part-form.tsx`, `_components/csv-import.tsx`, `_components/parts-tabs.tsx` and `app/actions/parts.ts` are all deleted. Only `/admin/parts` and `/admin/parts/aag-check` remain.
+`parts/manual`, `parts/new`, `parts/[id]/edit`, `parts/import`, `_components/parts-table.tsx`, `_components/part-form.tsx`, `_components/csv-import.tsx`, `_components/parts-tabs.tsx` and `app/actions/parts.ts` are deleted. Only `/admin/parts` and `/admin/parts/aag-check` remain in the route manifest.
 
-**The `parts` TABLE stays** — `booking_parts.part_id` and `job_quote_lines.part_id` reference it on historical bookings, and dropping it would break them.
+**The `parts` TABLE stays** — `booking_parts.part_id` and `job_quote_lines.part_id` reference it on historical bookings.
 
-**⚠️ Consequence to be aware of:** `listQuoteParts()` (`lib/quotes/mechanic.ts:300`) and the job-revision flow (`lib/revisions/mechanic.ts`) still read `parts` to populate the **mechanic's on-site quote part picker**. With the admin UI gone, that list is frozen at whatever migration `0021` seeded and **nobody can add, reprice or deactivate a catalogue part**. The picker is a `Combobox` with `allowCustom`, so a mechanic can still type a part as free text and it degrades rather than breaks. **Follow-up: point that picker at the supplier catalogue instead**, which is the stated direction.
+**⚠️ Consequence:** `listQuoteParts()` (`lib/quotes/mechanic.ts:300`) and the job-revision flow still read `parts` to populate the **mechanic's on-site quote part picker**. With no admin UI, that list is frozen at whatever migration `0021` seeded and nobody can add, reprice or deactivate a catalogue part. The picker is a `Combobox` with `allowCustom`, so a mechanic can still type a part as free text and it degrades rather than breaks. **Follow-up: point that picker at the supplier catalogue**, which is the stated direction.
 
 ### Revised acceptance criteria
 
-- [x] No curated categories; the picker searches all 2,277 components.
-- [x] List and card views with a toggle.
-- [x] Filter by brand and by supplier; also sort and free-text search.
-- [x] Each row carries SKU, brand, name, and a price column per supplier.
-- [x] Part images rendered in both views.
+- [x] No curated categories. A registration returns LKQ's own list of what fits that vehicle.
+- [x] The per-vehicle parts list is filterable, and marks which parts can be compared with AAG.
+- [x] Clicking a part shows the two-supplier comparison with the brand/quality ladder.
+- [x] Part images rendered.
 - [x] Manual catalogue removed; `parts` table and its FK references intact.
-- [x] 460 tests pass (17 new on the merge), typecheck and lint clean, build compiles; only `/admin/parts` and `/admin/parts/aag-check` remain in the route manifest.
+- [x] Credit discipline preserved: at most 2 credits per new vehicle, 1 per new part on it, all cached; prices never cached.
+- [x] 443 tests pass, typecheck and lint clean, build compiles, route manifest shows only the two intended routes.
 - [ ] Exercised in a browser by a signed-in admin — **owner step.**

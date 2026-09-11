@@ -25,6 +25,9 @@ export const ADS_VEHICLE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 /** Which parts fit a vehicle. Changes only when LKQ re-catalogues. */
 export const ADS_PARTS_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
+/** Which component types fit a vehicle. As stable as the vehicle itself. */
+export const ADS_COMPONENTS_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+
 export const ADS_USAGE_KEY = "lkq_ads_usage";
 
 const CACHE_PREFIX = "lkq:ads:";
@@ -35,6 +38,11 @@ export function vehicleCacheKey(regKey: string): string {
 
 export function partsCacheKey(regKey: string, component: string, increment: number): string {
   return `${CACHE_PREFIX}parts:${regKey}:${component}:${increment}`;
+}
+
+/** The components that fit one vehicle — LKQ's own catalogue, narrowed to the car. */
+export function vehicleComponentsCacheKey(regKey: string): string {
+  return `${CACHE_PREFIX}components:${regKey}`;
 }
 
 export function isCacheFresh(at: string, ttlMs: number, now: number = Date.now()): boolean {

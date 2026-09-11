@@ -20,16 +20,18 @@ import { randomUUID } from "node:crypto";
 
 import { getLkqAdsConfig } from "./config";
 import {
+  ADS_COMPONENTS_TTL_MS,
   ADS_PARTS_TTL_MS,
   ADS_VEHICLE_TTL_MS,
   partsCacheKey,
   readAdsCache,
   spendAdsCredit,
   vehicleCacheKey,
+  vehicleComponentsCacheKey,
   writeAdsCache,
 } from "./ads-cache";
 import { recordLkqHealth } from "./health";
-import type { AdsAttribute, AdsPartsReply, LkqAdsConfig } from "./types";
+import type { AdsAttribute, AdsComponent, AdsPartsReply, LkqAdsConfig } from "./types";
 import { adsRegKey } from "./vehicle";
 
 // Re-exported for convenience. The implementations are PURE and live in
@@ -335,4 +337,59 @@ export async function adsLookupParts(
 
   await writeAdsCache(db, key, payload);
   return { value: payload, cached: false };
+}
+
+
+/**
+ * The components that actually fit one vehicle — LKQ's own catalogue narrowed
+ * from 2,277 to the couple of hundred relevant to the car in front of you.
+ * A 2007 Volvo S40 returns 211.
+ *
+ * NB the request body is the BARE ATTRIBUTE ARRAY, not an object wrapping it —
+ * unlike every other ADS call, which takes {UserToken, Attributes, …}. Verified
+ * against the live service on 2026-09-11; the documented shapes all return 400.
+ * The API key still has to be in the ApiKey header.
+ */
+export async function adsLookupVehicleComponents(
+  reg: string,
+  attributes: readonly AdsAttribute[],
+): Promise<AdsResult<AdsComponent[]>> {
+  const config = getLkqAdsConfig();
+  if (!config) return null;
+
+  const regKey = adsRegKey(reg);
+  if (!regKey || attributes.length === 0) return null;
+
+  const db = await adminDb();
+  if (!db) return null;
+
+  const key = vehicleComponentsCacheKey(regKey);
+  const cached = await readAdsCache<AdsComponent[]>(db, key, ADS_COMPONENTS_TTL_MS);
+  if (cached) return { value: cached, cached: true };
+
+  const budget = await spendAdsCredit(db);
+  if (!budget.allowed) {
+    await recordLkqHealth(db, "ads", {
+      state: "budget_exhausted",
+      errorCode: null,
+      detail: `The monthly catalogue-call budget (${budget.cap}) is spent. It resets next month, or raise LKQ_ADS_MONTHLY_CALL_CAP.`,
+      endpoint: config.partsUrl,
+    });
+    return ADS_BUDGET_EXHAUSTED;
+  }
+
+  // Derived from the parts URL so a host override moves both together.
+  const base = config.partsUrl.replace(/\/GB\/search$/i, "");
+  const url = `${base}/ComponentsByVehicleAttributes/${encodeURIComponent(config.appId)}/GB/en`;
+
+  const payload = await postAds(config, url, attributes);
+  if (!Array.isArray(payload)) return null;
+
+  const components = (payload as AdsComponent[]).filter(
+    (c) => c && typeof c.ComponentNumber === "string" && typeof c.ComponentName === "string",
+  );
+  if (components.length === 0) return null;
+
+  await writeAdsCache(db, key, components);
+  return { value: components, cached: false };
 }
