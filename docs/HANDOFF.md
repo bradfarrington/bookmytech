@@ -119,6 +119,22 @@ You are working on **Book My Tech**, a UK mobile-mechanic booking platform. This
 
 ## Current task
 
+### ⏸️ WHERE WE STOPPED — 2026-09-11. Read `docs/tasks/43-supplier-parts-into-quoting.md` first.
+
+Task 42 shipped: `/admin/parts` is a live supplier catalogue (reg → everything LKQ lists for that vehicle → click a part for both suppliers' prices). The hand-maintained `parts` catalogue is **gone**; everything is to come from the supplier APIs from here.
+
+**The next task is scoped but deliberately not started.** Its whole point is a split that is not obvious, so read Task 43 before touching anything:
+
+- **Blocked on HaynesPro:** repair→parts linking (`genartIds` is the only source of "this repair needs these parts") and the customer booking funnel.
+- **NOT blocked, start here:** **engine oil matching** and the **mechanic's on-site quote picker**.
+
+**The finding that decides it: LKQ supplies the oil capacity itself, so oil does not need HaynesPro.** Component `000398` returns 35 products for a vehicle, all stating a fill quantity, 14 naming the exact engine code, with viscosity and pack size as structured columns. Fixture checked in at `lib/lkq/__fixtures__/ads-parts-000398-oil.json`.
+
+**And it is wrong today in a way that costs money:** a 4-litre fill bills at `4 × £15 = £60`; the real 5-litre pack is **£33.38** — and the 5 L pack is cheaper than the 4 L one, so "capacity × price per litre" errs in both directions.
+
+**⚠️ HaynesPro is currently DEAD** — auth fails with `statusCode 1`, and the demo expired **2026-08-09**. The entire repair catalogue and every booking quote depend on it. **Check whether production is actually quoting.** Renewal is the critical path. Production ADS credentials are the second prerequisite — 500 test credits will not survive customer booking volume.
+
+
 ### 2026-09-11 (later) — Supplier parts catalogue ✅ (Task 42)
 
 **Revised twice the same day after review.** `/admin/parts` is now: **enter a registration → everything LKQ lists for that vehicle** (its own catalogue narrowed from 2,277 components to the ~211 that actually fit), filterable; **click a part → live prices from both suppliers** in the two-panel brand/quality ladder.
