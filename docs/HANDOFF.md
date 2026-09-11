@@ -119,6 +119,23 @@ You are working on **Book My Tech**, a UK mobile-mechanic booking platform. This
 
 ## Current task
 
+### 2026-09-11 — LKQ Euro Car Parts spike ✅ (Task 41). AAG is parked.
+
+**`docs/tasks/41-lkq-parts-api-spike.md` · findings in `docs/06-lkq-parts-api.md`.** Gareth's LKQ Euro Car Parts trade account now has working test credentials, and the whole chain **registration → ADS catalogue → Gareth's trade price with live stock** is verified end-to-end on account `L4040300`. Scripts and docs only — **no `lib/`, no app code, no migration, no mobile-API change.**
+
+Two APIs, two credential sets, two protocols: **ADS Vehicle & Parts** (REST/JSON catalogue, VRM/VIN → 56 attributes → parts, metered at 500 test credits) and **LKQECP API Plus** (SOAP 1.1 — `PutSession` → 20-minute token, `GetPrice`, and an unimplemented `CreateSalesOrder`). Both hosts answered from a normal dev machine with **no IP allowlist** — the blocker AAG (Task 40) is still stuck behind, which is why LKQ is now the stronger candidate. LKQ's order API also has a full **carrier delivery block**, so parts can ship to the customer's address: the mobile-mechanic case AAG had no answer for.
+
+**Five errors in LKQ's own documentation**, all found by testing rather than reading (`docs/06-lkq-parts-api.md` §2). The two that would bite hardest:
+- **An unknown part number is NOT an error.** `GetPrice` answers `Status 0` with a blank description and `ShowPrice` `"0.00"` — the documented code 107 never appears. **Anything that prices a job must call `isNotFound()`** or a part LKQ has never heard of becomes a **£0.00 line on a customer quote**.
+- **"104 = Brake Discs" is wrong** — `000104` is Distributor Cap; Brake Disc is `000027`. The real 2,277-entry component list is checked in at `lib/lkq/__fixtures__/ads-components-GB-en.json`, fetched from LKQ's own `Components` endpoint rather than requested from them.
+
+Best finding: **one 8-digit ADS part expands to ~8 branded ECP variants** — a real £31.67 Textar → £66.90 Brembo XTR ladder with five-level stock. That is exactly the shape a quote engine wants.
+
+**Two questions are deferred and must be settled before any build** (§8): (1) does `ShowPrice` include the surcharge when `CustSur` is present? It decides whether surcharged parts are mis-quoted — **it affects money**. (2) Does `TecDocReferences` map our existing TecDoc GenArt ids to ADS components, or do we need a hand-built mapping table?
+
+**Nothing orders.** `CreateSalesOrder` is deliberately unimplemented.
+
+
 **⚠️ THIS REPO IS NOW ALSO A MOBILE BACKEND. Read `AGENTS.md` → "A customer mobile app consumes this codebase" before changing anything.** A customer mobile app (React Native / Expo) lives in a separate repo, `bmt-customer-app`, and shares this database, this business logic and these integrations. It reaches us through HTTP route handlers under `app/api/mobile/v1/` (Bearer tokens, JSON, no cookies, no redirects) and by reading Supabase directly under the existing customer RLS policies.
 
 The consequence that changes how you work here: **a mobile app cannot be force-updated.** Old builds stay on people's phones for months and keep calling whatever they shipped with. So a shipped API path, response shape or field name is a **contract** — additive changes are safe, renames and removals are not. Ask "would a phone running last month's build still work after this?", and **say so explicitly in your summary to Brad whenever a change needs work in the app repo** — every schema migration does, because the app generates its types from the live schema. The full standing rules and the list of always-report changes are in `AGENTS.md`; the architecture split is in `docs/01-architecture.md`.

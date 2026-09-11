@@ -47,3 +47,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Supplier documentation and credentials dropped in the repo root.
+# These contain live account numbers, passwords and API keys — keep them local.
+# The sanitised specs belong in docs/suppliers/, the secrets in .env.local.
+/*.docx
+/*.pptx
+/Data Contract Customer.pdf
+/LKQECP Standard External Facing API+ - Book My Tech/
