@@ -61,7 +61,7 @@ function parsePartForm(
 }
 
 function revalidatePartsSurfaces() {
-  revalidatePath("/admin/parts");
+  revalidatePath("/admin/parts/manual");
 }
 
 export async function createPart(formData: FormData): Promise<PartActionResult> {
@@ -91,7 +91,7 @@ export async function createPart(formData: FormData): Promise<PartActionResult> 
   if (error) return { error: error.message };
 
   revalidatePartsSurfaces();
-  redirect("/admin/parts?flash=part-created");
+  redirect("/admin/parts/manual?flash=part-created");
 }
 
 export async function updatePart(
@@ -128,7 +128,7 @@ export async function updatePart(
   if (error) return { error: error.message };
 
   revalidatePartsSurfaces();
-  redirect("/admin/parts?flash=part-updated");
+  redirect("/admin/parts/manual?flash=part-updated");
 }
 
 export async function setPartStock(id: string, inStock: boolean): Promise<PartActionResult> {

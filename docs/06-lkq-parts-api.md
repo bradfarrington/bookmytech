@@ -179,12 +179,20 @@ Note the two documents disagree on the orders endpoint — the spec says `sysmon
 
 ## 8. Open questions
 
-1. **Does `ShowPrice` include the surcharge?** (§3) Decides whether surcharged parts are mis-quoted. Highest priority — it affects money.
+1. **Does `ShowPrice` include the surcharge?** (§3) Decides whether surcharged parts are mis-quoted. Highest priority — it affects money. **Until it is answered, cost and surcharge are carried and displayed as two separate figures and are never summed** (`lib/parts/supplier-offer.ts`).
 2. **Does `TecDocReferences` map GenArt → ADS component?** (§5) Decides whether repair→parts needs a hand-built mapping table.
 3. **Which orders host is live**, and does `CreateSalesOrder` behave on the test account? (§7)
 4. **What exactly consumes an ADS credit** — searches only, or metadata calls like `Components` too? 500 on the test account; unknown on production.
 5. **Why do some variants have no `ShowPrice`** (Starline throughout)? Not sellable on this account, or not stocked?
 6. **Production credentials** — the PROD half of the ADS request form is blank.
+7. **Who absorbs commission on a pass-through part?** ~~Open~~ **Answered by Gareth, 2026-09-11: commission is charged on the whole booking total, parts included.** That is what the engine already does (`lib/pricing/calculate.ts` → `totalPence = basePence + partsPence`, fee on the total; `app/actions/booking-parts.ts` `recomputePayout`), so **no code change was needed**.
+
+   Two consequences worth holding on to, neither of which is a bug:
+
+   - Combined with "no mark-up on parts" (owner decision, same day), BMT's margin on a part *is* the commission. The two statements sound contradictory but are not — the cut is collected as commission rather than as a mark-up. On a £300 parts bill at 15% that is £45.
+   - The arithmetic lands the same either way the part is sourced. With `sourcing='self'` the mechanic is paid `total − fee` and buys the part; with `'bmt'` the payout excludes the part line. Both leave the mechanic at `0.85 × labour − 0.15 × parts`.
+
+8. **Who keeps the difference when the mechanic fits a cheaper variant than the one quoted?** Raised by combining Q7 with the proposed "quote the dearest variant" rule. If a customer is charged for 2 × £66.90 Brembo XTR and the mechanic fits 2 × £31.67 Textar, the mechanic keeps roughly £70 of the difference after commission. That is a real incentive to fit the cheapest part on a job the customer paid a premium for, and it needs a deliberate answer before the quoting rule ships.
 
 ---
 

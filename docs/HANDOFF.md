@@ -119,6 +119,21 @@ You are working on **Book My Tech**, a UK mobile-mechanic booking platform. This
 
 ## Current task
 
+### 2026-09-11 (later) — Live supplier parts catalogue ✅ (Task 42)
+
+**`docs/tasks/42-live-supplier-parts-catalogue.md`.** `/admin/parts` now leads with a **live, registration-driven supplier lookup**: put in a reg and a part, get LKQ's real brand/quality price ladder with five-level stock, laid out in two columns so AAG sits beside it. Against the real Volvo S40, one lookup returns **58 priced variants across 14 catalogue parts**, each carrying ADS fitment (16" Front Vented 300mm) and quantity-of-fit. The hand-maintained catalogue moved **intact** to `/admin/parts/manual` — nothing dropped, `booking_parts.part_id` still resolves. **No migration, no `app/api/mobile/**` change, nothing orders.**
+
+AAG renders a clear "not connected" state (its IP allowlist is still outstanding, Task 40) and will populate with no UI change once it lands. Both supplier legs run in parallel and neither can take the page down.
+
+**Money rules are enforced in code, not by convention:** `isNotFound` is applied *inside* `getLkqPrices`, so LKQ's £0.00 phantom for an unknown part cannot reach a caller by omission; cost and surcharge are separate columns and **never summed**; blank stock renders "—", never "0"; an unpublished RRP is absent, not £0.00. No mark-up is applied anywhere (owner decision).
+
+**Gareth's commission decision (2026-09-11): commission is charged on the whole booking total, parts included.** That is already what the engine does, so **no code changed**. It does raise a new question worth settling before the quoting rule ships — `docs/06-lkq-parts-api.md` §8 Q8: if we quote the dearest variant and the mechanic fits the cheapest, he keeps roughly £70 of the difference on a £67-vs-£32 brake disc pair. That is an incentive to fit the cheap part on a job the customer paid a premium for.
+
+**Two pre-existing bugs fixed in passing:** `/admin/pricing` was selecting **every** `platform_settings` row unfiltered (supplier caches now live there, so that would have pulled megabytes per page load), and `scripts/probe-ads-parts.mjs` validated component numbers as numeric — which rejects 967 of the 2,277 real ones.
+
+443 tests pass (44 new, all against fixtures captured from both live APIs), typecheck and lint clean, production build compiles. **Not yet opened in a browser by a signed-in admin** — that is the owner step.
+
+
 ### 2026-09-11 — LKQ Euro Car Parts spike ✅ (Task 41). AAG is parked.
 
 **`docs/tasks/41-lkq-parts-api-spike.md` · findings in `docs/06-lkq-parts-api.md`.** Gareth's LKQ Euro Car Parts trade account now has working test credentials, and the whole chain **registration → ADS catalogue → Gareth's trade price with live stock** is verified end-to-end on account `L4040300`. Scripts and docs only — **no `lib/`, no app code, no migration, no mobile-API change.**

@@ -9,7 +9,7 @@ export default function AdminPartNewPage() {
     <div className="mx-auto max-w-3xl space-y-6">
       <div>
         <Link
-          href="/admin/parts"
+          href="/admin/parts/manual"
           className="inline-flex items-center gap-1 text-sm font-medium text-text-muted transition-colors hover:text-text-primary"
         >
           <Icon icon={ChevronLeft} size={14} />

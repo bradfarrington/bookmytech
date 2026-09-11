@@ -221,7 +221,7 @@ export function PartForm({
       </Card>
 
       <div className="flex items-center justify-end gap-3">
-        <Link href="/admin/parts">
+        <Link href="/admin/parts/manual">
           <Button type="button" variant="ghost" disabled={pending}>
             Cancel
           </Button>

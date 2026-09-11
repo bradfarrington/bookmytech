@@ -3,7 +3,7 @@
 import { aagQuote, isAagConfigured, isAagSandbox } from "@/lib/aag/client";
 import { cheapestLine, flattenQuote, type AagQuoteLine } from "@/lib/aag/quote";
 import type { AagVehicleDetails } from "@/lib/aag/types";
-import { createClient } from "@/lib/supabase/server";
+import { requireAdmin } from "@/lib/auth/require-admin";
 import { normaliseReg } from "@/lib/utils";
 
 // Admin-only AAG sandbox check (Task 40). One read-only quote for one
@@ -26,21 +26,6 @@ export type AagCheckResult =
       cheapestProductId: string | null;
     }
   | { ok: false; error: string };
-
-async function requireAdmin(): Promise<{ ok: true } | { ok: false; error: string }> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { ok: false, error: "Not signed in." };
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-  if (profile?.role !== "admin") return { ok: false, error: "Admins only." };
-  return { ok: true };
-}
 
 export async function checkAagQuoteAction(input: {
   reg: string;

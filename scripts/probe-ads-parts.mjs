@@ -1,15 +1,18 @@
 #!/usr/bin/env node
 // Task 41 — ADS part lookup probe. SPENDS ONE CREDIT PER RUN.
 //
-//   node scripts/probe-ads-parts.mjs --attributes lib/lkq/__fixtures__/ads-attributes-NV57XGP.json --group 104
-//   ... --group 104 --increment 2       # next page/refinement
-//   ... --group 104 --dump --save
+//   node scripts/probe-ads-parts.mjs --attributes lib/lkq/__fixtures__/ads-attributes-NV57XGP.json --group 000027
+//   ... --group 000027 --increment 2     # next page/refinement
+//   ... --group 000027 --dump --save
 //
-// --group is an ADS COMPONENT GROUP, not a TecDoc GenArt. The docx gives one
-// worked example: 104 = brake discs (TecDoc's GenArt for brake discs is 82, so
-// the two numberings are NOT interchangeable). The full component list has not
-// been supplied, so groups other than 104 are guesswork until it is — which is
-// the single biggest open question on this integration.
+// --group is an ADS COMPONENT NUMBER, not a TecDoc GenArt — the two numbering
+// systems are unrelated (a brake disc is GenArt 82 to AAG and 000027 to LKQ).
+// The full 2,277-entry list is checked in at
+// lib/lkq/__fixtures__/ads-components-GB-en.json, fetched from LKQ's own
+// Components endpoint. Component numbers are opaque strings, not integers.
+//
+// The docx's one worked example, "104 = Brake Discs", is WRONG: 000104 is a
+// Distributor Cap.
 //
 // Attributes come from scripts/probe-ads-vehicle.mjs --save so a part lookup
 // does not pay for a vehicle lookup as well.
@@ -33,12 +36,15 @@ const increment = arg("increment") || "1";
 if (!attributesPath || !group) {
   console.error(
     "Usage: --attributes <file from probe-ads-vehicle.mjs --save> --group <component group> [--increment N]\n" +
-      "Only component group 104 (brake discs) is confirmed by the documentation.",
+      "Component numbers come from lib/lkq/__fixtures__/ads-components-GB-en.json\n" +
+      "(000027 = Brake Disc). The docx's \"104 = brake discs\" is WRONG — 000104 is a Distributor Cap.",
   );
   process.exit(2);
 }
-if (!/^\d+$/.test(group)) {
-  console.error(`Component group must be numeric, got "${group}".`);
+// Component numbers are NOT all numeric: 967 of the 2,277 look like "con001"
+// or "too409". An earlier /^\d+$/ guard here rejected 42% of the catalogue.
+if (!/^[A-Za-z0-9_-]+$/.test(group)) {
+  console.error(`Component "${group}" doesn't look like an LKQ component number.`);
   process.exit(2);
 }
 

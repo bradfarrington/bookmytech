@@ -34,7 +34,13 @@ export default async function AdminPricingPage() {
       .from("areas")
       .select("id, name, postcode_prefixes, labour_multiplier, is_active")
       .order("name", { ascending: true }),
-    supabase.from("platform_settings").select("key, value"),
+    // Only the keys this page consumes. platform_settings also holds supplier
+    // caches and health rows (Task 42), some of which are several KB — an
+    // unfiltered select would pull all of them down on every page load.
+    supabase
+      .from("platform_settings")
+      .select("key, value")
+      .in("key", [...Object.keys(SETTING_DEFAULTS), REPAIR_COMBINE_MODE_KEY]),
   ]);
 
   // Default area sorts last so the catch-all sits at the bottom of the table.
