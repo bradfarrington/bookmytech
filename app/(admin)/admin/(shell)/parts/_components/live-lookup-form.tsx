@@ -171,16 +171,6 @@ export function LiveLookupForm({ disabled }: { disabled: boolean }) {
                       )}
                     >
                       <span className="min-w-0 flex-1 truncate">{component.name}</span>
-                      {component.comparable ? (
-                        <span
-                          aria-label="Can be compared with Alliance Automotive"
-                          title="Can be compared with Alliance Automotive"
-                          className={cn(
-                            "size-1.5 shrink-0 rounded-full",
-                            active ? "bg-white" : "bg-brand-blue",
-                          )}
-                        />
-                      ) : null}
                     </button>
                   </li>
                 );
@@ -189,9 +179,8 @@ export function LiveLookupForm({ disabled }: { disabled: boolean }) {
           )}
 
           <p className="border-t border-border px-4 py-2.5 text-xs text-text-muted">
-            Everything LKQ lists for this vehicle. Pick one for live prices from both suppliers —
-            a part you haven&apos;t priced on this vehicle before spends one credit, and is free
-            after that. A dot marks the parts Alliance Automotive can also be asked about.
+            Everything LKQ lists for this vehicle. Pick one for live prices — a part you
+            haven&apos;t priced on this vehicle before spends one credit, and is free after that.
           </p>
         </Card>
       ) : null}
