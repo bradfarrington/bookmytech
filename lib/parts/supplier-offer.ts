@@ -88,6 +88,19 @@ export function cheapestOffer(offers: readonly SupplierOffer[]): SupplierOffer |
 }
 
 /**
+ * The dearest offer we could actually buy — the default part for a repair
+ * (Task 45, owner: "the best and highest cost one"). Null when nothing is priced.
+ */
+export function dearestOffer(offers: readonly SupplierOffer[]): SupplierOffer | null {
+  let best: SupplierOffer | null = null;
+  for (const offer of offers) {
+    if (!offer.buyable || offer.costPence == null) continue;
+    if (!best || offer.costPence > (best.costPence as number)) best = offer;
+  }
+  return best;
+}
+
+/**
  * The cheapest across every supplier that answered. Panels in any other state
  * are ignored rather than treated as zero.
  */

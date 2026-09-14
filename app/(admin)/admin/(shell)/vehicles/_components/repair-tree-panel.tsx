@@ -11,6 +11,7 @@ import {
   type NodeAvailability,
   type RepairExclusionRow,
 } from "@/lib/haynespro/exclusions";
+import { genartIdsOf } from "@/lib/haynespro/genarts";
 import { getRepairNodesByIds, getRepairtimeSubnodes, getRepairtimeTypeId } from "@/lib/haynespro/tree";
 import type { HpRepairtimeNode } from "@/lib/haynespro/types";
 import { loadCatalogueOverlay } from "@/lib/catalogue/load-overlay";
@@ -22,6 +23,7 @@ import {
   uniqueIds,
 } from "@/lib/catalogue/overlay";
 import { repairGroupIcon } from "@/lib/repair-group-icons";
+import { RepairParts } from "./repair-parts";
 import { RepairToggle } from "./repair-toggle";
 import { BundleCard, type BundleCardJob, type BundleCardOption } from "../../repairs/_components/bundle-card";
 import {
@@ -85,6 +87,8 @@ interface LeafRow {
   hours: number | null;
   source: "haynespro" | "moved";
   parent: string | null;
+  /** How many TecDoc part groups HaynesPro says the repair uses (Task 45). */
+  partGroups: number;
 }
 
 function fmtHours(n: number): string {
@@ -183,6 +187,7 @@ export async function RepairTreePanel({
         hours: typeof hp.value === "number" && hp.value > 0 ? hp.value / 100 : null,
         source: "haynespro",
         parent: override?.parent_id ?? null,
+        partGroups: genartIdsOf(hp)?.length ?? 0,
       });
     }
   }
@@ -200,6 +205,7 @@ export async function RepairTreePanel({
         hours: typeof value === "number" && value > 0 ? value / 100 : null,
         source: "moved",
         parent: override.parent_id,
+        partGroups: genartIdsOf(extraById.get(override.node_id) ?? {})?.length ?? 0,
       });
     }
   }
@@ -430,6 +436,10 @@ export async function RepairTreePanel({
                     </>
                   )}
                   <RepairToggle target={target} nodeId={row.id} description={row.original} initialAvailable={visible} />
+                  {/* Parts are per engine variant, so only on a model's page (Task 45). */}
+                  {!global && row.partGroups > 0 && (
+                    <RepairParts carTypeId={carTypeId} nodeId={row.id} repairName={row.name} />
+                  )}
                 </li>
               );
             })}

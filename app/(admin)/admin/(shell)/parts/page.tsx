@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Search } from "lucide-react";
+import { Link2, Search } from "lucide-react";
 
 import { isAagConfigured } from "@/lib/aag/client";
 import { readAagHealth } from "@/lib/aag/health";
@@ -54,6 +54,11 @@ export default async function AdminPartsLookupPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Link href="/admin/parts/groups">
+            <Button variant="ghost" iconLeft={Link2}>
+              Part group matches
+            </Button>
+          </Link>
           <Link href="/admin/parts/aag-check">
             <Button variant="ghost" iconLeft={Search}>
               AAG connection check
