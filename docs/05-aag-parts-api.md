@@ -10,7 +10,7 @@ The integration manual is checked in at `docs/suppliers/aag-sales-api-v2-custome
 
 | Account | What it is | Env vars (in `.env.local`) | Status |
 |---|---|---|---|
-| **AAG Sales API v2** | POST-JSON API: quote fitting parts for a registration by TecDoc GenArt product group (with trade price + branch stock), look up known part numbers, re-check a basket, and place on-demand / advance / stock orders against a named AAG branch. | `AAG_API_KEY`, `AAG_CUSTOMER_ID` (the account number), `AAG_VERIFICATION_ID` (only if issued), `AAG_BASE_URL`, `AAG_AUTH_HEADER`, `AAG_AUTH_SCHEME` | Credentials issued 2026-09-10. **Not yet verified live** — see §3. |
+| **AAG Sales API v2** | POST-JSON API: quote fitting parts for a registration by TecDoc GenArt product group (with trade price + branch stock), look up known part numbers, re-check a basket, and place on-demand / advance / stock orders against a named AAG branch. | `AAG_API_KEY`, `AAG_CUSTOMER_ID` (the account number), `AAG_VERIFICATION_ID` (only if issued), `AAG_BASE_URL`, `AAG_AUTH_HEADER`, `AAG_AUTH_SCHEME` | UAT credentials issued 2026-09-10, corrected 2026-09-14. **UAT sandbox verified 2026-09-14** (quotes succeed, see §3). Production credentials follow AAG's demo call. |
 
 Two hosts. **UAT sandbox** `https://aag-sapi-uat1.aaguklabs.co.uk/` is the default everywhere; **live** `https://sales.allianceautomotiveapis.co.uk/` has to be opted into per environment with `AAG_BASE_URL`.
 
@@ -22,18 +22,20 @@ What has been asked of AAG (2026-09-10, via Gareth): can they allowlist by **API
 
 **Confirmed 2026-09-10 (first probe run, from Brad's machine):** the sandbox host sits behind **Cloudflare with an IP allowlist**. Every request to `aag-sapi-uat1.aaguklabs.co.uk` — the quote POST under all three header variants, and even a bare `GET /` — gets **HTTP 403 with Cloudflare's "Attention Required — you have been blocked" HTML page**, so nothing reaches AAG's API at all. That is what their security team's request is about: they need the caller's IP on the sandbox allowlist. The **live** host (`sales.allianceautomotiveapis.co.uk`) has no such edge block from the same address — requests reach AAG's application and get a proper JSON envelope back (§3).
 
+**Resolved for UAT 2026-09-14:** AAG confirmed they have allowlisted the development IP (`80.6.218.98`, Brad's connection). The same day, requests from it reach AAG's application on UAT instead of the Cloudflare block page. If the dev connection's IP changes, the sandbox will 403 again; re-check with `curl -s https://api.ipify.org` and send AAG the new one.
+
 So there are two IP conversations, not one:
 
-- **Sandbox / development:** the fixed IP of whoever runs the probes and the dev server (Brad's office/home — check it at `curl -s https://api.ipify.org`). Give AAG that for UAT now; it unblocks everything in Task 40.
-- **Production:** the Vercel egress question above. Since live isn't edge-blocked today, it may be moot — but ask AAG explicitly whether live applies an IP check after authentication.
+- **Sandbox / development:** ✅ done (above).
+- **Production:** ✅ **answered 2026-09-14: no IP allowlist on live.** AAG confirmed production authenticates on the **API credentials alone**, so the Vercel functions can call it directly. **No static-IP proxy or VPS is needed.** The IP allowlist applies to the UAT sandbox only.
 
 ---
 
 ## 2. What the API offers vs. what BMT needs
 
-### Authentication — three headers, one unnamed
+### Authentication — three headers
 
-- An **API key** — the manual says only "an authorisation type API Key is required" and never names the header. The client therefore sends it under `AAG_AUTH_HEADER` (default `x-api-key`) with an optional `AAG_AUTH_SCHEME` prefix, so the sandbox can be probed with `Authorization: ApiKey …` or `Authorization: Bearer …` without a code change. **Pin the default once AAG confirms.**
+- An **API key** in the header **`api_key`**, bare (no prefix). The manual never names it; AAG's example curl (Chris, 2026-09-14) does, and UAT confirms it (§3). The client defaults to it; `AAG_AUTH_HEADER` / `AAG_AUTH_SCHEME` remain as overrides only.
 - `customer_id` — the account number. Required on every call.
 - `verification_id` — "some accounts" need it; one-to-one with `customer_id`. Error `ISE0101` means it was wrong or missing.
 
@@ -78,11 +80,44 @@ Each product option lists one or more AAG locations with `Priority` (1 = quickes
 | UAT | `POST /api/quote` (x-api-key), (`Authorization: ApiKey`), (`Authorization: Bearer`); `GET /` | **HTTP 403**, Cloudflare "you have been blocked" HTML — identical for all four | The sandbox is IP-allowlisted at the edge. Nothing reaches AAG. Header name untested. |
 | Live | `POST /api/quote` with `x-api-key`; with `Authorization: ApiKey`; with `Authorization: Bearer`; and without `verification_id` | **HTTP 200** + `{"Header":{"SuccessFlag":false,"ErrorCode":"ISE0034","Message":"User is unauthorized, check api key and customer key"}}` — identical for all four | Live is reachable from an arbitrary IP and answers a real AAG envelope. **The manual's inverted status is real: an error comes back as HTTP 200.** `parseAagEnvelope` handled it. The credentials are refused on live under every header we tried, so they are most likely **sandbox-only** — the header question is still open. |
 
-No fixture could be captured. The remaining steps, once AAG has allowlisted the development IP:
+**Second run 2026-09-14 — after AAG allowlisted `80.6.218.98` on UAT and sent an example curl.** All read-only quotes for `DV12CGU`, GenArt 82:
+
+| Host | Request | Result | What it tells us |
+|---|---|---|---|
+| UAT | `POST /api/quote`, our key under `api_key`, our `customer_id` + `verification_id` | **HTTP 200** + `ISE0101` "Invalid Verification ID supplied" | **The allowlist works** (no Cloudflare page). **`api_key` is the right header**: the key got past `ISE0034`. |
+| UAT | Same, with a bogus key under `api_key` | HTTP 200 + `ISE0034` | Control: the key really is checked, so reaching `ISE0101` means ours is accepted. |
+| UAT | Same, our key under `x-api-key` | HTTP 200 + `ISE0034` | Confirms `x-api-key` (the old default) was wrong. |
+| UAT | `api_key` with: no `verification_id`; `verification_id: 76335` (from AAG's example); `customer_id: NAPATEST` + `76335` (AAG's example pair); a bogus `customer_id` | HTTP 200 + `ISE0101`, all four | **The verification ID is checked before the account number** (a bogus customer still says `ISE0101`), and neither our issued ID nor the example one passes. So we can't yet tell whether `customer_id` is right. |
+| UAT | `POST /api/quote/classic` with `api_key`, our IDs (and with an empty `verification_id`) | **HTTP 401**, RFC 7807 problem JSON `{"title":"Invalid Credentials","ISECode":"ISE0034"}` | The classic endpoint refuses differently: a real 401 and no `Header` envelope. `aagCall` reads any non-2xx as "gateway refused", so this shows as unreachable, not auth-failed. Revisit once credentials pass. |
+| Live | `POST /api/quote`, our key under `api_key` | HTTP 200 + `ISE0034` | The key is still refused on live, consistent with AAG saying these are **UAT credentials**. |
+
+~~Blocked on AAG: the verification ID.~~ Resolved the same day: AAG sent corrected UAT credentials (a different account number and verification ID, now in `.env.local`).
+
+**Third run 2026-09-14 — sandbox access proven.** Corrected credentials, `api_key` header, `DV12CGU` (AAG resolved it as a 2012 Vauxhall Meriva 1.4 petrol, VIN returned):
+
+| Request | Result | Fixture |
+|---|---|---|
+| `POST /api/quote` GenArt 82 (brake discs) | **HTTP 201**, `Header.SuccessFlag: true`. 2 articles (front vented, rear solid) × 3 options each (NAPA, Brembo, NAPA Proformer), £14.50–£43.54 | `lib/aag/__fixtures__/quote-82.json` |
+| `POST /api/quote` GenArt 402 (brake pads) | HTTP 201, success. Front + rear × Apec / Brembo / Brakefit, £13.70–£30.41 | `quote-402.json` |
+| `POST /api/quote/classic` GenArt 82 | HTTP 201, success. **13 products**, flat | `quote-classic-82.json` |
+| `POST /api/product/info` `NPANBD5400`, `BRE08.7627.11` | HTTP 201, success, both found; prices match the quote | `product-info.json` |
+
+`npm test` runs the fixture-gated tests in `lib/aag/aag.test.ts` against these, all green. The earlier `/api/quote/classic` 401 was the bad verification ID, not a separate permission.
+
+**Recorded facts (vs. the manual):**
+- **Success is HTTP 201**, as documented; errors are HTTP 200.
+- The **auth header** is `api_key`, bare. **`verification_id` is required** for this account.
+- **`/api/quote/classic` answers in camelCase** (`header.successFlag`, `body.products[].costPrice`), not the manual's PascalCase, and has **no `QuoteId`**. `parseAagEnvelope` now reads either casing for the envelope. `AagQuoteClassicBody` in `lib/aag/types.ts` is still PascalCase: nothing in the app calls `aagQuoteClassic`, so fix the types before anything does. `/api/quote` and `/api/product/info` are PascalCase as documented.
+- **Ratings are `Good` / `Better` / `Best`**, not the manual's Budget / Standard / Premium. The classic quote lowercases them (`best`).
+- **`LocationType` is upper case** (`LOCAL`).
+- `CustomerLockoutRating` is `UNKNOWN` on every option; `Surcharge` is `0`.
+- **ETA:** `/api/quote` gives `EstDeliveryTime: "Please call branch"`, while the classic quote gives a real time for the same branch (`deliveryNotes: "12:28"`). Both are from Milton Keynes (location 311, the only branch on UAT). Ask AAG whether live `/api/quote` returns real ETAs.
+
+The remaining steps:
 
 1. Put `AAG_API_KEY`, `AAG_CUSTOMER_ID` (+ `AAG_VERIFICATION_ID` if issued) in `.env.local`.
 2. `node scripts/probe-aag-quote.mjs --vrm <a real reg> --genart 82`. Expected: `HTTP 201 · SuccessFlag true` and at least one article.
-   - HTTP 401/403 → retry with `AAG_AUTH_HEADER=Authorization AAG_AUTH_SCHEME=ApiKey` (then `Bearer`). Still refused → it is the allowlist; stop and go back to AAG.
+   - HTTP 403 with an HTML page → the IP allowlist (the dev IP has changed); go back to AAG.
    - `ISE0034` in the body → the key or account number is wrong.
    - `ISE0101` → the verification ID is wrong or missing.
 3. `--save` the reply (`lib/aag/__fixtures__/quote-82.json`), then `--genart 402 --save` and `--classic --save`; `node scripts/probe-aag-product-info.mjs --ids <two ProductIds from the quote> --save`. `npm test` then runs the fixture-gated tests in `lib/aag/aag.test.ts` against real shapes.
@@ -132,9 +167,10 @@ Expectation: labour-only jobs (adjust, check, bleed, diagnose) legitimately carr
 ## 5. Open questions
 
 **For AAG (via Gareth):**
-1. **Which header carries the API key**, and with what prefix? (The manual doesn't say; `x-api-key`, `Authorization: ApiKey` and `Authorization: Bearer` all drew the same `ISE0034` on live.)
-2. Does **our account require `verification_id`**? One was issued; does it apply to UAT, live, or both?
-3. **The sandbox is Cloudflare-IP-allowlisted (confirmed).** Please add the development IP for UAT. Are the issued credentials **UAT-only** (live refused them), and what is the process for live credentials? Does **live** apply any IP check after authentication — cloud hosting has no fixed egress IP?
+1. ~~Which header carries the API key?~~ **Answered 2026-09-14:** `api_key`, bare. Verified on UAT.
+2. ~~Verification ID refused on UAT~~ **Resolved 2026-09-14:** AAG sent corrected UAT credentials, and quotes now succeed.
+3. ~~UAT IP allowlist~~ **done 2026-09-14** (`80.6.218.98`). ~~Are the credentials UAT-only?~~ **Yes** (Chris, 2026-09-14); production credentials follow a demo call once development is done. ~~Does live apply an IP check?~~ **No** (2026-09-14): live works on credentials alone, so no static-IP proxy.
+3a. ~~Does `/api/quote/classic` need separate enablement?~~ No; the 401 was the bad verification ID. **New:** on UAT `/api/quote` returns `EstDeliveryTime: "Please call branch"` while `/api/quote/classic` returns a real time for the same branch. Will live `/api/quote` return real ETAs?
 4. The **list of GenArt product groups** the account can quote — is it the full TecDoc set, or an AAG subset?
 5. **`/api/quote` or `/api/quote/classic`** — which do they recommend for new integrators, and what replaces `servicetimeandparts`?
 6. Which **AAG locations / branches** serve our mechanics' areas, and how delivery to a mobile mechanic (no fixed workshop) is meant to work — deliver to the customer's address? Collect from branch?
@@ -143,7 +179,7 @@ Expectation: labour-only jobs (adjust, check, bleed, diagnose) legitimately carr
 **For Gareth / Brad:**
 8. Who pays for the parts and when — does BMT order on account (AAG invoices BMT) and re-charge the customer at the BMT price, as the Task 10 margin model assumes?
 9. Should the customer ever see brand choices (Budget / Standard / Premium), or does the mechanic choose?
-10. Whether to move the booking to a Vercel plan / proxy with a static egress IP if AAG insist (a monthly cost either way).
+10. ~~Whether to pay for a static egress IP~~ — not needed; AAG live authenticates on credentials only (2026-09-14).
 
 ---
 
@@ -154,6 +190,6 @@ Expectation: labour-only jobs (adjust, check, bleed, diagnose) legitimately carr
 3. **Stage 2 — quotes:** AAG-priced part lines on follow-on / on-site quotes, mechanic picks a product option; store `RequestLineId` + `AagLocationId` + supplier cost (admin-only) on the line.
 4. **Stage 3 — ordering:** enquiry re-check then on-demand order from the "Order via BMT" toggle; `booking_parts.status` → `ordered` with `SupplierOrderNumber`; delivery ETA on the job page; a cron to chase undelivered.
 5. **Stage 4 — funnel:** "parts from £X" per repair, cached per (reg, GenArt) for the day, fail-open.
-6. **Ops:** static-IP proxy if AAG require it; live host switch; `aag_health` on the ops monitor.
+6. **Ops:** live credentials + host switch after AAG's demo call (no static-IP proxy — live is credentials-only); `aag_health` on the ops monitor.
 
 **Mobile app:** Task 40 adds one **optional** field (`genartIds`) to `CatalogueNode`, which the app receives from `GET /api/mobile/v1/repairs/{tree,search}` and ignores. No migration, no shape change, no endpoint. Stages 2–4 would each need app work and their own briefs.

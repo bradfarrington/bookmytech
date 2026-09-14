@@ -13,12 +13,12 @@
 //     and `Header.ErrorCode` from the body and ignores the status entirely;
 //     only a non-2xx (the gateway, a firewall, an allowlist) is treated as
 //     "unreachable".
-//  2. **Auth is three headers, and the manual never names the first.** An API
-//     key ("authorisation type API Key" — header name unstated), `customer_id`
-//     (the account number) and an optional `verification_id`. The header name
-//     and an optional scheme prefix are therefore configurable
-//     (`AAG_AUTH_HEADER`, `AAG_AUTH_SCHEME`) so the sandbox can be probed
-//     without a code change. Once AAG confirms, pin the default.
+//  2. **Auth is three headers.** The manual never names the first, but AAG's
+//     own example curl (2026-09-14) does: `api_key` (no scheme prefix),
+//     `customer_id` (the account number) and `verification_id`. Verified on
+//     UAT: a real key under `api_key` gets past `ISE0034`; a bogus key, or the
+//     real key under `x-api-key`, does not. The header name and prefix stay
+//     configurable (`AAG_AUTH_HEADER`, `AAG_AUTH_SCHEME`) in case live differs.
 //  3. **The sandbox is the default.** `AAG_BASE_URL` unset means UAT; live
 //     must be opted into explicitly per environment.
 //
@@ -69,7 +69,7 @@ export function getAagConfig(): AagConfig | null {
     customerId,
     verificationId: process.env.AAG_VERIFICATION_ID || null,
     baseUrl: (process.env.AAG_BASE_URL || AAG_UAT_BASE_URL).replace(/\/+$/, ""),
-    authHeader: process.env.AAG_AUTH_HEADER || "x-api-key",
+    authHeader: process.env.AAG_AUTH_HEADER || "api_key",
     authScheme: process.env.AAG_AUTH_SCHEME || "",
   };
 }
@@ -116,26 +116,35 @@ export type ParsedAagEnvelope<T> =
  * Read AAG's envelope. `Header.SuccessFlag` decides, never the HTTP status.
  * A reply with no Header block (the classic quote documents its header
  * fields as "not yet available") is taken as success when it has a body.
+ *
+ * Envelope keys are read in either casing: `/api/quote` answers PascalCase
+ * (`Header.SuccessFlag`), but `/api/quote/classic` answers camelCase
+ * (`header.successFlag`) — verified on UAT 2026-09-14. Only the envelope is
+ * normalised; the body is handed back as AAG sent it.
  */
 export function parseAagEnvelope<T>(raw: unknown): ParsedAagEnvelope<T> {
   if (raw == null || typeof raw !== "object") {
     return { ok: false, errorCode: null, message: "AAG returned an empty reply." };
   }
-  const env = raw as AagEnvelope<T> & Record<string, unknown>;
-  const header = env.Header;
-  if (header && typeof header === "object") {
-    if (header.SuccessFlag === true) {
-      return { ok: true, body: (env.Body ?? ({} as T)) as T, message: header.Message ?? null };
+  const env = raw as Record<string, unknown>;
+  const rawHeader = env.Header ?? env.header;
+  const rawBody = env.Body ?? env.body;
+  if (rawHeader && typeof rawHeader === "object") {
+    const h = rawHeader as Record<string, unknown>;
+    const message = (h.Message ?? h.message) as string | null | undefined;
+    if ((h.SuccessFlag ?? h.successFlag) === true) {
+      return { ok: true, body: (rawBody ?? {}) as T, message: message || null };
     }
-    const errorCode = typeof header.ErrorCode === "string" && header.ErrorCode ? header.ErrorCode : null;
+    const code = h.ErrorCode ?? h.errorCode;
+    const errorCode = typeof code === "string" && code ? code : null;
     return {
       ok: false,
       errorCode,
-      message: header.Message?.trim() || describeAagError(errorCode),
+      message: message?.trim() || describeAagError(errorCode),
     };
   }
   // No Header: the payload is either {Body: …} or the body itself.
-  const body = (env.Body != null ? env.Body : env) as T;
+  const body = (rawBody != null ? rawBody : env) as T;
   return { ok: true, body, message: null };
 }
 

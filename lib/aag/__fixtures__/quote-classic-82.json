@@ -1,0 +1,1038 @@
+{
+  "header": {
+    "successFlag": true,
+    "message": "",
+    "errorCode": ""
+  },
+  "body": {
+    "products": [
+      {
+        "productId": "BRE09.7629.11",
+        "description": "BRAKE DISC PAIR (PRICE PER DISC)",
+        "requestLineId": "AAGV2Q000639249776318410003/1",
+        "mfgCode": "BRE",
+        "customerPartNumber": "",
+        "customerLockoutRating": "UNKNOWN",
+        "recMinOrdQty": 2,
+        "supplier": {
+          "supplierCode": 65,
+          "supplierName": "BREMBO",
+          "brandLogoFileName": "https://cdn.aag-puurdata.eu/articles/0065/logo_brembo.jpg"
+        },
+        "costPrice": 43.54,
+        "surcharge": 0,
+        "perQuantity": 1,
+        "stock": [
+          {
+            "aagLocationId": 311,
+            "branchCode": "MKEY",
+            "branchName": "NAPA Auto Parts - Milton Keynes",
+            "count": 2,
+            "notes": "",
+            "deliveryNotes": "12:28"
+          },
+          {
+            "aagLocationId": 582,
+            "branchCode": "Rotherham",
+            "branchName": "Rotherham NDC",
+            "count": 200,
+            "notes": "",
+            "deliveryNotes": "13:45 NWD"
+          }
+        ],
+        "customerProductGroup": "82",
+        "fitment": "Front Axle",
+        "imageUrl": "https://cdn.aag-puurdata.eu/articles/0065/09762911.jpg",
+        "isKit": false,
+        "productRating": "best",
+        "productDetails": [
+          {
+            "name": "Number of Holes",
+            "value": "5"
+          },
+          {
+            "name": "Brake Disc Type",
+            "value": "Vented"
+          },
+          {
+            "name": "Centering Diameter [mm]",
+            "value": "70"
+          },
+          {
+            "name": "Height [mm]",
+            "value": "42"
+          },
+          {
+            "name": "Brake Disc Thickness [mm]",
+            "value": "25"
+          },
+          {
+            "name": "Outer Diameter [mm]",
+            "value": "280"
+          },
+          {
+            "name": "Fitting Position",
+            "value": "Front Axle"
+          }
+        ]
+      },
+      {
+        "productId": "BRE09.7629.1X",
+        "description": "BRAKE DISC PAIR (PRICE PER DISC)",
+        "requestLineId": "AAGV2Q000639249776318410003/2",
+        "mfgCode": "BRE",
+        "customerPartNumber": "",
+        "customerLockoutRating": "UNKNOWN",
+        "recMinOrdQty": 2,
+        "supplier": {
+          "supplierCode": 65,
+          "supplierName": "BREMBO",
+          "brandLogoFileName": "https://cdn.aag-puurdata.eu/articles/0065/logo_brembo.jpg"
+        },
+        "costPrice": 77.53,
+        "surcharge": 0,
+        "perQuantity": 1,
+        "stock": [
+          {
+            "aagLocationId": 311,
+            "branchCode": "MKEY",
+            "branchName": "NAPA Auto Parts - Milton Keynes",
+            "count": 0,
+            "notes": "",
+            "deliveryNotes": "N/A"
+          }
+        ],
+        "customerProductGroup": "82",
+        "fitment": "Front Axle",
+        "imageUrl": "https://cdn.aag-puurdata.eu/articles/0065/0976291x.jpg",
+        "isKit": false,
+        "productRating": "best",
+        "productDetails": [
+          {
+            "name": "Technical information",
+            "value": "The specific drilling of Brembo Xtra brake discs provides a brilliant and efficient performance in any braking condition, to emphasise the driving style of true enthusiasts."
+          },
+          {
+            "name": "Number of Holes",
+            "value": "5"
+          },
+          {
+            "name": "Centering Diameter [mm]",
+            "value": "70"
+          },
+          {
+            "name": "Brake Disc Type",
+            "value": "Perforated/vented"
+          },
+          {
+            "name": "Height [mm]",
+            "value": "42"
+          },
+          {
+            "name": "Brake Disc Thickness [mm]",
+            "value": "25"
+          },
+          {
+            "name": "Outer Diameter [mm]",
+            "value": "280"
+          },
+          {
+            "name": "Fitting Position",
+            "value": "Front Axle"
+          }
+        ]
+      },
+      {
+        "productId": "BRE09.7629.75",
+        "description": "BRAKE DISC PAIR (PRICE PER DISC)",
+        "requestLineId": "AAGV2Q000639249776318410003/3",
+        "mfgCode": "BRE",
+        "customerPartNumber": "",
+        "customerLockoutRating": "UNKNOWN",
+        "recMinOrdQty": 2,
+        "supplier": {
+          "supplierCode": 65,
+          "supplierName": "BREMBO",
+          "brandLogoFileName": "https://cdn.aag-puurdata.eu/articles/0065/logo_brembo.jpg"
+        },
+        "costPrice": 59.25,
+        "surcharge": 0,
+        "perQuantity": 1,
+        "stock": [
+          {
+            "aagLocationId": 311,
+            "branchCode": "MKEY",
+            "branchName": "NAPA Auto Parts - Milton Keynes",
+            "count": 0,
+            "notes": "",
+            "deliveryNotes": "N/A"
+          }
+        ],
+        "customerProductGroup": "82",
+        "fitment": "Front Axle",
+        "imageUrl": "https://cdn.aag-puurdata.eu/articles/0065/09762975.jpg",
+        "isKit": false,
+        "productRating": "best",
+        "productDetails": [
+          {
+            "name": "Number of Holes",
+            "value": "5"
+          },
+          {
+            "name": "Brake Disc Type",
+            "value": "Vented, Slotted"
+          },
+          {
+            "name": "Centering Diameter [mm]",
+            "value": "70"
+          },
+          {
+            "name": "Height [mm]",
+            "value": "42"
+          },
+          {
+            "name": "Brake Disc Thickness [mm]",
+            "value": "25"
+          },
+          {
+            "name": "Outer Diameter [mm]",
+            "value": "280"
+          },
+          {
+            "name": "Fitting Position",
+            "value": "Front Axle"
+          }
+        ]
+      },
+      {
+        "productId": "APEDSK794",
+        "description": "B/DISC  280 * 5 (VENTED) - FRONT",
+        "requestLineId": "AAGV2Q000639249776318410003/4",
+        "mfgCode": "APE",
+        "customerPartNumber": "",
+        "customerLockoutRating": "UNKNOWN",
+        "recMinOrdQty": 2,
+        "supplier": {
+          "supplierCode": 9999,
+          "supplierName": "APEC",
+          "brandLogoFileName": "https://cdn.aag-puurdata.eu/articles/9999/9999_logo.png"
+        },
+        "costPrice": 30.26,
+        "surcharge": 0,
+        "perQuantity": 1,
+        "stock": [
+          {
+            "aagLocationId": 505,
+            "branchCode": "Luton",
+            "branchName": "Luton",
+            "count": 2,
+            "notes": "",
+            "deliveryNotes": "09:15 NWD"
+          },
+          {
+            "aagLocationId": 582,
+            "branchCode": "Rotherham",
+            "branchName": "Rotherham NDC",
+            "count": 11,
+            "notes": "",
+            "deliveryNotes": "13:45 NWD"
+          }
+        ],
+        "customerProductGroup": "82",
+        "fitment": "Front Axle",
+        "imageUrl": "https://cdn.aag-puurdata.eu/articles/9999/dsk794_6708302.jpg",
+        "isKit": false,
+        "productRating": "better",
+        "productDetails": [
+          {
+            "name": "Number of Holes",
+            "value": "5"
+          },
+          {
+            "name": "Brake Disc Type",
+            "value": "Vented"
+          },
+          {
+            "name": "Centering Diameter [mm]",
+            "value": "70"
+          },
+          {
+            "name": "Height [mm]",
+            "value": "42"
+          },
+          {
+            "name": "Brake Disc Thickness [mm]",
+            "value": "25"
+          },
+          {
+            "name": "Test Mark",
+            "value": "90R-02C0349/0739"
+          },
+          {
+            "name": "Bolt Hole Circle Ø [mm]",
+            "value": "110"
+          },
+          {
+            "name": "Outer Diameter [mm]",
+            "value": "280"
+          },
+          {
+            "name": "Fitting Position",
+            "value": "Front Axle"
+          },
+          {
+            "name": "Paired article number",
+            "value": "ADS7"
+          },
+          {
+            "name": "Only for article number",
+            "value": "PAD1348"
+          }
+        ]
+      },
+      {
+        "productId": "FAHFBD6028",
+        "description": "FAHREN BRAKE DISC",
+        "requestLineId": "AAGV2Q000639249776318410003/5",
+        "mfgCode": "FAH",
+        "customerPartNumber": "",
+        "customerLockoutRating": "UNKNOWN",
+        "recMinOrdQty": 2,
+        "supplier": {
+          "supplierCode": 7097,
+          "supplierName": "FAHREN",
+          "brandLogoFileName": "https://cdn.aag-puurdata.eu/articles/7097/fahren.jpg"
+        },
+        "costPrice": 27.79,
+        "surcharge": 0,
+        "perQuantity": 1,
+        "stock": [
+          {
+            "aagLocationId": 311,
+            "branchCode": "MKEY",
+            "branchName": "NAPA Auto Parts - Milton Keynes",
+            "count": 4,
+            "notes": "",
+            "deliveryNotes": "12:28"
+          },
+          {
+            "aagLocationId": 505,
+            "branchCode": "Luton",
+            "branchName": "Luton",
+            "count": 8,
+            "notes": "",
+            "deliveryNotes": "09:15 NWD"
+          },
+          {
+            "aagLocationId": 582,
+            "branchCode": "Rotherham",
+            "branchName": "Rotherham NDC",
+            "count": 74,
+            "notes": "",
+            "deliveryNotes": "13:45 NWD"
+          }
+        ],
+        "customerProductGroup": "82",
+        "fitment": "Front Axle",
+        "imageUrl": "https://cdn.aag-puurdata.eu/articles/7097/fbd6028_904978.jpg",
+        "isKit": false,
+        "productRating": "good",
+        "productDetails": [
+          {
+            "name": "Centering Diameter [mm]",
+            "value": "70"
+          },
+          {
+            "name": "Brake Disc Type",
+            "value": "Vented"
+          },
+          {
+            "name": "Height [mm]",
+            "value": "42"
+          },
+          {
+            "name": "Brake Disc Thickness [mm]",
+            "value": "25"
+          },
+          {
+            "name": "Test Mark",
+            "value": "90R-02C0349/0739"
+          },
+          {
+            "name": "Bolt Hole Circle Ø [mm]",
+            "value": "110"
+          },
+          {
+            "name": "Outer Diameter [mm]",
+            "value": "280"
+          },
+          {
+            "name": "Fitting Position",
+            "value": "Front Axle"
+          },
+          {
+            "name": "Paired article number",
+            "value": "ADS7"
+          },
+          {
+            "name": "Only for article number",
+            "value": "FBP3078"
+          },
+          {
+            "name": "Article number of recommended accessories",
+            "value": "Use ADS7"
+          }
+        ]
+      },
+      {
+        "productId": "BFTSDK6028",
+        "description": "BRAKEFIT 280* 5 (VENTED) SINGLE DISC",
+        "requestLineId": "AAGV2Q000639249776318410003/6",
+        "mfgCode": "APE",
+        "customerPartNumber": "",
+        "customerLockoutRating": "UNKNOWN",
+        "recMinOrdQty": 2,
+        "supplier": {
+          "supplierCode": 9997,
+          "supplierName": "APEC BLUE",
+          "brandLogoFileName": "https://cdn.aag-puurdata.eu/articles/9997/9997_logo.png"
+        },
+        "costPrice": 27.03,
+        "surcharge": 0,
+        "perQuantity": 1,
+        "stock": [
+          {
+            "aagLocationId": 505,
+            "branchCode": "Luton",
+            "branchName": "Luton",
+            "count": 12,
+            "notes": "",
+            "deliveryNotes": "09:15 NWD"
+          },
+          {
+            "aagLocationId": 582,
+            "branchCode": "Rotherham",
+            "branchName": "Rotherham NDC",
+            "count": 328,
+            "notes": "",
+            "deliveryNotes": "13:45 NWD"
+          }
+        ],
+        "customerProductGroup": "82",
+        "fitment": "Front Axle",
+        "imageUrl": "https://cdn.aag-puurdata.eu/articles/9997/sdk6028_881945.jpg",
+        "isKit": false,
+        "productRating": "good",
+        "productDetails": [
+          {
+            "name": "Number of Holes",
+            "value": "5"
+          },
+          {
+            "name": "Centering Diameter [mm]",
+            "value": "70"
+          },
+          {
+            "name": "Brake Disc Type",
+            "value": "Vented"
+          },
+          {
+            "name": "Height [mm]",
+            "value": "42"
+          },
+          {
+            "name": "Brake Disc Thickness [mm]",
+            "value": "25"
+          },
+          {
+            "name": "Test Mark",
+            "value": "90R-02C0349/0739"
+          },
+          {
+            "name": "Bolt Hole Circle Ø [mm]",
+            "value": "110"
+          },
+          {
+            "name": "Outer Diameter [mm]",
+            "value": "280"
+          },
+          {
+            "name": "Fitting Position",
+            "value": "Front Axle"
+          },
+          {
+            "name": "Paired article number",
+            "value": "ADS7"
+          },
+          {
+            "name": "Only for article number",
+            "value": "PD3078"
+          }
+        ]
+      },
+      {
+        "productId": "BRE08.7627.11",
+        "description": "BRAKE DISC PAIR (PRICE PER DISC)",
+        "requestLineId": "AAGV2Q000639249776318410003/7",
+        "mfgCode": "BRE",
+        "customerPartNumber": "",
+        "customerLockoutRating": "UNKNOWN",
+        "recMinOrdQty": 2,
+        "supplier": {
+          "supplierCode": 65,
+          "supplierName": "BREMBO",
+          "brandLogoFileName": "https://cdn.aag-puurdata.eu/articles/0065/logo_brembo.jpg"
+        },
+        "costPrice": 30.85,
+        "surcharge": 0,
+        "perQuantity": 1,
+        "stock": [
+          {
+            "aagLocationId": 311,
+            "branchCode": "MKEY",
+            "branchName": "NAPA Auto Parts - Milton Keynes",
+            "count": 2,
+            "notes": "",
+            "deliveryNotes": "12:28"
+          },
+          {
+            "aagLocationId": 505,
+            "branchCode": "Luton",
+            "branchName": "Luton",
+            "count": 4,
+            "notes": "",
+            "deliveryNotes": "09:15 NWD"
+          },
+          {
+            "aagLocationId": 582,
+            "branchCode": "Rotherham",
+            "branchName": "Rotherham NDC",
+            "count": 32,
+            "notes": "",
+            "deliveryNotes": "13:45 NWD"
+          }
+        ],
+        "customerProductGroup": "82",
+        "fitment": "Rear Axle",
+        "imageUrl": "https://cdn.aag-puurdata.eu/articles/0065/08762711.jpg",
+        "isKit": false,
+        "productRating": "best",
+        "productDetails": [
+          {
+            "name": "Number of Holes",
+            "value": "5"
+          },
+          {
+            "name": "Centering Diameter [mm]",
+            "value": "65"
+          },
+          {
+            "name": "Brake Disc Type",
+            "value": "Solid"
+          },
+          {
+            "name": "Height [mm]",
+            "value": "42"
+          },
+          {
+            "name": "Supplementary Article/Supplementary Info 2",
+            "value": "With bolts/screws"
+          },
+          {
+            "name": "Brake Disc Thickness [mm]",
+            "value": "10"
+          },
+          {
+            "name": "Outer Diameter [mm]",
+            "value": "264"
+          },
+          {
+            "name": "Fitting Position",
+            "value": "Rear Axle"
+          }
+        ]
+      },
+      {
+        "productId": "BRE08.7627.1X",
+        "description": "BRAKE DISC PAIR (PRICE PER DISC)",
+        "requestLineId": "AAGV2Q000639249776318410003/8",
+        "mfgCode": "BRE",
+        "customerPartNumber": "",
+        "customerLockoutRating": "UNKNOWN",
+        "recMinOrdQty": 2,
+        "supplier": {
+          "supplierCode": 65,
+          "supplierName": "BREMBO",
+          "brandLogoFileName": "https://cdn.aag-puurdata.eu/articles/0065/logo_brembo.jpg"
+        },
+        "costPrice": 52.01,
+        "surcharge": 0,
+        "perQuantity": 1,
+        "stock": [
+          {
+            "aagLocationId": 311,
+            "branchCode": "MKEY",
+            "branchName": "NAPA Auto Parts - Milton Keynes",
+            "count": 0,
+            "notes": "",
+            "deliveryNotes": "N/A"
+          }
+        ],
+        "customerProductGroup": "82",
+        "fitment": "Rear Axle",
+        "imageUrl": "https://cdn.aag-puurdata.eu/articles/0065/0876271x.jpg",
+        "isKit": false,
+        "productRating": "best",
+        "productDetails": [
+          {
+            "name": "Technical information",
+            "value": "The specific drilling of Brembo Xtra brake discs provides a brilliant and efficient performance in any braking condition, to emphasise the driving style of true enthusiasts."
+          },
+          {
+            "name": "Number of Holes",
+            "value": "5"
+          },
+          {
+            "name": "Centering Diameter [mm]",
+            "value": "65"
+          },
+          {
+            "name": "Brake Disc Type",
+            "value": "Perforated, Solid"
+          },
+          {
+            "name": "Height [mm]",
+            "value": "42"
+          },
+          {
+            "name": "Supplementary Article/Supplementary Info 2",
+            "value": "With bolts/screws"
+          },
+          {
+            "name": "Brake Disc Thickness [mm]",
+            "value": "10"
+          },
+          {
+            "name": "Outer Diameter [mm]",
+            "value": "264"
+          },
+          {
+            "name": "Fitting Position",
+            "value": "Rear Axle"
+          }
+        ]
+      },
+      {
+        "productId": "BRE08.7627.75",
+        "description": "BRAKE DISC PAIR (PRICE PER DISC)",
+        "requestLineId": "AAGV2Q000639249776318410003/9",
+        "mfgCode": "BRE",
+        "customerPartNumber": "",
+        "customerLockoutRating": "UNKNOWN",
+        "recMinOrdQty": 2,
+        "supplier": {
+          "supplierCode": 65,
+          "supplierName": "BREMBO",
+          "brandLogoFileName": "https://cdn.aag-puurdata.eu/articles/0065/logo_brembo.jpg"
+        },
+        "costPrice": 37.74,
+        "surcharge": 0,
+        "perQuantity": 1,
+        "stock": [
+          {
+            "aagLocationId": 311,
+            "branchCode": "MKEY",
+            "branchName": "NAPA Auto Parts - Milton Keynes",
+            "count": 0,
+            "notes": "",
+            "deliveryNotes": "N/A"
+          }
+        ],
+        "customerProductGroup": "82",
+        "fitment": "Rear Axle",
+        "imageUrl": "https://cdn.aag-puurdata.eu/articles/0065/08762775.jpg",
+        "isKit": false,
+        "productRating": "best",
+        "productDetails": [
+          {
+            "name": "Number of Holes",
+            "value": "5"
+          },
+          {
+            "name": "Centering Diameter [mm]",
+            "value": "65"
+          },
+          {
+            "name": "Brake Disc Type",
+            "value": "Slotted, Solid"
+          },
+          {
+            "name": "Height [mm]",
+            "value": "42"
+          },
+          {
+            "name": "Supplementary Article/Supplementary Info 2",
+            "value": "With bolts/screws"
+          },
+          {
+            "name": "Brake Disc Thickness [mm]",
+            "value": "10"
+          },
+          {
+            "name": "Outer Diameter [mm]",
+            "value": "264"
+          },
+          {
+            "name": "Fitting Position",
+            "value": "Rear Axle"
+          }
+        ]
+      },
+      {
+        "productId": "APEDSK806",
+        "description": "B/DISC  264 * 5 (SOLID) - REAR",
+        "requestLineId": "AAGV2Q000639249776318410003/10",
+        "mfgCode": "APE",
+        "customerPartNumber": "",
+        "customerLockoutRating": "UNKNOWN",
+        "recMinOrdQty": 2,
+        "supplier": {
+          "supplierCode": 9999,
+          "supplierName": "APEC",
+          "brandLogoFileName": "https://cdn.aag-puurdata.eu/articles/9999/9999_logo.png"
+        },
+        "costPrice": 27.66,
+        "surcharge": 0,
+        "perQuantity": 1,
+        "stock": [
+          {
+            "aagLocationId": 505,
+            "branchCode": "Luton",
+            "branchName": "Luton",
+            "count": 2,
+            "notes": "",
+            "deliveryNotes": "09:15 NWD"
+          },
+          {
+            "aagLocationId": 582,
+            "branchCode": "Rotherham",
+            "branchName": "Rotherham NDC",
+            "count": 79,
+            "notes": "",
+            "deliveryNotes": "13:45 NWD"
+          }
+        ],
+        "customerProductGroup": "82",
+        "fitment": "Rear Axle",
+        "imageUrl": "https://cdn.aag-puurdata.eu/articles/9999/dsk806_6708396.jpg",
+        "isKit": false,
+        "productRating": "better",
+        "productDetails": [
+          {
+            "name": "Number of Holes",
+            "value": "5"
+          },
+          {
+            "name": "Brake Disc Type",
+            "value": "Solid"
+          },
+          {
+            "name": "Centering Diameter [mm]",
+            "value": "65"
+          },
+          {
+            "name": "Height [mm]",
+            "value": "42"
+          },
+          {
+            "name": "Brake Disc Thickness [mm]",
+            "value": "10"
+          },
+          {
+            "name": "Test Mark",
+            "value": "90R-02C0722/2597"
+          },
+          {
+            "name": "Bolt Hole Circle Ø [mm]",
+            "value": "110"
+          },
+          {
+            "name": "Outer Diameter [mm]",
+            "value": "264"
+          },
+          {
+            "name": "Fitting Position",
+            "value": "Rear Axle"
+          },
+          {
+            "name": "Only for article number",
+            "value": "PAD1286"
+          },
+          {
+            "name": "Paired article number",
+            "value": "ASG1159, ADS8"
+          }
+        ]
+      },
+      {
+        "productId": "BFTSDK6077",
+        "description": "BRAKEFIT 264* 5 (SOLID) SINGLE DISC",
+        "requestLineId": "AAGV2Q000639249776318410003/11",
+        "mfgCode": "APE",
+        "customerPartNumber": "",
+        "customerLockoutRating": "UNKNOWN",
+        "recMinOrdQty": 2,
+        "supplier": {
+          "supplierCode": 9997,
+          "supplierName": "APEC BLUE",
+          "brandLogoFileName": "https://cdn.aag-puurdata.eu/articles/9997/9997_logo.png"
+        },
+        "costPrice": 16.45,
+        "surcharge": 0,
+        "perQuantity": 1,
+        "stock": [
+          {
+            "aagLocationId": 505,
+            "branchCode": "Luton",
+            "branchName": "Luton",
+            "count": 10,
+            "notes": "",
+            "deliveryNotes": "09:15 NWD"
+          },
+          {
+            "aagLocationId": 582,
+            "branchCode": "Rotherham",
+            "branchName": "Rotherham NDC",
+            "count": 172,
+            "notes": "",
+            "deliveryNotes": "13:45 NWD"
+          }
+        ],
+        "customerProductGroup": "82",
+        "fitment": "Rear Axle",
+        "imageUrl": "https://cdn.aag-puurdata.eu/articles/9997/sdk6077_6677601.jpg",
+        "isKit": false,
+        "productRating": "good",
+        "productDetails": [
+          {
+            "name": "Number of Holes",
+            "value": "5"
+          },
+          {
+            "name": "Brake Disc Type",
+            "value": "Solid"
+          },
+          {
+            "name": "Centering Diameter [mm]",
+            "value": "65"
+          },
+          {
+            "name": "Height [mm]",
+            "value": "42"
+          },
+          {
+            "name": "Brake Disc Thickness [mm]",
+            "value": "10"
+          },
+          {
+            "name": "Test Mark",
+            "value": "90R-02C0355/0368"
+          },
+          {
+            "name": "Bolt Hole Circle Ø [mm]",
+            "value": "110"
+          },
+          {
+            "name": "Outer Diameter [mm]",
+            "value": "264"
+          },
+          {
+            "name": "Fitting Position",
+            "value": "Rear Axle"
+          },
+          {
+            "name": "Only for article number",
+            "value": "PD3070"
+          },
+          {
+            "name": "Paired article number",
+            "value": "ASG1159, ADS8"
+          }
+        ]
+      },
+      {
+        "productId": "BSC0986478884",
+        "description": "BD783 BRAKE DISC PAIR (PRICE PER DISC)",
+        "requestLineId": "AAGV2Q000639249776318410003/12",
+        "mfgCode": "BSC",
+        "customerPartNumber": "",
+        "customerLockoutRating": "UNKNOWN",
+        "recMinOrdQty": 2,
+        "supplier": {
+          "supplierCode": 30,
+          "supplierName": "BOSCH",
+          "brandLogoFileName": "https://cdn.aag-puurdata.eu/articles/0030/0030001.jpg"
+        },
+        "costPrice": 24.28,
+        "surcharge": 0,
+        "perQuantity": 1,
+        "stock": [
+          {
+            "aagLocationId": 311,
+            "branchCode": "MKEY",
+            "branchName": "NAPA Auto Parts - Milton Keynes",
+            "count": 2,
+            "notes": "",
+            "deliveryNotes": "12:28"
+          },
+          {
+            "aagLocationId": 582,
+            "branchCode": "Rotherham",
+            "branchName": "Rotherham NDC",
+            "count": 15,
+            "notes": "",
+            "deliveryNotes": "13:45 NWD"
+          }
+        ],
+        "customerProductGroup": "82",
+        "fitment": "Rear Axle",
+        "imageUrl": "https://cdn.aag-puurdata.eu/articles/0030/0986478884phanwhco0000.jpg",
+        "isKit": false,
+        "productRating": "best",
+        "productDetails": [
+          {
+            "name": "Number of Holes",
+            "value": "5"
+          },
+          {
+            "name": "Centering Diameter [mm]",
+            "value": "65,5"
+          },
+          {
+            "name": "Brake Disc Type",
+            "value": "Solid"
+          },
+          {
+            "name": "Height [mm]",
+            "value": "42"
+          },
+          {
+            "name": "Brake Disc Thickness [mm]",
+            "value": "10"
+          },
+          {
+            "name": "Bolt Hole Circle Ø [mm]",
+            "value": "110"
+          },
+          {
+            "name": "Outer Diameter [mm]",
+            "value": "263,8"
+          },
+          {
+            "name": "Surface",
+            "value": "Coated"
+          },
+          {
+            "name": "Fitting Position",
+            "value": "Rear Axle"
+          }
+        ]
+      },
+      {
+        "productId": "FAHFBD6077",
+        "description": "FAHREN BRAKE DISC",
+        "requestLineId": "AAGV2Q000639249776318410003/13",
+        "mfgCode": "FAH",
+        "customerPartNumber": "",
+        "customerLockoutRating": "UNKNOWN",
+        "recMinOrdQty": 2,
+        "supplier": {
+          "supplierCode": 7097,
+          "supplierName": "FAHREN",
+          "brandLogoFileName": "https://cdn.aag-puurdata.eu/articles/7097/fahren.jpg"
+        },
+        "costPrice": 16.92,
+        "surcharge": 0,
+        "perQuantity": 1,
+        "stock": [
+          {
+            "aagLocationId": 311,
+            "branchCode": "MKEY",
+            "branchName": "NAPA Auto Parts - Milton Keynes",
+            "count": 8,
+            "notes": "",
+            "deliveryNotes": "12:28"
+          },
+          {
+            "aagLocationId": 505,
+            "branchCode": "Luton",
+            "branchName": "Luton",
+            "count": 8,
+            "notes": "",
+            "deliveryNotes": "09:15 NWD"
+          },
+          {
+            "aagLocationId": 582,
+            "branchCode": "Rotherham",
+            "branchName": "Rotherham NDC",
+            "count": 90,
+            "notes": "",
+            "deliveryNotes": "13:45 NWD"
+          }
+        ],
+        "customerProductGroup": "82",
+        "fitment": "Rear Axle",
+        "imageUrl": "https://cdn.aag-puurdata.eu/articles/7097/fbd6077_6677601.jpg",
+        "isKit": false,
+        "productRating": "good",
+        "productDetails": [
+          {
+            "name": "Centering Diameter [mm]",
+            "value": "65"
+          },
+          {
+            "name": "Brake Disc Type",
+            "value": "Solid"
+          },
+          {
+            "name": "Height [mm]",
+            "value": "42"
+          },
+          {
+            "name": "Brake Disc Thickness [mm]",
+            "value": "10"
+          },
+          {
+            "name": "Test Mark",
+            "value": "90R-02C0355/0368"
+          },
+          {
+            "name": "Bolt Hole Circle Ø [mm]",
+            "value": "110"
+          },
+          {
+            "name": "Outer Diameter [mm]",
+            "value": "264"
+          },
+          {
+            "name": "Fitting Position",
+            "value": "Rear Axle"
+          },
+          {
+            "name": "Paired article number",
+            "value": "ASG1159, ADS8"
+          },
+          {
+            "name": "Only for article number",
+            "value": "FBP3070"
+          },
+          {
+            "name": "Article number of recommended accessories",
+            "value": "Use ADS8"
+          }
+        ]
+      }
+    ],
+    "vehicleDetails": null
+  }
+}

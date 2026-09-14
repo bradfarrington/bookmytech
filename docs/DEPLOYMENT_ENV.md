@@ -87,7 +87,7 @@ nothing else is affected. Nothing customer-facing reads this yet.
 | `AAG_CUSTOMER_ID` | ✅ | 🔑 | The **account number** — sent as AAG's `customer_id` header. |
 | `AAG_VERIFICATION_ID` | ⬜ | 🔑 | The verification ID, only if AAG issued one for this account (`verification_id` header). |
 | `AAG_BASE_URL` | ⬜ | plain | Unset = the **UAT sandbox** (`https://aag-sapi-uat1.aaguklabs.co.uk`). Set to `https://sales.allianceautomotiveapis.co.uk` on production only once AAG has signed the account off. |
-| `AAG_AUTH_HEADER` | ⬜ | plain | The header the API key travels in. Falls back to `x-api-key`. AAG's manual never names it — set to `Authorization` if the sandbox refuses the default. |
+| `AAG_AUTH_HEADER` | ⬜ | plain | The header the API key travels in. Falls back to `api_key` (AAG's own example; verified on UAT 2026-09-14). Leave unset unless AAG say live differs. |
 | `AAG_AUTH_SCHEME` | ⬜ | plain | Optional prefix inside that header (`ApiKey`, `Bearer`). Unset = the bare key. |
 
 Missing = feature silently off. The same six names are read by the CLI probes

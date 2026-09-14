@@ -1,0 +1,48 @@
+{
+  "Header": {
+    "SuccessFlag": true,
+    "Message": null,
+    "ErrorCode": null
+  },
+  "Body": {
+    "Products": [
+      {
+        "RequestLineId": "AAGV2Q14141121/1",
+        "DisplayOrder": 1,
+        "CustomerProductGroup": [
+          "82"
+        ],
+        "AutocatProductGroup": "BDIS",
+        "ProductId": "BRE08.7627.11",
+        "ProductDescription": "BRAKE DISC PAIR (PRICE PER DISC)",
+        "Brand": "BREMBO",
+        "BrandRating": "Best",
+        "CustomerPartNumber": null,
+        "CustomerLockoutRating": "AUTHORISATION ONLY",
+        "RecMinOrdQty": 2,
+        "CostPrice": 30.85,
+        "Surcharge": 0,
+        "BrandLogoURL": "https://cdn.aag-puurdata.eu/articles/0065/logo_brembo.jpg"
+      },
+      {
+        "RequestLineId": "AAGV2Q14141121/2",
+        "DisplayOrder": 2,
+        "CustomerProductGroup": [
+          "82"
+        ],
+        "AutocatProductGroup": "BDIS",
+        "ProductId": "NPANBD5400",
+        "ProductDescription": "NAPA BRAKE DISC 264 * 5 (SOLID) -  REAR",
+        "Brand": "NAPA",
+        "BrandRating": "Better",
+        "CustomerPartNumber": null,
+        "CustomerLockoutRating": "OK FOR SUPPLY",
+        "RecMinOrdQty": 2,
+        "CostPrice": 27.66,
+        "Surcharge": 0,
+        "BrandLogoURL": "https://cdn.aag-puurdata.eu/articles/6473/napa.jpg"
+      }
+    ],
+    "ProductsNotFound": []
+  }
+}

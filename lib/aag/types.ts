@@ -42,7 +42,7 @@ export interface AagAvailability {
   AagBusinessUnit?: string | null;
   BranchCode?: string | null;
   LocationName?: string | null;
-  /** "Local" | "Buddy" | "RDC" | "NDC" — case varies in the examples. */
+  /** "Local" | "Buddy" | "RDC" | "NDC" per the manual; UAT sends upper case ("LOCAL"). Compare case-insensitively. */
   LocationType?: string | null;
   QtyInStock?: number | null;
   /** "13:00", "N/A", "14:15 NWD" — a display string, not a time. */
@@ -58,8 +58,9 @@ export interface AagProductOption {
   /** AAG's product id / part number ("NPAPBD8077"). */
   ProductId?: string | null;
   Brand?: string | null;
-  BrandLogoUrl?: string | null;
-  /** "Premium" | "Standard" | "Budget". */
+  /** Spelled "URL" in real replies (the manual says "Url"). */
+  BrandLogoURL?: string | null;
+  /** "Good" | "Better" | "Best" on UAT (the manual says Budget / Standard / Premium). */
   BrandRating?: string | null;
   CustomerPartNumber?: string | null;
   /** "OK FOR SUPPLY" | "Unknown" | "UNKNOWN" — whether we may buy it. */
@@ -185,7 +186,8 @@ export interface AagProductInfo {
   ProductId?: string | null;
   ProductDescription?: string | null;
   Brand?: string | null;
-  BrandLogoUrl?: string | null;
+  /** Spelled "URL" in real replies (the manual says "Url"). */
+  BrandLogoURL?: string | null;
   BrandRating?: string | null;
   CustomerPartNumber?: string | null;
   CustomerLockoutRating?: string | null;

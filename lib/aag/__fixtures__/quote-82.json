@@ -1,0 +1,364 @@
+{
+  "Header": {
+    "SuccessFlag": true,
+    "Message": null,
+    "ErrorCode": null
+  },
+  "Body": {
+    "Articles": [
+      {
+        "ArticleProvider": "Apec",
+        "ArticleDescription": "B/DISC  264 * 5 (SOLID) - REAR",
+        "CustomerProductGroup": [
+          "82"
+        ],
+        "FittingPosition": "RR",
+        "AutocatProductGroup": "BDIS",
+        "ImageUrl": "https://www.autocatplus.co.uk/acweb/images/APC/DSK806-904989_.jpg",
+        "ProductId": "APEDSK806",
+        "ArticleProperties": [
+          {
+            "Name": "Type",
+            "Value": "Solid"
+          },
+          {
+            "Name": "OE System",
+            "Value": ""
+          },
+          {
+            "Name": "Description",
+            "Value": "Brake Disc"
+          },
+          {
+            "Name": "Engine Code",
+            "Value": "A14XER"
+          },
+          {
+            "Name": "BHP",
+            "Value": "99"
+          },
+          {
+            "Name": "Fitment",
+            "Value": ""
+          },
+          {
+            "Name": "No of Teeth",
+            "Value": ""
+          },
+          {
+            "Name": "Part Detail",
+            "Value": "5 Holes"
+          },
+          {
+            "Name": "Part Detail 2",
+            "Value": "Paired Pad:PAD1286;Paired Screw:ADS8;Paired Disc Splash Guard:ASG1159"
+          },
+          {
+            "Name": "Part Note",
+            "Value": ""
+          },
+          {
+            "Name": "Size mm",
+            "Value": "Dia.: 264;Thickness: 10;Min. Thickness: 8;Centre Dia.: 65;PCD: 110;Overall Height: 42"
+          },
+          {
+            "Name": "Vehicle Detail",
+            "Value": ""
+          },
+          {
+            "Name": "Axle Info",
+            "Value": ""
+          },
+          {
+            "Name": "Fit Kit Note",
+            "Value": ""
+          },
+          {
+            "Name": "Lead Note",
+            "Value": ""
+          },
+          {
+            "Name": "Disc Note",
+            "Value": "For Screw Use ADS8"
+          },
+          {
+            "Name": "Chassis Note",
+            "Value": ""
+          },
+          {
+            "Name": "PR No",
+            "Value": ""
+          },
+          {
+            "Name": "Euro Spec",
+            "Value": ""
+          },
+          {
+            "Name": "Bulletin Ref",
+            "Value": ""
+          }
+        ],
+        "ProductOptions": [
+          {
+            "RequestLineId": "AAGV2Q14141119/1",
+            "DisplayOrder": 1,
+            "ProductId": "NPANBD5400",
+            "Brand": "NAPA",
+            "BrandRating": "Better",
+            "BrandLogoURL": "https://cdn.aag-puurdata.eu/articles/6473/napa.jpg",
+            "CustomerPartNumber": null,
+            "CustomerLockoutRating": "UNKNOWN",
+            "RecMinOrdQty": 2,
+            "CostPrice": 27.66,
+            "Surcharge": 0,
+            "Availability": [
+              {
+                "AagLocationId": 311,
+                "AagBusinessUnit": "LV Stores",
+                "BranchCode": "MKEY",
+                "LocationName": "NAPA Auto Parts - Milton Keynes",
+                "LocationType": "LOCAL",
+                "QtyInStock": 10,
+                "EstDeliveryTime": "Please call branch",
+                "Priority": 1
+              }
+            ]
+          },
+          {
+            "RequestLineId": "AAGV2Q14141119/2",
+            "DisplayOrder": 2,
+            "ProductId": "BRE08.7627.11",
+            "Brand": "BREMBO",
+            "BrandRating": "Best",
+            "BrandLogoURL": "https://cdn.aag-puurdata.eu/articles/0065/logo_brembo.jpg",
+            "CustomerPartNumber": null,
+            "CustomerLockoutRating": "UNKNOWN",
+            "RecMinOrdQty": 2,
+            "CostPrice": 30.85,
+            "Surcharge": 0,
+            "Availability": [
+              {
+                "AagLocationId": 311,
+                "AagBusinessUnit": "LV Stores",
+                "BranchCode": "MKEY",
+                "LocationName": "NAPA Auto Parts - Milton Keynes",
+                "LocationType": "LOCAL",
+                "QtyInStock": 10,
+                "EstDeliveryTime": "Please call branch",
+                "Priority": 1
+              }
+            ]
+          },
+          {
+            "RequestLineId": "AAGV2Q14141119/3",
+            "DisplayOrder": 3,
+            "ProductId": "NPAPBD8036",
+            "Brand": "NAPA PROFORMER",
+            "BrandRating": "Good",
+            "BrandLogoURL": "",
+            "CustomerPartNumber": null,
+            "CustomerLockoutRating": "UNKNOWN",
+            "RecMinOrdQty": 2,
+            "CostPrice": 14.5,
+            "Surcharge": 0,
+            "Availability": [
+              {
+                "AagLocationId": 311,
+                "AagBusinessUnit": "LV Stores",
+                "BranchCode": "MKEY",
+                "LocationName": "NAPA Auto Parts - Milton Keynes",
+                "LocationType": "LOCAL",
+                "QtyInStock": 10,
+                "EstDeliveryTime": "Please call branch",
+                "Priority": 1
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "ArticleProvider": "Apec",
+        "ArticleDescription": "B/DISC  280 * 5 (VENTED) - FRONT",
+        "CustomerProductGroup": [
+          "82"
+        ],
+        "FittingPosition": "FR",
+        "AutocatProductGroup": "BDIS",
+        "ImageUrl": "https://www.autocatplus.co.uk/acweb/images/APC/DSK794-904978_.jpg",
+        "ProductId": "APEDSK794",
+        "ArticleProperties": [
+          {
+            "Name": "Type",
+            "Value": "Vented"
+          },
+          {
+            "Name": "OE System",
+            "Value": ""
+          },
+          {
+            "Name": "Description",
+            "Value": "Brake Disc"
+          },
+          {
+            "Name": "Engine Code",
+            "Value": "A14XER"
+          },
+          {
+            "Name": "BHP",
+            "Value": "99"
+          },
+          {
+            "Name": "Fitment",
+            "Value": ""
+          },
+          {
+            "Name": "No of Teeth",
+            "Value": ""
+          },
+          {
+            "Name": "Part Detail",
+            "Value": "5 Holes"
+          },
+          {
+            "Name": "Part Detail 2",
+            "Value": "Paired Pad:PAD1348;Paired Screw:ADS7"
+          },
+          {
+            "Name": "Part Note",
+            "Value": ""
+          },
+          {
+            "Name": "Size mm",
+            "Value": "Dia.: 280;Thickness: 25;Min. Thickness: 22;Centre Dia.: 70;PCD: 110;Overall Height: 42"
+          },
+          {
+            "Name": "Vehicle Detail",
+            "Value": ""
+          },
+          {
+            "Name": "Axle Info",
+            "Value": ""
+          },
+          {
+            "Name": "Fit Kit Note",
+            "Value": ""
+          },
+          {
+            "Name": "Lead Note",
+            "Value": ""
+          },
+          {
+            "Name": "Disc Note",
+            "Value": "For Screw Use ADS7"
+          },
+          {
+            "Name": "Chassis Note",
+            "Value": ""
+          },
+          {
+            "Name": "PR No",
+            "Value": ""
+          },
+          {
+            "Name": "Euro Spec",
+            "Value": ""
+          },
+          {
+            "Name": "Bulletin Ref",
+            "Value": ""
+          }
+        ],
+        "ProductOptions": [
+          {
+            "RequestLineId": "AAGV2Q14141119/4",
+            "DisplayOrder": 1,
+            "ProductId": "NPANBD5248",
+            "Brand": "NAPA",
+            "BrandRating": "Better",
+            "BrandLogoURL": "https://cdn.aag-puurdata.eu/articles/6473/napa.jpg",
+            "CustomerPartNumber": null,
+            "CustomerLockoutRating": "UNKNOWN",
+            "RecMinOrdQty": 2,
+            "CostPrice": 30.26,
+            "Surcharge": 0,
+            "Availability": [
+              {
+                "AagLocationId": 311,
+                "AagBusinessUnit": "LV Stores",
+                "BranchCode": "MKEY",
+                "LocationName": "NAPA Auto Parts - Milton Keynes",
+                "LocationType": "LOCAL",
+                "QtyInStock": 10,
+                "EstDeliveryTime": "Please call branch",
+                "Priority": 1
+              }
+            ]
+          },
+          {
+            "RequestLineId": "AAGV2Q14141119/5",
+            "DisplayOrder": 2,
+            "ProductId": "BRE09.7629.11",
+            "Brand": "BREMBO",
+            "BrandRating": "Best",
+            "BrandLogoURL": "https://cdn.aag-puurdata.eu/articles/0065/logo_brembo.jpg",
+            "CustomerPartNumber": null,
+            "CustomerLockoutRating": "UNKNOWN",
+            "RecMinOrdQty": 2,
+            "CostPrice": 43.54,
+            "Surcharge": 0,
+            "Availability": [
+              {
+                "AagLocationId": 311,
+                "AagBusinessUnit": "LV Stores",
+                "BranchCode": "MKEY",
+                "LocationName": "NAPA Auto Parts - Milton Keynes",
+                "LocationType": "LOCAL",
+                "QtyInStock": 10,
+                "EstDeliveryTime": "Please call branch",
+                "Priority": 1
+              }
+            ]
+          },
+          {
+            "RequestLineId": "AAGV2Q14141119/6",
+            "DisplayOrder": 3,
+            "ProductId": "NPAPBD8032",
+            "Brand": "NAPA PROFORMER",
+            "BrandRating": "Good",
+            "BrandLogoURL": "",
+            "CustomerPartNumber": null,
+            "CustomerLockoutRating": "UNKNOWN",
+            "RecMinOrdQty": 2,
+            "CostPrice": 23.82,
+            "Surcharge": 0,
+            "Availability": [
+              {
+                "AagLocationId": 311,
+                "AagBusinessUnit": "LV Stores",
+                "BranchCode": "MKEY",
+                "LocationName": "NAPA Auto Parts - Milton Keynes",
+                "LocationType": "LOCAL",
+                "QtyInStock": 10,
+                "EstDeliveryTime": "Please call branch",
+                "Priority": 1
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "VehicleDetails": [
+      {
+        "Vrm": "DV12CGU",
+        "Make": "Vauxhall",
+        "Model": "Meriva",
+        "Fuel": "Petrol",
+        "YearOfManufacture": "2012",
+        "EngineNumber": "19ZD8236",
+        "EngineSize": "1.4",
+        "Vin": "W0LSD9EC1C4144589",
+        "DateRegistered": "20120330"
+      }
+    ]
+  }
+}

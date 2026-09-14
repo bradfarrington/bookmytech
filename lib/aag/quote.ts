@@ -31,7 +31,7 @@ export interface AagQuoteLine {
   requestLineId: string | null;
   productId: string;
   brand: string | null;
-  /** "Premium" | "Standard" | "Budget" (as AAG spells it). */
+  /** As AAG sends it: "Good" | "Better" | "Best" on UAT (the manual says Budget / Standard / Premium). */
   rating: string | null;
   /** Integer pence; null when AAG sent no usable price. */
   costPence: number | null;

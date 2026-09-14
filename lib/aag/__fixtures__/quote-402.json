@@ -1,0 +1,364 @@
+{
+  "Header": {
+    "SuccessFlag": true,
+    "Message": null,
+    "ErrorCode": null
+  },
+  "Body": {
+    "Articles": [
+      {
+        "ArticleProvider": "Apec",
+        "ArticleDescription": "BRAKE PAD - FRONT",
+        "CustomerProductGroup": [
+          "402"
+        ],
+        "FittingPosition": "FR",
+        "AutocatProductGroup": "BKPA",
+        "ImageUrl": "https://www.autocatplus.co.uk/acweb/images/APC/PAD1348-782459_.jpg",
+        "ProductId": "APEPAD1348",
+        "ArticleProperties": [
+          {
+            "Name": "Type",
+            "Value": ""
+          },
+          {
+            "Name": "OE System",
+            "Value": "ATE"
+          },
+          {
+            "Name": "Description",
+            "Value": "Brake Pad"
+          },
+          {
+            "Name": "Engine Code",
+            "Value": "A14XER"
+          },
+          {
+            "Name": "BHP",
+            "Value": "99"
+          },
+          {
+            "Name": "Fitment",
+            "Value": ""
+          },
+          {
+            "Name": "No of Teeth",
+            "Value": ""
+          },
+          {
+            "Name": "Part Detail",
+            "Value": "With acoustic wear warning;Directional;WVA No.: 23832"
+          },
+          {
+            "Name": "Part Detail 2",
+            "Value": "Paired Disc:DSK794"
+          },
+          {
+            "Name": "Part Note",
+            "Value": "Wear Indicators: 2;2 Back Springs;4 Back Lams."
+          },
+          {
+            "Name": "Size mm",
+            "Value": "Height 1: 76;Width: 156;Height 2: 71;Width2: 155;Back springs: 46;ThicknessA: 20"
+          },
+          {
+            "Name": "Vehicle Detail",
+            "Value": ""
+          },
+          {
+            "Name": "Axle Info",
+            "Value": ""
+          },
+          {
+            "Name": "Fit Kit Note",
+            "Value": ""
+          },
+          {
+            "Name": "Lead Note",
+            "Value": ""
+          },
+          {
+            "Name": "Disc Note",
+            "Value": ""
+          },
+          {
+            "Name": "Chassis Note",
+            "Value": ""
+          },
+          {
+            "Name": "PR No",
+            "Value": ""
+          },
+          {
+            "Name": "Euro Spec",
+            "Value": ""
+          },
+          {
+            "Name": "Bulletin Ref",
+            "Value": "ElcomeV8/DirectionalBrakePads.pdf"
+          }
+        ],
+        "ProductOptions": [
+          {
+            "RequestLineId": "AAGV2Q14141120/1",
+            "DisplayOrder": 1,
+            "ProductId": "APEPAD1348",
+            "Brand": "APEC",
+            "BrandRating": "Better",
+            "BrandLogoURL": "",
+            "CustomerPartNumber": null,
+            "CustomerLockoutRating": "UNKNOWN",
+            "RecMinOrdQty": 1,
+            "CostPrice": 30.41,
+            "Surcharge": 0,
+            "Availability": [
+              {
+                "AagLocationId": 311,
+                "AagBusinessUnit": "LV Stores",
+                "BranchCode": "MKEY",
+                "LocationName": "NAPA Auto Parts - Milton Keynes",
+                "LocationType": "LOCAL",
+                "QtyInStock": 10,
+                "EstDeliveryTime": "Please call branch",
+                "Priority": 1
+              }
+            ]
+          },
+          {
+            "RequestLineId": "AAGV2Q14141120/2",
+            "DisplayOrder": 2,
+            "ProductId": "BREP59045",
+            "Brand": "BREMBO",
+            "BrandRating": "Best",
+            "BrandLogoURL": "https://cdn.aag-puurdata.eu/articles/0065/logo_brembo.jpg",
+            "CustomerPartNumber": null,
+            "CustomerLockoutRating": "UNKNOWN",
+            "RecMinOrdQty": 1,
+            "CostPrice": 28.37,
+            "Surcharge": 0,
+            "Availability": [
+              {
+                "AagLocationId": 311,
+                "AagBusinessUnit": "LV Stores",
+                "BranchCode": "MKEY",
+                "LocationName": "NAPA Auto Parts - Milton Keynes",
+                "LocationType": "LOCAL",
+                "QtyInStock": 10,
+                "EstDeliveryTime": "Please call branch",
+                "Priority": 1
+              }
+            ]
+          },
+          {
+            "RequestLineId": "AAGV2Q14141120/3",
+            "DisplayOrder": 3,
+            "ProductId": "BFTPD3078",
+            "Brand": "BRAKEFIT",
+            "BrandRating": "Good",
+            "BrandLogoURL": "",
+            "CustomerPartNumber": null,
+            "CustomerLockoutRating": "UNKNOWN",
+            "RecMinOrdQty": 1,
+            "CostPrice": 21.79,
+            "Surcharge": 0,
+            "Availability": [
+              {
+                "AagLocationId": 311,
+                "AagBusinessUnit": "LV Stores",
+                "BranchCode": "MKEY",
+                "LocationName": "NAPA Auto Parts - Milton Keynes",
+                "LocationType": "LOCAL",
+                "QtyInStock": 10,
+                "EstDeliveryTime": "Please call branch",
+                "Priority": 1
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "ArticleProvider": "Apec",
+        "ArticleDescription": "BRAKE PAD - REAR",
+        "CustomerProductGroup": [
+          "402"
+        ],
+        "FittingPosition": "RR",
+        "AutocatProductGroup": "BKPA",
+        "ImageUrl": "https://www.autocatplus.co.uk/acweb/images/APC/PAD1286-1221272_.jpg",
+        "ProductId": "APEPAD1286",
+        "ArticleProperties": [
+          {
+            "Name": "Type",
+            "Value": ""
+          },
+          {
+            "Name": "OE System",
+            "Value": "TRW"
+          },
+          {
+            "Name": "Description",
+            "Value": "Brake Pad"
+          },
+          {
+            "Name": "Engine Code",
+            "Value": "A14XER"
+          },
+          {
+            "Name": "BHP",
+            "Value": "99"
+          },
+          {
+            "Name": "Fitment",
+            "Value": ""
+          },
+          {
+            "Name": "No of Teeth",
+            "Value": ""
+          },
+          {
+            "Name": "Part Detail",
+            "Value": "With acoustic wear warning;WVA No.: 23837"
+          },
+          {
+            "Name": "Part Detail 2",
+            "Value": "Paired Disc:DSK806"
+          },
+          {
+            "Name": "Part Note",
+            "Value": "Wear Indicators: 2;4 chamfered pads;Supplied with bolts;No. Bolts/Screws: 4"
+          },
+          {
+            "Name": "Size mm",
+            "Value": "Height 1: 43;Width: 95;ThicknessA: 15"
+          },
+          {
+            "Name": "Vehicle Detail",
+            "Value": ""
+          },
+          {
+            "Name": "Axle Info",
+            "Value": ""
+          },
+          {
+            "Name": "Fit Kit Note",
+            "Value": ""
+          },
+          {
+            "Name": "Lead Note",
+            "Value": ""
+          },
+          {
+            "Name": "Disc Note",
+            "Value": ""
+          },
+          {
+            "Name": "Chassis Note",
+            "Value": ""
+          },
+          {
+            "Name": "PR No",
+            "Value": ""
+          },
+          {
+            "Name": "Euro Spec",
+            "Value": ""
+          },
+          {
+            "Name": "Bulletin Ref",
+            "Value": ""
+          }
+        ],
+        "ProductOptions": [
+          {
+            "RequestLineId": "AAGV2Q14141120/4",
+            "DisplayOrder": 1,
+            "ProductId": "APEPAD1286",
+            "Brand": "APEC",
+            "BrandRating": "Better",
+            "BrandLogoURL": "",
+            "CustomerPartNumber": null,
+            "CustomerLockoutRating": "UNKNOWN",
+            "RecMinOrdQty": 1,
+            "CostPrice": 20.76,
+            "Surcharge": 0,
+            "Availability": [
+              {
+                "AagLocationId": 311,
+                "AagBusinessUnit": "LV Stores",
+                "BranchCode": "MKEY",
+                "LocationName": "NAPA Auto Parts - Milton Keynes",
+                "LocationType": "LOCAL",
+                "QtyInStock": 10,
+                "EstDeliveryTime": "Please call branch",
+                "Priority": 1
+              }
+            ]
+          },
+          {
+            "RequestLineId": "AAGV2Q14141120/5",
+            "DisplayOrder": 2,
+            "ProductId": "BREP59038",
+            "Brand": "BREMBO",
+            "BrandRating": "Best",
+            "BrandLogoURL": "https://cdn.aag-puurdata.eu/articles/0065/logo_brembo.jpg",
+            "CustomerPartNumber": null,
+            "CustomerLockoutRating": "UNKNOWN",
+            "RecMinOrdQty": 1,
+            "CostPrice": 21.07,
+            "Surcharge": 0,
+            "Availability": [
+              {
+                "AagLocationId": 311,
+                "AagBusinessUnit": "LV Stores",
+                "BranchCode": "MKEY",
+                "LocationName": "NAPA Auto Parts - Milton Keynes",
+                "LocationType": "LOCAL",
+                "QtyInStock": 10,
+                "EstDeliveryTime": "Please call branch",
+                "Priority": 1
+              }
+            ]
+          },
+          {
+            "RequestLineId": "AAGV2Q14141120/6",
+            "DisplayOrder": 3,
+            "ProductId": "BFTPD3070",
+            "Brand": "BRAKEFIT",
+            "BrandRating": "Good",
+            "BrandLogoURL": "",
+            "CustomerPartNumber": null,
+            "CustomerLockoutRating": "UNKNOWN",
+            "RecMinOrdQty": 1,
+            "CostPrice": 13.7,
+            "Surcharge": 0,
+            "Availability": [
+              {
+                "AagLocationId": 311,
+                "AagBusinessUnit": "LV Stores",
+                "BranchCode": "MKEY",
+                "LocationName": "NAPA Auto Parts - Milton Keynes",
+                "LocationType": "LOCAL",
+                "QtyInStock": 10,
+                "EstDeliveryTime": "Please call branch",
+                "Priority": 1
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "VehicleDetails": [
+      {
+        "Vrm": "DV12CGU",
+        "Make": "Vauxhall",
+        "Model": "Meriva",
+        "Fuel": "Petrol",
+        "YearOfManufacture": "2012",
+        "EngineNumber": "19ZD8236",
+        "EngineSize": "1.4",
+        "Vin": "W0LSD9EC1C4144589",
+        "DateRegistered": "20120330"
+      }
+    ]
+  }
+}

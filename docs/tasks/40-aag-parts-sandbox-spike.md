@@ -4,6 +4,10 @@
 
 > **First sandbox run (2026-09-10, credentials now in `.env.local`).** The UAT host is **Cloudflare-IP-allowlisted**: every request, even `GET /`, gets a 403 block page, under all three auth-header variants — so this is exactly the IP AAG's security team asked for, and the one to give them is the **development machine's IP** (`curl -s https://api.ipify.org`). The **live** host is reachable and answered a genuine AAG envelope — `HTTP 200` + `ISE0034 "User is unauthorized"` under every header variant and without `verification_id` — which (a) proves the inverted-status behaviour and the parser against a real reply, and (b) says the credentials are most likely sandbox-only. No quote and no fixture yet; blocked on AAG allowlisting the dev IP. Details and the sharpened questions for AAG in `docs/05-aag-parts-api.md` §1, §3, §5.
 
+> **Second run (2026-09-14).** AAG allowlisted `80.6.218.98` on UAT and sent an example curl naming the key header **`api_key`**. Now verified on UAT: no Cloudflare block, and the key is accepted under `api_key` (a bogus key or `x-api-key` gets `ISE0034`). The client and script default is now `api_key`. **New blocker: `ISE0101` Invalid Verification ID**, with our ID, with no ID, and with the example's `76335`. AAG checks the verification ID before the account number. Back to AAG for the right UAT verification ID. Full table in `docs/05-aag-parts-api.md` §3.
+
+> **Third run (2026-09-14): sandbox access proven.** AAG sent corrected UAT credentials. `/api/quote` (GenArts 82 and 402), `/api/quote/classic` and `/api/product/info` all return HTTP 201 + success for `DV12CGU`. Fixtures saved, and the fixture-gated tests are green. Found and fixed: the classic quote answers in **camelCase**, which `parseAagEnvelope` would have read as success even on a refusal; it now reads either casing. Also confirmed: **AAG live authenticates on credentials alone, with no IP allowlist, so no static-IP proxy is needed.** Coverage (step 3) is still to run.
+
 Gareth has a trade account with Alliance Automotive Group and AAG have issued Sales API v2 credentials. This task proves access to their sandbox, captures real response shapes, measures how much of our repair catalogue a parts supplier could price without a mapping table, and gives Gareth a page to see real prices on — **before** anyone commits to the full quote → enquiry → order build. Assessment, verified calls, open questions and the proposed full build live in `docs/05-aag-parts-api.md`.
 
 ## Owner decisions consumed (2026-09-10)
@@ -14,7 +18,7 @@ Gareth has a trade account with Alliance Automotive Group and AAG have issued Sa
 
 ## What the manual establishes (Data Contract Customer.pdf v1.07)
 
-- Auth is three headers: an API key (**header name not stated** — configurable via `AAG_AUTH_HEADER` / `AAG_AUTH_SCHEME`, default `x-api-key`), `customer_id` (the account number), optional `verification_id`.
+- Auth is three headers: an API key (**header name not stated** in the manual; AAG later confirmed `api_key`, now the default, with `AAG_AUTH_HEADER` / `AAG_AUTH_SCHEME` as overrides), `customer_id` (the account number), optional `verification_id`.
 - **HTTP 201 = success, 200 = error.** The client reads `Header.SuccessFlag` / `ErrorCode` from the body and never trusts the status.
 - `/api/servicetimeandparts` (a whole service as tasks + parts) is **no longer supported**, so repairs must be mapped to TecDoc GenArt ids by us — hence Stage C.
 - Prices are decimal pounds; converted to integer pence at the edge.
@@ -55,8 +59,8 @@ Gareth has a trade account with Alliance Automotive Group and AAG have issued Sa
 ## Acceptance criteria
 
 - [x] `node scripts/probe-aag-quote.mjs` without env exits 2 naming the missing vars; with env it prints a quote or a precise reason (HTTP status vs AAG error code). *(Exercised live: reported the Cloudflare 403 on UAT and the `ISE0034` envelope on live distinctly and correctly.)*
-- [ ] Sandbox access **proven**: a 2xx + `SuccessFlag: true` quote for a real reg, with the working auth header recorded in `docs/05-aag-parts-api.md` §3. — **Blocked on AAG allowlisting the development IP on UAT (Cloudflare 403 confirmed 2026-09-10).**
-- [ ] Fixtures captured (`--save`) and the fixture-gated tests in `lib/aag/aag.test.ts` green against them. — **Owner, same run.**
+- [x] Sandbox access **proven**: a 2xx + `SuccessFlag: true` quote for a real reg, with the working auth header recorded in `docs/05-aag-parts-api.md` §3. *(2026-09-14: HTTP 201 for `DV12CGU`, header `api_key`.)*
+- [x] Fixtures captured (`--save`) and the fixture-gated tests in `lib/aag/aag.test.ts` green against them. *(2026-09-14: `quote-82`, `quote-402`, `quote-classic-82`, `product-info`.)*
 - [x] `lib/aag/` client never throws; unconfigured → null; auth failures and unreachability recorded in `platform_settings.aag_health`.
 - [x] `CatalogueNode.genartIds` carried through both composition paths, additive, tested; existing catalogue/overlay tests unchanged and green.
 - [ ] Coverage numbers for at least one vehicle pasted into `docs/05-aag-parts-api.md` §4. — **Owner: `node scripts/probe-genart-coverage.mjs --vrm <reg> --quote`.**
@@ -66,15 +70,15 @@ Gareth has a trade account with Alliance Automotive Group and AAG have issued Sa
 
 ## Env (`.env.local`, never committed)
 
-`AAG_API_KEY`, `AAG_CUSTOMER_ID`, `AAG_VERIFICATION_ID` (optional), `AAG_BASE_URL` (optional, default UAT), `AAG_AUTH_HEADER` (optional, default `x-api-key`), `AAG_AUTH_SCHEME` (optional). Missing = feature silently off. Table in `docs/DEPLOYMENT_ENV.md`.
+`AAG_API_KEY`, `AAG_CUSTOMER_ID`, `AAG_VERIFICATION_ID` (optional), `AAG_BASE_URL` (optional, default UAT), `AAG_AUTH_HEADER` (optional, default `api_key`), `AAG_AUTH_SCHEME` (optional). Missing = feature silently off. Table in `docs/DEPLOYMENT_ENV.md`.
 
 ## How to verify
 
 ```
 # 1. credentials in .env.local, then the access test
 node scripts/probe-aag-quote.mjs --vrm <real reg> --genart 82
-#    401/403 → AAG_AUTH_HEADER=Authorization AAG_AUTH_SCHEME=ApiKey node scripts/probe-aag-quote.mjs …
-#    still refused → the IP allowlist; back to AAG
+#    403 HTML page → the IP allowlist (dev IP changed?); back to AAG
+#    ISE0034 → key/account wrong · ISE0101 → verification ID wrong
 
 # 2. fixtures + tests
 node scripts/probe-aag-quote.mjs --vrm <reg> --genart 82 --save

@@ -13,8 +13,9 @@
 //   node scripts/probe-aag-quote.mjs --vrm … --genart 82 --json      # dump the raw reply
 //
 // The first run is the access test. A clean quote proves the key, account and
-// header name; HTTP 401/403 or a timeout is either a wrong auth header (try
-// AAG_AUTH_HEADER=Authorization AAG_AUTH_SCHEME=ApiKey) or AAG's IP allowlist.
+// verification ID. HTTP 403 with an HTML page is AAG's Cloudflare IP allowlist;
+// ISE0034 is the key/account (or the header name — `api_key` is AAG's);
+// ISE0101 is the verification ID.
 // Read-only against AAG — nothing here orders anything.
 //
 // Exit 0 = printed, 2 = config/upstream problem.

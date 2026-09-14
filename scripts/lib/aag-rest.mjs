@@ -20,13 +20,12 @@ export const LIVE_BASE_URL = "https://sales.allianceautomotiveapis.co.uk";
 const REQUEST_TIMEOUT_MS = 30_000;
 
 /**
- * Read the AAG env. The manual never names the API-key header, so the header
- * and an optional scheme prefix are configurable — the first probe run tries
- * variants without a code edit:
+ * Read the AAG env. The API key travels in `api_key` (AAG's example curl,
+ * 2026-09-14; verified on UAT). The header and an optional scheme prefix stay
+ * overridable for probing without a code edit:
  *
- *   AAG_AUTH_HEADER=x-api-key                  (default)
+ *   AAG_AUTH_HEADER=api_key                    (default)
  *   AAG_AUTH_HEADER=Authorization AAG_AUTH_SCHEME=ApiKey
- *   AAG_AUTH_HEADER=Authorization AAG_AUTH_SCHEME=Bearer
  */
 export function requireEnv() {
   const apiKey = process.env.AAG_API_KEY;
@@ -40,7 +39,7 @@ export function requireEnv() {
     customerId,
     verificationId: process.env.AAG_VERIFICATION_ID || null,
     baseUrl: (process.env.AAG_BASE_URL || UAT_BASE_URL).replace(/\/+$/, ""),
-    authHeader: process.env.AAG_AUTH_HEADER || "x-api-key",
+    authHeader: process.env.AAG_AUTH_HEADER || "api_key",
     authScheme: process.env.AAG_AUTH_SCHEME || "",
   };
 }
@@ -92,14 +91,21 @@ export function createAagRest() {
     if (res.status < 200 || res.status >= 300) {
       throw new Error(`AAG ${path} responded HTTP ${res.status}: ${text.slice(0, 300)}`);
     }
-    const header = raw?.Header ?? null;
+    // /api/quote answers PascalCase (Header.SuccessFlag); /api/quote/classic
+    // answers camelCase (header.successFlag). Same rule as parseAagEnvelope.
+    const rawHeader = raw?.Header ?? raw?.header ?? null;
+    const header = rawHeader && {
+      SuccessFlag: rawHeader.SuccessFlag ?? rawHeader.successFlag,
+      ErrorCode: rawHeader.ErrorCode ?? rawHeader.errorCode,
+      Message: rawHeader.Message ?? rawHeader.message,
+    };
     const ok = header ? header.SuccessFlag === true : raw != null;
     if (!ok) {
       throw new Error(
-        `AAG ${path} refused (HTTP ${res.status}) ${header?.ErrorCode ?? "?"}: ${header?.Message ?? JSON.stringify(raw).slice(0, 300)}`,
+        `AAG ${path} refused (HTTP ${res.status}) ${header?.ErrorCode || "?"}: ${header?.Message || JSON.stringify(raw).slice(0, 300)}`,
       );
     }
-    return { status: res.status, header, body: raw?.Body ?? raw, raw };
+    return { status: res.status, header, body: raw?.Body ?? raw?.body ?? raw, raw };
   }
 
   return {

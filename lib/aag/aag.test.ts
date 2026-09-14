@@ -73,7 +73,7 @@ const CONFIG: AagConfig = {
   customerId: "QKF9999",
   verificationId: null,
   baseUrl: AAG_UAT_BASE_URL,
-  authHeader: "x-api-key",
+  authHeader: "api_key",
   authScheme: "",
 };
 
@@ -109,6 +109,16 @@ describe("parseAagEnvelope", () => {
     expect(bare.ok && bare.body.QuoteId).toBe("AAGQ6880959");
   });
 
+  it("reads the classic quote's camelCase envelope, including a refusal", () => {
+    const ok = parseAagEnvelope<{ products: unknown[] }>({
+      header: { successFlag: true, message: "", errorCode: "" },
+      body: { products: [{ productId: "BRE09.7629.11" }] },
+    });
+    expect(ok.ok && ok.body.products).toHaveLength(1);
+    const refused = parseAagEnvelope({ header: { successFlag: false, message: "", errorCode: "ISE0101" }, body: null });
+    expect(refused).toEqual({ ok: false, errorCode: "ISE0101", message: describeAagError("ISE0101") });
+  });
+
   it("refuses an empty reply", () => {
     expect(parseAagEnvelope(null).ok).toBe(false);
     expect(parseAagEnvelope("").ok).toBe(false);
@@ -127,7 +137,7 @@ describe("isAagAuthFailure", () => {
 describe("buildAagHeaders", () => {
   it("sends the key under the configured header, bare by default", () => {
     const h = buildAagHeaders(CONFIG);
-    expect(h["x-api-key"]).toBe("key-123");
+    expect(h.api_key).toBe("key-123");
     expect(h.customer_id).toBe("QKF9999");
     expect(h).not.toHaveProperty("verification_id");
   });
@@ -136,7 +146,7 @@ describe("buildAagHeaders", () => {
     const h = buildAagHeaders({ ...CONFIG, authHeader: "Authorization", authScheme: "ApiKey", verificationId: "v-1" });
     expect(h.Authorization).toBe("ApiKey key-123");
     expect(h.verification_id).toBe("v-1");
-    expect(h).not.toHaveProperty("x-api-key");
+    expect(h).not.toHaveProperty("api_key");
   });
 });
 
