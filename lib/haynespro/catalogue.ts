@@ -46,6 +46,7 @@ import {
   getRepairtimeSubnodes,
   getRepairtimeTypeId,
 } from "./tree";
+import type { HpVehicleRef } from "./tree";
 import { resolveVehicle } from "./vehicle";
 import type { HpRepairtimeNode } from "./types";
 
@@ -203,7 +204,7 @@ const NO_REPAIR_DATA: CatalogueFailure = {
 // Shared context: the vehicle, its rate, and what the admin has hidden.
 // ---------------------------------------------------------------------------
 
-interface CatalogueContext {
+interface CatalogueContext extends HpVehicleRef {
   repairtimeTypeId: number;
   vehicle: CatalogueVehicle;
   /** Node ids switched off for this model — hidden, and never walked into. */
@@ -224,12 +225,12 @@ interface CatalogueContext {
  * One batched call; ids the vehicle doesn't have simply don't come back.
  */
 async function hoursForNodes(
-  repairtimeTypeId: number,
+  vehicle: HpVehicleRef,
   nodeIds: string[],
 ): Promise<Map<string, number>> {
   const hours = new Map<string, number>();
   if (nodeIds.length === 0) return hours;
-  const nodes = await getRepairNodesByIds(repairtimeTypeId, nodeIds);
+  const nodes = await getRepairNodesByIds(vehicle, nodeIds);
   for (const n of nodes) {
     if (n.id != null && typeof n.value === "number" && n.value > 0) hours.set(n.id, n.value / 100);
   }
@@ -278,7 +279,7 @@ async function loadContext(
     nodeHours: ReadonlyMap<string, number>,
   ): Promise<number | null> => {
     if (nodeIds.length > 1 && combineMode === "haynespro") {
-      const combined = await combineRepairTimes(repairtimeTypeId, nodeIds, hourlyRatePence);
+      const combined = await combineRepairTimes({ carTypeId, repairtimeTypeId }, nodeIds, hourlyRatePence);
       if (combined) return combined.totalRepairTime / 100;
     }
     let total = 0;
@@ -293,6 +294,7 @@ async function loadContext(
   return {
     ok: true,
     context: {
+      carTypeId,
       repairtimeTypeId,
       vehicle: {
         description: resolved.description ?? "vehicle",
@@ -334,7 +336,7 @@ async function composeLevelFor(
   raw: HpRepairtimeNode[],
 ): Promise<CatalogueNode[]> {
   const extraIds = extraNodeIdsFor(levelId, context.overlay);
-  const nodeHours = await hoursForNodes(context.repairtimeTypeId, extraIds);
+  const nodeHours = await hoursForNodes(context,extraIds);
 
   const combined = new Map<string, number | null>();
   for (const { bundle, options } of bundlesAt(levelId, context.overlay)) {
@@ -420,7 +422,7 @@ export async function getRepairCatalogueLevel(
   const raw =
     isCustomGroupId(level) || isProductCategoryId(level)
       ? []
-      : await getRepairtimeSubnodes(context.repairtimeTypeId, level);
+      : await getRepairtimeSubnodes(context,level);
 
   // getRepairtimeSubnodes swallows upstream failures as []. At the root that is
   // indistinguishable from "HaynesPro is down", and every vehicle with a
@@ -516,6 +518,7 @@ export async function searchJobsForCarType(
     loadCatalogueOverlay(db),
   ]);
   const context: CatalogueContext = {
+    carTypeId,
     repairtimeTypeId,
     vehicle: { description: `car type ${carTypeId}`, hourlyRatePence },
     excluded: new Set(),
@@ -595,7 +598,7 @@ async function runSearch(
     expansions += batch.length;
 
     const levels = await Promise.all(
-      batch.map((p) => getRepairtimeSubnodes(context.repairtimeTypeId, p.id)),
+      batch.map((p) => getRepairtimeSubnodes(context,p.id)),
     );
 
     for (let i = 0; i < levels.length; i++) {
@@ -667,7 +670,7 @@ async function bundleSearchHits(
   if (candidates.length === 0) return [];
 
   const ids = [...new Set(candidates.flatMap((c) => c.options.flatMap((o) => o.node_ids)))];
-  const nodeHours = await hoursForNodes(context.repairtimeTypeId, ids);
+  const nodeHours = await hoursForNodes(context,ids);
   const out: CatalogueNode[] = [];
   for (const { bundle, options } of candidates) {
     const optionCount = (context.overlay.optionsByBundle.get(bundle.id) ?? []).length;

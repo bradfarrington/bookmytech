@@ -17,7 +17,7 @@
 // structural; the numbers are printed for the task md.
 //
 // Exit 0 = PASS, 1 = FAIL, 2 = config/discovery problem.
-import { createHaynesProRest, norm } from "./lib/haynespro-rest.mjs";
+import { content, createHaynesProRest, norm } from "./lib/haynespro-rest.mjs";
 
 const args = process.argv.slice(2);
 const arg = (name) => {
@@ -34,25 +34,26 @@ function check(label, ok, detail = "") {
 
 const BRAKES_GROUP = "1M2"; // "Brakes (Mechanical)" — same id on every make (Task 23 check)
 
-async function findLeaf(repairtimeTypeId, subgroupPattern, leafPattern) {
-  const groups = await hp.getSubnodes(repairtimeTypeId, BRAKES_GROUP);
+/** `vehicle` is { carTypeId, repairtimeTypeId }. */
+async function findLeaf(vehicle, subgroupPattern, leafPattern) {
+  const groups = await hp.getSubnodes(vehicle, BRAKES_GROUP);
   const group = groups.find((g) => g.hasSubnodes && subgroupPattern.test(g.description ?? ""));
   if (!group) return null;
-  const leaves = (await hp.getSubnodes(repairtimeTypeId, group.id)).filter((n) => !n.hasSubnodes);
+  const leaves = (await hp.getSubnodes(vehicle, group.id)).filter((n) => !n.hasSubnodes);
   return leaves.find((n) => leafPattern.test(n.description ?? "")) ?? null;
 }
 
-async function basket(repairtimeTypeId, ids) {
+async function basket(vehicle, ids) {
   return hp.call("processRepairTasksV4", {
     descriptionLanguage: "en",
-    repairtimeTypeId,
+    repairtimeTypeId: vehicle.repairtimeTypeId,
     typeCategory: "CAR",
     repairTaskIds: ids,
     repairVatRates: ids.map(() => 20),
     labourRateMechanical: 6000,
     labourRateBody: 6000,
     labourRateElectronics: 6000,
-  });
+  }, content(vehicle.carTypeId));
 }
 
 function describeBasket(label, reply) {
@@ -77,17 +78,18 @@ async function main() {
     process.exit(2);
   }
 
+  const vehicle = { carTypeId, repairtimeTypeId };
   const [discs, pads, rearPads] = await Promise.all([
-    findLeaf(repairtimeTypeId, /disc/i, /renew both front brake discs/i),
-    findLeaf(repairtimeTypeId, /pad/i, /^renew the front brake pads$/i),
-    findLeaf(repairtimeTypeId, /pad/i, /^renew the rear brake pads$/i),
+    findLeaf(vehicle, /disc/i, /renew both front brake discs/i),
+    findLeaf(vehicle, /pad/i, /^renew the front brake pads$/i),
+    findLeaf(vehicle, /pad/i, /^renew the rear brake pads$/i),
   ]);
   for (const [name, leaf] of [["discs", discs], ["front pads", pads], ["rear pads", rearPads]]) {
     console.log(`   ${name.padEnd(10)} ${leaf ? `${leaf.id} (${leaf.value}) "${leaf.description}"` : "NOT FOUND"}`);
   }
   if (!discs || !pads || !rearPads) process.exit(2);
 
-  const overlapping = await basket(repairtimeTypeId, [discs.id, pads.id]);
+  const overlapping = await basket(vehicle, [discs.id, pads.id]);
   describeBasket("1. discs + front pads (overlap expected)", overlapping);
   const items = new Map((overlapping?.basketItems ?? []).map((i) => [i.id, i]));
   check("reply is an object with statusCode 0", overlapping?.status?.statusCode === 0);
@@ -107,11 +109,11 @@ async function main() {
     overlapping?.totalRepairTime === [...items.values()].reduce((n, i) => n + (i.calculatedTime ?? 0), 0),
   );
 
-  const single = await basket(repairtimeTypeId, [pads.id]);
+  const single = await basket(vehicle, [pads.id]);
   describeBasket("2. front pads alone", single);
   check("single job equals the leaf's own time", single?.totalRepairTime === pads.value, `${single?.totalRepairTime} vs ${pads.value}`);
 
-  const disjoint = await basket(repairtimeTypeId, [pads.id, rearPads.id]);
+  const disjoint = await basket(vehicle, [pads.id, rearPads.id]);
   describeBasket("3. front + rear pads (no overlap expected)", disjoint);
   check(
     "disjoint jobs are a plain sum",

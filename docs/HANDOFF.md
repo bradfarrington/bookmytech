@@ -119,6 +119,18 @@ You are working on **Book My Tech**, a UK mobile-mechanic booking platform. This
 
 ## Current task
 
+### 2026-09-14 — HaynesPro back on production accounts ✅ (Task 44)
+
+**HaynesPro is working again.** Production issued two Data Exchange accounts: **DX ID** (identification) and **DX Content** (data once the car type is known). They came with contractual session rules: tokens are per vehicle and per user, content usernames are `<prefix>_<vehicle>`, and tokens may only be reused the same day by the same user for the same car. `lib/haynespro/client.ts` now names a session on every call and stores one row per `(account, username)` in `platform_settings`, reused same-day only. The shared `haynespro_vrid` token is gone, and so are the demo credentials.
+
+- **Verified live:** an uncached reg identifies and prices brake repairs through the public catalogue endpoints, and the coverage script runs.
+- **Owner, before deploying:** Vercel env — add `HAYNESPRO_ID_DISTRIBUTOR_*` and `HAYNESPRO_CONTENT_DISTRIBUTOR_*`, and delete the six demo `HAYNESPRO_*` variables.
+- **SSO ("open manual") is off** until a production SSO account is issued.
+- **Signatures changed:** `getRepairtimeSubnodes` / `getRepairNodesByIds` / `combineRepairTimes` take `{carTypeId, repairtimeTypeId}`.
+- **Scripts** use a `bmtprobe` prefix and in-memory tokens.
+
+Details and the open questions for HaynesPro: `docs/tasks/44-haynespro-production-accounts.md`. This unblocks the HaynesPro half of Task 43.
+
 ### ⏸️ WHERE WE STOPPED — 2026-09-11. Read `docs/tasks/43-supplier-parts-into-quoting.md` first.
 
 Task 42 shipped: `/admin/parts` is a live supplier catalogue (reg → everything LKQ lists for that vehicle → click a part for both suppliers' prices). The hand-maintained `parts` catalogue is **gone**; everything is to come from the supplier APIs from here.
@@ -132,7 +144,7 @@ Task 42 shipped: `/admin/parts` is a live supplier catalogue (reg → everything
 
 **And it is wrong today in a way that costs money:** a 4-litre fill bills at `4 × £15 = £60`; the real 5-litre pack is **£33.38** — and the 5 L pack is cheaper than the 4 L one, so "capacity × price per litre" errs in both directions.
 
-**⚠️ HaynesPro is currently DEAD** — auth fails with `statusCode 1`, and the demo expired **2026-08-09**. The entire repair catalogue and every booking quote depend on it. **Check whether production is actually quoting.** Renewal is the critical path. Production ADS credentials are the second prerequisite — 500 test credits will not survive customer booking volume.
+~~**⚠️ HaynesPro is currently DEAD**~~ — **resolved 2026-09-14 (Task 44):** production DX ID + DX Content accounts are live and verified; deploy once the Vercel env is updated. Production ADS credentials are the second prerequisite — 500 test credits will not survive customer booking volume.
 
 
 ### 2026-09-11 (later) — Supplier parts catalogue ✅ (Task 42)

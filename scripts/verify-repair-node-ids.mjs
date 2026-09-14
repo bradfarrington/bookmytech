@@ -69,15 +69,15 @@ async function describeType(carTypeId) {
   };
 }
 
-/** Bounded walk under `startId` collecting timed leaves (id, awNumber, description, value, parentId). */
-async function collectLeaves(repairtimeTypeId, startId, maxExpansions = 60) {
+/** Bounded walk under `startId` collecting timed leaves (id, awNumber, description, value, parentId). `vehicle` is { carTypeId, repairtimeTypeId }. */
+async function collectLeaves(vehicle, startId, maxExpansions = 60) {
   const leaves = [];
   const queue = [startId];
   let expansions = 0;
   while (queue.length && expansions < maxExpansions) {
     const id = queue.shift();
     expansions += 1;
-    const nodes = await hp.getSubnodes(repairtimeTypeId, id);
+    const nodes = await hp.getSubnodes(vehicle, id);
     for (const n of nodes) {
       if (n.id == null) continue;
       if (n.hasSubnodes) queue.push(n.id);
@@ -114,8 +114,8 @@ async function main() {
   // 1. Root groups.
   console.log("\n1. Root groups");
   const [rootA, rootB] = await Promise.all([
-    hp.getSubnodes(A.repairtimeTypeId, "root"),
-    hp.getSubnodes(B.repairtimeTypeId, "root"),
+    hp.getSubnodes(A, "root"),
+    hp.getSubnodes(B, "root"),
   ]);
   const byIdB = new Map(rootB.map((n) => [n.id, n]));
   const shared = rootA.filter((n) => byIdB.has(n.id));
@@ -149,8 +149,8 @@ async function main() {
   check("Brakes group id matches", groupA.id === groupB.id, `${groupA.id} vs ${groupB.id}`);
 
   const [leavesA, leavesB] = await Promise.all([
-    collectLeaves(A.repairtimeTypeId, groupA.id),
-    collectLeaves(B.repairtimeTypeId, groupB.id),
+    collectLeaves(A, groupA.id),
+    collectLeaves(B, groupB.id),
   ]);
   const padsA = leavesA.find((n) => padsPattern.test(n.description ?? ""));
   const padsB = leavesB.find((n) => padsPattern.test(n.description ?? ""));
@@ -192,7 +192,7 @@ async function main() {
 
   // 3. The quoteRepair path: look B up by A's id.
   console.log("\n3. getRepairtimeNodesV4 on B with A's leaf id");
-  const byId = await hp.getNodesByIds(B.repairtimeTypeId, [padsA.id]);
+  const byId = await hp.getNodesByIds(B, [padsA.id]);
   const hit = byId.find((n) => n.id === padsA.id) ?? byId[0];
   console.log(`   → ${hit ? show({ ...hit, parentId: "?" }) : "nothing"}`);
   check(

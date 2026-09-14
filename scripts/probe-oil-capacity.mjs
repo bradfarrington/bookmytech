@@ -12,12 +12,13 @@
 //   node scripts/probe-oil-capacity.mjs --type … --save       # also write the fixture
 //   node scripts/probe-oil-capacity.mjs --adjustments         # print getAdjustmentsV7 too
 //
-// Shares the app's VRID (scripts/lib/haynespro-rest.mjs), so it never
-// invalidates the production session. Read-only against HaynesPro.
+// Uses probe-prefixed sessions (scripts/lib/haynespro-rest.mjs), so it never
+// invalidates the live site's session for the same car. Read-only against
+// HaynesPro.
 //
 // Exit 0 = printed, 2 = config/upstream problem.
 import { mkdirSync, writeFileSync } from "node:fs";
-import { createHaynesProRest } from "./lib/haynespro-rest.mjs";
+import { content, createHaynesProRest } from "./lib/haynespro-rest.mjs";
 
 const args = process.argv.slice(2);
 const arg = (name) => {
@@ -48,13 +49,13 @@ try {
   const capacities = await hp.call("getLubricantCapacitiesV4", {
     descriptionLanguage: "en",
     carType: carTypeId,
-  });
+  }, content(carTypeId));
   const rows = Array.isArray(capacities) ? capacities : capacities ? [capacities] : [];
   console.log(`\ngetLubricantCapacitiesV4 → ${Array.isArray(capacities) ? "array" : typeof capacities} (${rows.length} top-level row${rows.length === 1 ? "" : "s"})\n`);
   printTree(rows);
 
   if (flag("--adjustments")) {
-    const adjustments = await hp.call("getAdjustmentsV7", { descriptionLanguage: "en", carType: carTypeId });
+    const adjustments = await hp.call("getAdjustmentsV7", { descriptionLanguage: "en", carType: carTypeId }, content(carTypeId));
     console.log(`\ngetAdjustmentsV7 → ${(adjustments ?? []).length} top-level rows\n`);
     printTree(adjustments ?? []);
   }

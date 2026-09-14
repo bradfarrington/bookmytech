@@ -132,7 +132,7 @@ export async function RepairTreePanel({
   const [rawNodes, { data: exclusionRows }, overlay] = await Promise.all([
     isCustomGroupId(nodeId)
       ? Promise.resolve([] as HpRepairtimeNode[])
-      : getRepairtimeSubnodes(repairtimeTypeId, nodeId),
+      : getRepairtimeSubnodes({ carTypeId, repairtimeTypeId }, nodeId),
     supabase.from("repair_vehicle_exclusions").select("*"),
     loadCatalogueOverlay(createAdminClient()),
   ]);
@@ -155,7 +155,7 @@ export async function RepairTreePanel({
     ...movedIn.filter((o) => o.kind === "repair").map((o) => o.node_id),
     ...bundlesHere.flatMap((b) => [...b.bundle.node_ids, ...b.options.flatMap((o) => o.node_ids)]),
   ]);
-  const extraNodes = extraIds.length ? await getRepairNodesByIds(repairtimeTypeId, extraIds) : [];
+  const extraNodes = extraIds.length ? await getRepairNodesByIds({ carTypeId, repairtimeTypeId }, extraIds) : [];
   const extraById = new Map(extraNodes.filter((n) => n.id != null).map((n) => [n.id as string, n]));
   const nameFor = (id: string) =>
     overlay.overrides.get(id)?.custom_name?.trim() ||

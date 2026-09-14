@@ -54,7 +54,9 @@ export default async function AdminRepairsPage({ searchParams }: RepairsPageProp
   if (configured) {
     const repairtimeTypeId = await getRepairtimeTypeId(reference.carTypeId);
     const rootGroups =
-      repairtimeTypeId == null ? [] : await getRepairtimeSubnodes(repairtimeTypeId, "root");
+      repairtimeTypeId == null
+        ? []
+        : await getRepairtimeSubnodes({ carTypeId: reference.carTypeId, repairtimeTypeId }, "root");
     const destinations = [
       { value: "root", label: "Top level" },
       ...rootGroups

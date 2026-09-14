@@ -12,8 +12,13 @@
 //
 // All lookups return null/[] on any failure — admin pages render an empty
 // state instead of erroring.
+//
+// Sessions (Task 44): identification-tree reads run on the DX ID account;
+// every per-type read runs on DX Content under that car type's own session —
+// which is why the repair-times functions take the car type as well as the
+// repair-times dataset id. See lib/haynespro/client.ts for the rules.
 
-import { haynesProCall } from "./client";
+import { haynesProCall, type HaynesProSession } from "./client";
 import { parseProcessRepairTasks, type CombinedRepairTimes } from "./combine";
 import type {
   HpAdjustment,
@@ -46,18 +51,36 @@ async function memoised<T>(
 // Identification tree.
 // ---------------------------------------------------------------------------
 
-async function treeCall(params: Record<string, unknown>): Promise<HpTreeNode | null> {
-  return haynesProCall<HpTreeNode>("getIdentificationTreeV2", {
-    descriptionLanguage: "en",
-    filter_category: "PASSENGER",
-    ...params,
-  });
+/**
+ * Browsing the tree (makes → models → types) isn't about one vehicle, so it
+ * shares one DX ID session; a lookup of a single TYPE runs on that type's.
+ */
+const BROWSE_SESSION = "browse";
+
+/** The DX Content session for one car type. */
+function contentSession(carTypeId: number): HaynesProSession {
+  return { account: "content", carTypeId };
+}
+
+async function treeCall(
+  params: Record<string, unknown>,
+  identifier: string | number,
+): Promise<HpTreeNode | null> {
+  return haynesProCall<HpTreeNode>(
+    "getIdentificationTreeV2",
+    {
+      descriptionLanguage: "en",
+      filter_category: "PASSENGER",
+      ...params,
+    },
+    { account: "id", identifier },
+  );
 }
 
 /** All car makes (~88), alphabetical. */
 export async function getMakes(): Promise<HpTreeNode[]> {
   const root = await memoised("makes", TREE_TTL_MS, () =>
-    treeCall({ vehicle_level: "ROOT", filter_toVehicleLevel: "MAKE" }),
+    treeCall({ vehicle_level: "ROOT", filter_toVehicleLevel: "MAKE" }, BROWSE_SESSION),
   );
   return root?.subElements ?? [];
 }
@@ -69,7 +92,7 @@ export async function getMakeWithModels(makeId: number): Promise<HpTreeNode | nu
       vehicle_id: makeId,
       vehicle_level: "MAKE",
       filter_toVehicleLevel: "MODEL",
-    }),
+    }, BROWSE_SESSION),
   );
 }
 
@@ -80,7 +103,7 @@ export async function getModelWithTypes(modelId: number): Promise<HpTreeNode | n
       vehicle_id: modelId,
       vehicle_level: "MODEL",
       filter_toVehicleLevel: "TYPE",
-    }),
+    }, BROWSE_SESSION),
   );
 }
 
@@ -109,7 +132,7 @@ export async function getCarTypeNode(carTypeId: number): Promise<HpTreeNode | nu
       vehicle_id: carTypeId,
       vehicle_level: "TYPE",
       filter_toVehicleLevel: "TYPE",
-    });
+    }, carTypeId);
     return node?.id == null ? null : node;
   });
 }
@@ -138,7 +161,7 @@ export async function getRepairtimeTypeId(carTypeId: number): Promise<number | n
     const types = await haynesProCall<HpRepairtimeType[]>("getRepairtimeTypesV2", {
       descriptionLanguage: "en",
       carTypeId,
-    });
+    }, contentSession(carTypeId));
     for (const t of types ?? []) {
       if (t.repairtimeTypeId != null) return t.repairtimeTypeId;
     }
@@ -146,27 +169,39 @@ export async function getRepairtimeTypeId(carTypeId: number): Promise<number | n
   });
 }
 
+/**
+ * What every repair-times read needs: the dataset to read, and the car type
+ * whose DX Content session reads it. `ResolvedVehicle` satisfies it once
+ * `repairtimeTypeId` is known to be non-null.
+ */
+export interface HpVehicleRef {
+  carTypeId: number;
+  repairtimeTypeId: number;
+}
+
 /** One level of the repair-times tree ("root" = top-level groups). */
 export async function getRepairtimeSubnodes(
-  repairtimeTypeId: number,
+  vehicle: HpVehicleRef,
   nodeId: string,
 ): Promise<HpRepairtimeNode[]> {
+  const { carTypeId, repairtimeTypeId } = vehicle;
   const nodes = await memoised(`rtnodes:${repairtimeTypeId}:${nodeId}`, DATA_TTL_MS, () =>
     haynesProCall<HpRepairtimeNode[]>("getRepairtimeSubnodesByGroupV4", {
       descriptionLanguage: "en",
       repairtimeTypeId,
       typeCategory: "CAR",
       nodeId,
-    }),
+    }, contentSession(carTypeId)),
   );
   return nodes ?? [];
 }
 
 /** Specific repair-time nodes by id (used to re-price a chosen repair). */
 export async function getRepairNodesByIds(
-  repairtimeTypeId: number,
+  vehicle: HpVehicleRef,
   nodeIds: string[],
 ): Promise<HpRepairtimeNode[]> {
+  const { carTypeId, repairtimeTypeId } = vehicle;
   const key = `rtbyid:${repairtimeTypeId}:${[...nodeIds].sort().join(",")}`;
   const nodes = await memoised(key, DATA_TTL_MS, () =>
     haynesProCall<HpRepairtimeNode[]>("getRepairtimeNodesV4", {
@@ -174,7 +209,7 @@ export async function getRepairNodesByIds(
       repairtimeTypeId,
       typeCategory: "CAR",
       nodesIds: nodeIds,
-    }),
+    }, contentSession(carTypeId)),
   );
   return nodes ?? [];
 }
@@ -190,10 +225,11 @@ export async function getRepairNodesByIds(
  * from lib/pricing/calculate.ts, never from HaynesPro's subtotal.
  */
 export async function combineRepairTimes(
-  repairtimeTypeId: number,
+  vehicle: HpVehicleRef,
   nodeIds: readonly string[],
   labourRatePence: number,
 ): Promise<CombinedRepairTimes | null> {
+  const { carTypeId, repairtimeTypeId } = vehicle;
   const ids = [...new Set(nodeIds)];
   if (ids.length < 2) return null;
   const key = `rtcombine:${repairtimeTypeId}:${[...ids].sort().join(",")}`;
@@ -208,7 +244,7 @@ export async function combineRepairTimes(
       labourRateMechanical: rate,
       labourRateBody: rate,
       labourRateElectronics: rate,
-    });
+    }, contentSession(carTypeId));
     return parseProcessRepairTasks(payload, ids);
   });
 }
@@ -219,7 +255,7 @@ export async function getStoryList(carTypeId: number): Promise<HpStoryOverviewIt
     haynesProCall<HpStoryOverviewItem[]>("getStoryOverview", {
       descriptionLanguage: "en",
       carType: carTypeId,
-    }),
+    }, contentSession(carTypeId)),
   );
   return (stories ?? []).filter((s) => s.storyId != null && s.storyId !== 0);
 }
@@ -235,7 +271,7 @@ export async function getStory(
       carTypeId,
       storyId,
       smartLinks: false,
-    }),
+    }, contentSession(carTypeId)),
   );
 }
 
@@ -245,7 +281,7 @@ export async function getAdjustments(carTypeId: number): Promise<HpAdjustment[]>
     haynesProCall<HpAdjustment[]>("getAdjustmentsV7", {
       descriptionLanguage: "en",
       carType: carTypeId,
-    }),
+    }, contentSession(carTypeId)),
   );
   return rows ?? [];
 }
@@ -256,7 +292,7 @@ export async function getCapacities(carTypeId: number): Promise<HpAdjustment[]> 
     haynesProCall<HpAdjustment>("getLubricantCapacitiesV4", {
       descriptionLanguage: "en",
       carType: carTypeId,
-    }),
+    }, contentSession(carTypeId)),
   );
   return row ? [row] : [];
 }
@@ -268,7 +304,7 @@ export async function getIdLocations(carTypeId: number): Promise<HpStoryInfo[]> 
       descriptionLanguage: "en",
       carTypeId,
       carTypeLevel: 3, // TYPE
-    }),
+    }, contentSession(carTypeId)),
   );
   return rows ?? [];
 }

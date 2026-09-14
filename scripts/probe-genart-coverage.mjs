@@ -42,8 +42,9 @@ const hp = createHaynesProRest();
 
 async function resolveRepairtimeTypeId() {
   if (typeArg) {
-    const id = await hp.getRepairtimeTypeId(Number(typeArg));
-    return { repairtimeTypeId: id, label: `car type ${typeArg}` };
+    const carTypeId = Number(typeArg);
+    const id = await hp.getRepairtimeTypeId(carTypeId);
+    return { carTypeId, repairtimeTypeId: id, label: `car type ${typeArg}` };
   }
   const { data } = await hp.db
     .from("haynespro_vehicle_cache")
@@ -55,13 +56,15 @@ async function resolveRepairtimeTypeId() {
     process.exit(2);
   }
   return {
+    carTypeId: data.car_type_id,
     repairtimeTypeId: data.repairtime_type_id ?? (await hp.getRepairtimeTypeId(data.car_type_id)),
     label: `${data.description ?? "vehicle"} (car type ${data.car_type_id})`,
   };
 }
 
 try {
-  const { repairtimeTypeId, label } = await resolveRepairtimeTypeId();
+  const { carTypeId, repairtimeTypeId, label } = await resolveRepairtimeTypeId();
+  const vehicle = { carTypeId, repairtimeTypeId };
   if (repairtimeTypeId == null) {
     console.error(`No repair-times coverage for ${label}.`);
     process.exit(2);
@@ -76,7 +79,7 @@ try {
   while (queue.length && expansions < maxExpansions) {
     const batch = queue.splice(0, Math.min(8, maxExpansions - expansions));
     expansions += batch.length;
-    const levels = await Promise.all(batch.map((g) => hp.getSubnodes(repairtimeTypeId, g.id)));
+    const levels = await Promise.all(batch.map((g) => hp.getSubnodes(vehicle, g.id)));
     for (let i = 0; i < levels.length; i++) {
       const parent = batch[i];
       for (const node of levels[i]) {

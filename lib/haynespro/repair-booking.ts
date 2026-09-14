@@ -335,6 +335,7 @@ export async function quoteRepairs(
       productIds.length ? loadCatalogueProducts(db) : Promise.resolve([]),
     ]);
     if (!vehicle || vehicle.repairtimeTypeId == null) return null;
+    const hpVehicle = { carTypeId: vehicle.carTypeId, repairtimeTypeId: vehicle.repairtimeTypeId };
 
     const products = productIds.length ? resolveProducts(productIds, productRows) : [];
     if (!products) return null;
@@ -353,7 +354,7 @@ export async function quoteRepairs(
       const excluded = await excludedRepairNodeIdsForVehicle(vehicle.hpModelLabel, db);
       if (nodeIds.some((id) => excluded.has(id))) return null;
 
-      const nodes = await getRepairNodesByIds(vehicle.repairtimeTypeId, nodeIds);
+      const nodes = await getRepairNodesByIds(hpVehicle, nodeIds);
       const byId = new Map(nodes.filter((n) => n.id != null).map((n) => [n.id as string, n]));
       for (const id of nodeIds) {
         // A single-id reply whose item carries no id is tolerated, as it always was.
@@ -386,7 +387,7 @@ export async function quoteRepairs(
     // overlap removal; otherwise buildRepairsQuote adds the book times.
     const combined =
       nodeIds.length > 1 && combineMode === "haynespro"
-        ? await combineRepairTimes(vehicle.repairtimeTypeId, nodeIds, hourlyRatePence)
+        ? await combineRepairTimes(hpVehicle, nodeIds, hourlyRatePence)
         : null;
 
     return buildRepairsQuote({

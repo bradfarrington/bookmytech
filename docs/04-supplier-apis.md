@@ -8,8 +8,10 @@
 
 | Account | What it is | Env vars (in `.env.local`) | Expiry |
 |---|---|---|---|
-| **HaynesPro Data Exchange** (demo) | SOAP + REST JSON API for vehicle identification, repair times, maintenance schedules, adjustments, parts (genart) linkage, technical data. Rights: **Car dataset, "SET" package** (Tech + Electronics + Smart). | `HAYNESPRO_DISTRIBUTOR_USERNAME`, `HAYNESPRO_DISTRIBUTOR_PASSWORD` | **2026-08-09** |
-| **HaynesPro Portal-to-Portal (SSO)** (demo) | One-time-link single sign-on into **WorkshopData Touch** (their end-user app) with vehicle + subject pre-selected. For mechanic-facing technical data. userType: `demo` (CarSET). | `HAYNESPRO_SSO_COMPANY_ID`, `HAYNESPRO_SSO_PASSWORD`, `HAYNESPRO_SSO_USERTYPE` | **2026-08-09** |
+| **HaynesPro Data Exchange — DX ID** (production, 2026-09-14) | Identification only: reg/VIN/make-model lookups, the identification tree. Not invoiced. Refuses content operations with statusCode 6. | `HAYNESPRO_ID_DISTRIBUTOR_USERNAME`, `HAYNESPRO_ID_DISTRIBUTOR_PASSWORD` | — |
+| **HaynesPro Data Exchange — DX Content** (production, 2026-09-14) | Everything once the car type is known: repair times, manuals, adjustments, capacities. Session username must be `<prefix>_<vehicle>`. | `HAYNESPRO_CONTENT_DISTRIBUTOR_USERNAME`, `HAYNESPRO_CONTENT_DISTRIBUTOR_PASSWORD`, `HAYNESPRO_USERNAME_PREFIX` | — |
+| ~~HaynesPro Data Exchange (demo)~~ | Replaced by the two production accounts above. Rights were **Car dataset, "SET" package** (Tech + Electronics + Smart). | removed | expired **2026-08-09** |
+| **HaynesPro Portal-to-Portal (SSO)** (demo) | One-time-link single sign-on into **WorkshopData Touch** (their end-user app) with vehicle + subject pre-selected. For mechanic-facing technical data. userType: `demo` (CarSET). **Demo credentials removed 2026-09-14; no production SSO account issued yet.** | `HAYNESPRO_SSO_COMPANY_ID`, `HAYNESPRO_SSO_PASSWORD`, `HAYNESPRO_SSO_USERTYPE` | expired **2026-08-09** |
 | **VRM lookup supplier** (test) | Reg → vehicle details + **VIN**. MOT Data / MOT History / VED / Imagery available as paid add-ons (a few pence per lookup, can be toggled). Username `BookMyTech` + a UUID "Web API token". | `VRM_LOOKUP_API_TOKEN` | not stated |
 | WorkshopData Touch (browser login) | Comparison/browsing tool, not an API. `Support@bookmytech.co.uk` — password in owner's email. Useful to eyeball what data exists for a vehicle before coding against it. https://www.workshopdata.com/touch/ | — | — |
 
@@ -143,9 +145,15 @@ OpenAPI (param names/types) per group — fastest way to check an op's signature
 ```
 
 ### Auth model + the VRID gotcha (matters on Vercel)
-- `getAuthenticationVrid(distributorUsername, distributorPassword, username)` → **VRID** token. Valid **8h since last use**. **Minting a new VRID for the same `username` invalidates all previous ones for that username.**
-- On serverless (Fluid Compute, many instances), a naive module-level cache per instance → instances mint VRIDs that invalidate each other → auth churn. **Do instead:** persist the current VRID in Supabase (`platform_settings` key, service-role) with the username used; on statusCode `5` (incorrect/expired vrid) re-auth once, update the row, retry the call. Two instances racing converge (last writer wins; the loser gets a 5 and re-auths). Status codes: 0 OK, 1 unknown company, 2 bad password, 3 username not found, 4 no licence, 5 bad/expired vrid, 6 no rights for operation, 7 banned 20 min, −1 unknown.
-- Demo accepts **any username ≤32 chars**; production usernames may be contractually restricted — keep it to one configured username (`HAYNESPRO_USERNAME`, default `bookmytech_prod`).
+- `getAuthenticationVrid(distributorUsername, distributorPassword, username)` → **VRID** token. Valid **8h since last use**. **Minting a new VRID for the same `username` invalidates all previous ones for that username.** Status codes: 0 OK, 1 unknown company, 2 bad password, 3 username not found, 4 no licence, 5 bad/expired vrid, 6 no rights for operation, 7 banned 20 min, −1 unknown.
+- **Production rules (HaynesPro email, 2026-09-14) — contractual:**
+  - **Two accounts.** DX ID for identification (manual searches, not invoiced); DX Content for data once the HaynesPro type id is known. Verified: `getRepairtimeTypesV2` on DX ID → statusCode 6; on DX Content → data.
+  - **Tokens are vehicle- and user-specific**; switching vehicle needs a new token.
+  - **Content session usernames are `<prefix>_<vehicle identifier>`** (their examples: `35sg46_FX73KUA`, `5hg84h_619008017`). We use the car type id: `bmt_619023786`.
+  - **Caching tokens is prohibited**, except the same token reused **the same day by the user who created it, for that same vehicle**.
+- **How the app complies (Task 44, `lib/haynespro/client.ts`):** every call names its session. One `platform_settings` row per `(account, username)` — `haynespro_session:<account>:<username>` holding `{vrid, username, day}` — reused only on the same Europe/London day. Identification sessions are named for the reg being resolved, the car type being looked up, or `browse` for the make/model tree. On statusCode 5, re-read the row (another instance may have re-minted), else mint once and retry. Concurrent mints for one session inside an instance collapse into one (the catalogue search fans out 8 calls per vehicle). Rows older than a day are deleted on each mint. The old shared `haynespro_vrid` row is gone.
+- **Scripts** (`scripts/lib/haynespro-rest.mjs`) hold tokens in memory for the run only, under a separate prefix (`HAYNESPRO_PROBE_USERNAME_PREFIX`, default `bmtprobe`), so a probe never invalidates the live site's session for the same car.
+- Open with HaynesPro: whether they assign the `<prefix>`; whether one shared `browse` session for the make/model tree is acceptable; whether "the user who created it" means the session username (our reading) or the end user.
 
 ### Data-stability gotcha
 `ExtCarType.id` (carTypeId) is **NOT stable across HaynesPro database updates** ("don't store it and expect it to be the same in a few months"). So: cache resolutions keyed by **VIN / reg / TecDoc**, store carTypeId + repairtimeTypeId with a TTL (~30 days), and re-resolve on miss. Never treat a stored carTypeId as permanent.

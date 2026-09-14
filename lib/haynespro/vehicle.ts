@@ -285,7 +285,7 @@ export async function resolveVehicle(
     return null;
   }
 
-  const resolved = await resolveFromDetails(details);
+  const resolved = await resolveFromDetails(details, key);
   if (!resolved) {
     negativeCache.set(key, Date.now() + NEGATIVE_CACHE_TTL_MS);
     return null;
@@ -350,15 +350,22 @@ interface InternalResolution {
   via: "vin" | "details";
 }
 
+/**
+ * Identification runs on the DX ID account under a session named for the
+ * registration being identified (HaynesPro: one session per vehicle).
+ */
 async function resolveFromDetails(
   details: VehicleDetailsInput,
+  reg: string,
 ): Promise<InternalResolution | null> {
+  const identify = { account: "id", identifier: reg } as const;
+
   // Preferred path once the VRM supplier lands: decode the VIN.
   if (details.vin) {
     const candidates = await haynesProCall<HpCarType[]>("decodeVINV4", {
       descriptionLanguage: "en",
       vin: details.vin,
-    });
+    }, identify);
     const best = pickBestCandidate(candidates ?? [], details);
     if (best?.id != null) {
       const embedded = firstRepairtimeTypeId(best.repairTimeTypes);
@@ -385,7 +392,7 @@ async function resolveFromDetails(
     wholeWordModels: false,
     engineCapacity: details.engineCapacity ?? undefined,
     year: details.yearOfManufacture ?? undefined,
-  });
+  }, identify);
 
   let best = pickBestCandidate(candidates ?? [], details);
 
@@ -404,7 +411,7 @@ async function resolveFromDetails(
         wholeWordMakes: false,
         modelDescription: model,
         wholeWordModels: false,
-      });
+      }, identify);
       best = pickBestCandidate(loose ?? [], details);
       if (best) break;
     }
@@ -431,9 +438,10 @@ function firstRepairtimeTypeId(
 }
 
 async function lookupRepairtimeTypeId(carTypeId: number): Promise<number | null> {
+  // The car type is known from here on, so this is content, not identification.
   const types = await haynesProCall<HpRepairtimeType[]>("getRepairtimeTypesV2", {
     descriptionLanguage: "en",
     carTypeId,
-  });
+  }, { account: "content", carTypeId });
   return firstRepairtimeTypeId(types);
 }

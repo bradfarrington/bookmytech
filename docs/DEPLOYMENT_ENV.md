@@ -57,18 +57,28 @@ browser — prefixed `NEXT_PUBLIC_`) · **Required** = app breaks without it.
 ## Repair catalogue & labour times (HaynesPro) — required for booking
 
 Every booking is a HaynesPro repair (Task 17), so without these the booking
-funnel has nothing to sell. `lib/haynespro/client.ts` treats the integration as
-**unconfigured** when the two distributor values are missing (`/admin/vehicles`
+funnel has nothing to sell. Production (Task 44, 2026-09-14) is **two Data
+Exchange accounts**: DX ID for identification, DX Content for everything once
+the car type is known. `lib/haynespro/client.ts` treats the integration as
+**unconfigured** unless all four distributor values are set (`/admin/vehicles`
 shows a "not configured" banner and lookups fail).
 
 | Var | Req | Type | Notes |
 |-----|-----|------|-------|
-| `HAYNESPRO_DISTRIBUTOR_USERNAME` | ✅ | 🔑 | Data Exchange distributor login (`lib/haynespro/client.ts`). |
-| `HAYNESPRO_DISTRIBUTOR_PASSWORD` | ✅ | 🔑 | Data Exchange distributor password. |
-| `HAYNESPRO_USERNAME` | ⬜ | plain | Per-app username minted against the distributor account. Falls back to `bookmytech`. |
-| `HAYNESPRO_SSO_COMPANY_ID` | ✅ | 🔑 | Portal-to-Portal SSO (the mechanic's "open manual" link, `lib/haynespro/sso.ts`). Unset = SSO links are simply not offered. |
-| `HAYNESPRO_SSO_PASSWORD` | ✅ | 🔑 | SSO distributor password. |
-| `HAYNESPRO_SSO_USERTYPE` | ⬜ | plain | Falls back to `demo`. Set to the live value once off the demo licence. |
+| `HAYNESPRO_ID_DISTRIBUTOR_USERNAME` | ✅ | 🔑 | DX ID account — identification only (reg/VIN/make-model lookups, the identification tree). |
+| `HAYNESPRO_ID_DISTRIBUTOR_PASSWORD` | ✅ | 🔑 | DX ID password. |
+| `HAYNESPRO_CONTENT_DISTRIBUTOR_USERNAME` | ✅ | 🔑 | DX Content account — repair times, manuals, adjustments, capacities. |
+| `HAYNESPRO_CONTENT_DISTRIBUTOR_PASSWORD` | ✅ | 🔑 | DX Content password. |
+| `HAYNESPRO_USERNAME_PREFIX` | ⬜ | plain | Session usernames are `<prefix>_<vehicle>` (HaynesPro's rule). Falls back to `bmt`. Set it if HaynesPro assign a prefix. |
+
+**Removed 2026-09-14:** the demo `HAYNESPRO_DISTRIBUTOR_USERNAME`,
+`HAYNESPRO_DISTRIBUTOR_PASSWORD` and `HAYNESPRO_USERNAME` — delete them from
+Vercel. The demo `HAYNESPRO_SSO_COMPANY_ID` / `HAYNESPRO_SSO_PASSWORD` /
+`HAYNESPRO_SSO_USERTYPE` were removed too (expired 2026-08-09). No production
+SSO account has been issued, so the mechanic's "open manual" link
+(`lib/haynespro/sso.ts`) is not offered until one is; the same three names apply
+when it arrives, with `HAYNESPRO_SSO_USERTYPE` set to the live value (it
+defaults to `demo`).
 
 > `VRM_LOOKUP_USERNAME` / `VRM_LOOKUP_API_TOKEN` are in `.env.local` but **nothing
 > reads them** — leftovers from an earlier supplier. Don't add them to Vercel.
