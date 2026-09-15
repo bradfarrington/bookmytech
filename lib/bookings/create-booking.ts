@@ -18,6 +18,8 @@ import {
 import { dispatchBooking } from "@/lib/dispatch/dispatch";
 import { PARTS_UNAVAILABLE_MESSAGE, quoteRepairsResult, type RepairsQuote } from "@/lib/haynespro/repair-booking";
 import { catalogueBookingPartRows, customerPartLines, type CustomerPartLine } from "@/lib/parts/quote-parts";
+import { recordBookedVehicle } from "@/lib/garage/garage";
+import { checkoutCustomerFor, type CardSurface } from "@/lib/payments/saved-cards";
 import { MAX_REPAIRS_PER_BOOKING, repairIdsFromInput } from "@/lib/bookings/repair-ids";
 import { quoteFollowOn, type FollowOnOrigin } from "@/lib/quotes/book-follow-on";
 import type { QuoteView } from "@/lib/quotes/load";
@@ -431,6 +433,16 @@ export async function createBooking(
     }
   }
 
+  // The vehicle goes in the customer's garage if it isn't there yet (Task 50).
+  // Never fails the booking.
+  if (customerId) {
+    await recordBookedVehicle(db, customerId, {
+      registration: vehicleReg,
+      make: vehicleMake,
+      model: vehicleModel,
+    });
+  }
+
   // A return visit booked from a follow-on quote (Task 34): the quote's parts
   // become the booking's parts (self-sourced — the mechanic supplies them; the
   // first rows this table has had since Task 17), the quote is marked booked,
@@ -592,6 +604,15 @@ export type PrepareCheckoutResult =
       promoCode: string | null;
       /** ADDITIVE (Task 43): the supplier parts inside `totalPence`, as POST /quote returns them. */
       parts: CustomerPartLine[];
+      /**
+       * ADDITIVE (Task 53): set only when the customer has a saved card. The hold
+       * is made against this Stripe Customer, and the session lets the card form
+       * (the website's PaymentElement, the app's PaymentSheet) offer those cards.
+       * Both null otherwise, and the session alone may be null if Stripe
+       * couldn't make one.
+       */
+      customerId: string | null;
+      customerSessionClientSecret: string | null;
     }
   | {
       ok: true;
@@ -623,6 +644,8 @@ export type PrepareCheckoutResult =
 export async function prepareCheckoutFor(
   input: PrepareCheckoutInput,
   customerId: string | null,
+  /** Which card form will confirm the hold, for the saved-cards session (Task 53). */
+  options: { surface?: CardSurface } = {},
 ): Promise<PrepareCheckoutResult> {
   const resolved = await resolveBookingQuote(input, customerId);
   if (!resolved.ok) return resolved;
@@ -670,6 +693,11 @@ export async function prepareCheckoutFor(
     return { ok: false, error: "Payments aren't configured. Please try again shortly." };
   }
 
+  // Saved cards (Task 53, owner decision 2026-09-15): only a customer who has
+  // one gets the hold made against their Stripe Customer, so the card form can
+  // offer those cards. Everyone else's hold is made exactly as before.
+  const saved = customerId ? await checkoutCustomerFor(customerId, options.surface ?? "mobile") : null;
+
   try {
     const intent = await stripe.paymentIntents.create({
       amount: chargePence,
@@ -690,6 +718,7 @@ export async function prepareCheckoutFor(
       // release their funds. Absent for guests (no id to record), which is why
       // releasing is an authenticated-only action.
       ...(customerId ? { metadata: { customer_id: customerId } } : {}),
+      ...(saved ? { customer: saved.customerId } : {}),
     });
     if (!intent.client_secret) return { ok: false, error: "Couldn't start the payment. Please try again." };
 
@@ -715,6 +744,8 @@ export async function prepareCheckoutFor(
       discountPence,
       promoCode: promo?.code.code ?? null,
       parts,
+      customerId: saved?.customerId ?? null,
+      customerSessionClientSecret: saved?.customerSessionClientSecret ?? null,
     };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Payment error" };

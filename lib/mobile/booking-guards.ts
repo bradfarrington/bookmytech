@@ -68,6 +68,9 @@ export async function requireMobileCustomer(request: Request): Promise<MobileCus
  *   message  — dispute thread messages
  *   upload   — dispute photos
  *   vehicle  — correcting the vehicle a reg resolved to (shared pricing state)
+ *   account  — garage adds and saved cards (a DVLA lookup or a Stripe call each)
+ *   slots    — mechanics per arrival window (also callable by guests; see
+ *              app/api/mobile/v1/slots/route.ts for the guest rules)
  */
 export type MobileLimitFamily =
   | "checkout"
@@ -75,7 +78,9 @@ export type MobileLimitFamily =
   | "action"
   | "message"
   | "upload"
-  | "vehicle";
+  | "vehicle"
+  | "account"
+  | "slots";
 
 /**
  * Count this request against its bucket family. Returns a ready-to-return 429

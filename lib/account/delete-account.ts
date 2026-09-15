@@ -3,6 +3,7 @@ import { randomBytes } from "node:crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendEmail } from "@/lib/email/send";
 import { renderTemplateEmail } from "@/emails/resolve";
+import { deleteSavedCardsFor } from "@/lib/payments/saved-cards";
 import {
   deletionBlocker,
   deletedSentinelEmail,
@@ -43,10 +44,11 @@ import {
 // runs again. The other order would leave someone locked out of an account
 // whose data is still intact, with no way to try again.
 //
-// Stripe: the CRM only ever creates PaymentIntents, never a Customer object,
-// so there is nothing to delete there. A hold on a live booking can't exist
-// here (live bookings refuse deletion); an abandoned checkout hold expires on
-// its own after seven days.
+// Stripe: since Task 53 a customer who saved a card has a Stripe Customer
+// holding it. Step 2b deletes that Customer, which removes the cards; a
+// failure is logged with the id and never blocks the deletion. A hold on a
+// live booking can't exist here (live bookings refuse deletion); an abandoned
+// checkout hold expires on its own after seven days.
 
 export interface AccountDeletionCaller {
   userId: string;
@@ -138,7 +140,12 @@ export async function deleteCustomerAccountFor(
     }
   }
 
-  // 3. The database, atomically.
+  // 2b. Saved cards (Task 53): delete the Stripe Customer, which removes them.
+  // Never fatal; a failure is logged with the Customer id to delete by hand.
+  await deleteSavedCardsFor(caller.userId);
+
+  // 3. The database, atomically. Since 0077 this also deletes saved addresses,
+  // the garage and inbox read state.
   const { data: counts, error: rpcError } = await admin.rpc("delete_customer_account", {
     p_user_id: caller.userId,
     p_email: caller.email,

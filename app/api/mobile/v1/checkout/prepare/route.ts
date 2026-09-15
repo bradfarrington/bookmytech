@@ -23,6 +23,12 @@ import { requireMobileUser } from "@/lib/supabase/mobile";
 // (brand is null for a set price; position "front" | "rear" | null). Confirm
 // can list them without calling /quote as well. Empty for a follow-on quote.
 //
+// ADDITIVE (Task 53): the "preauth" arm carries `customerId` and
+// `customerSessionClientSecret`. Both are null unless the customer has a saved
+// card; then the hold is made against their Stripe Customer, and passing both
+// to initPaymentSheet (alongside paymentIntentClientSecret) lists the saved
+// cards. A card typed in the sheet is not saved.
+//
 // Thin wrapper over `prepareCheckoutFor` — the SAME function the website's
 // checkout calls through app/actions/create-booking.ts. Everything that decides
 // money happens in there: the price is re-quoted from (reg, node) server-side,

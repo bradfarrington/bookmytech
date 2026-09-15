@@ -87,6 +87,21 @@ export const RATE_LIMIT_DEFAULTS = {
   mobile_upload_user_daily: 60,
   mobile_upload_ip_burst: 20,
   mobile_upload_ip_daily: 200,
+  // Account housekeeping (Tasks 50, 53): adding a vehicle to the garage (a DVLA
+  // lookup) and the saved-card endpoints (each a Stripe API call). A customer
+  // opens these screens a few times a week; the ceiling is for a loop.
+  mobile_account_user_burst: 15,
+  mobile_account_user_daily: 120,
+  mobile_account_ip_burst: 30,
+  mobile_account_ip_daily: 400,
+  // Mechanics per arrival window (GET /slots, Task 54). Guest-accessible, like
+  // the booking flow. Each call geocodes a postcode and reads every mechanic's
+  // calendar, so it's limited, but paging through seven days of chips is seven
+  // calls in a few seconds and must never trip it.
+  mobile_slots_user_burst: 30,
+  mobile_slots_user_daily: 400,
+  mobile_slots_ip_burst: 40,
+  mobile_slots_ip_daily: 800,
 } as const;
 
 export type RateLimitKey = keyof typeof RATE_LIMIT_DEFAULTS;

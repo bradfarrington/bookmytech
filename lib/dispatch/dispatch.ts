@@ -1,6 +1,7 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { geocodePostcode, haversineMiles, outwardCode } from "@/lib/geo/postcodes";
+import { geocodePostcode, outwardCode } from "@/lib/geo/postcodes";
+import { coversJob, isSuspendedNow } from "@/lib/dispatch/eligibility";
 
 // Broadcast dispatch (Task 05 Stage 2). Offers a booking to EVERY eligible
 // online mechanic at once — first to accept wins (see app/actions/job-offers.ts).
@@ -98,27 +99,13 @@ export async function dispatchBooking(bookingId: string): Promise<DispatchResult
   for (const m of mechanics as MechanicRow[]) {
     // Suspended mechanics never get offers. An expired time-boxed suspension
     // auto-lifts (the daily cron clears the flag; here we just stop excluding).
-    if (m.is_suspended && (!m.suspended_until || new Date(m.suspended_until).getTime() > now)) {
-      continue;
-    }
-    if (!m.base_postcode) continue;
+    if (isSuspendedNow(m, now)) continue;
 
-    const radius = m.service_radius_miles ?? 10;
-    let inRange = false;
-
-    if (jobCoords) {
-      const mc = await geocodePostcode(m.base_postcode);
-      if (mc) {
-        inRange = haversineMiles(jobCoords, mc) <= radius;
-      } else {
-        usedFallback = true;
-        inRange = outwardCode(m.base_postcode) === jobArea;
-      }
-    } else {
-      inRange = outwardCode(m.base_postcode) === jobArea;
-    }
-
-    if (inRange) eligible.push(m.id);
+    // The radius check lives in lib/dispatch/eligibility.ts, shared with the
+    // per-window availability count (Task 54).
+    const coverage = await coversJob(m, { coords: jobCoords, area: jobArea });
+    if (coverage.usedFallback) usedFallback = true;
+    if (coverage.inRange) eligible.push(m.id);
   }
 
   if (!eligible.length) {

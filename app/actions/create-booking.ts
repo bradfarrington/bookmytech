@@ -47,5 +47,5 @@ export async function prepareCheckout(input: PrepareCheckoutInput) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  return prepareCheckoutFor(input, user?.id ?? null);
+  return prepareCheckoutFor(input, user?.id ?? null, { surface: "web" });
 }
