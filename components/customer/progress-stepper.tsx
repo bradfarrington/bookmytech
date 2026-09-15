@@ -1,79 +1,47 @@
-import { Check } from "lucide-react";
-import { cn } from "@/lib/utils";
+// Where the customer is in the booking funnel (Task 47), matching the app's
+// stepper: a thin track filling left to right, with "Step N · Name" and
+// "N of 5" above it. A follow-on quote books only a time and an address, so it
+// counts those two alone, as the app does. Confirm has no stepper.
 
-const STEPS = [
-  { label: "Your vehicle" },
-  { label: "What you need" },
-  { label: "Price" },
-  { label: "Date & time" },
-];
+const STEPS = ["Your vehicle", "The job", "Price", "Time", "Address"] as const;
+const FOLLOW_ON_STEPS = ["Time", "Address"] as const;
 
 interface ProgressStepperProps {
-  currentStep: 1 | 2 | 3 | 4;
+  /** 1 Vehicle · 2 The job · 3 Price · 4 Time · 5 Address. */
+  currentStep: 1 | 2 | 3 | 4 | 5;
+  /** A return visit from a follow-on quote: only Time and Address count. */
+  followOn?: boolean;
 }
 
-export function ProgressStepper({ currentStep }: ProgressStepperProps) {
-  const current = STEPS[currentStep - 1];
+export function ProgressStepper({ currentStep, followOn = false }: ProgressStepperProps) {
+  const steps: readonly string[] = followOn ? FOLLOW_ON_STEPS : STEPS;
+  const position = followOn ? Math.max(1, currentStep - 3) : currentStep;
+  const name = steps[position - 1] ?? steps[steps.length - 1];
+  const percent = Math.round((position / steps.length) * 100);
 
   return (
     <nav aria-label="Booking progress" className="w-full">
-      {/* Caption — makes the position in the flow unmistakable. */}
-      <div className="mb-3 flex items-baseline justify-between">
-        <p className="text-xs font-bold uppercase tracking-[0.1em] text-brand-blue">
-          Step {currentStep} of {STEPS.length}
+      <div className="mb-2 flex items-baseline justify-between gap-3 text-[11px] font-bold uppercase tracking-[0.12em]">
+        <p className="text-brand-blue">
+          Step {position} · {name}
         </p>
-        <p className="text-sm font-semibold text-text-secondary">{current.label}</p>
+        <p className="text-text-muted">
+          {position} of {steps.length}
+        </p>
       </div>
-
-      <ol className="flex items-center gap-0">
-        {STEPS.map((step, idx) => {
-          const stepNum = (idx + 1) as 1 | 2 | 3 | 4;
-          const done = stepNum < currentStep;
-          const active = stepNum === currentStep;
-
-          return (
-            <li key={step.label} className="flex flex-1 items-center">
-              {/* Step bubble */}
-              <div className="flex flex-col items-center gap-1.5">
-                <div
-                  className={cn(
-                    "flex size-9 items-center justify-center rounded-full text-sm font-extrabold transition-all",
-                    done && "bg-brand-blue text-white",
-                    active &&
-                      "bg-brand-gradient text-white shadow-[0_4px_12px_rgba(37,99,235,0.35)] ring-4 ring-brand-blue/15",
-                    !done && !active && "border-2 border-border bg-white text-text-muted",
-                  )}
-                  aria-current={active ? "step" : undefined}
-                >
-                  {done ? <Check size={16} strokeWidth={3} /> : stepNum}
-                </div>
-                <span
-                  className={cn(
-                    "hidden text-[11px] font-semibold tracking-wide sm:block",
-                    active && "text-brand-blue",
-                    done && "text-text-secondary",
-                    !done && !active && "text-text-muted",
-                  )}
-                >
-                  {step.label}
-                </span>
-              </div>
-
-              {/* Connector line — don't render after last step */}
-              {idx < STEPS.length - 1 && (
-                <div className="mx-2 h-1 flex-1 overflow-hidden rounded-full bg-border">
-                  <div
-                    className={cn(
-                      "h-full rounded-full bg-brand-blue transition-all duration-500",
-                      done ? "w-full" : "w-0",
-                    )}
-                  />
-                </div>
-              )}
-            </li>
-          );
-        })}
-      </ol>
+      <div
+        role="progressbar"
+        aria-valuemin={1}
+        aria-valuemax={steps.length}
+        aria-valuenow={position}
+        aria-valuetext={`Step ${position} of ${steps.length}: ${name}`}
+        className="h-1 overflow-hidden rounded-full bg-border-subtle"
+      >
+        <div
+          className="h-full rounded-full bg-brand-blue transition-[width] duration-500"
+          style={{ width: `${percent}%` }}
+        />
+      </div>
     </nav>
   );
 }

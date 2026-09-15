@@ -10,9 +10,9 @@ import {
   useStripe,
   useElements,
 } from "@stripe/react-stripe-js";
-import { Loader2, Lock, CheckCircle2, ShieldAlert } from "lucide-react";
+import { Loader2, Lock, ShieldAlert } from "lucide-react";
+import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Select } from "@/components/ui/select";
 import { createClient } from "@/lib/supabase/client";
 import { cn, formatPrice, vehicleLabel } from "@/lib/utils";
 import { prepareCheckout, createBookingAction } from "@/app/actions/create-booking";
@@ -20,29 +20,32 @@ import type { CreateBookingInput, PrepareCheckoutResult } from "@/app/actions/cr
 import { groupRepairLines, type RepairLineLite } from "@/lib/bookings/repair-lines";
 import { reportOrphanedHold } from "@/app/actions/orphaned-hold";
 import { ensureCustomerAccount, requestPasswordReset } from "@/app/actions/booking-account";
+import { formatBookingWhen } from "@/lib/slots";
 import {
-  TWO_HOUR_SLOTS,
-  ALL_DAY_SLOT,
-  slotIso,
-  formatBookingWhen,
-  isSlotBookable,
-  dayHasBookableSlot,
-  upcomingDayKeys,
-  dayChipLabel,
-  londonDateKey,
-  MIN_LEAD_MINUTES,
-  MAX_CANDIDATE_DAYS,
-} from "@/lib/slots";
+  parkingLabel,
+  useAddressDraft,
+  writeAddressDraft,
+  PARKING_OPTIONS,
+  type ParkingType,
+} from "@/lib/bookings/address-draft";
+import type { BookingBaseParams, BookingTimeParams } from "@/lib/bookings/step-params";
 import { track, FUNNEL_EVENTS } from "@/lib/analytics/track";
+import {
+  EMPTY_TIME,
+  TimePicker,
+  isTimeOpen,
+  timeValueFrom,
+  type TimeValue,
+} from "../../_components/time-picker";
 
-type ParkingType = "driveway" | "street" | "car_park" | "other";
-
-const PARKING_OPTIONS: ReadonlyArray<{ value: ParkingType; label: string }> = [
-  { value: "driveway", label: "Driveway" },
-  { value: "street", label: "Street" },
-  { value: "car_park", label: "Car park" },
-  { value: "other", label: "Other" },
-];
+// Confirm: the last step of the booking funnel (Task 47). The time and address
+// were chosen on the two steps before and are shown here as a summary; this
+// step handles the account, the discount code and the payment.
+//
+// Everything below the summary is the checkout that used to live in the slot
+// picker, moved without changing what it does: the pre-auth hold is placed,
+// then the booking row is written, and the 3-D Secure redirect, double-hold,
+// stranded-hold and discount-code safeguards are exactly as they were.
 
 const MIN_PASSWORD_LENGTH = 8;
 
@@ -51,7 +54,9 @@ const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
   : null;
 
 const inputClass =
-  "h-12 rounded-lg border border-border bg-surface-card px-3 text-sm text-text-primary outline-none transition-colors placeholder:text-text-muted focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/25";
+  "h-12 rounded-xl border border-border bg-white px-3.5 text-[15px] text-text-primary outline-none transition-colors placeholder:text-text-muted focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20";
+
+const SUPPORT_EMAIL = "support@bookmytech.co.uk";
 
 // Narrow the prepareCheckout result to its success shapes once we've handled !ok.
 type ReadyCheckout = Extract<PrepareCheckoutResult, { ok: true }>;
@@ -60,14 +65,14 @@ type ReadyCheckout = Extract<PrepareCheckoutResult, { ok: true }>;
 //
 // `redirect: "if_required"` does not mean "no redirect". When the issuer won't
 // run its challenge in Stripe's iframe, Stripe navigates the whole page away and
-// later returns the customer to `return_url` — to a FRESHLY MOUNTED SlotPicker.
-// Every answer they gave (slot, address, parking, instructions, name, email) and
-// the `checkout` result itself are component state, and are gone. The hold,
-// meanwhile, is live on their card.
+// later returns the customer to `return_url`, to a FRESHLY MOUNTED checkout.
+// Every answer they gave (time, address, name, email) and the `checkout` result
+// itself are component state, and are gone. The hold, meanwhile, is live on
+// their card.
 //
 // So the draft is parked before confirming and replayed on the way back.
 // sessionStorage, not the URL: it holds the customer's address. Same tab, dies
-// with it — the right lifetime for a half-finished checkout.
+// with it: the right lifetime for a half-finished checkout.
 //
 // Keyed by PaymentIntent id so a customer who abandons one attempt and starts
 // another can't have the first attempt's answers replayed against the second
@@ -77,7 +82,7 @@ const DRAFT_PREFIX = "bmt.checkout-draft.";
 
 interface CheckoutDraft {
   common: ConfirmCommon;
-  /** What the hold was reduced by — createBooking redeems against it. */
+  /** What the hold was reduced by: createBooking redeems against it. */
   creditAppliedPence: number;
   /**
    * The prepared checkout itself, so a customer whose window closed while
@@ -91,9 +96,9 @@ interface CheckoutDraft {
 const PROMO_GONE_NOTICE =
   "That discount code was used up while you were checking out, so we couldn't apply it. Your card wasn't charged and we've released the hold. Please book again.";
 
-/** Shown on the picker when the customer is sent back to choose again. */
+/** Shown when the customer has to pick another time. */
 const SLOT_PASSED_NOTICE =
-  "That arrival window has passed while you were checking out. Pick another time. Your card is already authorised, so you won't need to enter it again.";
+  "That arrival window has passed while you were checking out. Pick another time below. Your card is already authorised, so you won't need to enter it again.";
 
 /** `pi_3abc..._secret_xyz` → `pi_3abc...` */
 function intentIdFrom(clientSecret: string): string {
@@ -105,7 +110,7 @@ function saveDraft(intentId: string, draft: CheckoutDraft): void {
     sessionStorage.setItem(DRAFT_PREFIX + intentId, JSON.stringify(draft));
   } catch {
     // Private mode, or storage full. The common path never redirects and so
-    // never reads this back — failing to save must not block the payment.
+    // never reads this back: failing to save must not block the payment.
   }
 }
 
@@ -136,7 +141,7 @@ function readDraft(intentId: string): CheckoutDraft | null {
       ];
     }
     // A draft missing any of these can't produce a bookable row. A follow-on
-    // quote (Task 34) carries no repair ids — the quote is the price.
+    // quote (Task 34) carries no repair ids: the quote is the price.
     if (
       !parsed?.common?.selectedSlot ||
       !parsed.common.addressLine1 ||
@@ -158,16 +163,10 @@ function clearDraft(intentId: string): void {
   try {
     sessionStorage.removeItem(DRAFT_PREFIX + intentId);
   } catch {
-    // Nothing to do — it dies with the tab regardless.
+    // Nothing to do: it dies with the tab regardless.
   }
 }
 
-/**
- * Query for the return URL. It must land on a page that RENDERS: /book/slot
- * bounces to /book without `reg` and `repairs`. The rest is carried so the header
- * and the form still describe the right vehicle if we have to put the customer
- * back on it. The address is deliberately absent — that's what the draft is for.
- */
 type ResumeState =
   | { phase: "idle" }
   /** Back from the challenge, finishing the booking. Do not close the page. */
@@ -178,7 +177,7 @@ type ResumeState =
 /** Statuses that mean the customer's money IS committed. */
 const MONEY_HELD = new Set(["requires_capture", "succeeded"]);
 
-/** Statuses that mean nothing was taken — safe to put them back on the form. */
+/** Statuses that mean nothing was taken: safe to put them back on the form. */
 const NOTHING_HELD = new Set([
   "requires_payment_method",
   "requires_confirmation",
@@ -186,25 +185,44 @@ const NOTHING_HELD = new Set([
   "canceled",
 ]);
 
+/**
+ * Query for the return URL. It must land on a page that RENDERS: /book/slot
+ * bounces to /book without `reg` and `repairs` (or `quote`). The time is
+ * carried so a reload after the return still has it. The address is
+ * deliberately absent: that's what the draft is for.
+ */
 function returnParams(c: ConfirmCommon): Record<string, string> {
-  // A follow-on quote (Task 34) is the whole address of the page; the rest is
-  // derived from it server-side.
-  if (c.quoteId) return { quote: c.quoteId };
-  const params: Record<string, string> = { reg: c.reg, repairs: c.repairNodeIds.join(",") };
-  if (c.make) params.make = c.make;
-  if (c.model) params.model = c.model;
-  if (c.preferredMechanicId) params.pref = c.preferredMechanicId;
+  const params: Record<string, string> = c.quoteId
+    ? { quote: c.quoteId }
+    : { reg: c.reg, repairs: c.repairNodeIds.join(",") };
+  if (!c.quoteId) {
+    if (c.make) params.make = c.make;
+    if (c.model) params.model = c.model;
+    if (c.preferredMechanicId) params.pref = c.preferredMechanicId;
+  }
+  if (c.selectedSlot) params.slot = c.selectedSlot;
+  if (c.selectedWindow) params.window = c.selectedWindow;
+  if (c.candidateDays.length >= 2) params.days = c.candidateDays.join(",");
   return params;
 }
 
-interface SlotPickerProps {
+interface ConfirmCheckoutProps {
+  base: BookingBaseParams;
+  /** `contextKeyFor(base)`: which saved address belongs to this booking. */
+  contextKey: string;
+  /** The time off the URL, chosen on the Time step. Null only on a 3-D Secure return. */
+  initialTime: BookingTimeParams | null;
+  /** Links back to the earlier steps for "Change". */
+  timeHref: string;
+  addressHref: string;
+  /** The price step, or null for a follow-on quote (nothing to change there). */
+  priceHref: string | null;
   reg: string;
   make: string;
   model?: string;
-  defaultPostcode?: string;
-  /** HaynesPro repair node ids, in the customer's order — the server re-quotes from (reg, nodes). Empty for a follow-on quote. */
+  /** Catalogue item ids, in the customer's order. Empty for a follow-on quote. */
   repairNodeIds: string[];
-  /** The same jobs with their names and charged hours, for the recap (Task 24). */
+  /** The same jobs with their names and charged hours, for the summary (Task 24). */
   repairLines: RepairLineLite[];
   pricePence: number;
   preferredMechanicId?: string;
@@ -212,14 +230,9 @@ interface SlotPickerProps {
   quoteId?: string;
   /** Signed-in customer's spendable account credit (0 for guests). */
   availableCreditPence?: number;
-  /** Whether the visitor is signed in AS A CUSTOMER — hides the account block. */
+  /** Whether the visitor is signed in AS A CUSTOMER: hides the account block. */
   signedIn?: boolean;
-  /**
-   * Set when the session belongs to an admin or mechanic. They can't book as
-   * themselves (proxy keeps them out of /dashboard, so the job would be
-   * invisible to them), so we ask them to sign out rather than silently
-   * attaching the booking to a staff account.
-   */
+  /** Set when the session belongs to an admin or mechanic (see the page). */
   wrongRole?: string;
   /** Signed-in customer's details, used in place of the account block. */
   customerName?: string;
@@ -229,16 +242,20 @@ interface SlotPickerProps {
    * `payment_intent_client_secret` off the URL, present only when Stripe has
    * just returned the customer from a 3-D Secure challenge. Threaded down from
    * the page rather than read from `window` so the first render agrees with the
-   * server's — this decides whether the picker renders the form at all.
+   * server's: this decides whether the checkout renders the form at all.
    */
   returnedIntentSecret?: string;
 }
 
-export function SlotPicker({
+export function ConfirmCheckout({
+  contextKey,
+  initialTime,
+  timeHref,
+  addressHref,
+  priceHref,
   reg,
   make,
   model,
-  defaultPostcode = "",
   repairNodeIds,
   repairLines,
   pricePence,
@@ -251,83 +268,33 @@ export function SlotPicker({
   customerEmail = "",
   customerPhone = "",
   returnedIntentSecret,
-}: SlotPickerProps) {
+}: ConfirmCheckoutProps) {
   const router = useRouter();
 
-  // "Now", re-read every minute so a customer who sits on the page watches
-  // windows close rather than booking one that has quietly passed. All the
-  // date/window maths is UK time (lib/slots) — a device in another zone, or
-  // the UTC server rendering this, sees the same days and the same cut-offs.
   // Discount code (Task 35): what they've typed, and what the server accepted.
   const [promoInput, setPromoInput] = useState("");
   const [appliedPromo, setAppliedPromo] = useState<string | null>(null);
   const [promoOpen, setPromoOpen] = useState(false);
 
+  // "Now", re-read every minute so a window that closes while the customer
+  // sits on the page is re-picked rather than sent to the server. UK time.
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 60_000);
     return () => clearInterval(id);
   }, []);
 
-  // Seven UK calendar days from today, as "YYYY-MM-DD" keys. Today drops out
-  // of the *selectable* set once its last window has closed (after 7pm), so
-  // the default selection is the first day that still has something to offer.
-  const days = upcomingDayKeys(now);
-  const [selectedDay, setSelectedDay] = useState(
-    () => days.find((d) => dayHasBookableSlot(d, now)) ?? days[0],
-  );
-  const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
-  // The arrival window the customer picked (persisted + shown to the mechanic).
-  // Tracked alongside selectedSlot because the "8am–10am" and all-day windows
-  // share the same start time — the ISO alone can't tell them apart.
-  const [selectedWindow, setSelectedWindow] = useState<string | null>(null);
+  // The time chosen on the Time step. State, not just a prop, because a window
+  // can close mid-checkout and be re-picked here without losing the hold.
+  const [time, setTime] = useState<TimeValue>(() => timeValueFrom(initialTime));
+  const selectedSlot = time.slot;
+  const selectedWindow = time.window;
+  const selectedSlotOpen = isTimeOpen(time, now);
 
-  // Flexible mode (Task 28): the customer offers SEVERAL all-day dates and the
-  // mechanic picks one. The date strip becomes multi-select, the window is
-  // always all-day, and `selectedSlot` is parked on the earliest day so the
-  // rest of the checkout (lead-time check, draft, slot_passed) is unchanged.
-  const [flexible, setFlexible] = useState(false);
-  const [flexDays, setFlexDays] = useState<string[]>([]);
-
-  function applyFlexDays(days: string[]) {
-    const sorted = [...new Set(days)].sort();
-    setFlexDays(sorted);
-    if (sorted.length > 0) {
-      setSelectedSlot(slotIso(sorted[0], ALL_DAY_SLOT.startHour));
-      setSelectedWindow(ALL_DAY_SLOT.window);
-    } else {
-      setSelectedSlot(null);
-      setSelectedWindow(null);
-    }
-  }
-
-  function setFlexibleMode(on: boolean) {
-    setFlexible(on);
-    if (on) {
-      applyFlexDays(dayHasBookableSlot(selectedDay, now) ? [selectedDay] : []);
-    } else {
-      setFlexDays([]);
-      setSelectedSlot(null);
-      setSelectedWindow(null);
-    }
-  }
-
-  // The days still open to offer, judged against `now` like every window.
-  const openFlexDays = flexDays.filter((d) => isSlotBookable(d, ALL_DAY_SLOT, now));
-
-  // A window chosen earlier can close while the form is being filled in. It's
-  // judged against `now` at render, so the CTA disables (and the button loses
-  // its highlight) rather than sending a start the server would reject. In
-  // flexible mode the offer needs at least two days that are still open.
-  const selectedSlotOpen = flexible
-    ? openFlexDays.length >= 2
-    : !!selectedSlot &&
-      new Date(selectedSlot).getTime() - now.getTime() >= MIN_LEAD_MINUTES * 60_000;
-
-  const [addressLine1, setAddressLine1] = useState("");
-  const [postcode, setPostcode] = useState(defaultPostcode);
-  const [parkingType, setParkingType] = useState<ParkingType>("driveway");
-  const [instructions, setInstructions] = useState("");
+  // The address from the Address step (sessionStorage). `undefined` until the
+  // browser has been read; `null` when there is none for this booking.
+  const savedAddress = useAddressDraft(contextKey);
+  const address = savedAddress ?? null;
 
   // --- Account (guests only) -------------------------------------------------
   // Every booking needs an account so the customer lands on a dashboard that
@@ -347,7 +314,7 @@ export function SlotPicker({
 
   // The server prices, applies any account credit, and decides the payment mode
   // (pre-auth hold, or 'free' when credit covers the whole total) when the
-  // customer confirms — that, not the URL estimate, is authoritative.
+  // customer continues: that, not the URL estimate, is authoritative.
   const [checkout, setCheckout] = useState<ReadyCheckout | null>(null);
   const [stripeError, setStripeError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -356,24 +323,22 @@ export function SlotPicker({
   // confirmPayment succeeds and kept if the booking write then fails: Stripe
   // refuses a second confirm on an authorised intent, and a reload would
   // prepare a fresh intent and place a SECOND hold. With this remembered, a
-  // retry — or a re-picked time after the window closed — goes straight to
-  // the booking write against the hold they already have.
+  // retry (or a re-picked time after the window closed) goes straight to the
+  // booking write against the hold they already have.
   const [confirmedIntentId, setConfirmedIntentId] = useState<string | null>(null);
   const [slotNotice, setSlotNotice] = useState<string | null>(null);
 
   // The window closed under them (a 3-D Secure trip that outlasted the lead
   // time, or a long think). Nothing was written and the hold is untouched:
-  // drop the slot so the picker comes back, keep everything else.
+  // drop the time so the picker appears on this page, keep everything else.
   function handleSlotPassed() {
-    setSelectedSlot(null);
-    setSelectedWindow(null);
-    setFlexDays([]);
+    setTime(EMPTY_TIME);
     setSlotNotice(SLOT_PASSED_NOTICE);
   }
 
   // The discount code ran out between the hold and the booking (Task 35).
   // Nothing was written, but the hold is live for the discounted amount and
-  // can't be reused for the full one — ops releases it (reportOrphanedHold
+  // can't be reused for the full one: ops releases it (reportOrphanedHold
   // ran at the call site) and the customer starts the payment again without
   // the code.
   function handlePromoUnavailable() {
@@ -385,13 +350,21 @@ export function SlotPicker({
   }
 
   // Where we are in the return-from-redirect path (see the draft helpers above).
-  // "idle" is every ordinary render — the customer arriving at this page normally.
   // Seeded from the prop, not from an effect: a customer coming back from their
-  // bank must never be shown the empty "Pick a time" form, not even for a frame.
+  // bank must never be shown the empty form, not even for a frame.
   const [resume, setResume] = useState<ResumeState>(
     returnedIntentSecret ? { phase: "completing" } : { phase: "idle" },
   );
   const resumeStarted = useRef(false);
+
+  // No saved address for this booking (a direct link, or storage blocked):
+  // send the customer back a step. Not on a 3-D Secure return, which restores
+  // the address from its own draft.
+  useEffect(() => {
+    if (savedAddress === null && !returnedIntentSecret && !checkout) {
+      router.replace(addressHref);
+    }
+  }, [savedAddress, returnedIntentSecret, checkout, router, addressHref]);
 
   const hasAccount = signedIn || accountReady;
   const accountFilled =
@@ -399,35 +372,34 @@ export function SlotPicker({
     email.trim().includes("@") &&
     password.length >= MIN_PASSWORD_LENGTH;
 
-  const canProceed =
-    !wrongRole &&
-    selectedSlotOpen &&
-    addressLine1.trim().length > 3 &&
-    postcode.trim().length >= 5 &&
-    (hasAccount || accountFilled);
+  const addressReady = !!address && address.addressLine1.trim().length > 3 && address.postcode.trim().length >= 5;
 
-  // Put a parked draft back on the form, for when the customer failed the
-  // challenge and has to try again. Nothing was taken in that case.
+  const canProceed = !wrongRole && selectedSlotOpen && addressReady && (hasAccount || accountFilled);
+
+  // Put a parked draft back, for when the customer failed the challenge and
+  // has to try again (nothing was taken), or when their window closed.
   function restoreDraft(c: ConfirmCommon, opts: { keepSlot?: boolean } = {}) {
-    const wasFlexible = c.candidateDays.length >= 2;
-    setFlexible(wasFlexible);
     if (opts.keepSlot !== false) {
-      setSelectedSlot(c.selectedSlot || null);
-      setSelectedWindow(c.selectedWindow || null);
-      setFlexDays(wasFlexible ? [...c.candidateDays].sort() : []);
-      const when = new Date(c.selectedSlot);
-      if (c.selectedSlot && !Number.isNaN(when.getTime())) setSelectedDay(londonDateKey(when));
+      setTime({
+        slot: c.selectedSlot || null,
+        window: c.selectedWindow || null,
+        days: c.candidateDays.length >= 2 ? [...c.candidateDays].sort() : [],
+        flexible: c.candidateDays.length >= 2,
+      });
     } else {
-      setFlexDays([]);
+      setTime(EMPTY_TIME);
     }
-    setAddressLine1(c.addressLine1);
-    setPostcode(c.postcode);
-    if (PARKING_OPTIONS.some((o) => o.value === c.parkingType)) {
-      setParkingType(c.parkingType as ParkingType);
-    }
-    setInstructions(c.instructions);
+    writeAddressDraft({
+      context: contextKey,
+      addressLine1: c.addressLine1,
+      postcode: c.postcode,
+      parkingType: PARKING_OPTIONS.some((o) => o.value === c.parkingType)
+        ? (c.parkingType as ParkingType)
+        : "driveway",
+      instructions: c.instructions,
+    });
     // The account block is hidden once they're signed in (which they are by
-    // now — the account is created before the pre-auth), but a guest whose
+    // now: the account is created before the pre-auth), but a guest whose
     // session didn't survive the round trip still gets their details back.
     if (!signedIn) {
       setName(c.customerName);
@@ -441,7 +413,7 @@ export function SlotPicker({
   // the hold is already placed and this component has been remounted from
   // scratch, so finishing the booking is entirely on us.
   useEffect(() => {
-    // Runs once — React StrictMode mounts effects twice in dev, and writing the
+    // Runs once: React StrictMode mounts effects twice in dev, and writing the
     // booking twice would mean two rows against one hold.
     if (resumeStarted.current) return;
     const secret = returnedIntentSecret;
@@ -475,9 +447,8 @@ export function SlotPicker({
 
       const draft = readDraft(paymentIntent.id);
 
-      // NOT `succeeded` — a confirmed manual-capture hold sits at
+      // NOT `succeeded`: a confirmed manual-capture hold sits at
       // `requires_capture`, and nothing is captured until the job is done.
-      // Testing for `succeeded` would reject every good payment.
       if (MONEY_HELD.has(paymentIntent.status)) {
         if (!draft) {
           void reportOrphanedHold(paymentIntent.id, "checkout draft missing on return");
@@ -494,10 +465,10 @@ export function SlotPicker({
         );
         if (!result.ok) {
           // The bank took longer than the window's lead time. The hold is
-          // good and stays theirs — put them back on the picker with
-          // everything else restored, and finish on this intent without
-          // confirming again. (Needs the checkout parked in the draft; a
-          // draft from an older build without it is treated as stranded.)
+          // good and stays theirs: put them back with everything else
+          // restored, and finish on this intent without confirming again.
+          // (Needs the checkout parked in the draft; a draft from an older
+          // build without it is treated as stranded.)
           if (result.code === "slot_passed" && draft.checkout) {
             clearDraft(paymentIntent.id);
             restoreDraft(draft.common, { keepSlot: false });
@@ -538,7 +509,7 @@ export function SlotPicker({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Clear the staff session in the browser and re-render the page as a guest —
+  // Clear the staff session in the browser and re-render the page as a guest:
   // a server sign-out would redirect away and lose the funnel.
   function handleSignOut() {
     startSignOutTransition(async () => {
@@ -548,18 +519,18 @@ export function SlotPicker({
   }
 
   function handleProceedToPayment() {
-    if (!canProceed) return;
+    if (!canProceed || !address) return;
     track(FUNNEL_EVENTS.slotPicked, {
       repairNodeId: repairNodeIds[0],
       repairNodeIds,
       repairCount: repairNodeIds.length,
       slot: selectedSlot,
-      candidateDayCount: flexible ? flexDays.length : 0,
+      candidateDayCount: time.flexible ? time.days.length : 0,
     });
     setStripeError(null);
     setAccountError(null);
     startTransition(async () => {
-      // Account first — nothing is authorised until this succeeds.
+      // Account first: nothing is authorised until this succeeds.
       if (!hasAccount) {
         const account = await ensureCustomerAccount({
           fullName: name,
@@ -579,7 +550,7 @@ export function SlotPicker({
       }
 
       const result = await prepareCheckout({
-        postcode,
+        postcode: address.postcode,
         vehicleReg: reg,
         repairNodeId: repairNodeIds[0],
         repairNodeIds,
@@ -607,14 +578,14 @@ export function SlotPicker({
     });
   }
 
-  const common = {
+  const common: ConfirmCommon = {
     selectedSlot: selectedSlot ?? "",
     selectedWindow: selectedWindow ?? "",
-    candidateDays: flexible ? flexDays : [],
-    addressLine1,
-    postcode,
-    parkingType,
-    instructions,
+    candidateDays: time.flexible ? time.days : [],
+    addressLine1: address?.addressLine1 ?? "",
+    postcode: address?.postcode ?? "",
+    parkingType: address?.parkingType ?? "driveway",
+    instructions: address?.instructions ?? "",
     reg,
     make,
     model,
@@ -623,16 +594,16 @@ export function SlotPicker({
     preferredMechanicId,
     quoteId,
     promoCode: appliedPromo ?? undefined,
-    // Identity is settled before this step — the checkout no longer asks.
+    // Identity is settled before this step: the checkout no longer asks.
     customerName: signedIn ? customerName : name.trim(),
     customerEmail: signedIn ? customerEmail : email.trim(),
     customerPhone: signedIn ? customerPhone : phone.trim(),
   };
 
-  // Back from a 3-D Secure challenge — finishing the booking they've paid for.
+  // Back from a 3-D Secure challenge: finishing the booking they've paid for.
   if (resume.phase === "completing") {
     return (
-      <div className="flex flex-col items-center gap-3 rounded-2xl border border-border bg-surface-card p-8 text-center">
+      <div className="flex flex-col items-center gap-3 rounded-[20px] border border-border bg-white p-8 text-center shadow-card">
         <Loader2 size={28} className="animate-spin text-brand-blue" />
         <p className="text-base font-semibold text-text-primary">Confirming your booking…</p>
         <p className="text-sm text-text-secondary">
@@ -647,7 +618,7 @@ export function SlotPicker({
   // have a pending amount on their card and no job in the system.
   if (resume.phase === "stranded") {
     return (
-      <div className="flex flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-6">
+      <div className="flex flex-col gap-3 rounded-[20px] border border-amber-200 bg-amber-50 p-6">
         <div className="flex items-start gap-2.5">
           <ShieldAlert size={20} className="mt-0.5 shrink-0 text-amber-700" />
           <div>
@@ -665,13 +636,10 @@ export function SlotPicker({
             )}
             <p className="mt-3 text-sm text-amber-900">
               Email{" "}
-              <a
-                href="mailto:help@bookmytech.co.uk"
-                className="font-semibold underline"
-              >
-                help@bookmytech.co.uk
-              </a>.{" "}
-              We already know about this one and are looking at it.
+              <a href={`mailto:${SUPPORT_EMAIL}`} className="font-semibold underline">
+                {SUPPORT_EMAIL}
+              </a>
+              . We already know about this one and are looking at it.
             </p>
           </div>
         </div>
@@ -680,7 +648,7 @@ export function SlotPicker({
   }
 
   if (checkout && selectedSlot) {
-    // Fully credit-covered — no card needed.
+    // Fully credit-covered: no card needed.
     if (checkout.mode === "free") {
       return (
         <FreeCheckoutForm
@@ -709,217 +677,65 @@ export function SlotPicker({
     );
   }
 
+  const whenLabel =
+    selectedSlot && selectedSlotOpen
+      ? formatBookingWhen({
+          scheduled_at: selectedSlot,
+          slot_window: selectedWindow,
+          candidate_days: time.flexible ? time.days : [],
+        })
+      : null;
+
   return (
     <div className="flex flex-col gap-6">
-      {slotNotice && (
-        <p role="alert" className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          {slotNotice}
-        </p>
-      )}
+      {slotNotice && <Alert tone="warning">{slotNotice}</Alert>}
 
-      {/* Date strip — single-select, or multi-select when offering several days */}
-      <div>
-        <p className="mb-2 text-sm font-semibold text-text-primary">
-          {flexible ? "Select the days you're happy with" : "Select a date"}
-        </p>
-        <div className="grid grid-cols-7 gap-2">
-          {days.map((day) => {
-            const active = flexible ? flexDays.includes(day) : day === selectedDay;
-            const bookable = flexible
-              ? isSlotBookable(day, ALL_DAY_SLOT, now)
-              : dayHasBookableSlot(day, now);
-            const label = dayChipLabel(day, now);
-            return (
-              <button
-                key={day}
-                type="button"
-                disabled={!bookable}
-                title={
-                  bookable
-                    ? undefined
-                    : flexible
-                      ? "The all-day window has already started today"
-                      : "No more arrival windows today"
-                }
-                aria-pressed={flexible ? active : undefined}
-                onClick={() => {
-                  if (flexible) {
-                    applyFlexDays(
-                      active ? flexDays.filter((d) => d !== day) : [...flexDays, day],
-                    );
-                    return;
-                  }
-                  setSelectedDay(day);
-                  setSelectedSlot(null);
-                  setSelectedWindow(null);
-                }}
-                className={cn(
-                  "flex flex-col items-center gap-1 rounded-2xl border py-3 text-center transition-colors",
-                  active
-                    ? "border-brand-blue bg-brand-blue"
-                    : "border-border bg-surface-card hover:border-brand-blue/40",
-                  "disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-border",
-                )}
-              >
-                <span className={cn("text-[11px] font-semibold uppercase tracking-wide", active ? "text-blue-200" : "text-text-muted")}>
-                  {label.weekday}
+      {/* The booking so far, with a way back to each step. */}
+      <section aria-labelledby="summary-heading">
+        <h2 id="summary-heading" className="mb-2.5 text-[11px] font-bold uppercase tracking-[0.12em] text-text-muted">
+          Your booking
+        </h2>
+        <dl className="divide-y divide-border-subtle overflow-hidden rounded-[20px] border border-border bg-white shadow-card">
+          <SummaryRow label="Job" changeHref={priceHref}>
+            <JobSummary lines={repairLines} />
+          </SummaryRow>
+          <SummaryRow label="Vehicle">{vehicleLabel(reg, make, model)}</SummaryRow>
+          <SummaryRow label="When" changeHref={selectedSlotOpen ? timeHref : null}>
+            {/* Word joiners keep "8am–10am" from breaking at the dash on phones. */}
+            {whenLabel ? (
+              whenLabel.replace(/–/g, "⁠–⁠")
+            ) : (
+              <span className="text-amber-700">Pick a new time below</span>
+            )}
+          </SummaryRow>
+          <SummaryRow label="Where" changeHref={addressHref}>
+            {address ? (
+              <>
+                {address.addressLine1}, {address.postcode}
+                <span className="block text-[13px] font-normal text-text-muted">
+                  Parking: {parkingLabel(address.parkingType)}
                 </span>
-                <span className={cn("text-xl font-extrabold leading-none", active ? "text-white" : "text-text-primary")}>
-                  {label.dayOfMonth}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
+              </>
+            ) : savedAddress === undefined ? (
+              <span className="text-text-muted">Loading…</span>
+            ) : (
+              <Link href={addressHref} className="text-brand-blue hover:underline">
+                Add your address
+              </Link>
+            )}
+          </SummaryRow>
+        </dl>
+      </section>
 
-      {/* Offering several days: the whole day is open on each — no window grid */}
-      {flexible && (
-        <div className="flex flex-col gap-3 rounded-2xl border border-brand-blue/30 bg-blue-50/40 p-4">
-          <div>
-            <p className="text-sm font-semibold text-text-primary">
-              {openFlexDays.length === 0
-                ? "Tick at least two days above"
-                : openFlexDays.length === 1
-                  ? "Tick one more day above"
-                  : `${openFlexDays.length} days offered · All day (8am–8pm)`}
-            </p>
-            <p className="mt-0.5 text-[13px] text-text-secondary">
-              With several days offered, the whole day is open on each. Your mechanic picks the
-              day and a 2-hour arrival window, and we&apos;ll tell you straight away.
-              {flexDays.length >= MAX_CANDIDATE_DAYS ? " That's the most you can offer." : ""}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => setFlexibleMode(false)}
-            className="self-start text-[13px] font-semibold text-brand-blue hover:underline"
-          >
-            Choose a single day and window instead
-          </button>
+      {/* A window that closed before payment: re-pick it here, keeping any hold. */}
+      {!selectedSlotOpen && (
+        <div className="rounded-[20px] border border-amber-200 bg-white p-5 shadow-card sm:p-6">
+          <p className="mb-4 font-display text-lg font-extrabold text-text-primary">Pick a new time</p>
+          <TimePicker value={time} onChange={setTime} now={now} />
         </div>
       )}
 
-      {/* Time slots — 2-hour arrival windows, plus an all-day option */}
-      <div hidden={flexible}>
-        <p className="mb-2 text-sm font-semibold text-text-primary">Select an arrival window</p>
-        <div className="grid grid-cols-3 gap-3">
-          {TWO_HOUR_SLOTS.map((slot) => {
-            const isoValue = slotIso(selectedDay, slot.startHour);
-            const bookable = isSlotBookable(selectedDay, slot, now);
-            const active = bookable && selectedSlot === isoValue && selectedWindow === slot.window;
-            return (
-              <button
-                key={slot.window}
-                type="button"
-                disabled={!bookable}
-                title={bookable ? undefined : "This window has passed"}
-                onClick={() => { setSelectedSlot(isoValue); setSelectedWindow(slot.window); }}
-                className={cn(
-                  "flex items-center justify-center rounded-xl border px-2 py-4 text-center text-sm font-bold transition-colors",
-                  active
-                    ? "border-brand-blue bg-brand-blue text-white"
-                    : "border-border bg-surface-card text-text-primary hover:border-brand-blue/50",
-                  "disabled:cursor-not-allowed disabled:text-text-muted disabled:line-through disabled:opacity-50 disabled:hover:border-border",
-                )}
-              >
-                {slot.window}
-              </button>
-            );
-          })}
-        </div>
-
-        {(() => {
-          const isoValue = slotIso(selectedDay, ALL_DAY_SLOT.startHour);
-          const bookable = isSlotBookable(selectedDay, ALL_DAY_SLOT, now);
-          const active = bookable && selectedSlot === isoValue && selectedWindow === ALL_DAY_SLOT.window;
-          return (
-            <button
-              type="button"
-              disabled={!bookable}
-              title={bookable ? undefined : "The all-day window has already started"}
-              onClick={() => { setSelectedSlot(isoValue); setSelectedWindow(ALL_DAY_SLOT.window); }}
-              className={cn(
-                "mt-3 flex w-full flex-col items-center gap-0.5 rounded-xl border px-2 py-3.5 text-center transition-colors",
-                active
-                  ? "border-brand-blue bg-brand-blue text-white"
-                  : "border-border bg-surface-card hover:border-brand-blue/50",
-                "disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-border",
-              )}
-            >
-              <span className={cn("text-sm font-bold", active ? "text-white" : bookable ? "text-text-primary" : "text-text-muted line-through")}>
-                All day
-              </span>
-              <span className={cn("text-[11px] leading-tight", active ? "text-blue-200" : "text-text-muted")}>
-                8am – 8pm
-              </span>
-            </button>
-          );
-        })()}
-
-        {/* Task 28: offer several all-day dates and let the mechanic pick one. */}
-        <button
-          type="button"
-          onClick={() => setFlexibleMode(true)}
-          className="mt-3 text-[13px] font-semibold text-brand-blue hover:underline"
-        >
-          Flexible? Offer more than one day
-        </button>
-
-        {!dayHasBookableSlot(selectedDay, now) && (
-          <p className="mt-3 rounded-lg bg-surface px-4 py-3 text-sm text-text-secondary">
-            No more arrival windows today. Pick another day above.
-          </p>
-        )}
-      </div>
-
-      {/* Address */}
-      <div className="flex flex-col gap-3">
-        <p className="text-sm font-semibold text-text-primary">Your address</p>
-        <input
-          type="text"
-          value={addressLine1}
-          onChange={(e) => setAddressLine1(e.target.value)}
-          placeholder="House number and street"
-          className={inputClass}
-        />
-        <input
-          type="text"
-          value={postcode}
-          onChange={(e) => setPostcode(e.target.value.toUpperCase())}
-          placeholder="Postcode"
-          autoComplete="postal-code"
-          autoCapitalize="characters"
-          maxLength={8}
-          className="h-12 rounded-lg border border-border bg-surface-card px-3 text-sm font-bold uppercase tracking-[0.04em] text-text-primary outline-none transition-colors placeholder:font-medium placeholder:normal-case placeholder:tracking-normal placeholder:text-text-muted focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/25"
-        />
-
-        <div className="flex flex-col gap-1.5">
-          <label className="text-sm font-semibold text-text-primary">Parking type</label>
-          <Select<ParkingType>
-            value={parkingType}
-            onChange={setParkingType}
-            options={PARKING_OPTIONS}
-            aria-label="Parking type"
-          />
-        </div>
-
-        <div className="flex flex-col gap-1.5">
-          <label className="text-sm font-semibold text-text-primary">
-            Special instructions{" "}
-            <span className="font-normal text-text-muted">(optional)</span>
-          </label>
-          <textarea
-            value={instructions}
-            onChange={(e) => setInstructions(e.target.value)}
-            placeholder="e.g. ring the bell on arrival, gate code is 1234…"
-            rows={2}
-            className="rounded-lg border border-border bg-surface-card px-3 py-2.5 text-sm text-text-primary outline-none transition-colors placeholder:text-text-muted focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/25 resize-none"
-          />
-        </div>
-      </div>
-
-      {/* Account — created before payment so the booking lands on a dashboard */}
+      {/* Account: created before payment so the booking lands on a dashboard */}
       {wrongRole ? (
         <div className="flex flex-col gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
           <div className="flex items-start gap-2.5">
@@ -945,14 +761,14 @@ export function SlotPicker({
           </Button>
         </div>
       ) : signedIn ? (
-        <p className="rounded-lg bg-surface px-4 py-3 text-sm text-text-secondary">
+        <p className="rounded-xl bg-white px-4 py-3 text-sm text-text-secondary ring-1 ring-inset ring-border">
           Booking as{" "}
           <span className="font-semibold text-text-primary">{customerEmail}</span>
         </p>
       ) : (
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-3 rounded-[20px] border border-border bg-white p-5 shadow-card sm:p-6">
           <div>
-            <p className="text-sm font-semibold text-text-primary">
+            <p className="font-display text-lg font-extrabold text-text-primary">
               {accountMode === "signin" ? "Sign in to continue" : "Your details"}
             </p>
             <p className="mt-0.5 text-[13px] text-text-muted">
@@ -1019,57 +835,46 @@ export function SlotPicker({
           )}
 
           {resetSent && (
-            <p className="rounded-lg bg-blue-50 px-4 py-3 text-sm text-brand-blue">
-              We&apos;ve emailed you a link to set a new password. Open it, choose a
-              password, then come back and finish your booking.
-            </p>
+            <Alert tone="info">
+              We&apos;ve emailed you a link to set a new password. Open it, choose a password,
+              then come back and finish your booking.
+            </Alert>
           )}
 
-          {accountError && (
-            <p role="alert" className="rounded-lg bg-red-50 px-4 py-3 text-sm text-danger">
-              {accountError}
-            </p>
-          )}
+          {accountError && <Alert tone="error">{accountError}</Alert>}
         </div>
       )}
 
-      {accountReady && !signedIn && (
-        <p className="flex items-center gap-2 rounded-lg bg-green-50 px-4 py-3 text-sm font-medium text-success">
-          <CheckCircle2 size={16} /> Your account is ready.
-        </p>
-      )}
+      {accountReady && !signedIn && <Alert tone="success">Your account is ready.</Alert>}
 
       {availableCreditPence > 0 && (
-        <p className="rounded-lg bg-green-50 px-4 py-3 text-sm font-medium text-success">
+        <Alert tone="success">
           You have {formatPrice(availableCreditPence)} in credit. It&apos;ll be applied at the next step.
-        </p>
+        </Alert>
       )}
 
       {/* Discount code (Task 35). Applying re-prepares the checkout, so the
           server is the only thing that ever decides what a code is worth. */}
       {appliedPromo ? (
-          <p className="flex items-center gap-2 rounded-lg bg-green-50 px-4 py-3 text-sm font-medium text-success">
-            <CheckCircle2 size={16} />
-            Code {appliedPromo} applied. The saving shows at the next step.
-          </p>
+        <Alert tone="success">Code {appliedPromo} applied. The saving shows at the next step.</Alert>
       ) : promoOpen ? (
-          <div className="flex gap-2">
-            <input
-              value={promoInput}
-              onChange={(e) => setPromoInput(e.target.value.toUpperCase())}
-              placeholder="Discount code"
-              aria-label="Discount code"
-              autoCapitalize="characters"
-              className={cn(inputClass, "flex-1 font-mono uppercase")}
-            />
-            <Button
-              variant="secondary"
-              disabled={!canProceed || pending || !promoInput.trim()}
-              onClick={handleProceedToPayment}
-            >
-              Apply
-            </Button>
-          </div>
+        <div className="flex gap-2">
+          <input
+            value={promoInput}
+            onChange={(e) => setPromoInput(e.target.value.toUpperCase())}
+            placeholder="Discount code"
+            aria-label="Discount code"
+            autoCapitalize="characters"
+            className={cn(inputClass, "flex-1 font-mono uppercase")}
+          />
+          <Button
+            variant="secondary"
+            disabled={!canProceed || pending || !promoInput.trim()}
+            onClick={handleProceedToPayment}
+          >
+            Apply
+          </Button>
+        </div>
       ) : (
         <button
           type="button"
@@ -1080,15 +885,12 @@ export function SlotPicker({
         </button>
       )}
 
-      {stripeError && (
-        <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-danger">{stripeError}</p>
-      )}
+      {stripeError && <Alert tone="error">{stripeError}</Alert>}
 
-      {/* Sticky CTA */}
-      <div className="sticky bottom-4 rounded-2xl border border-border bg-surface-card p-4 shadow-hero">
+      <div className="sticky bottom-4 z-10 rounded-2xl border border-border bg-white p-4 shadow-float">
         <div className="mb-3 flex items-center justify-between">
           <span className="text-sm text-text-secondary">Estimated total</span>
-          <span className="text-xl font-bold text-text-primary">{formatPrice(pricePence)}</span>
+          <span className="font-display text-2xl font-extrabold text-text-primary">{formatPrice(pricePence)}</span>
         </div>
         <Button
           variant="primary"
@@ -1097,14 +899,62 @@ export function SlotPicker({
           disabled={!canProceed || pending}
           onClick={handleProceedToPayment}
           iconLeft={pending ? Loader2 : Lock}
+          className="font-bold"
         >
           {pending ? "Setting up…" : "Continue to payment"}
         </Button>
-        <p className="mt-2 text-center text-[11px] text-text-muted">
-          No money taken until your job is complete
+        <p className="mt-2 text-center text-[12px] text-text-muted">
+          Your card is pre-authorised, not charged, until the job is complete.
         </p>
       </div>
     </div>
+  );
+}
+
+function SummaryRow({
+  label,
+  changeHref,
+  children,
+}: {
+  label: string;
+  changeHref?: string | null;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-start gap-4 px-4 py-3.5 sm:px-5">
+      <dt className="w-16 shrink-0 pt-0.5 text-[12px] font-semibold uppercase tracking-[0.06em] text-text-muted">
+        {label}
+      </dt>
+      <dd className="min-w-0 flex-1 text-[15px] font-semibold text-text-primary">{children}</dd>
+      {changeHref && (
+        <Link
+          href={changeHref}
+          className="shrink-0 pt-0.5 text-[13px] font-semibold text-brand-blue hover:underline"
+        >
+          Change
+        </Link>
+      )}
+    </div>
+  );
+}
+
+function JobSummary({ lines }: { lines: RepairLineLite[] }) {
+  if (lines.length <= 1) return <>{lines[0]?.description ?? "Vehicle repair"}</>;
+  const groups = groupRepairLines(lines);
+  return (
+    <ul className="flex flex-col gap-0.5">
+      {groups.map((group) => (
+        <li key={group.key}>
+          {group.label ?? group.lines[0].description}
+          {group.label && (
+            <span className="font-normal text-text-muted">
+              {" "}
+              ({group.lines.map((l) => l.description).join(", ")})
+            </span>
+          )}
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -1113,7 +963,7 @@ export function SlotPicker({
 interface ConfirmCommon {
   selectedSlot: string;
   selectedWindow: string;
-  /** Several all-day dates offered (Task 28) — empty for a single-day booking. */
+  /** Several all-day dates offered (Task 28): empty for a single-day booking. */
   candidateDays: string[];
   addressLine1: string;
   postcode: string;
@@ -1127,9 +977,9 @@ interface ConfirmCommon {
   preferredMechanicId?: string;
   /** A follow-on quote (Task 34). */
   quoteId?: string;
-  /** A discount code the customer applied (Task 35) — re-validated server-side. */
+  /** A discount code the customer applied (Task 35): re-validated server-side. */
   promoCode?: string;
-  /** Resolved before this step — the customer always has an account by now. */
+  /** Resolved before this step: the customer always has an account by now. */
   customerName: string;
   customerEmail: string;
   customerPhone: string;
@@ -1187,7 +1037,7 @@ function PriceSummary({
 }) {
   const multi = (lines?.length ?? 0) > 1;
   return (
-    <div className="rounded-xl border border-border bg-surface p-4 text-sm">
+    <div className="rounded-[20px] border border-blue-100 bg-blue-50/60 p-5 text-sm">
       {multi &&
         groupRepairLines(lines!).map((group) => (
           <div key={group.key} className="mb-1">
@@ -1211,7 +1061,7 @@ function PriceSummary({
       <div
         className={cn(
           "flex items-center justify-between text-text-secondary",
-          multi && "mt-1 border-t border-border pt-2",
+          multi && "mt-1 border-t border-blue-100 pt-2",
         )}
       >
         <span>{multi ? "Jobs total" : "Repair total"}</span>
@@ -1229,55 +1079,24 @@ function PriceSummary({
           <span>−{formatPrice(creditAppliedPence)}</span>
         </div>
       )}
-      <div className="mt-2 flex items-center justify-between border-t border-border pt-2 text-base font-bold text-text-primary">
-        <span>To pay</span>
-        <span>{formatPrice(chargePence)}</span>
+      <div className="mt-3 flex items-baseline justify-between border-t border-blue-100 pt-3 text-text-primary">
+        <span className="text-sm font-bold">To pay</span>
+        <span className="font-display text-3xl font-extrabold tracking-[-0.02em] text-brand-blue-dark">
+          {formatPrice(chargePence)}
+        </span>
       </div>
     </div>
   );
 }
 
-// Job + account recap at the top of the confirm step.
+// Job + account recap at the top of the payment step.
 function BookingRecap({ c }: { c: ConfirmCommon }) {
-  const groups = groupRepairLines(c.repairLines);
-  const multi = c.repairLines.length > 1;
   return (
-    <div className="rounded-xl border border-border bg-surface p-4 text-sm">
-      {multi ? (
-        <>
-          <p className="font-semibold text-text-primary">
-            {groups.length > 1 ? `${groups.length} jobs` : groups[0].label}
-          </p>
-          <ul className="mt-1 flex flex-col gap-0.5 text-text-secondary">
-            {groups.map((group) =>
-              group.label && groups.length > 1 ? (
-                <li key={group.key} className="flex gap-2">
-                  <span className="text-text-muted">•</span>
-                  <span>
-                    {group.label}
-                    <span className="text-text-muted">
-                      {" "}
-                      ({group.lines.map((l) => l.description).join(", ")})
-                    </span>
-                  </span>
-                </li>
-              ) : (
-                group.lines.map((line) => (
-                  <li key={line.nodeId} className="flex gap-2">
-                    <span className="text-text-muted">•</span>
-                    {line.description}
-                  </li>
-                ))
-              ),
-            )}
-          </ul>
-        </>
-      ) : (
-        <p className="font-semibold text-text-primary">
-          {c.repairLines[0]?.description ?? "Vehicle repair"}
-        </p>
-      )}
-      <p className="text-text-secondary">
+    <div className="rounded-[20px] border border-border bg-white p-5 text-sm shadow-card">
+      <p className="font-semibold text-text-primary">
+        <JobSummary lines={c.repairLines} />
+      </p>
+      <p className="mt-1 text-text-secondary">
         {vehicleLabel(c.reg, c.make, c.model)} ·{" "}
         {formatBookingWhen({
           scheduled_at: c.selectedSlot,
@@ -1285,10 +1104,34 @@ function BookingRecap({ c }: { c: ConfirmCommon }) {
           candidate_days: c.candidateDays,
         })}
       </p>
-      <p className="mt-2 border-t border-border pt-2 text-text-muted">
+      <p className="text-text-secondary">
+        {c.addressLine1}, {c.postcode}
+      </p>
+      <p className="mt-2 border-t border-border-subtle pt-2 text-text-muted">
         Booking as <span className="font-medium text-text-secondary">{c.customerEmail}</span>
       </p>
     </div>
+  );
+}
+
+function PaymentSmallPrint() {
+  return (
+    <p className="text-center text-[12px] leading-[1.5] text-text-muted">
+      No money is taken now. Your card is pre-authorised only, and charged when the job is
+      complete. Cancellation fees can apply, so see our{" "}
+      <Link
+        href="/cancellation-policy"
+        target="_blank"
+        className="font-semibold text-brand-blue hover:underline"
+      >
+        cancellation policy
+      </Link>
+      . By booking you agree to our{" "}
+      <Link href="/terms" target="_blank" className="font-semibold text-brand-blue hover:underline">
+        Terms &amp; Conditions
+      </Link>
+      .
+    </p>
   );
 }
 
@@ -1329,13 +1172,13 @@ function CheckoutForm({
     if (!alreadyConfirmed && stripe && elements) {
       // Park the draft BEFORE confirming. If the issuer wants a 3-D Secure
       // challenge Stripe can't run inline, the next thing that happens is the
-      // page navigating away — this component won't be here to save anything
+      // page navigating away: this component won't be here to save anything
       // later. The checkout goes with it so the return path can put the
       // customer back on the picker if their window has closed meanwhile.
       saveDraft(piId, { common: c, creditAppliedPence: checkout.creditAppliedPence, checkout });
 
       // Place the manual-capture hold now (captured on completion). The hold is
-      // always taken — credit only reduces its amount.
+      // always taken: credit only reduces its amount.
       const { error: confirmError, paymentIntent } = await stripe.confirmPayment({
         elements,
         confirmParams: {
@@ -1351,7 +1194,7 @@ function CheckoutForm({
         },
         redirect: "if_required",
       });
-      // Past this point we did NOT redirect — this component still holds every
+      // Past this point we did NOT redirect: this component still holds every
       // answer, so the parked draft has no further use either way.
       clearDraft(piId);
       if (confirmError) {
@@ -1392,7 +1235,7 @@ function CheckoutForm({
         return;
       }
       // The hold is already live here, so this is the same orphaned hold the
-      // redirect path can produce — tell ops either way. The customer keeps
+      // redirect path can produce: tell ops either way. The customer keeps
       // their filled-in form and sees the real error; pressing the button
       // again retries the write on this hold.
       void reportOrphanedHold(piId, `booking write failed: ${result.error}`);
@@ -1416,25 +1259,18 @@ function CheckoutForm({
       />
 
       {alreadyConfirmed ? (
-        <p className="flex items-start gap-2 rounded-lg bg-green-50 px-4 py-3 text-sm font-medium text-success">
-          <CheckCircle2 size={16} className="mt-0.5 shrink-0" />
-          <span>
-            Your card is already authorised for {formatPrice(checkout.chargePence)}. Nothing more
-            to enter. Confirm below to finish your booking.
-          </span>
-        </p>
+        <Alert tone="success">
+          Your card is already authorised for {formatPrice(checkout.chargePence)}. Nothing more to
+          enter. Confirm below to finish your booking.
+        </Alert>
       ) : (
-        <div>
-          <p className="mb-3 text-sm font-semibold text-text-primary">Payment details</p>
-          <div className="rounded-xl border border-border p-4">
-            <PaymentElement />
-          </div>
+        <div className="rounded-[20px] border border-border bg-white p-5 shadow-card">
+          <p className="mb-3 font-display text-lg font-extrabold text-text-primary">Payment details</p>
+          <PaymentElement />
         </div>
       )}
 
-      {error && (
-        <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-danger">{error}</p>
-      )}
+      {error && <Alert tone="error">{error}</Alert>}
 
       <Button
         type="submit"
@@ -1443,6 +1279,7 @@ function CheckoutForm({
         fullWidth
         disabled={(!alreadyConfirmed && !stripe) || submitting}
         iconLeft={submitting ? Loader2 : Lock}
+        className="font-bold"
       >
         {submitting
           ? "Processing…"
@@ -1450,22 +1287,7 @@ function CheckoutForm({
             ? "Confirm booking"
             : `Pre-authorise ${formatPrice(checkout.chargePence)}`}
       </Button>
-      <p className="text-center text-[11px] text-text-muted">
-        No money is taken now. Your card is pre-authorised only, charged when the job is complete.
-        {" "}Free to cancel more than 24 hours before your slot. See our{" "}
-        <Link
-          href="/cancellation-policy"
-          target="_blank"
-          className="font-semibold text-brand-blue hover:underline"
-        >
-          cancellation policy
-        </Link>
-        . By booking you agree to our{" "}
-        <Link href="/terms" target="_blank" className="font-semibold text-brand-blue hover:underline">
-          Terms &amp; Conditions
-        </Link>
-        .
-      </p>
+      <PaymentSmallPrint />
     </form>
   );
 }
@@ -1497,7 +1319,7 @@ function FreeCheckoutForm({
     );
     if (!result.ok) {
       setSubmitting(false);
-      // No card involved — just back to the picker for another time.
+      // No card involved: just back to the picker for another time.
       if (result.code === "slot_passed") {
         onSlotPassed();
         return;
@@ -1525,15 +1347,21 @@ function FreeCheckoutForm({
         lines={c.repairLines}
       />
 
-      <p className="rounded-lg bg-green-50 px-4 py-3 text-sm font-medium text-success">
+      <Alert tone="success">
         Your account credit covers this booking in full. There&apos;s nothing to pay.
-      </p>
+      </Alert>
 
-      {error && (
-        <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-danger">{error}</p>
-      )}
+      {error && <Alert tone="error">{error}</Alert>}
 
-      <Button type="submit" variant="primary" size="lg" fullWidth disabled={submitting} iconLeft={submitting ? Loader2 : Lock}>
+      <Button
+        type="submit"
+        variant="primary"
+        size="lg"
+        fullWidth
+        disabled={submitting}
+        iconLeft={submitting ? Loader2 : Lock}
+        className="font-bold"
+      >
         {submitting ? "Processing…" : "Confirm booking"}
       </Button>
     </form>

@@ -301,7 +301,7 @@ export const EMAIL_TEMPLATE_DEFS: readonly EmailTemplateDef[] = [
       {
         id: "help",
         type: "note",
-        text: "Questions? Email us at [help@bookmytech.co.uk](mailto:help@bookmytech.co.uk)",
+        text: "Questions? Email us at [support@bookmytech.co.uk](mailto:support@bookmytech.co.uk)",
       },
     ],
   },
@@ -536,7 +536,7 @@ export const EMAIL_TEMPLATE_DEFS: readonly EmailTemplateDef[] = [
         type: "note",
         text: "No money has left your account. Your existing pre-authorisation stays in place and simply transfers to your new mechanic.",
       },
-      { id: "help", type: "note", text: "Questions? Email us at [help@bookmytech.co.uk](mailto:help@bookmytech.co.uk)" },
+      { id: "help", type: "note", text: "Questions? Email us at [support@bookmytech.co.uk](mailto:support@bookmytech.co.uk)" },
     ],
   },
   {
@@ -562,7 +562,7 @@ export const EMAIL_TEMPLATE_DEFS: readonly EmailTemplateDef[] = [
         type: "note",
         text: "We'll be in touch shortly so you can accept this time, suggest another, or keep your original slot.",
       },
-      { id: "help", type: "note", text: "Questions? Email us at [help@bookmytech.co.uk](mailto:help@bookmytech.co.uk)" },
+      { id: "help", type: "note", text: "Questions? Email us at [support@bookmytech.co.uk](mailto:support@bookmytech.co.uk)" },
     ],
   },
   {
@@ -966,7 +966,7 @@ export const EMAIL_TEMPLATE_DEFS: readonly EmailTemplateDef[] = [
       {
         id: "body",
         type: "paragraph",
-        text: "While suspended you won't receive new job offers. If you have questions, reply to this email or contact [help@bookmytech.co.uk](mailto:help@bookmytech.co.uk).",
+        text: "While suspended you won't receive new job offers. If you have questions, reply to this email or contact [support@bookmytech.co.uk](mailto:support@bookmytech.co.uk).",
       },
       { id: "footnote", type: "note", text: "[Open your dashboard →]({{dashboard_url}})" },
     ],

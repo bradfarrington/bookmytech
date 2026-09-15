@@ -70,7 +70,7 @@ export function BookEntry({ node = null }: BookEntryProps) {
       </div>
 
       <p className="text-center text-xs text-text-muted">
-        No upfront payment · Vetted mechanics only · 12-month guarantee
+        Charged only when the job&apos;s done · Vetted mechanics · 12 months or 12,000 miles warranty on eligible repairs
       </p>
     </div>
   );

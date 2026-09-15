@@ -10,7 +10,7 @@ import { formatPrice } from "@/lib/utils";
 //
 // It exists because the web funnel can now be interrupted by a 3-D Secure
 // redirect (see the return path in app/(customer)/book/slot/_components/
-// slot-picker.tsx). Ordering is unchanged — hold first, then write the row — so
+// confirm-checkout.tsx). Ordering is unchanged — hold first, then write the row — so
 // a payment failure still leaves no orphaned booking row. This is the other
 // direction: a live, uncaptured hold on a real customer's card with nothing in
 // the CRM to capture it against. It expires on its own after 7 days, but nobody

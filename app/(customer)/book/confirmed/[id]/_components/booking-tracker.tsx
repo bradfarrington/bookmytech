@@ -37,7 +37,7 @@ const ORDER = STEPS.map((s) => s.key);
 const BANNERS: Record<string, { title: string; body: string; icon: LucideIcon }> = {
   sourcing_mechanic: {
     title: "Finding your mechanic",
-    body: "We're matching you with the best available mechanic in your area. You'll get an email as soon as one accepts, usually within minutes.",
+    body: "Your job has gone out to vetted mechanics near you, and the first to accept takes it. You'll get an email as soon as one does.",
     icon: Clock,
   },
   confirmed: {
@@ -83,7 +83,7 @@ function sourcingBanner(elapsedSec: number): { title: string; body: string; icon
   }
   return {
     title: "Finding your mechanic",
-    body: "We're matching you with the best available mechanic in your area, usually within seconds. You'll get an email the moment one accepts.",
+    body: "Your job has gone out to vetted mechanics near you, and the first to accept takes it. You'll get an email the moment one does.",
     icon: Clock,
   };
 }

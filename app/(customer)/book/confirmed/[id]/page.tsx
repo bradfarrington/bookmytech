@@ -204,8 +204,8 @@ export default async function ConfirmedPage({ params }: ConfirmedPageProps) {
 
       <p className="text-center text-sm text-text-muted">
         Questions?{" "}
-        <a href="mailto:help@bookmytech.co.uk" className="font-semibold text-brand-blue hover:underline">
-          help@bookmytech.co.uk
+        <a href="mailto:support@bookmytech.co.uk" className="font-semibold text-brand-blue hover:underline">
+          support@bookmytech.co.uk
         </a>
       </p>
     </div>

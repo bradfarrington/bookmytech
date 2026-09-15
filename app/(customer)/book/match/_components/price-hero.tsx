@@ -89,7 +89,7 @@ export function PriceHero({
       {/* Price hero card */}
       <div className="rounded-2xl bg-brand-gradient p-6 text-white shadow-hero">
         <p className="text-sm font-semibold uppercase tracking-widest text-blue-200">
-          Fixed price
+          Price for this job
         </p>
         <p className="mt-1 text-5xl font-extrabold tracking-tight">
           {formatPrice(pricePence)}
@@ -195,25 +195,17 @@ export function PriceHero({
           </li>
           <li className="flex items-center gap-2">
             <span className="size-1.5 rounded-full bg-blue-300" />
-            No call-out fee
-          </li>
-          <li className="flex items-center gap-2">
-            <span className="size-1.5 rounded-full bg-blue-300" />
-            12-month guarantee
+            Warranty on eligible repairs: 12 months or 12,000 miles
           </li>
         </ul>
-
-        <p className="mt-4 rounded-xl bg-white/15 px-4 py-3 text-[13px] leading-relaxed text-blue-100">
-          Your card is pre-authorised now. No money leaves your account until your
-          mechanic has completed the job.
-        </p>
+        {/* The pre-authorisation is explained on Confirm, where it happens (Task 47). */}
       </div>
 
       {/* Trust row */}
       <div className="grid grid-cols-3 gap-2">
         {[
           { icon: ShieldCheck, label: "Vetted professional" },
-          { icon: Star, label: "12-month guarantee" },
+          { icon: Star, label: "12-month / 12,000-mile warranty" },
           // Not "No fix, no fee": an on-site diagnostic fee can apply (Task 37).
           { icon: Wrench, label: "Extra work needs your OK" },
         ].map(({ icon: Icon, label }) => (

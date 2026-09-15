@@ -119,6 +119,22 @@ You are working on **Book My Tech**, a UK mobile-mechanic booking platform. This
 
 ## Current task
 
+### 2026-09-15 — Booking flow split into the app's steps ✅ (Task 47), branch `task-47-booking-flow-split`
+
+**The web funnel now books in the app's steps:** Price → Time (`/book/time`) → Address (`/book/address`) → Confirm (`/book/slot`, unchanged URL). Detail in `docs/tasks/47-booking-flow-split.md`. Next up is Task 48, the dashboard rebuild (plan: `mockups/` structure with a top header).
+
+- **Checkout unchanged underneath.** `slot-picker.tsx` became `confirm-checkout.tsx`. Only the time and address inputs moved out. The 3-D Secure draft, `confirmedIntentId`, stranded-hold and discount-code logic are exactly as they were.
+- **Address in sessionStorage, never the URL**, keyed by the job (`lib/bookings/address-draft.ts`). The time goes in the URL (`lib/bookings/step-params.ts`).
+- **Price re-quoted on the server at every step** (`lib/bookings/checkout-context.ts`).
+- **Copy:**
+  - "Price for this job"
+  - no "No call-out fee"
+  - warranty 12 months or 12,000 miles on eligible repairs
+  - tracker describes broadcast dispatch
+  - customers see `support@bookmytech.co.uk`
+- **E2E specs were silently skipping:** they checked the pre-Task-44 HaynesPro env names. Fixed; they still need `E2E_REG`.
+- **No app-side work.**
+
 ### 2026-09-15 — Homepage redesign ✅ (Task 46), branch `task-46-homepage-redesign`
 
 **The homepage now follows `proposal/homepage-redesign.html`**, the structure every customer page will follow one page at a time. Detail in `docs/tasks/46-homepage-redesign.md`.

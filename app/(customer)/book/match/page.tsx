@@ -14,6 +14,7 @@ import { TrackOnMount } from "@/components/analytics/track-on-mount";
 import { FUNNEL_EVENTS } from "@/lib/analytics/events";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { productIncludes } from "@/lib/catalogue/products";
+import { stepQuery } from "@/lib/bookings/step-params";
 import { PriceHero } from "./_components/price-hero";
 
 // Step 3: the price. One job, or several priced as one visit (Task 24) — the
@@ -61,7 +62,15 @@ export default async function MatchPage({ searchParams }: MatchPageProps) {
   }
 
   const withRepairs = (list: string[]) => `&${repairsQuery(list)}`;
-  const slotHref = `/book/slot?reg=${encodeURIComponent(reg)}${withRepairs(quote.itemIds)}${vehicleParams ? `&${vehicleParams}` : ""}${prefParam}`;
+  // Task 47: Price → Time → Address → Confirm, matching the app.
+  const timeHref = `/book/time?${stepQuery({
+    reg,
+    repairs: quote.itemIds,
+    make: params.make,
+    model: params.model,
+    postcode: params.postcode,
+    pref: params.pref,
+  })}`;
   const addHref = `${browserHref}${withRepairs(quote.itemIds)}`;
   // Dropping an item rewrites the URL; dropping the last one is "start again".
   const removeHref = (itemId: string) => {
@@ -143,7 +152,7 @@ export default async function MatchPage({ searchParams }: MatchPageProps) {
       />
 
       <div className="flex flex-col gap-3">
-        <Link href={slotHref}>
+        <Link href={timeHref}>
           <Button variant="primary" size="lg" fullWidth iconRight={ChevronRight}>
             Pick a time
           </Button>

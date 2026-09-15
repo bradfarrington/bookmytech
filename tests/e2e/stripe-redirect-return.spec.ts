@@ -12,8 +12,8 @@ import {
 //
 // When the issuer won't run its challenge inside Stripe's iframe, Stripe
 // navigates the whole page away and later returns the customer to `return_url`
-// — to a freshly mounted SlotPicker with none of their answers and a live hold
-// on their card. slot-picker.tsx parks the draft in sessionStorage before
+// — to a freshly mounted Confirm step with none of their answers and a live hold
+// on their card. confirm-checkout.tsx parks the draft in sessionStorage before
 // confirming and replays it on the way back. These tests cover that replay.
 //
 // WHAT IS AND ISN'T REAL HERE. Stripe's in-browser confirmPayment is gated by
@@ -79,15 +79,16 @@ async function prepareAndPark(page: Page): Promise<{ secret: string; slotUrl: UR
   return { secret, slotUrl };
 }
 
-/** The URL Stripe sends the customer back to, with the params it appends. */
+/**
+ * The URL Stripe sends the customer back to, with the params it appends. Built
+ * from the Confirm URL's own params (the app's return_url carries the same
+ * job, vehicle and time), so the page re-quotes the same booking.
+ */
 function returnUrl(slotUrl: URL, secret: string, status: string): string {
-  const params = new URLSearchParams({
-    reg: slotUrl.searchParams.get("reg") ?? "",
-    repair: slotUrl.searchParams.get("repair") ?? "",
-    payment_intent: secret.split("_secret_")[0],
-    payment_intent_client_secret: secret,
-    redirect_status: status,
-  });
+  const params = new URLSearchParams(slotUrl.searchParams);
+  params.set("payment_intent", secret.split("_secret_")[0]);
+  params.set("payment_intent_client_secret", secret);
+  params.set("redirect_status", status);
   return `/book/slot?${params}`;
 }
 
@@ -143,10 +144,9 @@ test("a failed challenge writes no booking and puts the customer back on the for
 
   await page.goto(returnUrl(slotUrl, secret, "failed"));
 
-  // Their answers come back rather than being silently reset to step one.
-  await expect(page.getByPlaceholder("House number and street")).toHaveValue(TEST_ADDRESS, {
-    timeout: 20_000,
-  });
+  // Their answers come back rather than being silently reset to step one. Since
+  // Task 47 the address is shown in Confirm's summary, not re-typed there.
+  await expect(page.getByText(TEST_ADDRESS).first()).toBeVisible({ timeout: 20_000 });
   await expect(page.getByText(/didn't authorise that payment/i)).toBeVisible();
 
   // No booking row, and nothing taken.

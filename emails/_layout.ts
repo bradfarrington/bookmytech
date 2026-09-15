@@ -58,7 +58,7 @@ export function layout({ preheader, content }: LayoutInput): string {
       <mj-column>
         <mj-text align="center" color="${TEXT_MUTED}" font-size="12px" line-height="1.6">
           Book My Tech &middot; UK mobile mechanic platform<br />
-          Questions? <a href="mailto:help@bookmytech.co.uk">help@bookmytech.co.uk</a>
+          Questions? <a href="mailto:support@bookmytech.co.uk">support@bookmytech.co.uk</a>
         </mj-text>
       </mj-column>
     </mj-section>
