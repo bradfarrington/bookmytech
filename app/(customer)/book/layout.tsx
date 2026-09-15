@@ -10,12 +10,16 @@ export default function BookLayout({ children }: { children: React.ReactNode }) 
           <Link href="/" aria-label="Book My Tech home" className="flex items-center">
             <Image src="/logo-cropped.png" alt="Book My Tech" width={1463} height={368} priority className="h-9 w-auto sm:h-10" />
           </Link>
-          <a
-            href="tel:+441234567890"
+          {/* Was a "Call us" link to a placeholder number (+44 1234 567890).
+              Opens in a new tab so a booking in progress isn't lost. */}
+          <Link
+            href="/help"
+            target="_blank"
+            rel="noopener"
             className="text-sm font-medium text-text-secondary hover:text-text-primary"
           >
-            Need help? Call us
-          </a>
+            Need help?
+          </Link>
         </div>
       </header>
 

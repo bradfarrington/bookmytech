@@ -28,7 +28,7 @@ export function Hero() {
               aria-hidden
               className="size-2 rounded-full bg-success shadow-[0_0_0_4px_rgba(34,197,94,0.24)]"
             />
-            Live in London, Birmingham, Manchester and Bristol
+            Live across four regions of England
           </span>
 
           <h1 className="mb-[22px] font-display text-[clamp(38px,6vw,72px)] font-extrabold leading-[1.02] tracking-[-0.028em]">

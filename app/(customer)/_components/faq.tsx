@@ -25,7 +25,7 @@ const FAQS: FaqItem[] = [
   {
     question: "What areas do you cover?",
     answer:
-      "We're live across Greater London, Birmingham, Manchester and Bristol. Enter your reg and postcode at the top of the page to get started.",
+      "We're live across London, the Midlands, the North West and the South West. Enter your reg and postcode at the top of the page to get started.",
   },
   {
     question: "What if the mechanic can't fix the problem?",

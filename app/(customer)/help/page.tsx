@@ -142,7 +142,7 @@ const FAQ_GROUPS: FaqGroup[] = [
       {
         question: "What areas do you cover?",
         answer:
-          "We're live across Greater London, Birmingham, Manchester and Bristol. Add your postcode when you book and your job goes to vetted mechanics who cover your area.",
+          "We're live across London, the Midlands, the North West and the South West. Add your postcode when you book and your job goes to vetted mechanics who cover your area.",
       },
       {
         question: "What vehicles can you work on?",

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Card } from "@/components/ui/card";
+import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { FIELD_ERROR } from "./field";
 
@@ -20,8 +20,10 @@ interface StepShellProps {
   children: React.ReactNode;
 }
 
-// Common chrome for every wizard step: a titled card, an error slot, and a
-// Back / Continue button row. Keeps each step component focused on its fields.
+// Common chrome for every wizard step: one white card holding the title, the
+// fields, an error slot and the Back / Continue row. Keeps each step component
+// focused on its fields. The title lives inside the card because the layout
+// pulls the card up over its gradient band (Task 46).
 export function StepShell({
   title,
   intro,
@@ -38,34 +40,44 @@ export function StepShell({
         e.preventDefault();
         onNext();
       }}
-      className="space-y-6"
+      className="overflow-hidden rounded-[24px] border border-border bg-white shadow-float"
     >
-      <div className="space-y-1">
-        <h1 className="text-2xl font-extrabold text-text-primary">{title}</h1>
-        {intro && <p className="text-sm text-text-secondary">{intro}</p>}
+      <div className="border-b border-border-subtle px-5 py-6 sm:px-8 sm:py-7">
+        <h1 className="font-display text-[26px] font-extrabold leading-tight tracking-[-0.02em] text-text-primary sm:text-[28px]">
+          {title}
+        </h1>
+        {intro && <p className="mt-1.5 text-[15px] leading-[1.55] text-text-secondary">{intro}</p>}
       </div>
 
-      <Card className="space-y-5 p-6">{children}</Card>
+      <div className="space-y-5 px-5 py-6 sm:px-8">{children}</div>
 
-      {error && (
-        <p role="alert" className={FIELD_ERROR}>
-          {error}
-        </p>
-      )}
-
-      <div className="flex items-center justify-between gap-3">
-        {backHref ? (
-          <Link href={backHref}>
-            <Button type="button" variant="ghost" disabled={pending}>
-              Back
-            </Button>
-          </Link>
-        ) : (
-          <span />
+      <div className="space-y-4 border-t border-border-subtle bg-surface/70 px-5 py-5 sm:px-8">
+        {error && (
+          <p role="alert" className={FIELD_ERROR}>
+            {error}
+          </p>
         )}
-        <Button type="submit" variant="primary" disabled={pending}>
-          {pending ? "Saving…" : nextLabel}
-        </Button>
+        <div className="flex items-center justify-between gap-3">
+          {backHref ? (
+            <Link href={backHref}>
+              <Button type="button" variant="ghost" size="lg" disabled={pending} className="bg-white font-bold">
+                Back
+              </Button>
+            </Link>
+          ) : (
+            <span />
+          )}
+          <Button
+            type="submit"
+            variant="primary"
+            size="lg"
+            iconRight={pending ? undefined : ArrowRight}
+            disabled={pending}
+            className="font-bold"
+          >
+            {pending ? "Saving…" : nextLabel}
+          </Button>
+        </div>
       </div>
     </form>
   );

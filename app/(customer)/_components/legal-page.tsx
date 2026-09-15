@@ -1,6 +1,10 @@
 import Link from "next/link";
+import { ArrowRight, CalendarDays, Mail } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { CustomerNav } from "@/components/ui/customer-nav";
-import { Overline } from "@/components/ui/overline";
+import { Icon } from "@/components/ui/icon";
+import { SectionHeading } from "@/components/ui/section-heading";
+import { SectionWatermark } from "@/components/ui/section-watermark";
 import { Footer } from "./footer";
 
 /**
@@ -60,7 +64,7 @@ function Block({ block }: { block: LegalBlock }) {
       return <p className={PARA}>{block.text}</p>;
     case "h3":
       return (
-        <h3 className="mb-1.5 mt-4 text-base font-bold tracking-[-0.01em] text-text-primary">
+        <h3 className="mb-1.5 mt-5 text-base font-bold tracking-[-0.01em] text-text-primary">
           {block.text}
         </h3>
       );
@@ -84,7 +88,7 @@ function Block({ block }: { block: LegalBlock }) {
       );
     case "table":
       return (
-        <div className="mb-4 mt-2 overflow-x-auto rounded-xl border border-border bg-surface-card">
+        <div className="mb-4 mt-2 overflow-x-auto rounded-xl border border-border bg-white">
           <table className="w-full min-w-[420px] text-left text-sm">
             <thead>
               <tr className="bg-surface">
@@ -134,7 +138,7 @@ function Block({ block }: { block: LegalBlock }) {
       return (
         <div className="mb-3 mt-2 grid gap-3 sm:grid-cols-2">
           {block.items.map((it) => (
-            <div key={it.title} className="rounded-xl border border-border bg-surface-card p-4">
+            <div key={it.title} className="rounded-xl border border-border bg-surface p-4">
               <p className="mb-1 flex items-center gap-2 text-sm font-bold text-text-primary">
                 <span aria-hidden>{it.emoji}</span>
                 {it.title}
@@ -147,22 +151,16 @@ function Block({ block }: { block: LegalBlock }) {
   }
 }
 
-function ContentsList({ sections }: { sections: LegalSection[] }) {
-  return (
-    <ol className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-      {sections.map((s, i) => (
-        <li key={s.heading}>
-          <a href={`#section-${i + 1}`} className="text-sm text-brand-blue hover:underline">
-            {i + 1}. {s.heading}
-          </a>
-        </li>
-      ))}
-    </ol>
-  );
-}
+const sectionId = (index: number) => `section-${index + 1}`;
 
 // Shared chrome + typography for the policy pages (Terms, Privacy, Cookies,
 // Mechanic Terms, Cancellation Policy). Keeps each page file to its content model.
+//
+// Task 46: the marketing page pattern. A gradient hero; on desktop a sticky,
+// scrollable "On this page" list beside the document (on phones the list folds
+// into a disclosure above it); the document in one white card; and a contact
+// band on pale blue. Section anchors stay `#section-N`, so existing links
+// between the documents keep working.
 export function LegalPage({
   eyebrow,
   title,
@@ -175,83 +173,133 @@ export function LegalPage({
   return (
     <>
       <CustomerNav />
-      <section className="bg-brand-gradient text-white">
-        <div className="mx-auto max-w-content px-4 pb-14 pt-12 sm:px-8 lg:pb-16 lg:pt-16">
-          <Overline className="mb-3 text-white/70">{eyebrow}</Overline>
-          <h1 className="mb-3 max-w-3xl text-[32px] font-extrabold leading-[1.07] tracking-[-0.025em] sm:text-[42px]">
-            {title}
-          </h1>
-          <p className="max-w-2xl text-base text-white/85 sm:text-lg">{intro}</p>
-          <p className="mt-5 text-sm text-white/60">Last updated {lastUpdated}</p>
-        </div>
-      </section>
-
-      <main className="bg-surface">
-        <div className="mx-auto max-w-[820px] px-4 py-14 sm:px-8 lg:py-[64px]">
-          {preamble && preamble.length > 0 && (
-            <div className="mb-8 rounded-2xl border border-border bg-surface-card p-5 shadow-card sm:p-6">
-              {preamble.map((b, i) => (
-                <Block key={i} block={b} />
-              ))}
-            </div>
-          )}
-
-          {/* Contents. Long documents (60 sections) would push the copy below the
-              fold on a phone, so the list is collapsed there and open on wider screens. */}
-          <details className="mb-10 rounded-2xl border border-border bg-surface-card p-5 shadow-card sm:hidden">
-            <summary className="cursor-pointer text-[11px] font-bold uppercase tracking-[0.1em] text-text-muted">
-              {contentsLabel} ({sections.length} sections)
-            </summary>
-            <div className="mt-3">
-              <ContentsList sections={sections} />
-            </div>
-          </details>
-          <nav
-            aria-label={contentsLabel}
-            className="mb-10 hidden rounded-2xl border border-border bg-surface-card p-5 shadow-card sm:block"
-          >
-            <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.1em] text-text-muted">
-              {contentsLabel}
+      <main>
+        <section className="relative overflow-hidden bg-brand-gradient-deep text-white">
+          <div aria-hidden className="hero-glow pointer-events-none absolute inset-0" />
+          <div className="relative mx-auto max-w-content px-4 pb-16 pt-14 sm:px-6 sm:pb-20 sm:pt-[88px]">
+            <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-white/75">{eyebrow}</p>
+            <h1 className="mb-4 mt-3 max-w-3xl font-display text-[clamp(34px,5vw,56px)] font-extrabold leading-[1.04] tracking-[-0.028em]">
+              {title}
+            </h1>
+            <p className="max-w-2xl text-[17px] leading-[1.55] text-white/80">{intro}</p>
+            <p className="mt-6 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white/85">
+              <Icon icon={CalendarDays} size={13} strokeWidth={2.2} />
+              Last updated {lastUpdated}
             </p>
-            <ContentsList sections={sections} />
-          </nav>
-
-          <div className="flex flex-col gap-9">
-            {sections.map((s, i) => (
-              <section key={s.heading} id={`section-${i + 1}`} className="scroll-mt-24">
-                <h2 className="mb-3 text-xl font-extrabold tracking-[-0.02em] text-text-primary sm:text-2xl">
-                  {i + 1}. {s.heading}
-                </h2>
-                {s.body?.map((p, j) => (
-                  <p key={j} className={PARA}>
-                    {p}
-                  </p>
-                ))}
-                {s.bullets && <Bullets items={s.bullets} />}
-                {s.blocks?.map((b, j) => (
-                  <Block key={j} block={b} />
-                ))}
-              </section>
-            ))}
           </div>
+        </section>
 
-          <div className="mt-12 rounded-2xl border border-border bg-surface-card p-6 shadow-card">
-            <h2 className="text-lg font-bold text-text-primary">Questions about this policy?</h2>
-            <p className="mt-1.5 text-sm text-text-secondary">
-              Email us at{" "}
-              <a href="mailto:support@bookmytech.co.uk" className="font-semibold text-brand-blue hover:underline">
-                support@bookmytech.co.uk
-              </a>{" "}
-              or visit the{" "}
-              <Link href="/help" className="font-semibold text-brand-blue hover:underline">
-                help centre
+        {/* overflow-clip, not hidden: hidden would stop the contents list sticking. */}
+        <section className="relative overflow-clip bg-surface">
+          <div className="relative mx-auto grid max-w-content gap-10 px-4 py-12 sm:px-6 sm:py-16 min-[1000px]:grid-cols-[260px_minmax(0,1fr)] min-[1000px]:gap-12">
+            <aside className="hidden min-[1000px]:block">
+              <nav
+                aria-label={contentsLabel}
+                className="sticky top-[92px] max-h-[calc(100vh-120px)] overflow-y-auto pr-2 [scrollbar-width:thin]"
+              >
+                <p className="mb-2 px-3 text-[11px] font-bold uppercase tracking-[0.14em] text-text-muted">
+                  {contentsLabel}
+                </p>
+                <ol className="flex flex-col gap-0.5">
+                  {sections.map((s, i) => (
+                    <li key={s.heading}>
+                      <a
+                        href={`#${sectionId(i)}`}
+                        className="flex gap-2 rounded-lg px-3 py-1.5 text-[13px] leading-snug text-text-secondary transition-colors hover:bg-white hover:text-text-primary"
+                      >
+                        <span className="w-5 shrink-0 font-semibold tabular-nums text-brand-blue">{i + 1}</span>
+                        {s.heading}
+                      </a>
+                    </li>
+                  ))}
+                </ol>
+              </nav>
+            </aside>
+
+            <div className="min-w-0 max-w-[820px]">
+              {preamble && preamble.length > 0 && (
+                <div className="mb-6 rounded-[20px] border border-blue-100 bg-blue-50/60 p-5 sm:p-6">
+                  {preamble.map((b, i) => (
+                    <Block key={i} block={b} />
+                  ))}
+                </div>
+              )}
+
+              {/* Long documents (60 sections) would push the copy below the fold
+                  on a phone, so the list is a closed disclosure there. */}
+              <details className="mb-6 rounded-[20px] border border-border bg-white p-5 shadow-card min-[1000px]:hidden">
+                <summary className="cursor-pointer text-[11px] font-bold uppercase tracking-[0.14em] text-text-muted">
+                  {contentsLabel} ({sections.length} sections)
+                </summary>
+                <ol className="mt-3 grid gap-2 sm:grid-cols-2">
+                  {sections.map((s, i) => (
+                    <li key={s.heading}>
+                      <a href={`#${sectionId(i)}`} className="text-sm text-brand-blue hover:underline">
+                        {i + 1}. {s.heading}
+                      </a>
+                    </li>
+                  ))}
+                </ol>
+              </details>
+
+              <article className="rounded-[24px] border border-border bg-white px-5 py-8 shadow-card sm:px-10 sm:py-10">
+                {sections.map((s, i) => (
+                  <section
+                    key={s.heading}
+                    id={sectionId(i)}
+                    className="scroll-mt-[92px] border-t border-border-subtle pt-8 first:border-t-0 first:pt-0 [&:not(:first-child)]:mt-8"
+                  >
+                    <h2 className="mb-4 flex items-start gap-3 font-display text-[22px] font-extrabold leading-tight tracking-[-0.02em] text-text-primary sm:text-2xl">
+                      <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg bg-blue-50 font-sans text-xs font-bold text-brand-blue">
+                        {i + 1}
+                      </span>
+                      {s.heading}
+                    </h2>
+                    {s.body?.map((p, j) => (
+                      <p key={j} className={PARA}>
+                        {p}
+                      </p>
+                    ))}
+                    {s.bullets && <Bullets items={s.bullets} />}
+                    {s.blocks?.map((b, j) => (
+                      <Block key={j} block={b} />
+                    ))}
+                  </section>
+                ))}
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <section className="relative overflow-hidden border-t border-blue-100 bg-[linear-gradient(180deg,#eff6ff_0%,#e0ebff_100%)]">
+          <SectionWatermark />
+          <div className="relative mx-auto max-w-content px-4 py-14 sm:px-6 sm:py-[88px]">
+            <SectionHeading
+              eyebrow="Questions"
+              title="Something here unclear?"
+              lead="Email our support team or visit the help centre, and we'll talk you through it."
+              className="mb-8"
+            />
+            <div className="flex flex-wrap justify-center gap-3">
+              <a href="mailto:support@bookmytech.co.uk">
+                <Button variant="primary" size="lg" iconLeft={Mail} className="font-bold">
+                  support@bookmytech.co.uk
+                </Button>
+              </a>
+              <Link href="/help">
+                <Button
+                  variant="ghost"
+                  size="lg"
+                  iconRight={ArrowRight}
+                  className="bg-white font-bold text-text-primary hover:border-text-primary hover:bg-white"
+                >
+                  Visit the help centre
+                </Button>
               </Link>
-              .
-            </p>
+            </div>
           </div>
-        </div>
+        </section>
       </main>
-
       <Footer />
     </>
   );

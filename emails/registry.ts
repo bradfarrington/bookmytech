@@ -64,14 +64,14 @@ export const EMAIL_TEMPLATE_DEFS: readonly EmailTemplateDef[] = [
     description: "Sent to a mechanic the moment they submit their application.",
     category: "mechanic",
     subject: "We've received your Book My Tech application",
-    preheader: "We've received your application. We'll review it within 48 hours.",
+    preheader: "We've received your application. We'll review it within a few working days.",
     variables: [{ name: "name", description: "Applicant's name", example: "Sam Rivera" }],
     blocks: [
       { id: "heading", type: "heading", text: "Thanks, {{name}}. We've got your application." },
       {
         id: "intro",
         type: "paragraph",
-        text: "Your application to join Book My Tech as a vetted professional has been received. Our team will review your details and documents and get back to you **within 48 hours**.",
+        text: "Your application to join Book My Tech as a vetted professional has been received. Our team will review your details and documents and get back to you **within a few working days**.",
       },
       {
         id: "more",

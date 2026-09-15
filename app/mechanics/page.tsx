@@ -52,7 +52,7 @@ export default function MechanicsLandingPage() {
                   aria-hidden
                   className="size-2 rounded-full bg-success shadow-[0_0_0_4px_rgba(34,197,94,0.24)]"
                 />
-                For mechanics in London, Birmingham, Manchester and Bristol
+                For mechanics across four regions of England
               </span>
 
               <h1 className="mb-[22px] font-display text-[clamp(38px,6vw,68px)] font-extrabold leading-[1.02] tracking-[-0.028em]">

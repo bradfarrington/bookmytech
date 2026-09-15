@@ -41,7 +41,7 @@ export const MECHANIC_FACTS: TickerFact[] = [
   { icon: CalendarClock, value: "Your hours", label: "go online when it suits you" },
   { icon: MapPin, value: "Your radius", label: "only jobs inside it" },
   { icon: Wallet, value: "Paid out", label: "when you complete the job" },
-  { icon: ShieldCheck, value: "Live in four cities", label: "London, Birmingham, Manchester, Bristol" },
+  { icon: ShieldCheck, value: "Live in four regions", label: "London, Midlands, North West, South West" },
 ];
 
 export const MECHANIC_BENEFITS: { icon: LucideIcon; title: string; body: string }[] = [

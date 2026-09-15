@@ -10,6 +10,8 @@ Brad's review the same day added:
 - a distinct look for each section, with a faded logo mark in some corners
 - the services grid driven by the admin's products, plus a gateway into booking a specific repair
 - `/help`, `/mechanics` and the area recruitment pages (`/mechanics/[area-slug]`) rebuilt in the same pattern
+- coverage named by region (London, the Midlands, the North West, the South West) instead of city
+- the mechanic application and the five legal pages rebuilt in the same pattern
 
 Deviations from the plan: the nav renders from `page.tsx` rather than inside `hero.tsx`, and the mobile drawer renders outside the `<header>`, because `backdrop-filter` would otherwise clip it to the bar. **One data-only migration, `0068_copy_no_em_dashes.sql`** (rewrites seeded text; no schema change, so no type regen). **No `app/api/mobile/**` shape change** (punctuation in some error sentences only). The mobile app needs to mirror the new tokens (see "Mobile app").
 
@@ -214,6 +216,46 @@ The section uses `overflow-clip` so the sidebar can stick.
 - The `/help` jump link lands the section at 92px, under the nav; the sidebar sticks; accordions open.
 - `/mechanics/manchester` and `/mechanics/london-z1-z2` render with area-tagged apply links.
 
+## Regions, the application and the legal pages (Brad, 2026-09-15)
+
+**Regions, not cities.** Wherever coverage was named by city it now says London, the Midlands, the North West and the South West:
+- homepage coverage (title, tiles, map pins and legend), FAQ and mechanics join section
+- `/help` areas answer
+- `/mechanics` badge and fact ticker
+
+There are no region boundaries to draw, so each map pin sits on the region's main city (`coverage.tsx` maps region to pin). The two hero badges read "Live across four regions of England" / "For mechanics across four regions of England", because the four names don't fit a pill on a phone.
+
+⚠️ **Regional wording promises more than the product.** A job is only dispatched to a mechanic whose radius covers the postcode, and "the South West" covers far more ground than mechanics based around Bristol do today. The `areas` table also still has city- and zone-based rows (Manchester, London Z1-Z2 …), and Birmingham and Bristol have none.
+
+**Mechanic application** (`app/mechanics/apply/**`):
+- **Header:** a frosted, sticky header like the site nav, without the full nav, so applicants aren't pulled away mid-form.
+- **Progress:** a gradient band holding the progress, restyled for the dark background.
+- **Steps:**
+  - Each step is one white card pulled up over the band.
+  - `StepShell` now holds the title, fields and the Back / Continue row in that card; the title moved inside because a dark title can't sit on the band.
+  - The review and submitted pages use the same card.
+- **Help link:** "Questions? Get help" opens `/help` in a new tab so a half-filled form isn't lost. It was "Questions? Call us" dialling a placeholder number.
+
+**Copy corrected in the application:**
+- The review page, submitted page and `application_received` email promised a review "within 48 hours"; they now say "a few working days", matching `/mechanics` and its FAQ.
+- Step 1's "takes about 5 minutes in total" is now 10, matching everywhere else.
+
+**Booking flow header.** Its "Need help? Call us" also dialled the placeholder number `+44 1234 567890`; it now links to `/help` (new tab). No other booking-flow change.
+
+**Legal pages** (`legal-page.tsx`, shared by Terms, Privacy, Cookies, Cancellation Policy and Mechanic Terms):
+- a gradient hero with a "Last updated" chip
+- a sticky, independently scrolling "On this page" list beside the document on desktop (a closed disclosure on phones)
+- the document in one white card with numbered section headings
+- a contact band on pale blue
+
+Section anchors are unchanged (`#section-N`), so cross-links still work. No legal wording changed.
+
+**Verified:**
+- `tsc`, eslint and the production build pass.
+- All five application steps plus submitted, at 375 and 1280: titles readable in the white card, no overflow, no em dash, no page errors.
+- `/terms` (58 sections), `/privacy` and `/cancellation-policy`: a jump lands the section at 92px under the nav, and the contents list sticks and scrolls.
+- `/`, `/help` and `/mechanics` show no city names.
+
 ## Parked: a public reviews feed
 
 Brad asked for new reviews to appear on the website automatically, with an admin switch to take any off. With the placeholder section gone, this waits until there are enough real reviews to show. When it's picked up:
@@ -244,6 +286,8 @@ Brad asked for new reviews to appear on the website automatically, with an admin
 - [x] Services grid lists the active `/admin/services` products with real prices, plus a gateway card into the repair catalogue; admin changes revalidate the homepage.
 - [x] A services or gateway card's choice survives reg entry and opens the repair browser at that category (or Repairs).
 - [x] `/help`, `/mechanics` and `/mechanics/[area-slug]` follow the marketing page pattern, with the shared nav, footer and sections, and true copy.
+- [x] Coverage is named by region everywhere it was named by city.
+- [x] The mechanic application and the legal pages follow the pattern; no placeholder phone numbers remain.
 - [x] Reg lookup from the hero and the final CTA reaches `/book/vehicle?reg=…&postcode=…`. Verified with the real reg DV12 CGU.
 - [x] Sticky bar hidden while a lookup form is on screen, shown mid-page; its button focuses the hero reg input.
 - [x] Reduced motion stops the ticker, the pulses, the dispatch card and the Reveal entrances.

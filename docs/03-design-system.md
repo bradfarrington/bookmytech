@@ -216,6 +216,8 @@ The layout every customer marketing page follows, taken from `proposal/homepage-
 - the homepage (`app/(customer)/page.tsx`)
 - `/help`
 - `/mechanics`, with its sections shared with the area pages in `app/mechanics/_components/`
+- the legal pages (`app/(customer)/_components/legal-page.tsx`), for long documents: a sticky, scrolling contents list and one white document card
+- the mechanic application (`app/mechanics/apply/layout.tsx` and `step-shell.tsx`), for multi-step forms: a gradient band holding the progress, and each step as one white card pulled up over it
 
 Reuse their pieces rather than restating classes.
 

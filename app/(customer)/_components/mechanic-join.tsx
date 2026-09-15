@@ -67,7 +67,7 @@ export function MechanicJoin() {
                 align="left"
                 eyebrow="For mechanics"
                 title="Fix cars on your terms. We'll bring the work."
-                lead="Join Book My Tech's network of vetted mobile mechanics in London, Birmingham, Manchester and Bristol."
+                lead="Join Book My Tech's network of vetted mobile mechanics in London, the Midlands, the North West and the South West."
               />
 
               <Reveal as="ul" stagger className="grid gap-5 min-[561px]:grid-cols-2">

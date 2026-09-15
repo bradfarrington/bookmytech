@@ -4,15 +4,16 @@ import { cn } from "@/lib/utils";
 import { GetPriceButton } from "./get-price-button";
 import { UK_CITY_PINS, UK_MAP_SIZE, UK_OUTLINE_PATH, type UkCity } from "./uk-outline";
 
-// Where we're live. Kept in step with the FAQ's areas answer, with deliberately
-// no mechanic counts. All four are live (Brad, 2026-09-15).
-// `label` says which side of the pin the name sits on, so neighbouring pins
-// (Bristol and London share a latitude) don't collide.
-const AREAS: { name: UkCity; label: "left" | "right" }[] = [
-  { name: "Greater London", label: "right" },
-  { name: "Birmingham", label: "right" },
-  { name: "Manchester", label: "left" },
-  { name: "Bristol", label: "left" },
+// Where we're live, named by region rather than city (Brad, 2026-09-15). Kept in
+// step with the FAQ's areas answer, with deliberately no mechanic counts. There
+// are no region boundaries to draw, so each pin sits on the region's main city
+// (`pin`). `label` says which side of the pin the name sits on, so neighbouring
+// pins (the South West and London share a latitude) don't collide.
+const AREAS: { name: string; pin: UkCity; label: "left" | "right" }[] = [
+  { name: "London", pin: "Greater London", label: "right" },
+  { name: "Midlands", pin: "Birmingham", label: "right" },
+  { name: "North West", pin: "Manchester", label: "left" },
+  { name: "South West", pin: "Bristol", label: "left" },
 ];
 
 export function Coverage() {
@@ -24,7 +25,7 @@ export function Coverage() {
             align="left"
             className="mb-0"
             eyebrow="Coverage"
-            title="Live in London, Birmingham, Manchester and Bristol."
+            title="Live in London, the Midlands, the North West and the South West."
             lead="Add your postcode when you look up your car, and your job goes to vetted mechanics who cover your area."
           />
 
@@ -71,7 +72,7 @@ export function Coverage() {
             </svg>
 
             {AREAS.map((area) => {
-              const pin = UK_CITY_PINS[area.name];
+              const pin = UK_CITY_PINS[area.pin];
               return (
                 <div
                   key={area.name}
@@ -97,7 +98,7 @@ export function Coverage() {
 
             <span className="absolute bottom-4 left-4 inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-[11px] font-bold text-green-700 shadow-card">
               <span className="size-1.5 rounded-full bg-success" />
-              Live in all four cities
+              Live in all four regions
             </span>
           </div>
         </Reveal>

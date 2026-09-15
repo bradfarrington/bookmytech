@@ -28,7 +28,7 @@ export function StepAbout() {
   return (
     <StepShell
       title="About you"
-      intro="Let's start with your contact details. Takes about 5 minutes in total."
+      intro="Let's start with your contact details. The whole application takes about 10 minutes."
       backHref={null}
       error={error}
       onNext={handleNext}
