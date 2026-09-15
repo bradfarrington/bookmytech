@@ -27,6 +27,8 @@ export interface AagQuoteLine {
   article: string;
   articleProvider: string | null;
   fittingPosition: string | null;
+  /** The article's catalogue picture; every product option for it shares it. */
+  imageUrl: string | null;
   /** AAG's own line ref — what an enquiry/order would echo back. */
   requestLineId: string | null;
   productId: string;
@@ -82,6 +84,7 @@ function toLine(article: AagArticle, option: AagProductOption): AagQuoteLine | n
     article: article.ArticleDescription?.trim() || "Part",
     articleProvider: article.ArticleProvider?.trim() || null,
     fittingPosition: article.FittingPosition?.trim() || null,
+    imageUrl: /^https?:\/\//i.test(article.ImageUrl?.trim() ?? "") ? article.ImageUrl!.trim() : null,
     requestLineId: option.RequestLineId?.trim() || null,
     productId,
     brand: option.Brand?.trim() || null,

@@ -259,7 +259,7 @@ export function aagOffers(
         ? [{ label: "Fitting position", value: line.fittingPosition }]
         : [],
       quantityOfFit: null,
-      imageUrl: null,
+      imageUrl: line.imageUrl,
       notes,
       buyable: line.sellable && line.costPence != null,
     };

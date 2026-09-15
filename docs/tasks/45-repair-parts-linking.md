@@ -1,6 +1,6 @@
 # Task 45 — Link HaynesPro repairs to LKQ and AAG parts
 
-**Status:** 🚧 In progress (2026-09-14). Built: the part-group table (0066, **applied**), automatic recording, name matching, the review page, and **parts inside each repair on the vehicle model page**, with the dearest part by default and a per-engine-variant "Change". **Migration 0067 not yet applied.** Not yet exercised by a signed-in admin.
+**Status:** 🚧 In progress (2026-09-14). Built: the part-group table (0066, **applied**), automatic recording, name matching, the review page, and **parts inside each repair on the vehicle model page**, with the dearest part by default and a per-engine-variant "Change". **Migration 0067 not yet applied.** Not yet exercised by a signed-in admin. 2026-09-15: part groups are now matched by checking **LKQ's real parts on a real car**, choosing only from LKQ parts that fit it, on the review page and inline in the Parts panel.
 
 Unblocked by Task 44 (HaynesPro production). This is item 3 of Task 43 ("repair → parts"), brought forward by Brad.
 
@@ -78,6 +78,22 @@ A part group means the same thing on every vehicle, so each is decided **once**.
 
 **Credits:** nothing is fetched until Parts is opened. LKQ costs 1 credit per new vehicle and 1 per new vehicle + component (cached 30 / 7 days). AAG is sandbox-only.
 
+### Matching by real parts (2026-09-15)
+
+Brad: the names alone don't show what's inside a group, so a match is a guess. LKQ's component list has only a number and a name, so the evidence has to come from real parts on a real car.
+
+- **`lib/parts/part-examples.ts`** (pure, tested against the LKQ brake-disc fixture): turns LKQ ADS parts into an "example part" (picture, fitment). No prices.
+- **`lib/parts/part-group-evidence.ts`**, reached through two admin-gated actions in `app/actions/part-groups.ts`:
+  - `loadPartGroupEvidenceAction`: the LKQ components that **fit that car** (`ComponentsByVehicleAttributes`, up to 2 credits per new car, cached 30 days), plus name suggestions within that list.
+  - `loadLkqComponentExamplesAction`: LKQ's parts for one candidate on that car (1 credit per new car + component, cached 7 days). Only when a part is picked.
+- **`part-group-matcher.tsx`**: "Which LKQ part is *group*?" Step 1: search the LKQ parts that fit the car, or pick a word-sharing suggestion (labelled "often wrong"). Step 2: LKQ's parts for the pick, then **Match to LKQ's *part***. The match button appears only after LKQ's parts have been seen. Nothing is preselected except an existing match, and it warns when that match isn't listed for the car.
+- **Alliance Automotive is not asked** (Brad, 2026-09-15): it takes part groups directly, so it never needs matching. An earlier AAG "what's in this group" column was dropped, and AAG didn't answer for BM19WKO on sandbox anyway.
+- **`/admin/parts/groups`**: a car picker (recent `haynespro_vehicle_cache` registrations or a typed one, kept in `?reg=`). Each row has one **Find the LKQ part** / **Check the match** / **Change the match**, plus Confirm (auto-matches only), No LKQ equivalent and Undo. The one-click "Use *name*" suggestion buttons and the name-only LKQ search were removed (Brad: they read like part group options and matched blind).
+- **Parts panel:** "Not matched to LKQ · match it" (a link to a list with no car) is replaced by **Match to LKQ** / **Check LKQ match**, which opens the same matcher on the registration already priced and reloads the parts after a match.
+- AAG quote lines now carry the article picture (`AagQuoteLine.imageUrl`), so AAG offers in the Parts panel show one too.
+
+No migration.
+
 ## Acceptance criteria
 
 - [x] Part groups recorded as repairs are fetched; reviewable and matchable at `/admin/parts/groups`.
@@ -87,6 +103,8 @@ A part group means the same thing on every vehicle, so each is decided **once**.
 - [x] A chosen part missing from today's results falls back to the dearest and says so.
 - [x] `/admin/parts` behaviour unchanged apart from sharing the lookup code.
 - [x] `tsc` clean, eslint clean on changed files, `npm test` 475 passed, production build compiles.
+- [x] A part group is matched by checking LKQ's real parts with pictures on a chosen car, choosing only from LKQ parts that fit that car, on the review page and inline in the Parts panel. *(2026-09-15.)*
+- [ ] Matcher exercised against live LKQ by a signed-in admin. — **Owner.**
 - [ ] Migration 0067 applied. — **Owner.**
 - [ ] Exercised by a signed-in admin on a real vehicle (e.g. the Vauxhall Crossland X 1.2, BM19WKO). — **Owner.**
 - [ ] Matches reviewed for the common part groups. — **Owner, after seeding.**

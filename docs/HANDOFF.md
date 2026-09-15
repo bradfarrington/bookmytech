@@ -119,6 +119,17 @@ You are working on **Book My Tech**, a UK mobile-mechanic booking platform. This
 
 ## Current task
 
+### 2026-09-15 — Repair → parts linking, merged to `main` 🚧 (Task 45)
+
+**Tasks 40–45 merged to `main` (fast-forward from branch `task-42-live-supplier-catalogue`).** Task 45 is still in progress; detail in `docs/tasks/45-repair-parts-linking.md`.
+
+- **Repairs show their parts:** on the vehicle model page, a repair's **Parts** button lists both suppliers' fitting parts for a registration proven to be that engine variant. The dearest part is used by default, and **Change** applies to that variant only.
+- **Part group → LKQ matching** (`/admin/parts/groups`, and **Match to LKQ** inside the Parts panel) works by checking LKQ's real parts on a real car. The choice is limited to LKQ parts that fit that car, and the match button appears only after those parts have been seen. Alliance Automotive is not part of matching: it takes part groups directly.
+- **Owner:**
+  - apply migration **`0067_repair_part_choices.sql`** (`0066` is applied). Until then, "Use this" on a part fails;
+  - after both migrations, run `npm run db:types` in the app (both tables are admin-only; no API or customer-read change);
+  - set the Vercel env for HaynesPro production (Task 44) and LKQ ADS before relying on the deploy.
+
 ### 2026-09-14 — HaynesPro back on production accounts ✅ (Task 44)
 
 **HaynesPro is working again.** Production issued two Data Exchange accounts: **DX ID** (identification) and **DX Content** (data once the car type is known). They came with contractual session rules: tokens are per vehicle and per user, content usernames are `<prefix>_<vehicle>`, and tokens may only be reused the same day by the same user for the same car. `lib/haynespro/client.ts` now names a session on every call and stores one row per `(account, username)` in `platform_settings`, reused same-day only. The shared `haynespro_vrid` token is gone, and so are the demo credentials.

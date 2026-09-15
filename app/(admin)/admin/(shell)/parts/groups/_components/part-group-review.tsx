@@ -1,103 +1,88 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Check, Search, Undo2, X } from "lucide-react";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { Check, Images, Undo2, X } from "lucide-react";
+import { toast } from "sonner";
 
-import {
-  confirmPartGroupMatch,
-  markPartGroupNoMatch,
-  resetPartGroupMatch,
-  searchComponentsForMatch,
-} from "@/app/actions/part-groups";
+import { confirmPartGroupMatch, markPartGroupNoMatch, resetPartGroupMatch } from "@/app/actions/part-groups";
 import { Button } from "@/components/ui/button";
 import type { ResolvedPartGroupLink } from "@/lib/parts/part-group-match";
 import { useCatalogueAction } from "../../../repairs/_components/use-catalogue-action";
+import { PartGroupMatcher } from "./part-group-matcher";
 
 // The decision controls for one part group on /admin/parts/groups (Task 45).
 // Each button is one server action; the list is server-rendered and refreshes
 // after every change.
+//
+// There are deliberately no one-click "Use <name>" suggestions here. A name
+// that shares a word with the group is a guess, and a row of them reads like a
+// list of part group options. Matching goes through the matcher, which shows
+// LKQ's real parts on a chosen car first. The one exception is confirming an
+// auto-match, where the names are word-for-word identical.
 
 export interface ComponentOption {
   number: string;
   name: string;
-  /** Name similarity, 0–100, for a suggestion. */
-  score?: number;
 }
 
-const MIN_QUERY = 2;
+const MATCH_LABEL: Record<ResolvedPartGroupLink["kind"], string> = {
+  unmatched: "Find the LKQ part",
+  stale: "Find the LKQ part",
+  no_match: "Find the LKQ part",
+  auto: "Check the match",
+  confirmed: "Change the match",
+};
 
 export function PartGroupReview({
   genartId,
+  description,
+  reg,
   kind,
   current,
-  suggestions,
 }: {
   genartId: number;
+  description: string;
+  /** The car chosen at the top of the page to check LKQ's parts on. */
+  reg: string | null;
   kind: ResolvedPartGroupLink["kind"];
   current: ComponentOption | null;
-  suggestions: ComponentOption[];
 }) {
+  const router = useRouter();
   const { pending, run } = useCatalogueAction();
-  const [searching, setSearching] = useState(false);
-  const [query, setQuery] = useState("");
-  const [results, setResults] = useState<ComponentOption[]>([]);
-
-  useEffect(() => {
-    const q = query.trim();
-    if (!searching || q.length < MIN_QUERY) return;
-    let cancelled = false;
-    const timer = setTimeout(async () => {
-      const found = await searchComponentsForMatch(q);
-      if (!cancelled) setResults(found);
-    }, 200);
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
-  }, [query, searching]);
-
-  const shownResults = query.trim().length >= MIN_QUERY ? results : [];
-
-  const confirm = (option: ComponentOption) =>
-    run(() => confirmPartGroupMatch({ genartId, componentNumber: option.number }), {
-      success: `Matched to ${option.name}.`,
-      onSuccess: () => {
-        setSearching(false);
-        setQuery("");
-      },
-    });
+  const [matching, setMatching] = useState(false);
 
   return (
-    <div className="flex w-full flex-col gap-2 lg:w-[26rem]">
-      <div className="flex flex-wrap items-center gap-2">
+    <>
+      <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+        <Button
+          size="sm"
+          variant="secondary"
+          iconLeft={Images}
+          disabled={pending}
+          onClick={() =>
+            reg
+              ? setMatching((open) => !open)
+              : toast.error("Pick a car at the top of the page first. Matching checks LKQ's parts on a real car.")
+          }
+        >
+          {matching ? "Close" : MATCH_LABEL[kind]}
+        </Button>
         {kind === "auto" && current && (
-          <Button size="sm" variant="success" iconLeft={Check} disabled={pending} onClick={() => confirm(current)}>
+          <Button
+            size="sm"
+            variant="success"
+            iconLeft={Check}
+            disabled={pending}
+            onClick={() =>
+              run(() => confirmPartGroupMatch({ genartId, componentNumber: current.number }), {
+                success: `Matched to ${current.name}.`,
+              })
+            }
+          >
             Confirm match
           </Button>
         )}
-        {suggestions.map((option) => (
-          <Button
-            key={option.number}
-            size="sm"
-            variant="secondary"
-            disabled={pending}
-            onClick={() => confirm(option)}
-            title={`${option.number} · ${option.score ?? 0}% of words shared`}
-          >
-            Use {option.name}
-          </Button>
-        ))}
-      </div>
-      <div className="flex flex-wrap items-center gap-2">
-        <Button
-          size="sm"
-          variant="ghost"
-          iconLeft={Search}
-          disabled={pending}
-          onClick={() => setSearching((open) => !open)}
-        >
-          {kind === "confirmed" ? "Change…" : "Search LKQ…"}
-        </Button>
         {kind !== "no_match" && kind !== "confirmed" && (
           <Button
             size="sm"
@@ -121,37 +106,20 @@ export function PartGroupReview({
           </Button>
         )}
       </div>
-      {searching && (
-        <div className="rounded-button border border-border bg-surface p-2">
-          <input
-            autoFocus
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search LKQ's 2,277 parts"
-            className="h-9 w-full rounded-button border border-border bg-surface-card px-3 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand-blue"
-          />
-          {shownResults.length > 0 && (
-            <ul className="mt-2 max-h-56 divide-y divide-border-subtle overflow-y-auto rounded-button border border-border bg-surface-card">
-              {shownResults.map((option) => (
-                <li key={option.number}>
-                  <button
-                    type="button"
-                    disabled={pending}
-                    onClick={() => confirm(option)}
-                    className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm hover:bg-blue-50 disabled:opacity-50"
-                  >
-                    <span className="font-mono text-xs text-text-muted">{option.number}</span>
-                    <span className="text-text-primary">{option.name}</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-          {query.trim().length >= MIN_QUERY && shownResults.length === 0 && (
-            <p className="mt-2 px-1 text-xs text-text-muted">No LKQ part matches that yet.</p>
-          )}
-        </div>
+      {matching && reg && (
+        <PartGroupMatcher
+          key={reg}
+          genartId={genartId}
+          description={description}
+          reg={reg}
+          current={current}
+          confirmed={kind === "confirmed"}
+          onMatched={() => {
+            setMatching(false);
+            router.refresh();
+          }}
+        />
       )}
-    </div>
+    </>
   );
 }

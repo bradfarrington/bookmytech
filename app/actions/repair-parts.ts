@@ -94,12 +94,12 @@ function lkqNotMapped(link: ResolvedPartGroupLink): SupplierPanel {
   if (link.kind === "stale") {
     return {
       state: "not_mapped",
-      message: `This part group was matched to LKQ part ${link.componentNumber}, which LKQ no longer lists. Match it again under Parts → Part group matches.`,
+      message: `This part group was matched to LKQ part ${link.componentNumber}, which LKQ no longer lists. Match it again with "Match to LKQ" below.`,
     };
   }
   return {
     state: "not_mapped",
-    message: "This part group isn't matched to an LKQ part yet. Match it under Parts → Part group matches.",
+    message: "This part group isn't matched to an LKQ part yet. Use \"Match to LKQ\" below to compare real parts and match it.",
   };
 }
 

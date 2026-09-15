@@ -3,14 +3,12 @@ import { AlertTriangle, ArrowLeft, Link2, Search } from "lucide-react";
 
 import { Overline } from "@/components/ui/overline";
 import { Pill } from "@/components/ui/pill";
-import {
-  resolvePartGroupLink,
-  suggestComponents,
-  type ResolvedPartGroupLink,
-} from "@/lib/parts/part-group-match";
+import { adsRegKey } from "@/lib/lkq/vehicle";
+import { resolvePartGroupLink, type ResolvedPartGroupLink } from "@/lib/parts/part-group-match";
 import { loadPartGroupLinks } from "@/lib/parts/part-groups";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { cn } from "@/lib/utils";
+import { ExampleCarPicker, type RecentVehicle } from "./_components/example-car-picker";
 import { PartGroupReview, type ComponentOption } from "./_components/part-group-review";
 
 // Part group matches (Task 45, stage 2).
@@ -63,13 +61,29 @@ function StatusPill({ link }: { link: ResolvedPartGroupLink }) {
   }
 }
 
+/** Cars customers or admins have looked up, newest first — candidates to show example parts on. */
+async function recentVehicles(db: ReturnType<typeof createAdminClient>): Promise<RecentVehicle[]> {
+  try {
+    const { data } = await db
+      .from("haynespro_vehicle_cache")
+      .select("reg, description")
+      .order("created_at", { ascending: false })
+      .limit(15);
+    return (data ?? []) as RecentVehicle[];
+  } catch {
+    return [];
+  }
+}
+
 interface PageProps {
-  searchParams: Promise<{ tab?: string; q?: string }>;
+  searchParams: Promise<{ tab?: string; q?: string; reg?: string }>;
 }
 
 export default async function PartGroupMatchesPage({ searchParams }: PageProps) {
   const query = await searchParams;
-  const { rows, missingTable } = await loadPartGroupLinks(createAdminClient());
+  const db = createAdminClient();
+  const [{ rows, missingTable }, recent] = await Promise.all([loadPartGroupLinks(db), recentVehicles(db)]);
+  const reg = adsRegKey(query.reg ?? "") || null;
 
   const items = rows.map((row) => ({ row, link: resolvePartGroupLink(row) }));
   const counts = new Map<TabKey, number>(TABS.map((t) => [t.key, 0]));
@@ -93,7 +107,7 @@ export default async function PartGroupMatchesPage({ searchParams }: PageProps) 
     .sort((a, b) => a.row.description.localeCompare(b.row.description));
 
   const tabHref = (key: TabKey) =>
-    `/admin/parts/groups?tab=${key}${needle ? `&q=${encodeURIComponent(query.q ?? "")}` : ""}`;
+    `/admin/parts/groups?tab=${key}${needle ? `&q=${encodeURIComponent(query.q ?? "")}` : ""}${reg ? `&reg=${reg}` : ""}`;
 
   return (
     <div className="space-y-6">
@@ -129,6 +143,8 @@ export default async function PartGroupMatchesPage({ searchParams }: PageProps) 
         </div>
       )}
 
+      <ExampleCarPicker reg={reg} recent={recent} tab={tab} q={query.q ?? ""} />
+
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <nav className="flex flex-wrap gap-2" aria-label="Filter part groups">
           {TABS.map((t) => (
@@ -148,6 +164,7 @@ export default async function PartGroupMatchesPage({ searchParams }: PageProps) 
         </nav>
         <form action="/admin/parts/groups" className="flex w-full items-center gap-2 lg:w-80">
           <input type="hidden" name="tab" value={tab} />
+          {reg && <input type="hidden" name="reg" value={reg} />}
           <label className="relative w-full">
             <span className="sr-only">Search part groups</span>
             <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
@@ -180,21 +197,13 @@ export default async function PartGroupMatchesPage({ searchParams }: PageProps) 
           {visible.map(({ row, link }) => {
             const current: ComponentOption | null =
               link.kind === "confirmed" || link.kind === "auto"
-                ? { number: link.component.ComponentNumber, name: link.component.ComponentName }
+                ? { number: link.component.ComponentNumber, name: link.component.ComponentName.trim() }
                 : null;
-            const suggestions: ComponentOption[] =
-              link.kind === "confirmed" || link.kind === "no_match"
-                ? []
-                : suggestComponents(row.description, 4)
-                    .filter((s) => s.component.ComponentNumber !== current?.number)
-                    .slice(0, 3)
-                    .map((s) => ({
-                      number: s.component.ComponentNumber,
-                      name: s.component.ComponentName,
-                      score: Math.round(s.score * 100),
-                    }));
             return (
-              <li key={row.genart_id} className="flex flex-col gap-3 px-4 py-3 lg:flex-row lg:items-start lg:gap-6">
+              <li
+                key={row.genart_id}
+                className="flex flex-col gap-3 px-4 py-3 lg:flex-row lg:flex-wrap lg:items-start lg:gap-x-6"
+              >
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="text-sm font-semibold text-text-primary">
@@ -214,9 +223,10 @@ export default async function PartGroupMatchesPage({ searchParams }: PageProps) 
                 </div>
                 <PartGroupReview
                   genartId={row.genart_id}
+                  description={row.description}
+                  reg={reg}
                   kind={link.kind}
                   current={current}
-                  suggestions={suggestions}
                 />
               </li>
             );
@@ -226,9 +236,10 @@ export default async function PartGroupMatchesPage({ searchParams }: PageProps) 
 
       <p className="text-xs text-text-muted">
         &ldquo;Auto-matched&rdquo; means the names use exactly the same words and only one LKQ part
-        fits. Nobody has checked it. Suggestions are ranked by how many words the names share, and a
-        close name can still be the wrong part (&ldquo;Tie rod end&rdquo; is not &ldquo;Inner Tie
-        Rod&rdquo;). Nothing on this page calls a supplier or spends a credit.
+        fits. Nobody has checked it. Everything else is matched by looking at LKQ&apos;s actual parts on
+        a real car, because a similar name can still be the wrong part (&ldquo;Tie rod end&rdquo; is not
+        &ldquo;Inner Tie Rod&rdquo;). That uses LKQ credits the first time for each car and part, then is
+        cached. Alliance Automotive needs no matching: it takes part groups directly.
       </p>
     </div>
   );

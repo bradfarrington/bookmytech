@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import Link from "next/link";
-import { ArrowDownWideNarrow, Info, Package, RotateCcw } from "lucide-react";
+import { ArrowDownWideNarrow, Info, Link2, Package, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -21,6 +20,7 @@ import {
   type SupplierPanel,
 } from "@/lib/parts/supplier-offer";
 import { cn, formatPrice } from "@/lib/utils";
+import { PartGroupMatcher } from "../../parts/groups/_components/part-group-matcher";
 
 // A repair's parts on one engine variant (Task 45), opened from a timed repair
 // on the admin vehicle model page.
@@ -90,14 +90,22 @@ function PartGroupCard({
   group,
   carTypeId,
   nodeId,
+  reg,
   onUpdated,
+  onMatched,
 }: {
   group: RepairPartGroupView;
   carTypeId: number;
   nodeId: string;
+  /** The registration these parts were priced for; the LKQ matcher shows parts on it too. */
+  reg: string;
   onUpdated: (next: RepairPartGroupView) => void;
+  /** The part group's LKQ match changed, so both suppliers' parts need asking again. */
+  onMatched: () => void;
 }) {
   const [changing, setChanging] = useState(false);
+  const [matching, setMatching] = useState(false);
+  const lkqMatched = group.lkqLink.kind === "confirmed" || group.lkqLink.kind === "auto";
   const [pending, startTransition] = useTransition();
 
   const offers = [...panelOffers(group.lkq), ...panelOffers(group.aag)].sort(
@@ -153,9 +161,7 @@ function PartGroupCard({
         {group.lkqLink.kind === "confirmed" && <Pill tone="success">LKQ matched</Pill>}
         {group.lkqLink.kind === "auto" && <Pill tone="accent">LKQ auto-matched</Pill>}
         {(group.lkqLink.kind === "unmatched" || group.lkqLink.kind === "stale") && (
-          <Link href={`/admin/parts/groups?tab=review&q=${group.genartId}`}>
-            <Pill tone="pending">Not matched to LKQ · match it</Pill>
-          </Link>
+          <Pill tone="pending">Not matched to LKQ</Pill>
         )}
         {group.lkqLink.kind === "no_match" && <Pill tone="neutral">No LKQ equivalent</Pill>}
       </div>
@@ -201,7 +207,31 @@ function PartGroupCard({
             Use dearest
           </Button>
         )}
+        <Button size="sm" variant="ghost" iconLeft={Link2} disabled={pending} onClick={() => setMatching((v) => !v)}>
+          {matching ? "Close LKQ match" : lkqMatched ? "Check LKQ match" : "Match to LKQ"}
+        </Button>
       </div>
+
+      {matching && (
+        <div className="mt-2">
+          <PartGroupMatcher
+            genartId={group.genartId}
+            description={group.description}
+            reg={reg}
+            current={
+              lkqMatched && group.lkqLink.componentNumber && group.lkqLink.componentName
+                ? { number: group.lkqLink.componentNumber, name: group.lkqLink.componentName.trim() }
+                : null
+            }
+            confirmed={group.lkqLink.kind === "confirmed"}
+            allowNoMatch={group.lkqLink.kind !== "no_match"}
+            onMatched={() => {
+              setMatching(false);
+              onMatched();
+            }}
+          />
+        </div>
+      )}
 
       {changing && (
         <ul className="mt-2 max-h-96 divide-y divide-border-subtle overflow-y-auto rounded-lg border border-border">
@@ -334,7 +364,9 @@ export function RepairParts({
                     group={group}
                     carTypeId={carTypeId}
                     nodeId={nodeId}
+                    reg={result.reg}
                     onUpdated={updateGroup}
+                    onMatched={() => load(result.reg)}
                   />
                 ))
               )}
