@@ -3,10 +3,13 @@
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { getRepairNodesByIds } from "@/lib/haynespro/tree";
 import { cacheRegKey, resolveVehicle } from "@/lib/haynespro/vehicle";
+import { loadPartGroupSettings, isMissingTable } from "@/lib/parts/part-group-settings";
 import { partGroupsOnNodes } from "@/lib/parts/part-groups";
 import {
+  jobPosition,
+  selectJobParts,
   selectRepairPart,
-  type PartSelection,
+  type JobPartSelection,
   type RepairPartChoiceRow,
 } from "@/lib/parts/repair-part-choice";
 import type { SupplierPanel } from "@/lib/parts/supplier-offer";
@@ -16,8 +19,10 @@ import { createAdminClient } from "@/lib/supabase/admin";
 // A repair's parts on one engine variant (Task 45), for the admin vehicle model
 // page. HaynesPro says which part groups the repair uses; Alliance Automotive
 // prices those groups directly and says what fits this vehicle and what it
-// costs. The default part is the dearest, unless an admin chose another for
-// this variant.
+// costs. The part shown is the one customer quotes use (lib/parts/quote-parts.ts):
+// the admin's choice for this variant, else AAG's best-rated, dearest within
+// that rating, one per axle when the repair names neither. An admin can also
+// stop customers being charged for a part group (a tool, not a part).
 //
 // Suppliers can only price a real registration, never a make/model/engine from
 // a list. So a variant is priced through a registration known to BE that
@@ -33,8 +38,11 @@ type SupabaseAdmin = ReturnType<typeof createAdminClient>;
 export interface RepairPartGroupView {
   genartId: number;
   description: string;
+  /** Whether customers are charged for this part group (Task 43). */
+  charged: boolean;
   aag: SupplierPanel;
-  selection: PartSelection;
+  /** The part in use: one, or one per axle. */
+  selections: JobPartSelection[];
 }
 
 export type RepairPartsResult =
@@ -44,6 +52,10 @@ export type RepairPartsResult =
       state: "ready";
       reg: string;
       vehicle: string | null;
+      /** HaynesPro's name for the repair: an axle in it narrows the parts. */
+      repairName: string;
+      /** False until migration 0070 is applied: the charge switches can't save. */
+      settingsReady: boolean;
       groups: RepairPartGroupView[];
     }
   | { ok: false; error: string };
@@ -110,10 +122,13 @@ export async function loadRepairPartsAction(input: {
   const nodes = await getRepairNodesByIds({ carTypeId, repairtimeTypeId: vehicle.repairtimeTypeId }, [nodeId]);
   const node = nodes.find((n) => n.id === nodeId) ?? (nodes.length === 1 ? nodes[0] : undefined);
   if (!node) return { ok: false, error: "HaynesPro didn't return that repair for this engine variant." };
+  const repairName = node.description?.trim() || "This repair";
 
   const seen = partGroupsOnNodes([node]);
+  const settings = await loadPartGroupSettings(db, seen.map((g) => g.genartId));
+  const settingsReady = settings.enabled;
   if (seen.length === 0) {
-    return { ok: true, state: "ready", reg, vehicle: vehicle.description, groups: [] };
+    return { ok: true, state: "ready", reg, vehicle: vehicle.description, repairName, settingsReady, groups: [] };
   }
 
   const { data: choiceRows } = await db
@@ -127,16 +142,21 @@ export async function loadRepairPartsAction(input: {
     seen.map(async (g): Promise<RepairPartGroupView> => {
       const description = g.description || `Part group ${g.genartId}`;
       const aag = await lookupAagPanel(reg, { genart: String(g.genartId), label: description });
+      const choice = choices.get(g.genartId) ?? null;
       return {
         genartId: g.genartId,
         description,
+        charged: !(settings.enabled && settings.uncharged.has(g.genartId)),
         aag,
-        selection: selectRepairPart([aag], choices.get(g.genartId) ?? null),
+        selections:
+          aag.state === "ok"
+            ? selectJobParts(repairName, aag.offers, choice)
+            : [{ position: jobPosition(repairName), selection: selectRepairPart([aag], choice) }],
       };
     }),
   );
 
-  return { ok: true, state: "ready", reg, vehicle: vehicle.description, groups };
+  return { ok: true, state: "ready", reg, vehicle: vehicle.description, repairName, settingsReady, groups };
 }
 
 /** Use this part for this repair's part group on this engine variant. */
@@ -201,5 +221,43 @@ export async function resetRepairPartAction(input: {
     .eq("node_id", nodeId)
     .eq("genart_id", genartId);
   if (error) return { ok: false, error: `Couldn't reset that part: ${error.message}` };
+  return { ok: true };
+}
+
+/**
+ * Charge customers for this part group, or not (Task 43). Applies to every
+ * repair and vehicle: a part group that is a workshop tool is never a part.
+ */
+export async function setPartGroupChargedAction(input: {
+  genartId: number;
+  description: string | null;
+  charged: boolean;
+}): Promise<RepairPartActionResult> {
+  const gate = await requireAdmin();
+  if (!gate.ok) return gate;
+
+  const genartId = positiveInt(input.genartId);
+  if (!genartId) return { ok: false, error: "That part group couldn't be found." };
+
+  const { error } = await createAdminClient()
+    .from("part_group_settings")
+    .upsert(
+      {
+        genart_id: genartId,
+        description: input.description?.trim() || null,
+        charged: input.charged === true,
+        changed_by: gate.userId,
+        changed_at: new Date().toISOString(),
+      },
+      { onConflict: "genart_id" },
+    );
+  if (error) {
+    return {
+      ok: false,
+      error: isMissingTable(error)
+        ? "Part group settings aren't set up yet. Apply migration 0070 first."
+        : `Couldn't save that: ${error.message}`,
+    };
+  }
   return { ok: true };
 }

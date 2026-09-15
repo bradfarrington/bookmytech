@@ -46,6 +46,7 @@ function quoteFixture(over: Partial<RepairsQuote> = {}): RepairsQuote {
     fixedPence: 0,
     oil: null,
     visitHours: 1.1,
+    parts: [],
     ...over,
   };
 }

@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { StepHeader } from "@/components/customer/step-header";
 import { loadCheckoutContext, type CheckoutSearchParams } from "@/lib/bookings/checkout-context";
 import { contextKeyFor, readTimeParams, stepQuery } from "@/lib/bookings/step-params";
+import { partGroupName } from "@/lib/parts/quote-parts";
 import { ConfirmCheckout } from "./_components/confirm-checkout";
 
 // Confirm (Task 47): the last step before the booking is made. Account, discount
@@ -88,6 +89,16 @@ export default async function SlotPage({ searchParams }: SlotPageProps) {
           itemId,
           itemLabel,
         }))}
+        priceExtras={[
+          ...quote.parts.map((part, index) => ({
+            key: `part:${index}`,
+            label: `${partGroupName(part)}${part.brand ? ` · ${part.brand}` : ""}${part.quantity === 2 ? " · pair" : part.quantity > 2 ? ` · × ${part.quantity}` : ""}`,
+            pence: part.linePence,
+          })),
+          ...(quote.oil && quote.oil.pence > 0
+            ? [{ key: "oil", label: `Engine oil · ${quote.oil.litres} L`, pence: quote.oil.pence }]
+            : []),
+        ]}
         pricePence={quote.breakdown.totalPence}
         preferredMechanicId={base.pref}
         availableCreditPence={bookingAsCustomer ? availableCreditPence : 0}

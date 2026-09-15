@@ -387,7 +387,11 @@ export function JobDetail(props: JobDetailProps) {
                 bookingId={bookingId}
                 status={status}
                 lines={props.revisionLines ?? []}
-                parts={props.parts.map((p) => ({ id: p.id, name: p.name, quantity: p.quantity, unitPricePence: p.unitPricePence, totalPence: p.totalPence, sourcing: p.sourcing }))}
+                // The mechanic's own parts only: supplier parts priced into the
+                // booking (Task 43) go with the jobs and are re-priced with them.
+                parts={props.parts
+                  .filter((p) => p.source !== "catalogue")
+                  .map((p) => ({ id: p.id, name: p.name, quantity: p.quantity, unitPricePence: p.unitPricePence, totalPence: p.totalPence, sourcing: p.sourcing }))}
                 revisions={props.revisions ?? []}
                 fees={props.onSiteFees ?? { diagnosticPence: 5999, enRoutePence: 5000 }}
               />

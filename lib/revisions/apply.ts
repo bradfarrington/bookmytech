@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { catalogueBookingPartRows } from "@/lib/parts/quote-parts";
 import { loadQuotesForBooking } from "@/lib/quotes/load";
 import { approvedExtras } from "./snapshot";
 import { diffRevision } from "./diff";
@@ -71,11 +72,21 @@ export async function applyRevision(
     if (linesError) console.error("[revisions] repair lines insert failed", revision.id, linesError);
   }
 
-  // --- Parts: keep what's still there, drop what was removed, add the rest.
+  // --- Parts: the mechanic's own keep what's still there, drop what was
+  // removed and add the rest. Supplier parts priced into the job (Task 43) are
+  // replaced by the revised jobs' own. ("*": `source` arrives with 0070.)
   const keepIds = after.parts.map((p) => p.id).filter((v): v is string => Boolean(v));
-  const { data: existing } = await admin.from("booking_parts").select("id").eq("booking_id", revision.bookingId);
-  const toDelete = (existing ?? []).map((r) => r.id as string).filter((id) => !keepIds.includes(id));
+  const { data: existing } = await admin.from("booking_parts").select("*").eq("booking_id", revision.bookingId);
+  const toDelete = (existing ?? [])
+    .filter((r) => r.source === "catalogue" || !keepIds.includes(r.id as string))
+    .map((r) => r.id as string);
   if (toDelete.length) await admin.from("booking_parts").delete().in("id", toDelete);
+  if (after.catalogueParts?.length) {
+    const { error: catalogueError } = await admin
+      .from("booking_parts")
+      .insert(catalogueBookingPartRows(revision.bookingId, after.catalogueParts));
+    if (catalogueError) console.error("[revisions] catalogue parts insert failed", revision.id, catalogueError);
+  }
   const added = after.parts.filter((p) => !p.id);
   if (added.length) {
     const { error: partsError } = await admin.from("booking_parts").insert(

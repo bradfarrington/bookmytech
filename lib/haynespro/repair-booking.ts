@@ -1,7 +1,7 @@
 // Bookable HaynesPro repairs (Task 16 Stage G; the only booking type since
 // Task 17 removed the packaged-services catalogue; several per booking since
 // Task 24; combined repairs since Task 26; fixed-price PRODUCTS — diagnostics,
-// servicing, inspections — since Task 31).
+// servicing, inspections — since Task 31; supplier parts since Task 43).
 //
 // A customer picks one or more items from the catalogue for THEIR car and
 // books them in one visit. An item is a HaynesPro repair operation, one
@@ -13,16 +13,18 @@
 // the admin setting says so (see ./combine.ts and getRepairCombineMode) — min
 // 1h applied ONCE to the whole booking's hourly work, × the global hourly
 // rate. A fixed-price product adds its price; a servicing product adds engine
-// oil at £/litre × the vehicle's capacity (the booking's only parts line).
-// Commission comes out of the total.
+// oil at £/litre × the vehicle's capacity; each job adds the Alliance
+// Automotive parts its part groups need (lib/parts/quote-parts.ts). Oil and
+// parts together are the parts line. Commission comes out of the total.
 //
 // The quote is re-derived SERVER-SIDE from (reg, ids) at every funnel step
 // (match → slot → checkout hold → booking create) — the client never supplies
-// a price or a duration. HaynesPro reads are memoised (lib/haynespro/tree.ts)
-// and the vehicle resolution is cached per reg, so the steps price
-// identically. A single plain job never calls the basket operation: its
-// figures are exactly what they were before Task 24, and a booking with no
-// products is priced exactly as it was before Task 31.
+// a price or a duration. HaynesPro reads are memoised (lib/haynespro/tree.ts),
+// the vehicle resolution is cached per reg and AAG's part prices per reg and
+// part group, so the steps price identically. A single plain job never calls
+// the basket operation: its figures are exactly what they were before Task 24,
+// and a booking with no products and no parts is priced exactly as it was
+// before Task 31.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
@@ -45,10 +47,13 @@ import {
   type OilQuote,
   type QuotableProduct,
 } from "@/lib/catalogue/products";
+import { partGroupsOnNodes } from "@/lib/parts/part-groups";
+import { quoteJobParts, type PartsJob, type QuotedPart } from "@/lib/parts/quote-parts";
 import type { CombinedRepairTimes } from "./combine";
 import { engineOilForVehicle } from "./engine-oil";
 import { excludedRepairNodeIdsForVehicle } from "./exclusions";
 import { combineRepairTimes, getRepairNodesByIds } from "./tree";
+import type { HpRepairtimeNode } from "./types";
 import { resolveVehicle } from "./vehicle";
 
 /** A combined repair may expand a booking well past the item cap; this bounds the jobs. */
@@ -70,7 +75,7 @@ export interface RepairQuoteLine {
   rawHours: number;
   /** Its share after overlap removal — 0 when another job in the basket covers it. */
   chargedHours: number;
-  /** chargedHours × rate — or the product's own price. Informational: lines need not sum to the total (min 1h, oil). */
+  /** chargedHours × rate — or the product's own price. Informational: lines need not sum to the total (min 1h, oil, parts). */
   linePence: number;
   /** The chosen item this job came from — its own id, or the combined repair's option id. */
   itemId: string;
@@ -106,10 +111,13 @@ export interface RepairsQuote {
   labourPence: number;
   /** The fixed-price products' prices added up. */
   fixedPence: number;
-  /** The engine-oil line, when a servicing product is in the booking (= breakdown.partsPence). */
+  /** The engine-oil line, when a servicing product is in the booking (part of breakdown.partsPence). */
   oil: OilQuote | null;
   /** Hours the visit is blocked out for: billed hours + fixed products' durations. */
   visitHours: number;
+  // --- Parts (Task 43). ADDITIVE. ---
+  /** The Alliance Automotive parts the jobs need: one per job, part group and axle. With any oil, they make breakdown.partsPence. */
+  parts: QuotedPart[];
 }
 
 /** The pre-Task-24 single-repair quote. Unchanged shape; still what /api/mobile/v1/quote returns. */
@@ -144,13 +152,15 @@ function round2(n: number): number {
  * single job, and a basket that doesn't cover every job falls back to the
  * plain sum. `order` is the customer's chosen order across items and
  * products (defaults to items first); `oil` is the vehicle's engine-oil
- * line, applied only when a product includes oil.
+ * line, applied only when a product includes oil; `parts` are the jobs'
+ * supplier parts, already priced.
  */
 export function buildRepairsQuote(args: {
   items: readonly QuotableItem[];
   products?: readonly QuotableProduct[];
   order?: readonly string[];
   oil?: OilQuote | null;
+  parts?: readonly QuotedPart[];
   combined: CombinedRepairTimes | null;
   hourlyRatePence: number;
   commissionRate: number;
@@ -220,17 +230,20 @@ export function buildRepairsQuote(args: {
   const fixedPence = fixedProducts.reduce((sum, p) => sum + (p.pricePence ?? 0), 0);
   const oil = products.some((p) => p.includesEngineOil) && args.oil && args.oil.pence > 0 ? args.oil : null;
   const oilPence = oil?.pence ?? 0;
+  // Supplier parts (Task 43): supplier cost, no mark-up, on top of labour like oil.
+  const parts = (args.parts ?? []).map((part) => ({ ...part }));
+  const repairPartsPence = parts.reduce((sum, part) => sum + part.linePence, 0);
   const labourPence = Math.round(billedHours * hourlyRatePence);
   const visitHours = round2(billedHours + fixedProducts.reduce((sum, p) => sum + p.durationHours, 0));
 
-  // With no products this is bit-for-bit the pre-Task-31 arithmetic:
-  // base = billed hours × rate, no parts line.
+  // With no products and no parts this is bit-for-bit the pre-Task-31
+  // arithmetic: base = billed hours × rate, no parts line.
   const breakdown: PriceBreakdown = {
     ...computePrice({
       durationHours: visitHours,
       hourlyRatePence,
       ...(products.length > 0 ? { overridePricePence: labourPence + fixedPence } : {}),
-      partsPence: oilPence,
+      partsPence: oilPence + repairPartsPence,
       commissionRate,
       areaId: null,
     }),
@@ -302,17 +315,31 @@ export function buildRepairsQuote(args: {
     fixedPence,
     oil,
     visitHours,
+    parts,
   };
 }
 
 /**
- * Price a set of chosen items for a specific reg, or null when it can't be
- * done (no ids, too many, unresolvable vehicle, an unknown / admin-hidden /
- * untimed job among them, a switched-off combined repair or product, API
- * down). All-or-nothing: one bad id refuses the lot, the same way the hold
- * and the booking insert re-quote.
+ * Why a set of items couldn't be priced. "parts_unavailable": a part one of
+ * the jobs needs has no Alliance Automotive price we can use right now, so the
+ * booking stops rather than go out without it (owner decision, 2026-09-15).
  */
-export async function quoteRepairs(
+export type RepairsQuoteFailure = "not_priceable" | "parts_unavailable";
+
+export type RepairsQuoteResult = { ok: true; quote: RepairsQuote } | { ok: false; reason: RepairsQuoteFailure };
+
+/** What a customer is told when a repair's parts can't be priced. Shown verbatim by the app. */
+export const PARTS_UNAVAILABLE_MESSAGE =
+  "We can't get a price for the parts this repair needs right now. Please try again shortly, or get in touch.";
+
+/**
+ * Price a set of chosen items for a specific reg. Fails when it can't be done
+ * (no ids, too many, unresolvable vehicle, an unknown / admin-hidden / untimed
+ * job among them, a switched-off combined repair or product, API down) or when
+ * a part a job needs can't be priced. All-or-nothing: one bad id refuses the
+ * lot, the same way the hold and the booking insert re-quote.
+ */
+export async function quoteRepairsResult(
   reg: string,
   ids: readonly string[],
   db: SupabaseClient,
@@ -322,10 +349,11 @@ export async function quoteRepairs(
    * reprice it because the platform rate moved since it was booked.
    */
   overrides: { hourlyRatePence?: number; commissionRate?: number } = {},
-): Promise<RepairsQuote | null> {
+): Promise<RepairsQuoteResult> {
+  const fail: RepairsQuoteResult = { ok: false, reason: "not_priceable" };
   try {
     const itemIds = dedupeRepairIds(ids);
-    if (!reg?.trim() || itemIds.length === 0 || itemIds.length > MAX_REPAIRS_PER_BOOKING) return null;
+    if (!reg?.trim() || itemIds.length === 0 || itemIds.length > MAX_REPAIRS_PER_BOOKING) return fail;
     const productIds = itemIds.filter(isProductId);
     const catalogueIds = itemIds.filter((id) => !isProductId(id));
 
@@ -334,41 +362,53 @@ export async function quoteRepairs(
       loadCatalogueOverlay(db),
       productIds.length ? loadCatalogueProducts(db) : Promise.resolve([]),
     ]);
-    if (!vehicle || vehicle.repairtimeTypeId == null) return null;
+    if (!vehicle || vehicle.repairtimeTypeId == null) return fail;
     const hpVehicle = { carTypeId: vehicle.carTypeId, repairtimeTypeId: vehicle.repairtimeTypeId };
 
     const products = productIds.length ? resolveProducts(productIds, productRows) : [];
-    if (!products) return null;
+    if (!products) return fail;
     const items = catalogueIds.length ? expandCatalogueItems(catalogueIds, overlay) : [];
-    if (!items) return null;
-    if (items.length === 0 && products.length === 0) return null;
+    if (!items) return fail;
+    if (items.length === 0 && products.length === 0) return fail;
 
     const nodeIds = [...new Set(items.flatMap((item) => item.nodeIds))];
-    if (nodeIds.length > MAX_JOBS_PER_BOOKING) return null;
+    if (nodeIds.length > MAX_JOBS_PER_BOOKING) return fail;
 
     const quotable = new Map<string, QuotableNode>();
+    const rawNodes = new Map<string, HpRepairtimeNode>();
     if (nodeIds.length > 0) {
       // Admin-hidden repairs aren't bookable even via a stale/crafted URL.
       // (Only the leaf itself is checked — ancestors aren't knowable from the
       // node id alone; hiding a group already removes the path to its leaves.)
       const excluded = await excludedRepairNodeIdsForVehicle(vehicle.hpModelLabel, db);
-      if (nodeIds.some((id) => excluded.has(id))) return null;
+      if (nodeIds.some((id) => excluded.has(id))) return fail;
 
       const nodes = await getRepairNodesByIds(hpVehicle, nodeIds);
       const byId = new Map(nodes.filter((n) => n.id != null).map((n) => [n.id as string, n]));
       for (const id of nodeIds) {
         // A single-id reply whose item carries no id is tolerated, as it always was.
         const node = byId.get(id) ?? (nodeIds.length === 1 && nodes.length === 1 ? nodes[0] : undefined);
-        if (!node || typeof node.value !== "number" || node.value <= 0) return null;
+        if (!node || typeof node.value !== "number" || node.value <= 0) return fail;
         quotable.set(id, {
           id,
           description: node.description?.trim() || "Vehicle repair",
           rawHours: node.value / 100,
         });
+        rawNodes.set(id, node);
       }
     }
 
-    const [hourlyRatePence, commissionRate, combineMode] = await Promise.all([
+    // The part groups each job uses, as HaynesPro names them (Task 43).
+    const partsJobs: PartsJob[] = nodeIds.map((id) => ({
+      nodeId: id,
+      description: quotable.get(id)!.description,
+      groups: partGroupsOnNodes([rawNodes.get(id)!]).map((g) => ({
+        genartId: g.genartId,
+        label: g.description || `Part group ${g.genartId}`,
+      })),
+    }));
+
+    const [hourlyRatePence, commissionRate, combineMode, pricedParts] = await Promise.all([
       overrides.hourlyRatePence != null && overrides.hourlyRatePence > 0
         ? Promise.resolve(Math.round(overrides.hourlyRatePence))
         : getHourlyRatePence(db),
@@ -376,7 +416,9 @@ export async function quoteRepairs(
         ? Promise.resolve(overrides.commissionRate)
         : getTakeRateBase(db),
       getRepairCombineMode(db),
+      quoteJobParts({ db, reg, carTypeId: vehicle.carTypeId, jobs: partsJobs }),
     ]);
+    if (!pricedParts.ok) return { ok: false, reason: "parts_unavailable" };
 
     // The engine-oil line, only when a servicing product asks for it.
     const oil = products.some((p) => p.includesEngineOil)
@@ -390,7 +432,7 @@ export async function quoteRepairs(
         ? await combineRepairTimes(hpVehicle, nodeIds, hourlyRatePence)
         : null;
 
-    return buildRepairsQuote({
+    const quote = buildRepairsQuote({
       items: items.map((item) => ({
         id: item.id,
         label: item.label,
@@ -399,14 +441,30 @@ export async function quoteRepairs(
       products,
       order: itemIds,
       oil,
+      parts: pricedParts.parts,
       combined,
       hourlyRatePence,
       commissionRate,
     });
+    return quote ? { ok: true, quote } : fail;
   } catch (err) {
     console.error("[haynespro] repairs quote failed:", err);
-    return null;
+    return fail;
   }
+}
+
+/**
+ * Price a set of chosen items for a specific reg, or null when it can't be
+ * done for any reason. For callers that don't need to know why.
+ */
+export async function quoteRepairs(
+  reg: string,
+  ids: readonly string[],
+  db: SupabaseClient,
+  overrides: { hourlyRatePence?: number; commissionRate?: number } = {},
+): Promise<RepairsQuote | null> {
+  const result = await quoteRepairsResult(reg, ids, db, overrides);
+  return result.ok ? result.quote : null;
 }
 
 /**

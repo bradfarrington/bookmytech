@@ -145,17 +145,17 @@ async function resolveParts(
 async function loadJobSheet(admin: ReturnType<typeof createAdminClient>, bookingId: string) {
   const [{ data: lineRows }, { data: partRows }, quotes, revisions] = await Promise.all([
     admin.from("booking_repairs").select("*").eq("booking_id", bookingId).order("position"),
-    admin
-      .from("booking_parts")
-      .select("id, booking_id, part_id, part_name, quantity, unit_price_pence, total_pence, sourcing")
-      .eq("booking_id", bookingId)
-      .order("created_at"),
+    // "*": `source` arrives with migration 0070, and naming it before then
+    // would fail the whole read.
+    admin.from("booking_parts").select("*").eq("booking_id", bookingId).order("created_at"),
     loadQuotesForBooking(admin, bookingId),
     loadRevisionsForBooking(admin, bookingId),
   ]);
   return {
     lineRows: (lineRows ?? null) as BookingRepairRow[] | null,
-    partRows: (partRows ?? []) as BookingPartRow[],
+    // The mechanic's own parts only. Supplier parts priced into the booking
+    // (Task 43) belong to the jobs and are re-priced with them.
+    partRows: ((partRows ?? []) as BookingPartRow[]).filter((row) => row.source !== "catalogue"),
     quotes,
     revisions,
   };
@@ -181,7 +181,11 @@ async function buildPreview(
     hourlyRatePence: booking.hourly_rate_pence ?? undefined,
     commissionRate: booking.commission_rate == null ? undefined : Number(booking.commission_rate),
   });
-  if (!quote) return { ok: false, error: "One of those repairs can't be priced for this car. Remove it and try again." };
+  if (!quote)
+    return {
+      ok: false,
+      error: "One of those repairs can't be priced for this car, or its parts can't be priced right now. Remove it or try again shortly.",
+    };
 
   const money = revisionMoney(sheet.revisions);
   const before = snapshotFromBooking(booking, sheet.lineRows, sheet.partRows, approvedExtras(sheet.quotes, money.holdQuoteIds));

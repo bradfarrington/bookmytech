@@ -16,7 +16,8 @@ import {
   slotIso,
 } from "@/lib/slots";
 import { dispatchBooking } from "@/lib/dispatch/dispatch";
-import { quoteRepairs, type RepairsQuote } from "@/lib/haynespro/repair-booking";
+import { PARTS_UNAVAILABLE_MESSAGE, quoteRepairsResult, type RepairsQuote } from "@/lib/haynespro/repair-booking";
+import { catalogueBookingPartRows } from "@/lib/parts/quote-parts";
 import { MAX_REPAIRS_PER_BOOKING, repairIdsFromInput } from "@/lib/bookings/repair-ids";
 import { quoteFollowOn, type FollowOnOrigin } from "@/lib/quotes/book-follow-on";
 import type { QuoteView } from "@/lib/quotes/load";
@@ -136,16 +137,18 @@ async function resolveBookingQuote(
   if (ids.length === 0) return { ok: false, error: "Choose the repairs you need first." };
   if (ids.length > MAX_REPAIRS_PER_BOOKING)
     return { ok: false, error: `You can book up to ${MAX_REPAIRS_PER_BOOKING} jobs in one visit.` };
-  const quote = await quoteRepairs(input.vehicleReg, ids, createAdminClient());
-  if (!quote)
+  const result = await quoteRepairsResult(input.vehicleReg, ids, createAdminClient());
+  if (!result.ok)
     return {
       ok: false,
       error:
-        ids.length > 1
-          ? "We couldn't price these repairs. Please start the booking again."
-          : "We couldn't price this repair. Please start the booking again.",
+        result.reason === "parts_unavailable"
+          ? PARTS_UNAVAILABLE_MESSAGE
+          : ids.length > 1
+            ? "We couldn't price these repairs. Please start the booking again."
+            : "We couldn't price this repair. Please start the booking again.",
     };
-  return { ok: true, quote, followOn: null };
+  return { ok: true, quote: result.quote, followOn: null };
 }
 
 export type CreateBookingResult =
@@ -405,6 +408,25 @@ export async function createBooking(
       return {
         ok: false,
         error: "We couldn't save the jobs on this booking. Please try again.",
+      };
+    }
+  }
+
+  // The supplier parts priced into the booking (Task 43): the exact part the
+  // mechanic buys, and what a dispute can check the price against. Written
+  // before anything references the booking, so a failure takes the booking
+  // row with it, as the job lines do. There are none until migration 0070.
+  if (quote.parts.length > 0) {
+    const { error: partsError } = await db
+      .from("booking_parts")
+      .insert(catalogueBookingPartRows(data.id, quote.parts));
+    if (partsError) {
+      console.error("[booking] catalogue parts insert failed; booking rolled back", data.id, partsError);
+      await db.from("booking_repairs").delete().eq("booking_id", data.id);
+      await db.from("bookings").delete().eq("id", data.id);
+      return {
+        ok: false,
+        error: "We couldn't save the parts on this booking. Please try again.",
       };
     }
   }

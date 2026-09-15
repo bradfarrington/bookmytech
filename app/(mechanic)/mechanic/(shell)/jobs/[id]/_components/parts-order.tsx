@@ -14,6 +14,11 @@ export interface JobPart {
   totalPence: number;
   sourcing: "self" | "bmt";
   status: string;
+  /** "catalogue" for a supplier part priced into the booking (Task 43). */
+  source?: "manual" | "catalogue";
+  /** The exact part to buy, when the booking priced one. */
+  supplierPartNumber?: string | null;
+  brand?: string | null;
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -26,7 +31,9 @@ const STATUS_LABEL: Record<string, string> = {
 
 // Per-job parts list. The mechanic chooses, per line, whether to source the
 // part themselves (keep the parts money) or order it via BMT (BMT supplies it
-// and keeps that money). The choice re-prices their payout server-side.
+// and keeps that money). The choice re-prices their payout server-side. A part
+// the customer's price included (Task 43) names the exact Alliance Automotive
+// part it was priced as, so the mechanic buys the same one.
 export function PartsOrder({
   parts,
   canEdit,
@@ -64,6 +71,12 @@ export function PartsOrder({
                   {p.name}
                   {p.quantity > 1 && <span className="ml-1 text-text-muted">× {p.quantity}</span>}
                 </span>
+                {p.supplierPartNumber && (
+                  <p className="mt-0.5 text-xs text-text-muted">
+                    Priced as Alliance Automotive{p.brand ? ` · ${p.brand}` : ""} ·{" "}
+                    <span className="font-mono">{p.supplierPartNumber}</span>
+                  </p>
+                )}
               </div>
               <span className="shrink-0 text-sm font-semibold tabular-nums text-text-primary">
                 {formatPrice(p.totalPence)}

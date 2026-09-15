@@ -3,8 +3,9 @@ import Link from "next/link";
 import { ArrowLeft, ChevronRight, Plus } from "lucide-react";
 import { vehicleLabel } from "@/lib/utils";
 import { ProgressStepper } from "@/components/customer/progress-stepper";
+import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { quoteRepairs } from "@/lib/haynespro/repair-booking";
+import { PARTS_UNAVAILABLE_MESSAGE, quoteRepairsResult } from "@/lib/haynespro/repair-booking";
 import {
   MAX_REPAIRS_PER_BOOKING,
   parseRepairIds,
@@ -14,12 +15,15 @@ import { TrackOnMount } from "@/components/analytics/track-on-mount";
 import { FUNNEL_EVENTS } from "@/lib/analytics/events";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { productIncludes } from "@/lib/catalogue/products";
+import { partGroupName } from "@/lib/parts/quote-parts";
 import { stepQuery } from "@/lib/bookings/step-params";
 import { PriceHero } from "./_components/price-hero";
 
 // Step 3: the price. One job, or several priced as one visit (Task 24) — the
 // customer can add another from here and comes back with it appended. A
 // combined repair (Task 26) is one chosen item that stands for several jobs.
+// Parts the jobs need are priced in (Task 43); when they can't be priced right
+// now the step says so, and the later steps send the customer back here.
 
 interface MatchPageProps {
   searchParams: Promise<{
@@ -55,11 +59,44 @@ export default async function MatchPage({ searchParams }: MatchPageProps) {
   const browserHref = `/book/repairs?reg=${encodeURIComponent(reg)}${vehicleParams ? `&${vehicleParams}` : ""}${prefParam}`;
 
   // Server-authoritative price from (reg, items) — the URL never carries one.
-  const quote = await quoteRepairs(reg, ids, createAdminClient());
-  if (!quote) {
+  const result = await quoteRepairsResult(reg, ids, createAdminClient());
+  if (!result.ok && result.reason !== "parts_unavailable") {
     // Vehicle no longer resolves or an item is stale/hidden — back to the browser.
     redirect(browserHref);
   }
+
+  const heading = (backHref: string) => (
+    <div className="flex items-center gap-3">
+      <Link
+        href={backHref}
+        className="flex size-9 shrink-0 items-center justify-center rounded-full border border-border text-text-secondary hover:bg-surface"
+        aria-label="Back"
+      >
+        <ArrowLeft size={18} />
+      </Link>
+      <div>
+        <h1 className="text-2xl font-bold text-text-primary">Your price</h1>
+        <p className="text-sm text-text-secondary">{vehicleLabel(reg, params.make, params.model)}</p>
+      </div>
+    </div>
+  );
+
+  if (!result.ok) {
+    // A part the jobs need has no supplier price we can use right now (Task 43).
+    return (
+      <div className="flex flex-col gap-6">
+        <ProgressStepper currentStep={3} />
+        {heading(browserHref)}
+        <Alert tone="warning">{PARTS_UNAVAILABLE_MESSAGE}</Alert>
+        <Link href={browserHref}>
+          <Button variant="secondary" size="lg" fullWidth>
+            Choose different repairs
+          </Button>
+        </Link>
+      </div>
+    );
+  }
+  const quote = result.quote;
 
   const withRepairs = (list: string[]) => `&${repairsQuery(list)}`;
   // Task 47: Price → Time → Address → Confirm, matching the app.
@@ -98,19 +135,7 @@ export default async function MatchPage({ searchParams }: MatchPageProps) {
       />
       <ProgressStepper currentStep={3} />
 
-      <div className="flex items-center gap-3">
-        <Link
-          href={quote.items.length > 1 ? addHref : browserHref}
-          className="flex size-9 shrink-0 items-center justify-center rounded-full border border-border text-text-secondary hover:bg-surface"
-          aria-label="Back"
-        >
-          <ArrowLeft size={18} />
-        </Link>
-        <div>
-          <h1 className="text-2xl font-bold text-text-primary">Your price</h1>
-          <p className="text-sm text-text-secondary">{vehicleLabel(reg, params.make, params.model)}</p>
-        </div>
-      </div>
+      {heading(quote.items.length > 1 ? addHref : browserHref)}
 
       <PriceHero
         serviceName={quote.description}
@@ -146,6 +171,13 @@ export default async function MatchPage({ searchParams }: MatchPageProps) {
         combinedRawHours={multiJobs ? quote.combinedRawHours : undefined}
         combineSource={multiJobs ? quote.combineSource : null}
         oil={quote.oil}
+        parts={quote.parts.map((part, index) => ({
+          key: `${part.nodeId}:${part.genartId}:${part.position ?? "any"}:${index}`,
+          name: partGroupName(part),
+          brand: part.brand,
+          quantity: part.quantity,
+          linePence: part.linePence,
+        }))}
         includes={singleProduct ? productIncludes(singleProduct.description) : undefined}
         visitHours={quote.visitHours}
         productsOnly={productsOnly}

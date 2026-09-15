@@ -206,6 +206,13 @@ function returnParams(c: ConfirmCommon): Record<string, string> {
   return params;
 }
 
+/** One line inside the price that isn't labour: a part, or engine oil (Task 43). */
+export interface PriceExtraLine {
+  key: string;
+  label: string;
+  pence: number;
+}
+
 interface ConfirmCheckoutProps {
   base: BookingBaseParams;
   /** `contextKeyFor(base)`: which saved address belongs to this booking. */
@@ -224,6 +231,8 @@ interface ConfirmCheckoutProps {
   repairNodeIds: string[];
   /** The same jobs with their names and charged hours, for the summary (Task 24). */
   repairLines: RepairLineLite[];
+  /** Parts and engine oil inside the price (Task 43), listed in the summary. */
+  priceExtras?: PriceExtraLine[];
   pricePence: number;
   preferredMechanicId?: string;
   /** A follow-on quote (Task 34): the server prices from it instead of the catalogue. */
@@ -258,6 +267,7 @@ export function ConfirmCheckout({
   model,
   repairNodeIds,
   repairLines,
+  priceExtras,
   pricePence,
   preferredMechanicId,
   quoteId,
@@ -591,6 +601,7 @@ export function ConfirmCheckout({
     model,
     repairNodeIds,
     repairLines,
+    priceExtras,
     preferredMechanicId,
     quoteId,
     promoCode: appliedPromo ?? undefined,
@@ -974,6 +985,8 @@ interface ConfirmCommon {
   model?: string;
   repairNodeIds: string[];
   repairLines: RepairLineLite[];
+  /** Parts and engine oil inside the price (Task 43). Absent on drafts parked before it. */
+  priceExtras?: PriceExtraLine[];
   preferredMechanicId?: string;
   /** A follow-on quote (Task 34). */
   quoteId?: string;
@@ -1018,7 +1031,8 @@ function hoursLabel(h: number): string {
 
 // Price breakdown shown on every confirm step. Several jobs list each one
 // above the total: the visit is priced as a whole (overlapping work isn't
-// charged twice), so the lines carry time, not money.
+// charged twice), so the lines carry time, not money. Parts and engine oil
+// (Task 43) are listed with their prices.
 function PriceSummary({
   totalPence,
   creditAppliedPence,
@@ -1026,6 +1040,7 @@ function PriceSummary({
   discountPence = 0,
   promoCode,
   lines,
+  extras,
 }: {
   totalPence: number;
   creditAppliedPence: number;
@@ -1034,8 +1049,11 @@ function PriceSummary({
   discountPence?: number;
   promoCode?: string | null;
   lines?: RepairLineLite[];
+  /** Parts and engine oil inside the total (Task 43). */
+  extras?: PriceExtraLine[];
 }) {
   const multi = (lines?.length ?? 0) > 1;
+  const hasExtras = (extras?.length ?? 0) > 0;
   return (
     <div className="rounded-[20px] border border-blue-100 bg-blue-50/60 p-5 text-sm">
       {multi &&
@@ -1058,10 +1076,20 @@ function PriceSummary({
             ))}
           </div>
         ))}
+      {hasExtras && (
+        <div className={cn("flex flex-col gap-0.5", multi && "mt-1")}>
+          {extras!.map((line) => (
+            <div key={line.key} className="flex items-start justify-between gap-3 text-text-muted">
+              <span className="min-w-0">{line.label}</span>
+              <span className="shrink-0 text-xs">{formatPrice(line.pence)}</span>
+            </div>
+          ))}
+        </div>
+      )}
       <div
         className={cn(
           "flex items-center justify-between text-text-secondary",
-          multi && "mt-1 border-t border-blue-100 pt-2",
+          (multi || hasExtras) && "mt-1 border-t border-blue-100 pt-2",
         )}
       >
         <span>{multi ? "Jobs total" : "Repair total"}</span>
@@ -1256,6 +1284,7 @@ function CheckoutForm({
         promoCode={checkout.promoCode}
         chargePence={checkout.chargePence}
         lines={c.repairLines}
+        extras={c.priceExtras}
       />
 
       {alreadyConfirmed ? (
@@ -1345,6 +1374,7 @@ function FreeCheckoutForm({
         promoCode={checkout.promoCode}
         chargePence={0}
         lines={c.repairLines}
+        extras={c.priceExtras}
       />
 
       <Alert tone="success">

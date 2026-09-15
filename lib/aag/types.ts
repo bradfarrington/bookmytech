@@ -98,7 +98,8 @@ export interface AagArticle {
 export interface AagVehicleDetails {
   Vrm?: string | null;
   Vin?: string | null;
-  EngineNo?: string | null;
+  /** Spelled "EngineNumber" in real replies (captured 2026-09-14). */
+  EngineNumber?: string | null;
   EngineSize?: string | null;
   Fuel?: string | null;
   Make?: string | null;

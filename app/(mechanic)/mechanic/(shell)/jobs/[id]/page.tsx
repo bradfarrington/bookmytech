@@ -144,10 +144,12 @@ export default async function MechanicJobDetailPage({ params }: PageProps) {
     .filter((m) => m.kind === "photo")
     .map((m) => ({ id: m.id, url: publicUrl(m.storage_path) }));
 
-  // --- Parts on this job (mechanic reads via RLS; only BMT-price columns) ----
+  // --- Parts on this job (mechanic reads via RLS) ----------------------------
+  // "*": the supplier columns arrive with migration 0070 (Task 43), and naming
+  // them before then would fail the whole read.
   const { data: partRows } = await supabase
     .from("booking_parts")
-    .select("id, part_name, quantity, unit_price_pence, total_pence, sourcing, status")
+    .select("*")
     .eq("booking_id", id)
     .order("created_at", { ascending: true });
 
@@ -159,6 +161,9 @@ export default async function MechanicJobDetailPage({ params }: PageProps) {
     totalPence: p.total_pence,
     sourcing: (p.sourcing === "bmt" ? "bmt" : "self") as "self" | "bmt",
     status: p.status,
+    source: (p.source === "catalogue" ? "catalogue" : "manual") as "manual" | "catalogue",
+    supplierPartNumber: (p.supplier_part_number as string | null | undefined) ?? null,
+    brand: (p.brand as string | null | undefined) ?? null,
   }));
   const partsPence = jobParts.reduce((s, p) => s + p.totalPence, 0);
   const bmtPartsPence = jobParts

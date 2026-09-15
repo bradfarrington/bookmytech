@@ -14,10 +14,17 @@
 // snapshots describe the job alone, so `approvedExtras` is subtracted from
 // the booking's figures to get `before` and added back when `after` is
 // applied (lib/revisions/apply.ts).
+//
+// Parts come in two kinds (Task 43). `parts` are the mechanic's own (and a
+// follow-on quote's): editable on a revision, priced on top of the quote.
+// The supplier parts a quote prices for its jobs are `catalogueParts`: already
+// inside the quote's parts figure, so they are never in `parts` too, and a
+// revision replaces them with the revised jobs' own.
 
 import type { OilQuote } from "@/lib/catalogue/products";
 import { repairLinesFor, repairSummary, type BookingRepairRow } from "@/lib/bookings/repair-lines";
 import type { RepairsQuote } from "@/lib/haynespro/repair-booking";
+import type { QuotedPart } from "@/lib/parts/quote-parts";
 import { splitCommission } from "@/lib/quotes/pricing";
 import type { QuoteView } from "@/lib/quotes/load";
 
@@ -50,6 +57,12 @@ export interface RevisionSnapshot {
   repairIds: string[];
   lines: RevisionLine[];
   parts: RevisionPart[];
+  /**
+   * ADDITIVE (Task 43): the supplier parts the quote priced for these jobs,
+   * already inside `partsPricePence`. Only on an `after` snapshot; absent on
+   * revisions sent before it existed.
+   */
+  catalogueParts?: QuotedPart[];
   repairDescription: string;
   serviceDurationHours: number;
   /** Raw book time before the 1h minimum (bookings.vehicle_raw_duration_hours). */
@@ -101,6 +114,13 @@ export interface BookingPartRow {
   unit_price_pence: number;
   total_pence: number;
   sourcing: string | null;
+  /** 'catalogue' for a supplier part priced into the booking (migration 0070); absent before it. */
+  source?: string | null;
+}
+
+/** A supplier part priced into the booking by the quote, rather than one the mechanic added. */
+export function isCatalogueRow(row: Pick<BookingPartRow, "source">): boolean {
+  return row.source === "catalogue";
 }
 
 export function partFromRow(row: BookingPartRow): RevisionPart {
@@ -149,7 +169,11 @@ const num = (v: number | string | null | undefined, fallback = 0): number => {
   return Number.isFinite(n) ? n : fallback;
 };
 
-/** The job as booked, from the booking row and its lines/parts, with any approved extra work taken off. */
+/**
+ * The job as booked, from the booking row and its lines/parts, with any
+ * approved extra work taken off. Supplier parts priced into the booking stay
+ * out of `parts`: their money is already in the booking's parts figure.
+ */
 export function snapshotFromBooking(
   booking: SnapshotBooking,
   lineRows: readonly BookingRepairRow[] | null | undefined,
@@ -182,7 +206,7 @@ export function snapshotFromBooking(
   return {
     repairIds: repairIdsFromLines(lines),
     lines,
-    parts: (partRows ?? []).map(partFromRow),
+    parts: (partRows ?? []).filter((row) => !isCatalogueRow(row)).map(partFromRow),
     repairDescription: booking.repair_description?.trim() || repairSummary(lines.map((l) => l.description)),
     serviceDurationHours: duration,
     rawHours: booking.vehicle_raw_duration_hours == null ? null : num(booking.vehicle_raw_duration_hours),
@@ -200,10 +224,11 @@ export function snapshotFromBooking(
 
 /**
  * The job as revised: a fresh RepairsQuote for the chosen ids (priced at the
- * booking's snapshotted rate and commission) plus the parts. Parts are priced
- * quantity × unit on top of the quote's own parts line (engine oil), the way
- * computePrice adds parts: total = base + parts, fee = round(total × rate),
- * payout = total − fee − any BMT-sourced parts (the rule in booking-parts.ts).
+ * booking's snapshotted rate and commission) plus the mechanic's parts. Those
+ * parts are priced quantity × unit on top of the quote's own parts line (oil
+ * and supplier parts), the way computePrice adds parts: total = base + parts,
+ * fee = round(total × rate), payout = total − fee − any BMT-sourced parts (the
+ * rule in booking-parts.ts).
  */
 export function snapshotFromQuote(quote: RepairsQuote, parts: readonly RevisionPart[]): RevisionSnapshot {
   const lines: RevisionLine[] = quote.lines.map((l) => ({
@@ -227,6 +252,7 @@ export function snapshotFromQuote(quote: RepairsQuote, parts: readonly RevisionP
     repairIds: [...quote.itemIds],
     lines,
     parts: parts.map((p) => ({ ...p })),
+    catalogueParts: (quote.parts ?? []).map((p) => ({ ...p })),
     repairDescription: quote.description,
     serviceDurationHours: quote.breakdown.durationHours,
     rawHours: quote.breakdown.vehicleRawDurationHours ?? quote.combinedRawHours,
@@ -251,6 +277,7 @@ export function parseSnapshot(value: unknown): RevisionSnapshot | null {
     repairIds: arr<string>(v.repairIds).filter((s) => typeof s === "string"),
     lines: arr<RevisionLine>(v.lines),
     parts: arr<RevisionPart>(v.parts),
+    ...(Array.isArray(v.catalogueParts) ? { catalogueParts: v.catalogueParts as QuotedPart[] } : {}),
     repairDescription: typeof v.repairDescription === "string" ? v.repairDescription : "Vehicle repair",
     serviceDurationHours: num(v.serviceDurationHours as number, 1),
     rawHours: v.rawHours == null ? null : num(v.rawHours as number),

@@ -3,10 +3,10 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { vehicleLabel } from "@/lib/utils";
-import { quoteRepairs, type RepairsQuote } from "@/lib/haynespro/repair-booking";
+import { quoteRepairsResult, type RepairsQuote } from "@/lib/haynespro/repair-booking";
 import { parseRepairIds } from "./repair-ids";
 import { quoteFollowOn } from "@/lib/quotes/book-follow-on";
-import type { BookingBaseParams } from "./step-params";
+import { stepQuery, type BookingBaseParams } from "./step-params";
 
 // The job being booked, loaded once per step of the second half of the funnel
 // (Task 47: Time, Address and Confirm). The price is re-quoted on the server at
@@ -79,8 +79,18 @@ export async function loadCheckoutContext(
   if (!reg.trim() || ids.length === 0) redirect("/book");
   // Re-quote server-side: the same (reg, items) price identically here, at
   // checkout and at booking create.
-  const quote = await quoteRepairs(reg, ids, createAdminClient());
-  if (!quote) redirect(`/book/repairs?reg=${encodeURIComponent(reg)}`);
+  const result = await quoteRepairsResult(reg, ids, createAdminClient());
+  if (!result.ok) {
+    // A part the job needs can't be priced right now (Task 43): the price step
+    // says so. Anything else means the items no longer price for this car.
+    if (result.reason === "parts_unavailable") {
+      redirect(
+        `/book/match?${stepQuery({ reg, repairs: ids, make: params.make, model: params.model, postcode: params.postcode, pref: params.pref })}`,
+      );
+    }
+    redirect(`/book/repairs?reg=${encodeURIComponent(reg)}`);
+  }
+  const quote = result.quote;
   return withLabels(
     {
       reg,

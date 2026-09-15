@@ -74,11 +74,15 @@ export function RepairRows({
         </span>
       );
     }
+    // `pricePence` is labour only; a repair that uses parts has them priced
+    // for this car on the next step (Task 43).
+    const withParts = (node.genartIds?.length ?? 0) > 0;
     if (atCap) {
       return (
         <span className="shrink-0 text-sm font-semibold text-text-muted">
           {label ? `${label} · ` : ""}
           {formatPrice(node.pricePence ?? 0)}
+          {withParts && " + parts"}
         </span>
       );
     }
@@ -89,6 +93,7 @@ export function RepairRows({
       >
         {label && <span className="text-xs font-semibold text-blue-100">{label}</span>}
         {formatPrice(node.pricePence ?? 0)}
+        {withParts && <span className="text-xs font-semibold text-blue-100">+ parts</span>}
         {adding ? (
           <>
             <span className="text-xs font-semibold text-blue-100">Add</span>

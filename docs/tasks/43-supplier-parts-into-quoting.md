@@ -1,6 +1,6 @@
 # Task 43 — Supplier parts into quoting: engine oil, the mechanic's picker, and repair→parts
 
-**Status:** 🚧 In progress (2026-09-15). **Revised the same evening: LKQ is removed entirely (Gareth) and Alliance Automotive is the only parts supplier.** Part A, removing LKQ (migration `0069_remove_lkq.sql`), is done. Part B, AAG parts in customer prices, is being built. "Revised decisions" directly below supersede the earlier decisions table; everything after it is earlier scoping, kept as history.
+**Status:** 🚧 Built (2026-09-15), awaiting owner steps. **LKQ is removed entirely (Gareth) and Alliance Automotive is the only parts supplier.** Part A (removing LKQ, migration `0069_remove_lkq.sql`) and Part B (AAG parts in customer prices, migration `0070_aag_part_prices.sql`) are built and committed. Not yet exercised live: both migrations are unapplied, and AAG's sandbox is blocking this machine's IP. "Revised decisions" and "What shipped" directly below supersede the earlier decisions table; everything after them is earlier scoping, kept as history.
 
 ## Revised decisions (2026-09-15, evening)
 
@@ -26,6 +26,65 @@
 - **Ratings** are Good / Better / Best, and the dearest isn't always Best.
 - **"No parts"** (`ISE0006` / `ISE0011`) currently looks the same as a failure.
 - **Surcharge:** a £0.00 surcharge is shown as a core charge.
+
+## What shipped (2026-09-15)
+
+**Part A: LKQ removed** (commit `c2fca78`). The Task 45 status lists what went.
+
+**Part B: AAG parts in customer prices** (migration `0070_aag_part_prices.sql`):
+
+- **Quote.** `quoteRepairsResult` (`lib/haynespro/repair-booking.ts`) prices each job's part groups through `lib/parts/quote-parts.ts`:
+  - groups switched off in `part_group_settings` are skipped;
+  - the part is the admin's choice for the engine variant, else AAG's Best-rated part, dearest within it (`defaultOffer`);
+  - the axle comes from the job's wording (`partBuckets`): a job naming neither gets one part per axle;
+  - the quantity is AAG's unit of issue, so a disc pair is 2 × the per-disc price.
+
+  Parts plus oil make `breakdown.partsPence`, and commission comes out of the whole total. `quoteRepairs` keeps its signature.
+- **Cache and fallback.** `lib/parts/aag-part-prices.ts` keeps AAG's offers per registration and part group in `aag_part_prices`:
+  - used as they are for 12 hours;
+  - after that, AAG is asked again with a 4-second timeout;
+  - if AAG can't answer, its last answer is used when at most 7 days old;
+  - otherwise the quote fails with `parts_unavailable`.
+- **AAG client.**
+  - `aagQuoteResult` tells "no parts" (`ISE0006` / `ISE0011`) apart from a failure.
+  - `aagCall` takes a timeout.
+  - A £0.00 surcharge is no core charge.
+  - The `EngineNumber` type is fixed.
+- **Booking.** `createBooking` writes one `booking_parts` row per priced part: `source='catalogue'`, supplier, part number, brand, part group, job and `priced_at`. It is rolled back with the booking on failure, and the mechanic sources the parts.
+- **Revised jobs.** Only the mechanic's own parts are editable. The revised quote's catalogue parts replace the booking's (additive `catalogueParts` on the snapshot), so nothing is charged twice.
+- **Screens.**
+  - **Price step:** lists the parts, and says so when they can't be priced.
+  - **Confirm:** lists parts and engine oil with their prices.
+  - **Repair list:** shows "+ parts" on repairs with part groups.
+  - **Mechanic's parts list:** names the AAG part number.
+  - **Admin job page:** lists the priced parts.
+  - **Vehicle Parts panel:** shows the part customers pay for (one per axle), with a "Charge customers" switch.
+- **Mobile API.**
+  - `POST /api/mobile/v1/quote` gains an additive `parts` array.
+  - `partsPence` / `totalPence` now include parts.
+  - A part that can't be priced gets its own `not_priceable` message.
+- **Before 0070 is applied, nothing changes.** Parts pricing switches itself off and quotes stay labour-only. Smoke-tested on the dev server: S28BSW "Renew the air filter" is £60.00 with `parts: []`, and `/book/match` returns 200.
+
+## Acceptance criteria
+
+- [x] LKQ removed from code, admin UI, scripts and local env; migration 0069 cleans the database.
+- [x] Customer quotes include the AAG part for every charged part group: Best-rated then dearest, with the admin's choice winning. *(Unit-tested against AAG's captured replies.)*
+- [x] Discs priced as a pair; a job naming an axle gets that axle's part; a job naming neither gets one per axle. *(Unit-tested.)*
+- [x] One price through every funnel step (12-hour cache). The last known price is used up to 7 days when AAG can't answer; otherwise the booking stops with a parts-specific message. *(Unit-tested.)*
+- [x] Admin switch per part group; switched-off groups aren't charged. *(Unit-tested.)*
+- [x] The booking records each priced part, the mechanic sees the part number, and revised jobs don't double-count.
+- [x] The mobile quote response change is additive.
+- [x] `tsc` (no new errors), eslint on changed files, `npm test`. No `next build`: Brad's dev server was running on `.next`.
+- [ ] Migrations 0069 and 0070 applied. **Owner** (0070 only once AAG answers from here).
+- [ ] AAG allowlists `80.1.6.55`, then the S28BSW air filter is priced with its part end to end (Price, Confirm, hold, booking row, mechanic page). **Owner, then verify.**
+- [ ] AAG production credentials and `AAG_BASE_URL` set on Vercel. **Owner, after the demo call.**
+- [ ] The customer app renders `quote.parts`. **App repo.**
+
+## Follow-ups
+
+- **Consumables:** AAG may not list antifreeze, screenwash or oil by registration. If such a group blocks bookings, add a per-group fallback price, like engine oil's £/litre.
+- **Mechanic's picker:** the on-site quote part picker still reads the frozen `parts` table (`lib/quotes/mechanic.ts`).
+- **Endpoint:** `/api/quote` or `/classic`, once AAG says which.
 
 ## The problem, as found (2026-09-15)
 

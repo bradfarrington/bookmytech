@@ -8,24 +8,36 @@ import {
   chooseRepairPartAction,
   loadRepairPartsAction,
   resetRepairPartAction,
+  setPartGroupChargedAction,
   type RepairPartGroupView,
   type RepairPartsResult,
 } from "@/app/actions/repair-parts";
 import { Button } from "@/components/ui/button";
 import { Pill } from "@/components/ui/pill";
-import { dearestOffer, type SupplierOffer, type SupplierPanel } from "@/lib/parts/supplier-offer";
+import { Switch } from "@/components/ui/switch";
+import { selectJobParts, type MissingChoice } from "@/lib/parts/repair-part-choice";
+import {
+  offerLinePence,
+  ratingRank,
+  type SupplierOffer,
+  type SupplierPanel,
+} from "@/lib/parts/supplier-offer";
 import { cn, formatPrice } from "@/lib/utils";
 
 // A repair's parts on one engine variant (Task 45), opened from a timed repair
 // on the admin vehicle model page.
 //
 // Nothing is fetched until the admin opens it. Alliance Automotive prices each
-// part group the repair uses. The default part is the dearest it will sell us,
-// "Change" lists every fitting part, and a choice applies to this engine
-// variant only.
+// part group the repair uses, and the part shown is the one customer quotes use
+// (Task 43): AAG's best-rated, dearest within that rating, one per axle when the
+// repair names neither. "Change" lists every fitting part, and a choice applies
+// to this engine variant only. The switch stops customers being charged for a
+// part group on every repair (a tool, not a part).
 //
 // Money rules: supplier cost, no mark-up; a core charge is never added to the
 // cost; an unpriced part says "Not priced", never £0.00.
+
+const POSITION_LABEL = { front: "Front", rear: "Rear" } as const;
 
 function panelOffers(panel: SupplierPanel): SupplierOffer[] {
   return panel.state === "ok" ? panel.offers : [];
@@ -42,6 +54,11 @@ function panelNote(panel: SupplierPanel): string | null {
   }
 }
 
+/** Best-rated first, dearest first within a rating: the order the default is picked in. */
+function byDefaultOrder(a: SupplierOffer, b: SupplierOffer): number {
+  return ratingRank(b.tier) - ratingRank(a.tier) || (offerLinePence(b) ?? -1) - (offerLinePence(a) ?? -1);
+}
+
 function OfferSummary({ offer }: { offer: SupplierOffer }) {
   return (
     <div className="min-w-0">
@@ -49,12 +66,9 @@ function OfferSummary({ offer }: { offer: SupplierOffer }) {
         <span className="text-sm font-semibold text-text-primary">{offer.brand ?? "Unbranded"}</span>
         <span className="font-mono text-xs text-text-muted">{offer.partNumber}</span>
         {offer.tier && <Pill tone="neutral">{offer.tier}</Pill>}
+        {offer.position && <Pill tone="info">{POSITION_LABEL[offer.position]}</Pill>}
       </div>
-      {(offer.description || offer.fitment.length > 0) && (
-        <p className="mt-0.5 text-xs text-text-muted">
-          {[offer.description, ...offer.fitment.map((f) => `${f.label}: ${f.value}`)].filter(Boolean).join(" · ")}
-        </p>
-      )}
+      {offer.description && <p className="mt-0.5 text-xs text-text-muted">{offer.description}</p>}
     </div>
   );
 }
@@ -71,7 +85,7 @@ function Cost({ offer }: { offer: SupplierOffer }) {
         </div>
       )}
       {offer.surchargePence != null && (
-        <div className="whitespace-nowrap text-xs text-amber-700">+ {formatPrice(offer.surchargePence)} surcharge</div>
+        <div className="whitespace-nowrap text-xs text-amber-700">+ {formatPrice(offer.surchargePence)} core charge</div>
       )}
     </div>
   );
@@ -81,20 +95,32 @@ function PartGroupCard({
   group,
   carTypeId,
   nodeId,
+  repairName,
+  settingsReady,
   onUpdated,
 }: {
   group: RepairPartGroupView;
   carTypeId: number;
   nodeId: string;
+  repairName: string;
+  settingsReady: boolean;
   onUpdated: (next: RepairPartGroupView) => void;
 }) {
   const [changing, setChanging] = useState(false);
   const [pending, startTransition] = useTransition();
 
-  const offers = [...panelOffers(group.aag)].sort((a, b) => (b.costPence ?? -1) - (a.costPence ?? -1));
-  const selection = group.selection;
-  const selected = selection.source === "none" ? null : selection.offer;
+  const offers = [...panelOffers(group.aag)].sort(byDefaultOrder);
   const note = panelNote(group.aag);
+  const chosen = group.selections.some((s) => s.selection.source === "choice");
+  const missingChoice = group.selections
+    .map((s) => (s.selection.source === "choice" ? null : s.selection.missingChoice))
+    .find(Boolean);
+  const inUse = new Set(
+    group.selections.flatMap((s) => (s.selection.source === "none" ? [] : [s.selection.offer.partNumber])),
+  );
+
+  const reselect = (choice: MissingChoice | null) =>
+    group.aag.state === "ok" ? selectJobParts(repairName, group.aag.offers, choice) : group.selections;
 
   const choose = (offer: SupplierOffer) =>
     startTransition(async () => {
@@ -111,7 +137,8 @@ function PartGroupCard({
         toast.error(result.error);
         return;
       }
-      onUpdated({ ...group, selection: { source: "choice", offer } });
+      const choice = { supplier: offer.supplier, part_number: offer.partNumber, brand: offer.brand, description: offer.description };
+      onUpdated({ ...group, selections: reselect(choice) });
       setChanging(false);
       toast.success(`Using ${offer.brand ?? offer.partNumber} for this engine variant.`);
     });
@@ -123,57 +150,100 @@ function PartGroupCard({
         toast.error(result.error);
         return;
       }
-      const dearest = dearestOffer(offers);
-      onUpdated({
-        ...group,
-        selection: dearest ? { source: "dearest", offer: dearest, missingChoice: null } : { source: "none", missingChoice: null },
-      });
-      toast.success("Back to the dearest part.");
+      onUpdated({ ...group, selections: reselect(null) });
+      toast.success("Back to the default part.");
+    });
+
+  const setCharged = (charged: boolean) =>
+    startTransition(async () => {
+      onUpdated({ ...group, charged }); // optimistic
+      const result = await setPartGroupChargedAction({ genartId: group.genartId, description: group.description, charged });
+      if (!result.ok) {
+        onUpdated({ ...group, charged: !charged });
+        toast.error(result.error);
+        return;
+      }
+      toast.success(
+        charged
+          ? `Customers are charged for “${group.description}” again.`
+          : `Customers won't be charged for “${group.description}” on any repair.`,
+      );
     });
 
   return (
-    <div className="rounded-xl border border-border bg-surface-card p-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <p className="text-sm font-semibold text-text-primary">{group.description}</p>
-        <span className="font-mono text-xs text-text-muted">Group {group.genartId}</span>
-      </div>
-
-      <div className="mt-2 flex flex-col gap-2 rounded-lg bg-surface px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
-        {selected ? (
-          <>
-            <div className="flex min-w-0 items-start gap-2">
-              <Pill tone={selection.source === "choice" ? "dark" : "accent"}>
-                {selection.source === "choice" ? "Chosen" : "Dearest (default)"}
-              </Pill>
-              <OfferSummary offer={selected} />
-            </div>
-            <Cost offer={selected} />
-          </>
-        ) : (
-          <p className="text-sm text-text-muted">Alliance Automotive didn&apos;t return a part we can buy for this vehicle.</p>
+    <div className={cn("rounded-xl border border-border bg-surface-card p-3", !group.charged && "opacity-75")}>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <p className="text-sm font-semibold text-text-primary">{group.description}</p>
+          <span className="font-mono text-xs text-text-muted">Group {group.genartId}</span>
+          {!group.charged && <Pill tone="neutral">Not charged</Pill>}
+        </div>
+        {settingsReady && (
+          <label className="flex items-center gap-2 text-xs font-semibold text-text-secondary">
+            Charge customers
+            <Switch
+              size="sm"
+              checked={group.charged}
+              disabled={pending}
+              onChange={setCharged}
+              label={`Charge customers for ${group.description}`}
+            />
+          </label>
         )}
       </div>
 
-      {selection.source !== "choice" && selection.missingChoice && (
+      <div className="mt-2 space-y-2">
+        {group.selections.map(({ position, selection }) => (
+          <div
+            key={position ?? "any"}
+            className="flex flex-col gap-2 rounded-lg bg-surface px-3 py-2 sm:flex-row sm:items-center sm:justify-between"
+          >
+            {selection.source === "none" ? (
+              <p className="text-sm text-text-muted">
+                {position ? `${POSITION_LABEL[position]}: ` : ""}Alliance Automotive didn&apos;t return a part we can buy
+                for this vehicle.
+              </p>
+            ) : (
+              <>
+                <div className="flex min-w-0 items-start gap-2">
+                  <Pill tone={selection.source === "choice" ? "dark" : "accent"}>
+                    {selection.source === "choice" ? "Chosen" : "Default: Best, dearest"}
+                  </Pill>
+                  <OfferSummary offer={selection.offer} />
+                </div>
+                <Cost offer={selection.offer} />
+              </>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {missingChoice && (
         <p className="mt-2 flex items-start gap-1.5 text-xs text-amber-700">
           <Info size={12} className="mt-0.5 shrink-0" />
-          The part chosen before ({selection.missingChoice.brand ?? "Alliance Automotive"}{" "}
-          {selection.missingChoice.part_number}) isn&apos;t in today&apos;s results, so the dearest is shown.
+          The part chosen before ({missingChoice.brand ?? "Alliance Automotive"} {missingChoice.part_number}) isn&apos;t
+          in today&apos;s results, so the default is shown.
         </p>
       )}
 
       {note && <p className="mt-1.5 text-xs text-text-muted">{note}</p>}
+      {group.aag.state === "empty" && group.charged && (
+        <p className="mt-1 text-xs text-amber-700">
+          A customer can&apos;t book this repair for this car while this group is charged. If it&apos;s a tool rather
+          than a part, switch it off.
+        </p>
+      )}
 
-      {(offers.length > 0 || selection.source === "choice") && (
+      {(offers.length > 0 || chosen) && (
         <div className="mt-2 flex flex-wrap gap-2">
           {offers.length > 0 && (
             <Button size="sm" variant="secondary" iconLeft={ArrowDownWideNarrow} disabled={pending} onClick={() => setChanging((v) => !v)}>
               {changing ? "Close" : `Change (${offers.length} options)`}
             </Button>
           )}
-          {selection.source === "choice" && (
+          {chosen && (
             <Button size="sm" variant="tertiary" iconLeft={RotateCcw} disabled={pending} onClick={reset}>
-              Use dearest
+              Use default
             </Button>
           )}
         </div>
@@ -182,16 +252,16 @@ function PartGroupCard({
       {changing && (
         <ul className="mt-2 max-h-96 divide-y divide-border-subtle overflow-y-auto rounded-lg border border-border">
           {offers.map((offer) => {
-            const isSelected = selected?.partNumber === offer.partNumber;
+            const isInUse = inUse.has(offer.partNumber);
             return (
               <li
                 key={offer.partNumber}
-                className={cn("flex flex-col gap-2 px-3 py-2 sm:flex-row sm:items-center sm:justify-between", isSelected && "bg-blue-50")}
+                className={cn("flex flex-col gap-2 px-3 py-2 sm:flex-row sm:items-center sm:justify-between", isInUse && "bg-blue-50")}
               >
                 <OfferSummary offer={offer} />
                 <div className="flex items-center gap-3">
                   <Cost offer={offer} />
-                  {isSelected ? (
+                  {isInUse ? (
                     <Pill tone="success">In use</Pill>
                   ) : (
                     <Button size="sm" variant="ghost" disabled={pending || !offer.buyable} onClick={() => choose(offer)}>
@@ -309,13 +379,16 @@ export function RepairParts({
                     group={group}
                     carTypeId={carTypeId}
                     nodeId={nodeId}
+                    repairName={result.repairName}
+                    settingsReady={result.settingsReady}
                     onUpdated={updateGroup}
                   />
                 ))
               )}
               <p className="text-xs text-text-muted">
-                Supplier cost, no mark-up. The dearest part is used unless you change it; a change applies to this
-                engine variant only.
+                Supplier cost, no mark-up. Customers are charged the part shown unless the group is switched off; a
+                change applies to this engine variant only.
+                {!result.settingsReady && " Charge switches appear once migration 0070 is applied."}
               </p>
             </>
           )}

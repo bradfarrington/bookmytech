@@ -120,14 +120,18 @@ export default async function BookingDetailPage({ params }: PageProps) {
   // Every job of a multi-job booking, and how its combined time was derived
   // (Task 24). Separate queries so the page still renders before migration
   // 0055 exists — errors just mean "one job" / "not combined".
-  const [{ data: lineRows }, { data: combineRow }] = await Promise.all([
+  const [{ data: lineRows }, { data: combineRow }, { data: partRows }] = await Promise.all([
     supabase
       .from("booking_repairs")
       .select("*")
       .eq("booking_id", id)
       .order("position"),
     supabase.from("bookings").select("combine_source").eq("id", id).maybeSingle(),
+    // The supplier parts priced into the booking (Task 43). "*": their
+    // columns arrive with migration 0070.
+    supabase.from("booking_parts").select("*").eq("booking_id", id).order("created_at"),
   ]);
+  const catalogueParts = (partRows ?? []).filter((part) => part.source === "catalogue");
   const repairLines = repairLinesFor(booking, (lineRows ?? null) as BookingRepairRow[] | null);
   // The service / inspection checklists on this booking (Task 32), with the
   // mechanic's answers so far. Admin RLS reads everything.
@@ -535,6 +539,22 @@ export default async function BookingDetailPage({ params }: PageProps) {
                 <span className="text-sm text-text-secondary">of which parts</span>
                 <span className="text-sm text-text-muted">{formatPrice(split.partsPence)}</span>
               </div>
+            )}
+            {catalogueParts.length > 0 && (
+              <ul className="space-y-1.5 rounded-button bg-surface px-3 py-2">
+                {catalogueParts.map((part) => (
+                  <li key={part.id} className="flex items-start justify-between gap-3 text-xs">
+                    <span className="min-w-0 text-text-secondary">
+                      {part.part_name}
+                      {part.quantity > 1 ? ` × ${part.quantity}` : ""}
+                      <span className="block font-mono text-text-muted">
+                        Alliance Automotive {part.supplier_part_number}
+                      </span>
+                    </span>
+                    <span className="shrink-0 text-text-muted">{formatPrice(part.total_pence)}</span>
+                  </li>
+                ))}
+              </ul>
             )}
             {quoteTotals.approvedNowPence > 0 && (
               <div className="flex items-center justify-between gap-3">

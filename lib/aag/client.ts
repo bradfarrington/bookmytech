@@ -24,8 +24,9 @@
 //
 // Everything degrades silently, as lib/haynespro/client.ts does: unconfigured,
 // unreachable or refused → null, logged, health recorded for the admin page.
-// The booking funnel does not depend on this yet; when it does, it must never
-// block on it.
+// Customer quotes call it through lib/parts/aag-part-prices.ts with a short
+// timeout and a cached fallback, so AAG being slow or down never stalls the
+// booking funnel (Task 43).
 //
 // NB: the service-role Supabase client is imported dynamically inside the
 // functions (never at module top) so the pure helpers stay importable in unit
@@ -154,6 +155,15 @@ export function isAagAuthFailure(errorCode: string | null): boolean {
 }
 
 /**
+ * Error codes that mean "nothing in this product group fits that vehicle".
+ * That is an answer, not a failure: a customer quote must not treat it as AAG
+ * being down.
+ */
+export function isAagNoParts(errorCode: string | null): boolean {
+  return errorCode === "ISE0006" || errorCode === "ISE0011";
+}
+
+/**
  * Plain-English reading of an AAG error code (manual v1.07, "Error codes"),
  * written for the admin page — never shown to a customer.
  */
@@ -229,13 +239,26 @@ async function noteFailure(
   if (db) await recordAagHealth(db, { state, errorCode, detail, baseUrl: config.baseUrl });
 }
 
+export interface AagCallOptions {
+  /** Abort after this long. Customer quotes use a short one; admin pages keep the default. */
+  timeoutMs?: number;
+}
+
 /**
- * POST one AAG method. Returns the parsed Body, or null when AAG is
- * unconfigured / unreachable / refuses the call. Never throws.
+ * The outcome of one AAG call, keeping AAG's error code for callers that must
+ * tell "no parts" apart from a failure. `errorCode` is null when AAG was
+ * unconfigured, unreachable or refused at its gateway.
  */
-export async function aagCall<T>(path: string, body: unknown): Promise<T | null> {
+export type AagCallResult<T> = { ok: true; body: T } | { ok: false; errorCode: string | null };
+
+/** POST one AAG method. Never throws. */
+export async function aagCallResult<T>(
+  path: string,
+  body: unknown,
+  options: AagCallOptions = {},
+): Promise<AagCallResult<T>> {
   const config = getAagConfig();
-  if (!config) return null;
+  if (!config) return { ok: false, errorCode: null };
 
   let raw: unknown;
   try {
@@ -243,7 +266,7 @@ export async function aagCall<T>(path: string, body: unknown): Promise<T | null>
       method: "POST",
       headers: buildAagHeaders(config),
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      signal: AbortSignal.timeout(options.timeoutMs ?? REQUEST_TIMEOUT_MS),
       // Prices and stock are live; never let Next cache a reply.
       cache: "no-store",
     });
@@ -260,25 +283,36 @@ export async function aagCall<T>(path: string, body: unknown): Promise<T | null>
           ? `AAG's gateway refused us with HTTP ${res.status}. Either the API-key header is wrong or our address isn't on their allowlist.`
           : `AAG responded HTTP ${res.status}.`,
       );
-      return null;
+      return { ok: false, errorCode: null };
     }
     raw = text ? (JSON.parse(text) as unknown) : null;
   } catch (err) {
     console.error(`[aag] ${path} failed:`, err);
     await noteFailure(config, "unreachable", null, "We couldn't reach AAG at all (network error or timeout).");
-    return null;
+    return { ok: false, errorCode: null };
   }
 
   const parsed = parseAagEnvelope<T>(raw);
   if (!parsed.ok) {
-    console.error(`[aag] ${path} refused: ${parsed.errorCode ?? "?"} ${parsed.message}`);
+    if (!isAagNoParts(parsed.errorCode)) {
+      console.error(`[aag] ${path} refused: ${parsed.errorCode ?? "?"} ${parsed.message}`);
+    }
     if (isAagAuthFailure(parsed.errorCode)) {
       await noteFailure(config, "auth_failed", parsed.errorCode, describeAagError(parsed.errorCode));
     }
-    return null;
+    return { ok: false, errorCode: parsed.errorCode };
   }
   await noteOk(config);
-  return parsed.body;
+  return { ok: true, body: parsed.body };
+}
+
+/**
+ * POST one AAG method. Returns the parsed Body, or null when AAG is
+ * unconfigured / unreachable / refuses the call. Never throws.
+ */
+export async function aagCall<T>(path: string, body: unknown, options: AagCallOptions = {}): Promise<T | null> {
+  const result = await aagCallResult<T>(path, body, options);
+  return result.ok ? result.body : null;
 }
 
 // ---------------------------------------------------------------------------
@@ -298,6 +332,29 @@ export async function aagQuote(
     VRM: vrm,
     IncludeVehicleDetails: options.includeVehicleDetails ?? true,
   });
+}
+
+/** A quote that says whether AAG answered "no parts" or couldn't answer at all. */
+export type AagQuoteOutcome =
+  | { kind: "ok"; body: AagQuoteBody }
+  | { kind: "no_parts" }
+  | { kind: "failed" };
+
+/** `aagQuote` for customer pricing: a short timeout, and "no parts" kept apart from a failure. */
+export async function aagQuoteResult(
+  reg: string,
+  genart: string | number,
+  options: AagCallOptions = {},
+): Promise<AagQuoteOutcome> {
+  const vrm = aagRegKey(reg);
+  if (!vrm) return { kind: "failed" };
+  const result = await aagCallResult<AagQuoteBody>(
+    "/api/quote",
+    { CustomerProductGroup: String(genart), VRM: vrm, IncludeVehicleDetails: false },
+    options,
+  );
+  if (result.ok) return { kind: "ok", body: result.body };
+  return isAagNoParts(result.errorCode) ? { kind: "no_parts" } : { kind: "failed" };
 }
 
 /** The older flat quote: several GenArts at once (slower, per the manual). */
@@ -323,3 +380,5 @@ export async function aagProductInfo(productIds: readonly string[]): Promise<Aag
     Products: ids.map((ProductId) => ({ ProductId })),
   });
 }
+
+export type { AagEnvelope };

@@ -130,12 +130,22 @@ You are working on **Book My Tech**, a UK mobile-mechanic booking platform. This
   - the LKQ catalogue at `/admin/parts`, which now redirects to the AAG check page ("Parts supplier" in the sidebar)
 
   The vehicle page's Parts panel is AAG only. No customer, mechanic or mobile code used LKQ.
-- **Part B 🚧** AAG parts priced into `quoteRepairs`.
-- **Owner:**
-  - apply **`0069_remove_lkq.sql`** (drops `part_group_links`, limits `repair_part_choices` to AAG, deletes LKQ cache rows), then run `npm run db:types` in the app;
-  - delete the `LKQ_*` variables on Vercel;
-  - **send AAG the dev IP `80.1.6.55`**: UAT only allows `80.6.218.98`, so every AAG call from this machine gets a Cloudflare 403;
-  - book AAG's demo call for production credentials (live needs no IP allowlist).
+- **Part B ✅ built: AAG parts in customer prices** (migration `0070_aag_part_prices.sql`).
+  - **What's priced:** every part group a booked repair uses, unless an admin switched it off in the vehicle Parts panel.
+  - **Which part:** the admin's choice, else Best-rated then dearest. Discs are priced as a pair, and a job gets one part per axle unless it names one.
+  - **Price stability:** prices are cached 12 hours per registration and part group, so every step and the hold match. When AAG can't answer, its last price up to 7 days old is used; otherwise the booking stops with "We can't get a price for the parts this repair needs right now…".
+  - **Where parts show:** the Price step and Confirm list them. The booking stores each part (`booking_parts.source = 'catalogue'`), and the mechanic sees the AAG part number. Revised jobs don't count them twice.
+  - **Until 0070 is applied, nothing changes:** quotes stay labour-only. Smoke-tested on S28BSW.
+- **Owner, in this order:**
+  1. **Send AAG the dev IP `80.1.6.55`.** UAT only allows `80.6.218.98`, so every AAG call from this machine gets a Cloudflare 403.
+  2. Apply **`0069_remove_lkq.sql`**; this can be done any time.
+  3. Apply **`0070_aag_part_prices.sql`** only once AAG answers. The database is shared, so from then on a repair that needs parts can't be booked anywhere without an AAG price.
+  4. Run `npm run db:types` in the app after both, and delete the `LKQ_*` variables on Vercel.
+  5. Book AAG's demo call. Production needs live credentials and `AAG_BASE_URL`; live needs no IP allowlist.
+- **Customer app:**
+  - render `quote.parts` on Price and Confirm (additive field on `POST /api/mobile/v1/quote`);
+  - show "+ parts" on tree nodes with `genartIds`;
+  - totals now include parts.
 - **Migration numbers:** 0069 and 0070 are Task 43's, so the dashboard plan's migrations (Tasks 49 to 55) now start at **0071**.
 - **This machine:** `tsc` shows two errors that predate this work:
   - `leaflet` isn't installed; run `npm install`;

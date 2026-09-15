@@ -98,6 +98,9 @@ export function buildFollowOnQuote(quote: QuoteView): RepairsQuote | null {
     combineSource: lines.length > 1 ? "sum" : null,
     breakdown,
     products: [],
+    // The quote's own part lines become booking_parts rows at booking time;
+    // no catalogue parts are priced on top of what the customer approved.
+    parts: [],
     labourPence: quote.labourPence,
     fixedPence: 0,
     oil: null,

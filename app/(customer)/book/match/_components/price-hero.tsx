@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Check, Droplets, ShieldCheck, Star, Wrench } from "lucide-react";
+import { Check, Droplets, Package, ShieldCheck, Star, Wrench } from "lucide-react";
 import { formatPrice } from "@/lib/utils";
 import { groupRepairLines } from "@/lib/bookings/repair-lines";
 
@@ -29,6 +29,16 @@ export interface PriceHeroOil {
   source: "haynespro" | "default";
 }
 
+/** A supplier part priced into the job (Task 43). */
+export interface PriceHeroPart {
+  key: string;
+  /** "Brake disc (front)". */
+  name: string;
+  brand: string | null;
+  quantity: number;
+  linePence: number;
+}
+
 interface PriceHeroProps {
   serviceName: string;
   pricePence: number;
@@ -44,6 +54,8 @@ interface PriceHeroProps {
   combineSource?: "haynespro" | "sum" | null;
   /** The engine-oil line, when a servicing product is in the booking. */
   oil?: PriceHeroOil | null;
+  /** The parts the jobs need, when there are any. */
+  parts?: PriceHeroPart[];
   /** "What's included" for a single product, one item each. */
   includes?: string[];
   /** Hours the visit is blocked out for — shown for a fixed-price product instead of book time. */
@@ -63,6 +75,13 @@ function timeLabel(line: PriceHeroLine): string {
   return hours(line.rawHours);
 }
 
+function includedLabel(hasParts: boolean, hasOil: boolean): string {
+  if (hasParts && hasOil) return "Labour, parts and engine oil included";
+  if (hasParts) return "Labour and parts included";
+  if (hasOil) return "Labour and engine oil included";
+  return "Labour included";
+}
+
 export function PriceHero({
   serviceName,
   pricePence,
@@ -73,6 +92,7 @@ export function PriceHero({
   combinedRawHours,
   combineSource,
   oil,
+  parts,
   includes,
   visitHours,
   productsOnly,
@@ -83,6 +103,7 @@ export function PriceHero({
   const minimumApplied =
     multiJobs && estimatedHours != null && combinedRawHours != null && estimatedHours > combinedRawHours;
   const hasOil = oil != null && oil.pence > 0;
+  const hasParts = (parts?.length ?? 0) > 0;
 
   return (
     <div className="flex flex-col gap-4">
@@ -147,7 +168,32 @@ export function PriceHero({
           </ul>
         )}
 
-        {/* Engine oil — a servicing product's only parts line */}
+        {/* Parts the jobs need (Task 43) */}
+        {hasParts && (
+          <div className="mt-3 rounded-xl bg-white/10 px-3 py-2.5 text-sm">
+            <p className="flex items-center gap-1.5 font-medium text-white">
+              <Package size={14} className="shrink-0 text-blue-200" />
+              Parts
+            </p>
+            <ul className="mt-1.5 flex flex-col gap-1">
+              {parts!.map((part) => (
+                <li key={part.key} className="flex items-start justify-between gap-3">
+                  <span className="min-w-0 text-blue-100">
+                    {part.name}
+                    {part.brand ? ` · ${part.brand}` : ""}
+                    {part.quantity === 2 ? " · pair" : part.quantity > 2 ? ` · × ${part.quantity}` : ""}
+                  </span>
+                  <span className="shrink-0 font-semibold text-white">{formatPrice(part.linePence)}</span>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-1.5 text-xs text-blue-200">
+              Parts for your exact vehicle, included in the price above
+            </p>
+          </div>
+        )}
+
+        {/* Engine oil — a servicing product's parts line */}
         {hasOil && (
           <div className="mt-3 flex items-start justify-between gap-3 rounded-xl bg-white/10 px-3 py-2.5 text-sm">
             <div className="min-w-0">
@@ -191,7 +237,7 @@ export function PriceHero({
         <ul className="mt-4 flex flex-col gap-1.5 text-sm text-blue-100">
           <li className="flex items-center gap-2">
             <span className="size-1.5 rounded-full bg-blue-300" />
-            {hasOil ? "Labour and engine oil included" : "Labour included"}
+            {includedLabel(hasParts, hasOil)}
           </li>
           <li className="flex items-center gap-2">
             <span className="size-1.5 rounded-full bg-blue-300" />

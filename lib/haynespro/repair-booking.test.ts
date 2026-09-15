@@ -236,3 +236,48 @@ describe("buildRepairsQuote with products", () => {
     expect(after!.visitHours).toBe(before!.billedHours);
   });
 });
+
+// --- Parts (Task 43) ----------------------------------------------------------
+
+const frontPads = {
+  nodeId: pads.id,
+  genartId: 402,
+  groupLabel: "Brake pads",
+  supplier: "aag" as const,
+  partNumber: "BREP59045",
+  brand: "BREMBO",
+  description: "BRAKE PAD - FRONT",
+  imageUrl: null,
+  position: "front" as const,
+  rating: "Best",
+  quantity: 1,
+  unitPence: 2837,
+  linePence: 2837,
+  source: "default" as const,
+  lastKnown: false,
+  pricedAt: "2026-09-15T11:00:00.000Z",
+};
+
+describe("buildRepairsQuote with parts", () => {
+  it("adds the parts on top of labour, with commission on the whole total", () => {
+    const quote = buildRepairsQuote({ items: [plain(pads)], parts: [frontPads], combined: null, hourlyRatePence: RATE, commissionRate: COMMISSION });
+    expect(quote!.breakdown.basePence).toBe(6000);
+    expect(quote!.breakdown.partsPence).toBe(2837);
+    expect(quote!.breakdown.totalPence).toBe(8837);
+    expect(quote!.breakdown.platformFeePence).toBe(Math.round(8837 * COMMISSION));
+    expect(quote!.breakdown.mechanicPayoutPence).toBe(8837 - Math.round(8837 * COMMISSION));
+    expect(quote!.parts).toEqual([frontPads]);
+  });
+
+  it("puts engine oil and parts in one parts line", () => {
+    const quote = buildRepairsQuote({ items: [plain(pads)], products: [fullService], oil, parts: [frontPads], combined: null, hourlyRatePence: RATE, commissionRate: COMMISSION });
+    expect(quote!.breakdown.partsPence).toBe(6450 + 2837);
+  });
+
+  it("with no parts is the quote it always was", () => {
+    const before = buildRepairsQuote({ items: [plain(discs), plain(pads)], combined: null, hourlyRatePence: RATE, commissionRate: COMMISSION });
+    const after = buildRepairsQuote({ items: [plain(discs), plain(pads)], parts: [], combined: null, hourlyRatePence: RATE, commissionRate: COMMISSION });
+    expect(after!.breakdown).toEqual(before!.breakdown);
+    expect(after!.parts).toEqual([]);
+  });
+});

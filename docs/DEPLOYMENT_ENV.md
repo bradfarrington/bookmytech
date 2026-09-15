@@ -83,13 +83,25 @@ defaults to `demo`).
 > `VRM_LOOKUP_USERNAME` / `VRM_LOOKUP_API_TOKEN` are in `.env.local` but **nothing
 > reads them** — leftovers from an earlier supplier. Don't add them to Vercel.
 
-## Parts pricing (AAG Sales API v2) — optional, sandbox only (Task 40)
+## Parts pricing (AAG Sales API v2) — customer prices since Task 43
 
 Alliance Automotive Group's parts API: fitting parts, trade prices and branch
-stock by registration + TecDoc product group. `lib/aag/client.ts` treats the
-integration as **unconfigured** when the key or account is missing — the admin
-check page (`/admin/parts/aag-check`) shows a "not configured" banner and
-nothing else is affected. Nothing customer-facing reads this yet.
+stock by registration + TecDoc product group. Since Task 43 (2026-09-15) it is
+the **only parts supplier and its prices go into customer quotes**
+(`lib/parts/quote-parts.ts`), once migration `0070_aag_part_prices.sql` is
+applied. Before 0070, quotes stay labour-only.
+
+**After 0070, AAG must be reachable wherever bookings are made.** A repair that
+needs parts is priced from AAG's answer (kept 12 hours). When AAG can't answer
+(unconfigured, blocked, down), its last answer from the past 7 days is used;
+with none, **that repair can't be booked** (owner decision). So:
+
+- **Production:** set the live credentials and `AAG_BASE_URL` before applying 0070.
+- **Development:** the UAT sandbox only lets allowlisted IPs through (Cloudflare
+  403 otherwise). Check your address with `curl -s https://api.ipify.org` and have
+  AAG allowlist it. `/admin/parts/aag-check` shows what AAG last said.
+- **Parts customers shouldn't pay for:** switch the part group off in a repair's
+  Parts panel on the vehicle page (`part_group_settings`).
 
 | Var | Req | Type | Notes |
 |-----|-----|------|-------|

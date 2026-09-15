@@ -1,4 +1,4 @@
-import { quoteRepairs } from "@/lib/haynespro/repair-booking";
+import { PARTS_UNAVAILABLE_MESSAGE, quoteRepairsResult } from "@/lib/haynespro/repair-booking";
 import { MAX_REPAIRS_PER_BOOKING, readRepairIdList } from "@/lib/bookings/repair-ids";
 import { enforceCatalogueLimits } from "@/lib/mobile/catalogue-limits";
 import { apiError, apiOk, readJsonBody } from "@/lib/mobile/respond";
@@ -33,17 +33,24 @@ import { createAdminClient } from "@/lib/supabase/admin";
 // Since Task 31 an id may also be a PRODUCT ("p:<uuid>" — a diagnostic, a
 // service, an inspection; see /repairs/tree). ADDITIVE on both shapes:
 //   oil:          { litres, pencePerLitre, pence, source, label } | null —
-//                 the engine-oil line a servicing product adds; it is what
-//                 `partsPence` now holds (0 and null on anything else)
+//                 the engine-oil line a servicing product adds
 //   products:     [{ id, name, pricePence, labourHours, durationHours }]
 //   labourPence / fixedPence / visitHours
 // and each line may carry kind: "product" + productId. `nodeId` may be a
 // "p:" id when the first thing chosen was a product.
 //
-// Thin wrapper over quoteRepairs, which is the SAME function the web funnel
-// prices with — match, slot, checkout hold and booking create each re-derive
-// the quote from (reg, nodes) server-side. The figure returned here is
-// therefore what gets charged, and the client never supplies a price or a
+// Since Task 43 repairs carry their supplier parts. ADDITIVE on both shapes:
+//   parts:        [{ nodeId, name, brand, position, quantity, unitPence,
+//                    linePence }] — one per job, part group and axle
+//                 (position "front" | "rear" | null). `partsPence` is oil
+//                 plus these, and `totalPence` includes it.
+// A repair whose parts can't be priced right now is `not_priceable` with a
+// parts-specific `message`; the code is unchanged.
+//
+// Thin wrapper over quoteRepairsResult, which is the SAME function the web
+// funnel prices with — match, slot, checkout hold and booking create each
+// re-derive the quote from (reg, nodes) server-side. The figure returned here
+// is therefore what gets charged, and the client never supplies a price or a
 // duration. Do not compute anything on this side of the wire.
 
 interface QuoteBody {
@@ -79,24 +86,27 @@ export async function POST(request: Request): Promise<Response> {
   const limited = await enforceCatalogueLimits(request);
   if (limited) return limited;
 
-  const quote = await quoteRepairs(reg, ids, createAdminClient());
+  const result = await quoteRepairsResult(reg, ids, createAdminClient());
 
-  // quoteRepairs returns null for every "can't price it" reason — unmatched
-  // vehicle, unknown or admin-hidden node, a group with no book time, HaynesPro
-  // down. The customer's next move is the same in all of them, so they share
-  // one code and one sentence rather than leaking which it was.
-  if (!quote) {
+  // Every "can't price it" reason shares one code — unmatched vehicle, unknown
+  // or admin-hidden node, a group with no book time, HaynesPro down. Only a
+  // part that can't be priced right now gets its own sentence, because the
+  // customer's next move differs: try again shortly.
+  if (!result.ok) {
     return apiOk({
       ok: false as const,
       code: "not_priceable" as const,
       message:
-        ids.length > 1
-          ? "We can't price one of those repairs for this vehicle. Please check the jobs you've chosen, " +
-            "or get in touch and we'll sort it for you."
-          : "We can't price that repair for this vehicle. Please choose another, " +
-            "or get in touch and we'll sort it for you.",
+        result.reason === "parts_unavailable"
+          ? PARTS_UNAVAILABLE_MESSAGE
+          : ids.length > 1
+            ? "We can't price one of those repairs for this vehicle. Please check the jobs you've chosen, " +
+              "or get in touch and we'll sort it for you."
+            : "We can't price that repair for this vehicle. Please choose another, " +
+              "or get in touch and we'll sort it for you.",
     });
   }
+  const quote = result.quote;
 
   const first = quote.lines[0];
   const base = {
@@ -120,6 +130,16 @@ export async function POST(request: Request): Promise<Response> {
     labourPence: quote.labourPence,
     fixedPence: quote.fixedPence,
     visitHours: quote.visitHours,
+    // ADDITIVE (Task 43): the supplier parts in the price.
+    parts: quote.parts.map((p) => ({
+      nodeId: p.nodeId,
+      name: p.groupLabel,
+      brand: p.brand,
+      position: p.position,
+      quantity: p.quantity,
+      unitPence: p.unitPence,
+      linePence: p.linePence,
+    })),
   };
 
   return apiOk({
