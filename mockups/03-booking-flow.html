@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>html,body{overflow:auto}body{min-width:2000px;min-height:3200px;position:relative;padding:20px 60px 80px}</style>
+</head>
+<body>
+
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@600;700;800;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@0.474.0/dist/umd/lucide.min.js"></script>
+<style>
+:root{--blue:#2563EB;--blue-dark:#1E3A8A;--blue-light:#3B82F6;--blue-tint:#EFF6FF;--blue-tint-strong:#DBEAFE;--blue-deepest:#0B1F52;--surface:#F8FAFC;--card:#FFFFFF;--surface-dark:#0F172A;--surface-dark-deep:#0B1220;--border:#E2E8F0;--border-subtle:#F1F5F9;--t-primary:#0F172A;--t-secondary:#475569;--t-muted:#64748B;--t-disabled:#CBD5E1;--t-faint:#94A3B8;--t-inverse:#FFFFFF;--success:#22C55E;--warning:#F59E0B;--danger:#EF4444;--plate:#FEF3C7;--grad-brand:linear-gradient(135deg,#1E3A8A 0%,#2563EB 50%,#3B82F6 100%);--grad-deep:linear-gradient(135deg,#0B1F52 0%,#1E3A8A 50%,#2563EB 100%);--sh-card:0 4px 20px rgba(15,23,42,0.05);--sh-hero:0 20px 60px rgba(15,23,42,0.25);--sh-float:0 12px 32px rgba(15,23,42,0.10)}
+*{box-sizing:border-box}
+body{margin:0;background:#EEF1F5;font-family:'Inter',system-ui,sans-serif;color:var(--t-primary)}
+a{color:var(--blue);text-decoration:none}a:hover{color:var(--blue-dark)}
+.frame{position:absolute;width:390px}
+.frame-label{font-family:'Inter Tight',sans-serif;font-weight:700;font-size:15px;color:var(--t-secondary);margin-bottom:12px;letter-spacing:-0.2px;cursor:grab}
+.frame-label .meta{color:var(--t-faint);font-weight:400;margin-left:8px;font-size:13px}
+.phone{width:390px;height:844px;background:#fff;border-radius:48px;border:3px solid #0F172A;overflow:hidden;box-shadow:0 24px 72px rgba(15,23,42,0.18);position:relative}
+.notch{position:absolute;top:10px;left:50%;transform:translateX(-50%);width:120px;height:32px;background:#0F172A;border-radius:20px;z-index:5}
+.hi{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);width:134px;height:5px;border-radius:3px;background:rgba(15,23,42,0.85);z-index:5}
+.hi-light{background:rgba(255,255,255,0.9)}
+.sb{height:47px;padding:16px 30px 6px;display:flex;align-items:center;justify-content:space-between;font-weight:600;font-size:15px;color:var(--t-primary);position:relative;z-index:3}
+.sb.dark{color:#fff}
+.sb .sb-icons{display:flex;gap:5px;align-items:center;color:currentColor}.sb .sb-icons svg{width:16px;height:16px;stroke-width:2}
+.screen{height:calc(100% - 47px);background:var(--surface);overflow:hidden;position:relative;display:flex;flex-direction:column}
+.screen.grad{background:var(--grad-deep);color:#fff}
+.h{height:52px;padding:0 18px;display:flex;align-items:center;justify-content:space-between;background:var(--surface)}
+.h.transp{background:transparent;color:inherit}
+.h .h-left{display:flex;align-items:center;gap:10px;flex:1;min-width:0}
+.h-title{font-family:'Inter Tight',sans-serif;font-weight:700;font-size:17px;letter-spacing:-0.3px;color:inherit;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.h-back{width:32px;height:32px;display:flex;align-items:center;justify-content:center;color:var(--t-secondary);margin-left:-6px}
+.h.transp .h-back{color:inherit}
+.h-back svg{width:22px;height:22px}
+.stepper-wrap{padding:6px 18px 12px;background:var(--surface)}
+.stepper-wrap.transp{background:transparent}
+.stepper-track{height:4px;background:var(--border-subtle);border-radius:999px;overflow:hidden}
+.stepper-track.on-dark{background:rgba(255,255,255,0.20)}
+.stepper-fill{height:100%;background:var(--blue);border-radius:999px}
+.stepper-fill.on-dark{background:#fff}
+.stepper-lbl{font-size:10.5px;font-weight:700;letter-spacing:1.1px;text-transform:uppercase;color:var(--t-muted);margin-top:8px;display:flex;justify-content:space-between}
+.stepper-lbl.on-dark{color:rgba(255,255,255,0.7)}
+.body{padding:6px 18px 20px;flex:1;overflow-y:hidden;display:flex;flex-direction:column;gap:14px}
+.h1{font-family:'Inter Tight',sans-serif;font-weight:800;font-size:26px;letter-spacing:-0.7px;line-height:32px}
+.h2{font-family:'Inter Tight',sans-serif;font-weight:800;font-size:22px;letter-spacing:-0.5px;line-height:28px}
+.h3{font-family:'Inter Tight',sans-serif;font-weight:700;font-size:18px;letter-spacing:-0.3px;line-height:24px}
+.h4{font-family:'Inter Tight',sans-serif;font-weight:700;font-size:16px;line-height:22px}
+.disp{font-family:'Inter Tight',sans-serif;font-weight:800;font-size:46px;letter-spacing:-1.2px;line-height:48px}
+.body-lg{font-size:16px;line-height:23px}
+.b{font-size:14px;line-height:20px}
+.sm{font-size:13px;line-height:19px}
+.cap{font-size:12px;line-height:16px;color:var(--t-muted)}
+.overline{font-size:11px;font-weight:700;letter-spacing:1.1px;text-transform:uppercase;color:var(--t-muted)}
+.faint{color:var(--t-faint)}.muted{color:var(--t-muted)}.sec{color:var(--t-secondary)}.inv{color:var(--t-inverse)}
+.center-t{text-align:center}.b6{font-weight:600}.b7{font-weight:700}
+.card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px;box-shadow:var(--sh-card)}
+.card.pad-none{padding:0;overflow:hidden}
+.card.pad-lg{padding:18px}
+.card.selected{background:var(--blue-tint);border-color:var(--blue);border-width:1.5px;padding:13px}
+.card.tint{background:var(--blue-tint);border-color:var(--blue-tint-strong)}
+.card.grad{background:var(--grad-deep);border:none;color:#fff;box-shadow:var(--sh-hero)}
+.card.grad-brand{background:var(--grad-brand);border:none;color:#fff;box-shadow:var(--sh-hero)}
+.card.float{box-shadow:var(--sh-float);border:none}
+.row{display:flex;align-items:center;gap:12px}
+.col{display:flex;flex-direction:column}
+.grow{flex:1;min-width:0}
+.between{justify-content:space-between}
+.gap-4{gap:4px}.gap-6{gap:6px}.gap-8{gap:8px}.gap-12{gap:12px}.gap-16{gap:16px}
+.tile{width:36px;height:36px;border-radius:10px;background:var(--blue-tint);color:var(--blue);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.tile.solid{background:var(--blue);color:#fff}
+.tile.warn-t{background:#FEF3C7;color:#B45309}
+.tile.dngr{background:#FEE2E2;color:#B91C1C}
+.tile.succ{background:#DCFCE7;color:#15803D}
+.tile.sm{width:28px;height:28px;border-radius:7px}
+.tile.lg{width:48px;height:48px;border-radius:12px}
+.tile.xl{width:56px;height:56px;border-radius:14px}
+.tile.on-dark{background:rgba(255,255,255,0.14);color:#fff}
+.tile svg{width:18px;height:18px}
+.tile.sm svg{width:14px;height:14px}
+.tile.lg svg{width:22px;height:22px}
+.tile.xl svg{width:28px;height:28px}
+.pill{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:999px;font-size:10.5px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase}
+.pill.active{background:var(--blue-tint-strong);color:var(--blue-dark)}
+.pill.success{background:#DCFCE7;color:#15803D}
+.pill.pending{background:#FEF3C7;color:#B45309}
+.pill.neutral{background:#F1F5F9;color:#334155}
+.pill.on-dark{background:rgba(255,255,255,0.14);color:#fff;border:1px solid rgba(255,255,255,0.20)}
+.pill.price{background:#EFF6FF;color:var(--blue);font-size:12.5px;padding:4px 10px}
+.pill.price.added{background:#DCFCE7;color:#15803D}
+.input{height:44px;border-radius:8px;border:1px solid var(--border);background:#fff;padding:0 14px;display:flex;align-items:center;gap:8px;color:var(--t-primary);font-size:14px}
+.input.focus{border-color:var(--blue);border-width:1.5px;padding:0 12.5px;box-shadow:0 0 0 4px rgba(37,99,235,0.10)}
+.input .val{flex:1}.input .plch{color:var(--t-faint)}
+.input svg{width:16px;height:16px;color:var(--t-muted)}
+.input-lbl{font-size:12px;font-weight:600;color:var(--t-secondary);margin-bottom:6px}
+.textarea{border-radius:8px;border:1px solid var(--border);background:#fff;padding:10px 12px;color:var(--t-primary);font-size:13px;line-height:19px}
+.btn{height:44px;border-radius:10px;display:inline-flex;align-items:center;justify-content:center;gap:8px;font-family:'Inter',sans-serif;font-weight:700;font-size:14px;letter-spacing:-0.1px;padding:0 14px;border:none}
+.btn.primary{background:var(--blue);color:#fff;box-shadow:0 4px 12px rgba(37,99,235,0.25)}
+.btn.secondary{background:#fff;color:var(--blue);border:1.5px solid var(--blue)}
+.btn.ghost{background:transparent;color:var(--t-secondary)}
+.btn.sm{height:30px;font-size:12.5px;padding:0 10px;border-radius:7px}
+.btn.lg{height:52px;font-size:15px}
+.btn.full{width:100%}
+.btn svg{width:16px;height:16px}
+.footer{padding:12px 18px 24px;background:var(--surface);border-top:1px solid var(--border-subtle);display:flex;flex-direction:column;gap:8px}
+.footer.grad-bg{background:transparent;border:none;color:#fff}
+.link{color:var(--blue);font-weight:600}
+.link.on-dark{color:#fff}
+.divider{height:1px;background:var(--border-subtle)}
+.plate{background:var(--plate);border:2px solid #B45309;border-radius:10px;padding:12px 18px;display:flex;align-items:center;justify-content:center;font-family:'Inter Tight',sans-serif;font-weight:900;font-size:32px;letter-spacing:2px;color:#0F172A;text-transform:uppercase;box-shadow:0 4px 12px rgba(180,83,9,0.15)}
+.list-row{padding:12px 14px;display:flex;align-items:center;gap:12px}
+.list-row + .list-row{border-top:1px solid var(--border-subtle)}
+.day-chip{min-width:56px;padding:8px 4px;border-radius:12px;border:1px solid var(--border);background:#fff;display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0}
+.day-chip.on{background:var(--blue);border-color:var(--blue);color:#fff}
+.day-chip.off{background:#F1F5F9;color:var(--t-disabled);border-color:transparent}
+.day-chip .dow{font-size:10.5px;font-weight:600;letter-spacing:0.8px;text-transform:uppercase;color:currentColor;opacity:0.75}
+.day-chip .num{font-family:'Inter Tight',sans-serif;font-weight:800;font-size:17px;color:currentColor}
+.slot-tile{padding:14px;border-radius:12px;border:1px solid var(--border);background:#fff;display:flex;flex-direction:column;gap:2px;text-align:left}
+.slot-tile.on{background:var(--blue-tint);border-color:var(--blue);border-width:1.5px;padding:13px}
+.slot-tile.off{background:#F8FAFC;color:var(--t-disabled)}
+.slot-tile .win{font-family:'Inter Tight',sans-serif;font-weight:700;font-size:15px}
+.slot-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.section-title{position:absolute;font-family:'Inter Tight',sans-serif;font-weight:800;font-size:26px;letter-spacing:-0.5px;color:var(--t-primary);cursor:grab}
+.section-sub{position:absolute;font-family:'Inter',sans-serif;font-size:14px;color:var(--t-muted);cursor:grab;max-width:900px}
+.check-hero{width:64px;height:64px;border-radius:32px;background:rgba(255,255,255,0.18);display:flex;align-items:center;justify-content:center;color:#fff;flex-shrink:0}
+.check-hero svg{width:32px;height:32px;stroke-width:2.4}
+</style>
+
+
+<div class="section-title" style="left:60px;top:40px" data-drags-parent="1">Booking flow — five taps to booked</div>
+<div class="section-sub" style="left:60px;top:78px" data-drags-parent="1">Vehicle → repair → price → time → address → confirm → confirmed. Deep-gradient hero on the summary and confirmation screens.</div>
+
+<!-- Row 1 -->
+
+<!-- Vehicle -->
+<div class="frame" style="left:60px;top:130px">
+  <div class="frame-label" data-drags-parent="1">1 · Vehicle</div>
+  <div class="phone">
+    <div class="notch"></div>
+    <div class="sb"><span>9:41</span><div class="sb-icons"><i data-lucide="signal"></i><i data-lucide="wifi"></i><i data-lucide="battery-full"></i></div></div>
+    <div class="screen" data-screen-label="Book — vehicle">
+      <div class="h transp"><div class="h-left"><div class="h-back"><i data-lucide="chevron-left"></i></div><div class="h-title">Book a mechanic</div></div></div>
+      <div class="stepper-wrap"><div class="stepper-track"><div class="stepper-fill" style="width:20%"></div></div><div class="stepper-lbl"><span>Step 1 · Your vehicle</span><span>1 of 5</span></div></div>
+      <div class="body">
+        <div>
+          <div class="h1">What are you driving?</div>
+          <div class="b sec" style="margin-top:6px">Drop in your reg and we'll pull everything we need.</div>
+        </div>
+        <div class="plate">AB12 CDE</div>
+        <div class="card selected">
+          <div class="row gap-12">
+            <div class="tile lg solid"><i data-lucide="car"></i></div>
+            <div class="grow">
+              <div class="b7 b">Ford Focus 1.0 EcoBoost 100PS</div>
+              <div class="cap" style="margin-top:2px">2019 · Petrol · Grey</div>
+            </div>
+            <div style="color:var(--success)"><i data-lucide="check-circle-2" style="width:22px;height:22px"></i></div>
+          </div>
+          <div class="divider" style="margin:14px 0"></div>
+          <div class="row between">
+            <div class="col gap-4">
+              <div class="cap">MOT</div>
+              <div class="b b7" style="color:var(--success)">Dec 2026</div>
+            </div>
+            <div class="col gap-4" style="align-items:flex-end">
+              <div class="cap">Road tax</div>
+              <div class="b b7" style="color:var(--success)">Taxed</div>
+            </div>
+          </div>
+        </div>
+        <div class="row gap-8 cap sec"><i data-lucide="info" style="width:14px;height:14px;color:var(--t-muted)"></i><span>Not your car? <a class="link">Pick it manually</a></span></div>
+        <div style="flex:1"></div>
+      </div>
+      <div class="footer">
+        <button class="btn primary lg full">Continue<i data-lucide="arrow-right"></i></button>
+        <div class="cap center-t faint">No account needed yet — you can create one when you book.</div>
+      </div>
+    </div>
+    <div class="hi"></div>
+  </div>
+</div>
+
+<!-- Repairs -->
+<div class="frame" style="left:530px;top:130px">
+  <div class="frame-label" data-drags-parent="1">2 · Repairs</div>
+  <div class="phone">
+    <div class="notch"></div>
+    <div class="sb"><span>9:41</span><div class="sb-icons"><i data-lucide="signal"></i><i data-lucide="wifi"></i><i data-lucide="battery-full"></i></div></div>
+    <div class="screen" data-screen-label="Book — repairs">
+      <div class="h transp"><div class="h-left"><div class="h-back"><i data-lucide="chevron-left"></i></div><div class="h-title">What needs fixing?</div></div></div>
+      <div class="stepper-wrap"><div class="stepper-track"><div class="stepper-fill" style="width:40%"></div></div><div class="stepper-lbl"><span>Step 2 · The job</span><span>2 of 5</span></div></div>
+      <div class="body" style="gap:12px">
+        <div>
+          <div class="h1">What's the issue?</div>
+          <div class="b sec" style="margin-top:6px">Prices below are for your Ford Focus.</div>
+        </div>
+        <div class="input"><i data-lucide="search"></i><span class="val plch">Search brakes, oil, MOT…</span></div>
+        <div class="card pad-none">
+          <div class="list-row">
+            <div class="tile"><i data-lucide="wrench"></i></div>
+            <div class="grow">
+              <div class="b b7">Front brake pads &amp; discs</div>
+              <div class="cap" style="margin-top:2px">Fixed price · about 2 hours</div>
+            </div>
+            <div class="pill price">£180</div>
+          </div>
+          <div class="list-row">
+            <div class="tile"><i data-lucide="droplets"></i></div>
+            <div class="grow">
+              <div class="b b7">Full service</div>
+              <div class="cap" style="margin-top:2px">Includes 4.5 L of 5W-30 · £29</div>
+            </div>
+            <div class="pill price">£220</div>
+          </div>
+          <div class="list-row">
+            <div class="tile"><i data-lucide="stethoscope"></i></div>
+            <div class="grow">
+              <div class="b b7">Diagnostic scan</div>
+              <div class="cap" style="margin-top:2px">Read fault codes · 1 hour</div>
+            </div>
+            <div class="pill price">£75</div>
+          </div>
+          <div class="list-row">
+            <div class="tile"><i data-lucide="clipboard-check"></i></div>
+            <div class="grow">
+              <div class="b b7">MOT test</div>
+              <div class="cap" style="margin-top:2px">At a partner test centre</div>
+            </div>
+            <div class="pill price">£54</div>
+          </div>
+        </div>
+        <div class="col gap-8">
+          <div class="overline">Categories</div>
+          <div class="card row between" style="padding:12px 14px">
+            <div class="row gap-12"><div class="tile"><i data-lucide="layers"></i></div><div class="b7 b">Combined repairs</div></div>
+            <i data-lucide="chevron-right" style="width:18px;height:18px;color:var(--t-muted)"></i>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="hi"></div>
+  </div>
+</div>
+
+<!-- Price -->
+<div class="frame" style="left:1000px;top:130px">
+  <div class="frame-label" data-drags-parent="1">3 · Price</div>
+  <div class="phone">
+    <div class="notch"></div>
+    <div class="sb"><span>9:41</span><div class="sb-icons"><i data-lucide="signal"></i><i data-lucide="wifi"></i><i data-lucide="battery-full"></i></div></div>
+    <div class="screen" data-screen-label="Book — price">
+      <div class="h transp"><div class="h-left"><div class="h-back"><i data-lucide="chevron-left"></i></div><div class="h-title">Your price</div></div></div>
+      <div class="stepper-wrap"><div class="stepper-track"><div class="stepper-fill" style="width:60%"></div></div><div class="stepper-lbl"><span>Step 3 · Price</span><span>3 of 5</span></div></div>
+      <div class="body">
+        <div class="card grad-brand pad-lg">
+          <div class="cap" style="color:rgba(255,255,255,0.7);letter-spacing:1.1px;text-transform:uppercase;font-weight:700">Fixed price</div>
+          <div class="disp" style="margin-top:6px">£420</div>
+          <div class="sm" style="color:rgba(255,255,255,0.85);margin-top:4px">Front brake pads &amp; discs · Full service</div>
+          <div class="cap" style="color:rgba(255,255,255,0.72);margin-top:10px">Labour included · No call-out fee · Mechanic comes to you</div>
+        </div>
+        <div class="col gap-8">
+          <div class="overline">Your jobs</div>
+          <div class="card pad-none">
+            <div class="list-row">
+              <div class="grow"><div class="b b7 sm">Front brake pads &amp; discs</div><div class="cap" style="margin-top:2px">2 hours</div></div>
+              <div class="b7 b">£180</div>
+              <i data-lucide="x" style="width:18px;height:18px;color:var(--t-muted)"></i>
+            </div>
+            <div class="list-row">
+              <div class="grow"><div class="b b7 sm">Full service</div><div class="cap" style="margin-top:2px">1.5 hours</div></div>
+              <div class="b7 b">£240</div>
+              <i data-lucide="x" style="width:18px;height:18px;color:var(--t-muted)"></i>
+            </div>
+          </div>
+        </div>
+        <button class="btn secondary full"><i data-lucide="plus"></i>Add another job</button>
+        <div class="col gap-8">
+          <div class="overline">What's included</div>
+          <div class="card pad-none">
+            <div class="list-row"><div class="tile sm"><i data-lucide="clock"></i></div><div class="grow"><div class="b b7 sm">Labour</div></div><div class="sm b7">3.5 hrs</div></div>
+            <div class="list-row"><div class="tile sm"><i data-lucide="droplets"></i></div><div class="grow"><div class="b b7 sm">Engine oil</div></div><div class="sm b7">£29</div></div>
+            <div class="list-row"><div class="tile sm"><i data-lucide="shield-check"></i></div><div class="grow"><div class="b b7 sm">Vehicle</div></div><div class="sm sec">Ford Focus</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="footer">
+        <button class="btn primary lg full">Choose a time<i data-lucide="arrow-right"></i></button>
+        <div class="cap center-t faint">Nothing is charged until the work is done.</div>
+      </div>
+    </div>
+    <div class="hi"></div>
+  </div>
+</div>
+
+<!-- Slot -->
+<div class="frame" style="left:1470px;top:130px">
+  <div class="frame-label" data-drags-parent="1">4 · Time</div>
+  <div class="phone">
+    <div class="notch"></div>
+    <div class="sb"><span>9:41</span><div class="sb-icons"><i data-lucide="signal"></i><i data-lucide="wifi"></i><i data-lucide="battery-full"></i></div></div>
+    <div class="screen" data-screen-label="Book — time">
+      <div class="h transp"><div class="h-left"><div class="h-back"><i data-lucide="chevron-left"></i></div><div class="h-title">Choose a time</div></div></div>
+      <div class="stepper-wrap"><div class="stepper-track"><div class="stepper-fill" style="width:80%"></div></div><div class="stepper-lbl"><span>Step 4 · When</span><span>4 of 5</span></div></div>
+      <div class="body">
+        <div>
+          <div class="h1">When suits you?</div>
+          <div class="b sec" style="margin-top:6px">Pick a day and an arrival window — we'll match a mechanic to it.</div>
+        </div>
+        <div class="row gap-8" style="overflow-x:auto;padding:2px 0 8px;margin:0 -18px 0 -18px;padding-left:18px;padding-right:18px">
+          <div class="day-chip"><div class="dow">Mon</div><div class="num">15</div></div>
+          <div class="day-chip on"><div class="dow">Tue</div><div class="num">16</div></div>
+          <div class="day-chip"><div class="dow">Wed</div><div class="num">17</div></div>
+          <div class="day-chip"><div class="dow">Thu</div><div class="num">18</div></div>
+          <div class="day-chip off"><div class="dow">Fri</div><div class="num">19</div></div>
+          <div class="day-chip off"><div class="dow">Sat</div><div class="num">20</div></div>
+        </div>
+        <div class="overline">Arrival window</div>
+        <div class="slot-grid">
+          <div class="slot-tile"><div class="win">8–10am</div><div class="cap">4 mechanics</div></div>
+          <div class="slot-tile on"><div class="win" style="color:var(--blue-dark)">10am–12pm</div><div class="cap" style="color:var(--blue-dark)">3 mechanics</div></div>
+          <div class="slot-tile"><div class="win">12–2pm</div><div class="cap">6 mechanics</div></div>
+          <div class="slot-tile"><div class="win">2–4pm</div><div class="cap">5 mechanics</div></div>
+          <div class="slot-tile off"><div class="win">4–6pm</div><div class="cap">Closed</div></div>
+          <div class="slot-tile"><div class="win">All day</div><div class="cap">Best chance</div></div>
+        </div>
+      </div>
+      <div class="footer">
+        <button class="btn primary lg full">Continue · Tue 10am–12pm<i data-lucide="arrow-right"></i></button>
+        <div class="cap center-t faint">We match a mechanic once you confirm.</div>
+      </div>
+    </div>
+    <div class="hi"></div>
+  </div>
+</div>
+
+<!-- Row 2 -->
+
+<!-- Address -->
+<div class="frame" style="left:60px;top:1090px">
+  <div class="frame-label" data-drags-parent="1">5 · Address</div>
+  <div class="phone">
+    <div class="notch"></div>
+    <div class="sb"><span>9:41</span><div class="sb-icons"><i data-lucide="signal"></i><i data-lucide="wifi"></i><i data-lucide="battery-full"></i></div></div>
+    <div class="screen" data-screen-label="Book — address">
+      <div class="h transp"><div class="h-left"><div class="h-back"><i data-lucide="chevron-left"></i></div><div class="h-title">Where are you?</div></div></div>
+      <div class="stepper-wrap"><div class="stepper-track"><div class="stepper-fill" style="width:100%"></div></div><div class="stepper-lbl"><span>Step 5 · Where</span><span>5 of 5</span></div></div>
+      <div class="body" style="gap:12px">
+        <div>
+          <div class="h1">Where should we come?</div>
+          <div class="b sec" style="margin-top:6px">Your mechanic works on the vehicle where it's parked, so they need to be able to reach it.</div>
+        </div>
+        <div>
+          <div class="input-lbl">House number and street</div>
+          <div class="input"><span class="val">14 Oakwood Grove</span></div>
+        </div>
+        <div>
+          <div class="input-lbl">Flat or building <span class="faint" style="font-weight:400">— optional</span></div>
+          <div class="input"><span class="val plch">Add if applicable</span></div>
+        </div>
+        <div>
+          <div class="input-lbl">Postcode</div>
+          <div class="input focus"><span class="val">SW11 6PJ</span></div>
+        </div>
+        <div>
+          <div class="input-lbl">Where will the vehicle be parked?</div>
+          <div class="row gap-6" style="flex-wrap:wrap">
+            <div class="pill outline" style="padding:8px 14px;font-size:12px">🚗 Driveway</div>
+            <div class="pill neutral" style="padding:8px 14px;font-size:12px;text-transform:none;letter-spacing:0">On the street</div>
+            <div class="pill neutral" style="padding:8px 14px;font-size:12px;text-transform:none;letter-spacing:0">Car park</div>
+            <div class="pill neutral" style="padding:8px 14px;font-size:12px;text-transform:none;letter-spacing:0">Other</div>
+          </div>
+        </div>
+        <div>
+          <div class="input-lbl">Anything the mechanic should know? <span class="faint" style="font-weight:400">— optional</span></div>
+          <div class="textarea" style="min-height:64px">Gate code #4231. Key with the neighbour at no. 16 if we're not in.</div>
+        </div>
+      </div>
+      <div class="footer">
+        <button class="btn primary lg full">Review booking<i data-lucide="arrow-right"></i></button>
+        <div class="cap center-t faint">We only share your address with the assigned mechanic.</div>
+      </div>
+    </div>
+    <div class="hi"></div>
+  </div>
+</div>
+
+<!-- Confirm -->
+<div class="frame" style="left:530px;top:1090px">
+  <div class="frame-label" data-drags-parent="1">Confirm</div>
+  <div class="phone">
+    <div class="notch"></div>
+    <div class="sb"><span>9:41</span><div class="sb-icons"><i data-lucide="signal"></i><i data-lucide="wifi"></i><i data-lucide="battery-full"></i></div></div>
+    <div class="screen" data-screen-label="Book — confirm">
+      <div class="h transp"><div class="h-left"><div class="h-back"><i data-lucide="chevron-left"></i></div><div class="h-title">Confirm booking</div></div></div>
+      <div class="body" style="gap:12px">
+        <div class="card tint center-t pad-lg">
+          <div class="overline">To pay today</div>
+          <div class="disp" style="color:var(--blue-dark);margin-top:4px">£400</div>
+          <div class="cap sec" style="margin-top:4px">£20 off with WELCOME20 · No call-out fee</div>
+        </div>
+        <div class="col gap-8">
+          <div class="overline">Your booking</div>
+          <div class="card pad-none">
+            <div class="list-row">
+              <div class="tile"><i data-lucide="wrench"></i></div>
+              <div class="grow"><div class="cap">Job</div><div class="b b7 sm">Front brakes · Full service</div></div>
+              <a class="link" style="font-size:12px">Change</a>
+            </div>
+            <div class="list-row">
+              <div class="tile"><i data-lucide="car"></i></div>
+              <div class="grow"><div class="cap">Vehicle</div><div class="b b7 sm">Ford Focus · AB12 CDE</div></div>
+              <a class="link" style="font-size:12px">Change</a>
+            </div>
+            <div class="list-row">
+              <div class="tile"><i data-lucide="calendar"></i></div>
+              <div class="grow"><div class="cap">When</div><div class="b b7 sm">Tue 16 Sep · 10am–12pm</div></div>
+              <a class="link" style="font-size:12px">Change</a>
+            </div>
+            <div class="list-row">
+              <div class="tile"><i data-lucide="map-pin"></i></div>
+              <div class="grow"><div class="cap">Where</div><div class="b b7 sm">14 Oakwood Grove, SW11 6PJ</div></div>
+              <a class="link" style="font-size:12px">Change</a>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="row between">
+            <div class="col gap-4"><div class="b b7">Same mechanic if available</div><div class="cap sec">Offer to Alex first · fallback if busy.</div></div>
+            <div style="width:44px;height:26px;border-radius:13px;background:var(--blue);position:relative;flex-shrink:0"><div style="position:absolute;top:2px;right:2px;width:22px;height:22px;border-radius:11px;background:#fff"></div></div>
+          </div>
+        </div>
+      </div>
+      <div class="footer">
+        <button class="btn primary lg full">Confirm · £400</button>
+        <div class="cap center-t faint">We hold the amount now and charge it once the work is done.</div>
+      </div>
+    </div>
+    <div class="hi"></div>
+  </div>
+</div>
+
+<!-- Confirmed -->
+<div class="frame" style="left:1000px;top:1090px">
+  <div class="frame-label" data-drags-parent="1">Confirmed</div>
+  <div class="phone">
+    <div class="notch"></div>
+    <div class="sb dark"><span>9:41</span><div class="sb-icons"><i data-lucide="signal"></i><i data-lucide="wifi"></i><i data-lucide="battery-full"></i></div></div>
+    <div class="screen grad" data-screen-label="Book — confirmed">
+      <div style="padding:60px 24px 20px">
+        <div class="check-hero"><i data-lucide="check"></i></div>
+        <div class="h1 inv" style="font-size:32px;line-height:36px;margin-top:24px">You're all booked.</div>
+        <div class="body-lg" style="color:rgba(255,255,255,0.82);margin-top:8px">We're finding you a mechanic for Tuesday 10am–12pm.</div>
+        <div class="pill on-dark" style="margin-top:16px">Booking ID · BMT-A1B2</div>
+      </div>
+      <div style="flex:1;padding:6px 18px 20px;display:flex;flex-direction:column;gap:12px">
+        <div class="card" style="background:rgba(255,255,255,0.10);border:1px solid rgba(255,255,255,0.14);box-shadow:none">
+          <div class="row gap-12">
+            <div class="tile lg on-dark"><i data-lucide="users"></i></div>
+            <div class="grow"><div class="b b7 inv">Finding your mechanic</div><div class="cap" style="color:rgba(255,255,255,0.7);margin-top:2px">We're offering the job around now. We'll ping you the moment someone takes it.</div></div>
+          </div>
+        </div>
+        <div class="card" style="background:rgba(255,255,255,0.10);border:1px solid rgba(255,255,255,0.14);box-shadow:none">
+          <div class="row gap-12">
+            <div class="tile lg on-dark"><i data-lucide="zap"></i></div>
+            <div class="grow"><div class="b b7 inv">Live tracking</div><div class="cap" style="color:rgba(255,255,255,0.7);margin-top:2px">Kicks in when your mechanic sets off — you'll see them on a map.</div></div>
+          </div>
+        </div>
+        <div style="flex:1"></div>
+        <button class="btn full lg" style="background:#fff;color:var(--blue-dark)">Track this booking<i data-lucide="arrow-right"></i></button>
+      </div>
+    </div>
+    <div class="hi hi-light"></div>
+  </div>
+</div>
+
+<!-- Vehicle correct -->
+<div class="frame" style="left:1470px;top:1090px">
+  <div class="frame-label" data-drags-parent="1">Vehicle · Pick variant</div>
+  <div class="phone">
+    <div class="notch"></div>
+    <div class="sb"><span>9:41</span><div class="sb-icons"><i data-lucide="signal"></i><i data-lucide="wifi"></i><i data-lucide="battery-full"></i></div></div>
+    <div class="screen" data-screen-label="Book — vehicle correct">
+      <div class="h transp"><div class="h-left"><div class="h-back"><i data-lucide="chevron-left"></i></div><div class="h-title">Which vehicle is it?</div></div></div>
+      <div class="body" style="gap:12px">
+        <div>
+          <div class="h1">Pick the model.</div>
+          <div class="b sec" style="margin-top:6px">Engine size and power are on your V5C.</div>
+        </div>
+        <div class="cap"><a class="link"><i data-lucide="chevron-left" style="width:12px;height:12px;display:inline-block;vertical-align:middle"></i> All makes</a></div>
+        <div class="overline">Ford</div>
+        <div class="input"><i data-lucide="search"></i><span class="val plch">Search models…</span></div>
+        <div class="card pad-none" style="flex:1;overflow-y:hidden">
+          <div class="list-row"><div class="tile"><i data-lucide="car"></i></div><div class="grow"><div class="b b7 sm">Focus</div><div class="cap" style="margin-top:2px">2018 – 2024</div></div><i data-lucide="chevron-right" style="width:16px;height:16px;color:var(--t-muted)"></i></div>
+          <div class="list-row"><div class="tile"><i data-lucide="car"></i></div><div class="grow"><div class="b b7 sm">Fiesta</div><div class="cap" style="margin-top:2px">2017 – 2023</div></div><i data-lucide="chevron-right" style="width:16px;height:16px;color:var(--t-muted)"></i></div>
+          <div class="list-row"><div class="tile"><i data-lucide="truck"></i></div><div class="grow"><div class="b b7 sm">Ranger</div><div class="cap" style="margin-top:2px">2019 – 2022</div></div><i data-lucide="chevron-right" style="width:16px;height:16px;color:var(--t-muted)"></i></div>
+          <div class="list-row"><div class="tile"><i data-lucide="car-front"></i></div><div class="grow"><div class="b b7 sm">Kuga</div><div class="cap" style="margin-top:2px">2020 – present</div></div><i data-lucide="chevron-right" style="width:16px;height:16px;color:var(--t-muted)"></i></div>
+          <div class="list-row"><div class="tile"><i data-lucide="car-front"></i></div><div class="grow"><div class="b b7 sm">Puma</div><div class="cap" style="margin-top:2px">2020 – present</div></div><i data-lucide="chevron-right" style="width:16px;height:16px;color:var(--t-muted)"></i></div>
+          <div class="list-row"><div class="tile"><i data-lucide="car"></i></div><div class="grow"><div class="b b7 sm">Mondeo</div><div class="cap" style="margin-top:2px">2014 – 2022</div></div><i data-lucide="chevron-right" style="width:16px;height:16px;color:var(--t-muted)"></i></div>
+        </div>
+      </div>
+    </div>
+    <div class="hi"></div>
+  </div>
+</div>
+
+
+<script>window.addEventListener("DOMContentLoaded",function(){if(window.lucide&&window.lucide.createIcons)window.lucide.createIcons();});</script>
+</body>
+</html>

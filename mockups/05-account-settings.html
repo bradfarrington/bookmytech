@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>html,body{overflow:auto}body{min-width:2000px;min-height:3200px;position:relative;padding:20px 60px 80px}</style>
+</head>
+<body>
+
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@600;700;800;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@0.474.0/dist/umd/lucide.min.js"></script>
+<style>
+:root{--blue:#2563EB;--blue-dark:#1E3A8A;--blue-light:#3B82F6;--blue-tint:#EFF6FF;--blue-tint-strong:#DBEAFE;--blue-deepest:#0B1F52;--surface:#F8FAFC;--card:#FFFFFF;--surface-dark:#0F172A;--surface-dark-deep:#0B1220;--border:#E2E8F0;--border-subtle:#F1F5F9;--t-primary:#0F172A;--t-secondary:#475569;--t-muted:#64748B;--t-disabled:#CBD5E1;--t-faint:#94A3B8;--t-inverse:#FFFFFF;--success:#22C55E;--warning:#F59E0B;--danger:#EF4444;--plate:#FEF3C7;--grad-brand:linear-gradient(135deg,#1E3A8A 0%,#2563EB 50%,#3B82F6 100%);--grad-deep:linear-gradient(135deg,#0B1F52 0%,#1E3A8A 50%,#2563EB 100%);--sh-card:0 4px 20px rgba(15,23,42,0.05);--sh-hero:0 20px 60px rgba(15,23,42,0.25);--sh-float:0 12px 32px rgba(15,23,42,0.10)}
+*{box-sizing:border-box}
+body{margin:0;background:#EEF1F5;font-family:'Inter',system-ui,sans-serif;color:var(--t-primary)}
+a{color:var(--blue);text-decoration:none}a:hover{color:var(--blue-dark)}
+.frame{position:absolute;width:390px}
+.frame-label{font-family:'Inter Tight',sans-serif;font-weight:700;font-size:15px;color:var(--t-secondary);margin-bottom:12px;letter-spacing:-0.2px;cursor:grab}
+.frame-label .meta{color:var(--t-faint);font-weight:400;margin-left:8px;font-size:13px}
+.phone{width:390px;height:844px;background:#fff;border-radius:48px;border:3px solid #0F172A;overflow:hidden;box-shadow:0 24px 72px rgba(15,23,42,0.18);position:relative}
+.notch{position:absolute;top:10px;left:50%;transform:translateX(-50%);width:120px;height:32px;background:#0F172A;border-radius:20px;z-index:5}
+.hi{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);width:134px;height:5px;border-radius:3px;background:rgba(15,23,42,0.85);z-index:5}
+.sb{height:47px;padding:16px 30px 6px;display:flex;align-items:center;justify-content:space-between;font-weight:600;font-size:15px;color:var(--t-primary);position:relative;z-index:3}
+.sb .sb-icons{display:flex;gap:5px;align-items:center}.sb .sb-icons svg{width:16px;height:16px;stroke-width:2}
+.screen{height:calc(100% - 47px);background:var(--surface);overflow:hidden;position:relative;display:flex;flex-direction:column}
+.h{height:52px;padding:0 18px;display:flex;align-items:center;justify-content:space-between;background:var(--surface)}
+.h.transp{background:transparent}
+.h .h-left{display:flex;align-items:center;gap:10px;flex:1;min-width:0}
+.h-title{font-family:'Inter Tight',sans-serif;font-weight:700;font-size:17px;letter-spacing:-0.3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.h-back{width:32px;height:32px;display:flex;align-items:center;justify-content:center;color:var(--t-secondary);margin-left:-6px}
+.h-back svg{width:22px;height:22px}
+.body{padding:8px 18px 20px;flex:1;overflow-y:hidden;display:flex;flex-direction:column;gap:14px}
+.h1{font-family:'Inter Tight',sans-serif;font-weight:800;font-size:26px;letter-spacing:-0.7px;line-height:32px}
+.h2{font-family:'Inter Tight',sans-serif;font-weight:800;font-size:22px;letter-spacing:-0.5px;line-height:28px}
+.h3{font-family:'Inter Tight',sans-serif;font-weight:700;font-size:18px;letter-spacing:-0.3px;line-height:24px}
+.h4{font-family:'Inter Tight',sans-serif;font-weight:700;font-size:16px;line-height:22px}
+.body-lg{font-size:15px;line-height:22px}
+.b{font-size:14px;line-height:20px}
+.sm{font-size:13px;line-height:19px}
+.cap{font-size:12px;line-height:16px;color:var(--t-muted)}
+.overline{font-size:11px;font-weight:700;letter-spacing:1.1px;text-transform:uppercase;color:var(--t-muted)}
+.faint{color:var(--t-faint)}.muted{color:var(--t-muted)}.sec{color:var(--t-secondary)}.inv{color:var(--t-inverse)}
+.center-t{text-align:center}.b6{font-weight:600}.b7{font-weight:700}
+.card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px;box-shadow:var(--sh-card)}
+.card.pad-none{padding:0;overflow:hidden}
+.card.pad-lg{padding:18px}
+.card.selected{background:var(--blue-tint);border-color:var(--blue);border-width:1.5px;padding:13px}
+.card.tint{background:var(--blue-tint);border-color:var(--blue-tint-strong)}
+.card.dngr{border-color:var(--danger);border-width:1.5px;padding:13px}
+.card.warn{background:#FEF3C7;border-color:var(--warning);border-width:1.5px;padding:13px}
+.card.float{box-shadow:var(--sh-float);border:none}
+.row{display:flex;align-items:center;gap:12px}
+.col{display:flex;flex-direction:column}
+.grow{flex:1;min-width:0}
+.between{justify-content:space-between}
+.gap-4{gap:4px}.gap-6{gap:6px}.gap-8{gap:8px}.gap-10{gap:10px}.gap-12{gap:12px}.gap-16{gap:16px}
+.tile{width:38px;height:38px;border-radius:10px;background:var(--blue-tint);color:var(--blue);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.tile.solid{background:var(--blue);color:#fff}
+.tile.warn-t{background:#FEF3C7;color:#B45309}
+.tile.dngr{background:#FEE2E2;color:#B91C1C}
+.tile.succ{background:#DCFCE7;color:#15803D}
+.tile.sm{width:30px;height:30px;border-radius:8px}
+.tile.lg{width:48px;height:48px;border-radius:12px}
+.tile.xl{width:56px;height:56px;border-radius:14px}
+.tile svg{width:18px;height:18px}.tile.sm svg{width:14px;height:14px}.tile.lg svg{width:22px;height:22px}.tile.xl svg{width:28px;height:28px}
+.pill{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:999px;font-size:10.5px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase}
+.pill.active{background:var(--blue-tint-strong);color:var(--blue-dark)}
+.pill.success{background:#DCFCE7;color:#15803D}
+.pill.pending{background:#FEF3C7;color:#B45309}
+.pill.neutral{background:#F1F5F9;color:#334155}
+.pill.outline{background:#fff;color:var(--blue);border:1px solid var(--blue)}
+.btn{height:44px;border-radius:10px;display:inline-flex;align-items:center;justify-content:center;gap:8px;font-family:'Inter',sans-serif;font-weight:700;font-size:14px;letter-spacing:-0.1px;padding:0 14px;border:none}
+.btn.primary{background:var(--blue);color:#fff;box-shadow:0 4px 12px rgba(37,99,235,0.25)}
+.btn.secondary{background:#fff;color:var(--blue);border:1.5px solid var(--blue)}
+.btn.ghost{background:transparent;color:var(--t-secondary)}
+.btn.destructive{background:var(--danger);color:#fff}
+.btn.sm{height:32px;font-size:12.5px;padding:0 10px;border-radius:8px}
+.btn.lg{height:50px;font-size:15px}
+.btn.full{width:100%}
+.btn svg{width:16px;height:16px}
+.list-row{padding:12px 14px;display:flex;align-items:center;gap:12px}
+.list-row + .list-row{border-top:1px solid var(--border-subtle)}
+.input{height:44px;border-radius:8px;border:1px solid var(--border);background:#fff;padding:0 14px;display:flex;align-items:center;gap:10px;color:var(--t-primary);font-size:14px}
+.input.focus{border-color:var(--blue);border-width:1.5px;padding:0 12.5px;box-shadow:0 0 0 4px rgba(37,99,235,0.10)}
+.input .val{flex:1}.input .plch{color:var(--t-faint)}.input svg{width:16px;height:16px;color:var(--t-muted)}
+.input-lbl{font-size:12px;font-weight:600;color:var(--t-secondary);margin-bottom:6px}
+.input-help{font-size:12px;color:var(--t-muted);margin-top:6px}
+.divider{height:1px;background:var(--border-subtle)}
+.footer{padding:12px 18px 22px;background:var(--surface);border-top:1px solid var(--border-subtle);display:flex;flex-direction:column;gap:8px}
+.link{color:var(--blue);font-weight:600}
+.section-title{position:absolute;font-family:'Inter Tight',sans-serif;font-weight:800;font-size:26px;letter-spacing:-0.5px;color:var(--t-primary);cursor:grab}
+.section-sub{position:absolute;font-family:'Inter',sans-serif;font-size:14px;color:var(--t-muted);cursor:grab;max-width:900px}
+.card-brand{background:var(--surface-dark-deep);color:#fff;border-radius:14px;padding:14px 16px;min-height:110px;display:flex;flex-direction:column;justify-content:space-between}
+.card-brand.default{background:var(--grad-deep)}
+.card-brand .num{font-family:'Inter Tight',sans-serif;font-weight:700;font-size:16px;letter-spacing:2px}
+.faq-row{padding:12px 14px;display:flex;align-items:flex-start;gap:10px;border-top:1px solid var(--border-subtle);cursor:pointer}
+.faq-row:first-child{border-top:none}
+.veh-icon{width:56px;height:56px;border-radius:14px;background:var(--blue-tint);color:var(--blue);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.veh-icon svg{width:28px;height:28px;stroke-width:1.6}
+.tabbar{height:82px;background:#fff;border-top:1px solid var(--border-subtle);display:flex;align-items:flex-start;justify-content:space-between;padding:10px 4px 22px;position:relative;flex-shrink:0}
+.tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--t-muted);padding-top:2px;cursor:pointer}
+.tab.on{color:var(--blue)}
+.tab svg{width:22px;height:22px;stroke-width:2}
+.tab.on svg{stroke-width:2.4}
+.tab .lbl{font-size:10px;font-weight:700;letter-spacing:0.1px}
+.tab-spacer{flex:1}
+.tab-fab{position:absolute;top:-20px;left:50%;transform:translateX(-50%);width:60px;height:60px;border-radius:30px;background:var(--grad-brand);color:#fff;border:none;display:flex;align-items:center;justify-content:center;box-shadow:0 12px 28px rgba(37,99,235,0.42),0 0 0 5px #fff;cursor:pointer}
+.tab-fab svg{width:26px;height:26px;stroke-width:2.6}
+</style>
+
+
+<div class="section-title" style="left:60px;top:40px" data-drags-parent="1">Account &amp; support — the tail of the app</div>
+<div class="section-sub" style="left:60px;top:78px" data-drags-parent="1">Settings hub, email/password/account deletion, and three new surfaces — help centre, vehicle garage, and payment methods.</div>
+
+<!-- Row 1 -->
+
+<!-- Settings -->
+<div class="frame" style="left:60px;top:130px">
+  <div class="frame-label" data-drags-parent="1">Settings</div>
+  <div class="phone">
+    <div class="notch"></div>
+    <div class="sb"><span>9:41</span><div class="sb-icons"><i data-lucide="signal"></i><i data-lucide="wifi"></i><i data-lucide="battery-full"></i></div></div>
+    <div class="screen" data-screen-label="Settings">
+      <div class="h transp"><div class="h-left"><div class="h-back"><i data-lucide="chevron-left"></i></div><div class="h-title">Settings</div></div></div>
+      <div class="body">
+        <div class="card float pad-lg" style="text-align:center">
+          <div class="tile xl" style="margin:0 auto;background:#DCFCE7;color:#15803D;font-family:'Inter Tight',sans-serif;font-weight:800;font-size:22px">HR</div>
+          <div class="h3" style="margin-top:10px">Hannah Reeves</div>
+          <div class="cap" style="margin-top:2px">hannah@example.com</div>
+        </div>
+        <div class="col gap-6">
+          <div class="overline">Your details</div>
+          <div>
+            <div class="input-lbl">Full name</div>
+            <div class="input"><span class="val">Hannah Reeves</span></div>
+          </div>
+          <div style="margin-top:12px">
+            <div class="input-lbl">Mobile number</div>
+            <div class="input"><span class="val">07700 900123</span></div>
+            <div class="input-help">So we can text you when your mechanic is on the way.</div>
+          </div>
+        </div>
+        <div class="col gap-6">
+          <div class="overline">Account</div>
+          <div class="card pad-none">
+            <div class="list-row"><div class="tile"><i data-lucide="bell"></i></div><div class="grow"><div class="b b7 sm">Service reminders</div><div class="cap" style="margin-top:2px">Choose how we remind you</div></div><i data-lucide="chevron-right" style="width:18px;height:18px;color:var(--t-muted)"></i></div>
+            <div class="list-row"><div class="tile"><i data-lucide="mail"></i></div><div class="grow"><div class="b b7 sm">Email address</div><div class="cap" style="margin-top:2px">hannah@example.com</div></div><i data-lucide="chevron-right" style="width:18px;height:18px;color:var(--t-muted)"></i></div>
+            <div class="list-row"><div class="tile"><i data-lucide="key-round"></i></div><div class="grow"><div class="b b7 sm">Password</div><div class="cap" style="margin-top:2px">Change the password you sign in with</div></div><i data-lucide="chevron-right" style="width:18px;height:18px;color:var(--t-muted)"></i></div>
+            <div class="list-row"><div class="tile"><i data-lucide="credit-card"></i></div><div class="grow"><div class="b b7 sm">Payment methods</div><div class="cap" style="margin-top:2px">Visa · 4242 default</div></div><i data-lucide="chevron-right" style="width:18px;height:18px;color:var(--t-muted)"></i></div>
+          </div>
+        </div>
+        <div class="col gap-6">
+          <div class="overline">Support</div>
+          <div class="card pad-none">
+            <div class="list-row"><div class="tile"><i data-lucide="life-buoy"></i></div><div class="grow"><div class="b b7 sm">Help centre</div><div class="cap" style="margin-top:2px">FAQs and get in touch</div></div><i data-lucide="chevron-right" style="width:18px;height:18px;color:var(--t-muted)"></i></div>
+          </div>
+        </div>
+        <div style="flex:1"></div>
+        <button class="btn ghost full">Sign out</button>
+        <div class="center-t"><a class="link" style="color:var(--danger)">Delete account</a></div>
+      </div>
+      <div class="tabbar">
+        <div class="tab"><i data-lucide="home"></i><div class="lbl">Home</div></div>
+        <div class="tab"><i data-lucide="car"></i><div class="lbl">Garage</div></div>
+        <div class="tab-spacer"></div>
+        <div class="tab"><i data-lucide="bell"></i><div class="lbl">Inbox</div></div>
+        <div class="tab on"><i data-lucide="user"></i><div class="lbl">Account</div></div>
+        <button class="tab-fab"><i data-lucide="plus"></i></button>
+      </div>
+    </div>
+    <div class="hi"></div>
+  </div>
+</div>
+
+<!-- Change email -->
+<div class="frame" style="left:530px;top:130px">
+  <div class="frame-label" data-drags-parent="1">Change email</div>
+  <div class="phone">
+    <div class="notch"></div>
+    <div class="sb"><span>9:41</span><div class="sb-icons"><i data-lucide="signal"></i><i data-lucide="wifi"></i><i data-lucide="battery-full"></i></div></div>
+    <div class="screen" data-screen-label="Change email">
+      <div class="h transp"><div class="h-left"><div class="h-back"><i data-lucide="chevron-left"></i></div><div class="h-title">Change email</div></div></div>
+      <div class="body">
+        <div>
+          <div class="h1">Change your email.</div>
+          <div class="b sec" style="margin-top:6px">You currently sign in as <span class="b7" style="color:var(--t-primary)">hannah@example.com</span>. This is also where your booking emails go.</div>
+        </div>
+        <div class="card tint">
+          <div class="row gap-10">
+            <div class="tile"><i data-lucide="mail-plus"></i></div>
+            <div class="grow">
+              <div class="b b7">Confirmation waiting</div>
+              <div class="cap sec" style="margin-top:4px">A change to <span class="b7" style="color:var(--t-primary)">hannah.new@example.com</span> is waiting. Tap the link we emailed to finish it.</div>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div class="input-lbl">New email</div>
+          <div class="input focus"><i data-lucide="at-sign"></i><span class="val">hannah.new@example.com</span></div>
+        </div>
+        <div>
+          <div class="input-lbl">Your password</div>
+          <div class="input"><i data-lucide="lock"></i><span class="val plch">••••••••</span></div>
+          <div class="input-help">To confirm it's you.</div>
+        </div>
+        <div style="flex:1"></div>
+        <button class="btn primary lg full">Send confirmation link</button>
+        <div class="cap center-t faint">You keep signing in as hannah@example.com until confirmed. Links last one hour.</div>
+      </div>
+    </div>
+    <div class="hi"></div>
+  </div>
+</div>
+
+<!-- Change password -->
+<div class="frame" style="left:1000px;top:130px">
+  <div class="frame-label" data-drags-parent="1">Change password</div>
+  <div class="phone">
+    <div class="notch"></div>
+    <div class="sb"><span>9:41</span><div class="sb-icons"><i data-lucide="signal"></i><i data-lucide="wifi"></i><i data-lucide="battery-full"></i></div></div>
+    <div class="screen" data-screen-label="Change password">
+      <div class="h transp"><div class="h-left"><div class="h-back"><i data-lucide="chevron-left"></i></div><div class="h-title">Change password</div></div></div>
+      <div class="body">
+        <div>
+          <div class="h1">Change your password.</div>
+          <div class="b sec" style="margin-top:6px">You'll still be signed in on this phone.</div>
+        </div>
+        <div>
+          <div class="input-lbl">Current password</div>
+          <div class="input"><i data-lucide="lock"></i><span class="val plch">••••••••</span></div>
+        </div>
+        <div>
+          <div class="input-lbl">New password</div>
+          <div class="input focus"><i data-lucide="lock"></i><span class="val">••••••••••••</span><i data-lucide="eye"></i></div>
+          <div class="row gap-4" style="margin-top:8px">
+            <div style="flex:1;height:4px;background:var(--success);border-radius:2px"></div>
+            <div style="flex:1;height:4px;background:var(--success);border-radius:2px"></div>
+            <div style="flex:1;height:4px;background:var(--success);border-radius:2px"></div>
+            <div style="flex:1;height:4px;background:var(--border);border-radius:2px"></div>
+          </div>
+          <div class="input-help">Looking strong.</div>
+        </div>
+        <div>
+          <div class="input-lbl">Confirm new password</div>
+          <div class="input"><i data-lucide="lock"></i><span class="val">••••••••••••</span></div>
+        </div>
+        <div class="card tint">
+          <div class="row gap-10">
+            <div class="tile"><i data-lucide="info"></i></div>
+            <div class="grow">
+              <div class="b b7 sm">Forgotten your current one?</div>
+              <div class="cap sec" style="margin-top:2px">Sign out and use "Forgotten your password?" on sign-in.</div>
+            </div>
+          </div>
+        </div>
+        <div style="flex:1"></div>
+        <button class="btn primary lg full">Change password</button>
+      </div>
+    </div>
+    <div class="hi"></div>
+  </div>
+</div>
+
+<!-- Delete account -->
+<div class="frame" style="left:1470px;top:130px">
+  <div class="frame-label" data-drags-parent="1">Delete account</div>
+  <div class="phone">
+    <div class="notch"></div>
+    <div class="sb"><span>9:41</span><div class="sb-icons"><i data-lucide="signal"></i><i data-lucide="wifi"></i><i data-lucide="battery-full"></i></div></div>
+    <div class="screen" data-screen-label="Delete account">
+      <div class="h transp"><div class="h-left"><div class="h-back"><i data-lucide="chevron-left"></i></div><div class="h-title">Delete account</div></div></div>
+      <div class="body">
+        <div>
+          <div class="h1">Delete your account?</div>
+          <div class="b sec" style="margin-top:6px">This removes your sign-in and your details from Book My Tech. It can't be undone.</div>
+        </div>
+        <div class="col gap-6">
+          <div class="overline">What happens</div>
+          <div class="card pad-none">
+            <div class="list-row"><div class="tile dngr sm"><i data-lucide="user-x"></i></div><div class="grow"><div class="b b7 sm">Your sign-in is removed</div><div class="cap" style="margin-top:2px">Straight away, on this phone and every other.</div></div></div>
+            <div class="list-row"><div class="tile warn-t sm"><i data-lucide="file-clock"></i></div><div class="grow"><div class="b b7 sm">Job records are kept 6 years</div><div class="cap" style="margin-top:2px">HMRC and MOT rules — anonymised where possible.</div></div></div>
+            <div class="list-row"><div class="tile dngr sm"><i data-lucide="wallet"></i></div><div class="grow"><div class="b b7 sm">Account credit is lost</div><div class="cap" style="margin-top:2px">Any unused credit or open dispute goes with the account.</div></div></div>
+          </div>
+        </div>
+        <div class="card warn">
+          <div class="row gap-10">
+            <div class="tile warn-t"><i data-lucide="alert-triangle"></i></div>
+            <div class="grow">
+              <div class="b b7" style="color:#78350F">Got a job on the go?</div>
+              <div class="cap" style="color:#78350F;margin-top:2px">Active bookings or open disputes need to be sorted before we can delete.</div>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div class="input-lbl">Your password</div>
+          <div class="input"><i data-lucide="lock"></i><span class="val plch">To confirm it's you</span></div>
+        </div>
+        <div style="flex:1"></div>
+      </div>
+      <div class="footer">
+        <button class="btn destructive lg full"><i data-lucide="trash-2"></i>Delete my account</button>
+        <button class="btn ghost full">Keep my account</button>
+      </div>
+    </div>
+    <div class="hi"></div>
+  </div>
+</div>
+
+<!-- Row 2 -->
+
+<!-- Help centre -->
+<div class="frame" style="left:60px;top:1090px">
+  <div class="frame-label" data-drags-parent="1">Help centre <span class="meta">— new</span></div>
+  <div class="phone">
+    <div class="notch"></div>
+    <div class="sb"><span>9:41</span><div class="sb-icons"><i data-lucide="signal"></i><i data-lucide="wifi"></i><i data-lucide="battery-full"></i></div></div>
+    <div class="screen" data-screen-label="Help centre">
+      <div class="h transp"><div class="h-left"><div class="h-back"><i data-lucide="chevron-left"></i></div><div class="h-title">Help centre</div></div></div>
+      <div class="body">
+        <div>
+          <div class="h1">How can we help?</div>
+          <div class="b sec" style="margin-top:6px">Answers to common questions, or a message to the team.</div>
+        </div>
+        <div class="input"><i data-lucide="search"></i><span class="val plch">Search articles…</span></div>
+        <div class="col gap-6">
+          <div class="overline">Get in touch</div>
+          <div class="row gap-8">
+            <div class="card grow" style="text-align:center;padding:14px">
+              <div class="tile" style="margin:0 auto"><i data-lucide="message-circle"></i></div>
+              <div class="b b7 sm" style="margin-top:8px">Chat</div>
+              <div class="cap" style="margin-top:2px">Usually 5 min</div>
+            </div>
+            <div class="card grow" style="text-align:center;padding:14px">
+              <div class="tile" style="margin:0 auto"><i data-lucide="mail"></i></div>
+              <div class="b b7 sm" style="margin-top:8px">Email</div>
+              <div class="cap" style="margin-top:2px">Reply within 24h</div>
+            </div>
+            <div class="card grow" style="text-align:center;padding:14px">
+              <div class="tile" style="margin:0 auto"><i data-lucide="phone"></i></div>
+              <div class="b b7 sm" style="margin-top:8px">Phone</div>
+              <div class="cap" style="margin-top:2px">Mon–Sat 8–6</div>
+            </div>
+          </div>
+        </div>
+        <div class="col gap-6">
+          <div class="overline">Popular articles</div>
+          <div class="card pad-none">
+            <div class="faq-row"><div class="tile sm"><i data-lucide="badge-pound-sterling"></i></div><div class="grow"><div class="b b7 sm">How does the fixed price work?</div><div class="cap" style="margin-top:2px">Labour, parts, no call-out fee.</div></div><i data-lucide="chevron-right" style="width:16px;height:16px;color:var(--t-muted);margin-top:8px"></i></div>
+            <div class="faq-row"><div class="tile sm"><i data-lucide="calendar-x"></i></div><div class="grow"><div class="b b7 sm">Cancelling or rescheduling</div><div class="cap" style="margin-top:2px">Fees, cut-off times, refunds.</div></div><i data-lucide="chevron-right" style="width:16px;height:16px;color:var(--t-muted);margin-top:8px"></i></div>
+            <div class="faq-row"><div class="tile sm"><i data-lucide="credit-card"></i></div><div class="grow"><div class="b b7 sm">When am I charged?</div><div class="cap" style="margin-top:2px">Hold at booking, taken when done.</div></div><i data-lucide="chevron-right" style="width:16px;height:16px;color:var(--t-muted);margin-top:8px"></i></div>
+            <div class="faq-row"><div class="tile sm"><i data-lucide="shield-check"></i></div><div class="grow"><div class="b b7 sm">Are your mechanics vetted?</div><div class="cap" style="margin-top:2px">Insurance, references, checks.</div></div><i data-lucide="chevron-right" style="width:16px;height:16px;color:var(--t-muted);margin-top:8px"></i></div>
+            <div class="faq-row"><div class="tile sm"><i data-lucide="scroll-text"></i></div><div class="grow"><div class="b b7 sm">Terms &amp; privacy</div><div class="cap" style="margin-top:2px">Legal bits.</div></div><i data-lucide="chevron-right" style="width:16px;height:16px;color:var(--t-muted);margin-top:8px"></i></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="hi"></div>
+  </div>
+</div>
+
+<!-- Vehicle garage -->
+<div class="frame" style="left:530px;top:1090px">
+  <div class="frame-label" data-drags-parent="1">Your garage <span class="meta">— new</span></div>
+  <div class="phone">
+    <div class="notch"></div>
+    <div class="sb"><span>9:41</span><div class="sb-icons"><i data-lucide="signal"></i><i data-lucide="wifi"></i><i data-lucide="battery-full"></i></div></div>
+    <div class="screen" data-screen-label="Vehicle garage">
+      <div class="h transp"><div class="h-left"><div class="h-back"><i data-lucide="chevron-left"></i></div><div class="h-title">Your garage</div></div><button class="btn primary sm"><i data-lucide="plus"></i>Add</button></div>
+      <div class="body">
+        <div>
+          <div class="h1">2 vehicles</div>
+          <div class="b sec" style="margin-top:6px">MOT and tax nudges appear here so nothing creeps up on you.</div>
+        </div>
+        <div class="card">
+          <div class="row gap-12">
+            <div class="veh-icon"><i data-lucide="car"></i></div>
+            <div class="grow">
+              <div class="b b7">Ford Focus 1.0 EcoBoost</div>
+              <div class="cap" style="margin-top:2px">AB12 CDE · 2019 · Grey</div>
+              <div class="cap" style="margin-top:2px">Nickname: Hannah's daily</div>
+            </div>
+            <i data-lucide="more-vertical" style="width:18px;height:18px;color:var(--t-muted)"></i>
+          </div>
+          <div class="divider" style="margin:12px 0"></div>
+          <div class="row between">
+            <div class="col gap-4"><div class="cap">MOT</div><div class="b b7 sm" style="color:var(--success)">Dec 2026</div></div>
+            <div class="col gap-4" style="align-items:center"><div class="cap">Tax</div><div class="b b7 sm" style="color:var(--success)">Taxed</div></div>
+            <div class="col gap-4" style="align-items:flex-end"><div class="cap">Last service</div><div class="b b7 sm">6 mo ago</div></div>
+          </div>
+          <div class="row gap-8" style="margin-top:12px">
+            <button class="btn primary sm" style="flex:1"><i data-lucide="wrench"></i>Book</button>
+            <button class="btn secondary sm" style="flex:1">History</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="row gap-12">
+            <div class="veh-icon" style="background:#FEF3C7;color:#B45309"><i data-lucide="car-front"></i></div>
+            <div class="grow">
+              <div class="b b7">VW Golf GTI</div>
+              <div class="cap" style="margin-top:2px">EF34 GHJ · 2016 · Blue</div>
+              <div class="cap" style="margin-top:2px">Nickname: Weekend car</div>
+            </div>
+            <i data-lucide="more-vertical" style="width:18px;height:18px;color:var(--t-muted)"></i>
+          </div>
+          <div class="divider" style="margin:12px 0"></div>
+          <div class="card warn" style="border-width:1px;padding:10px 12px;box-shadow:none">
+            <div class="row gap-8"><i data-lucide="alert-triangle" style="width:16px;height:16px;color:#B45309"></i><div class="cap b7" style="color:#78350F">MOT expires in 21 days</div></div>
+          </div>
+          <div class="row gap-8" style="margin-top:12px">
+            <button class="btn primary sm" style="flex:1"><i data-lucide="clipboard-check"></i>Book MOT</button>
+            <button class="btn secondary sm" style="flex:1">History</button>
+          </div>
+        </div>
+      </div>
+      <div class="tabbar">
+        <div class="tab"><i data-lucide="home"></i><div class="lbl">Home</div></div>
+        <div class="tab on"><i data-lucide="car"></i><div class="lbl">Garage</div></div>
+        <div class="tab-spacer"></div>
+        <div class="tab"><i data-lucide="bell"></i><div class="lbl">Inbox</div></div>
+        <div class="tab"><i data-lucide="user"></i><div class="lbl">Account</div></div>
+        <button class="tab-fab"><i data-lucide="plus"></i></button>
+      </div>
+    </div>
+    <div class="hi"></div>
+  </div>
+</div>
+
+<!-- Payment methods -->
+<div class="frame" style="left:1000px;top:1090px">
+  <div class="frame-label" data-drags-parent="1">Payment methods <span class="meta">— new</span></div>
+  <div class="phone">
+    <div class="notch"></div>
+    <div class="sb"><span>9:41</span><div class="sb-icons"><i data-lucide="signal"></i><i data-lucide="wifi"></i><i data-lucide="battery-full"></i></div></div>
+    <div class="screen" data-screen-label="Payment methods">
+      <div class="h transp"><div class="h-left"><div class="h-back"><i data-lucide="chevron-left"></i></div><div class="h-title">Payment methods</div></div></div>
+      <div class="body">
+        <div>
+          <div class="h1">Cards on file</div>
+          <div class="b sec" style="margin-top:6px">Used to hold the amount when you book. We never store the full card number.</div>
+        </div>
+        <div class="card-brand default">
+          <div class="row between"><div class="cap" style="color:rgba(255,255,255,0.7);letter-spacing:1.1px;text-transform:uppercase;font-weight:700">Visa · Default</div><i data-lucide="wifi" style="width:22px;height:22px;color:rgba(255,255,255,0.5);transform:rotate(90deg)"></i></div>
+          <div>
+            <div class="num">•••• •••• •••• 4242</div>
+            <div class="row between" style="margin-top:8px"><div class="cap" style="color:rgba(255,255,255,0.7)">Hannah Reeves</div><div class="cap" style="color:rgba(255,255,255,0.7)">12/28</div></div>
+          </div>
+        </div>
+        <div class="card-brand" style="background:#334155">
+          <div class="row between"><div class="cap" style="color:rgba(255,255,255,0.7);letter-spacing:1.1px;text-transform:uppercase;font-weight:700">Mastercard</div><i data-lucide="wifi" style="width:22px;height:22px;color:rgba(255,255,255,0.5);transform:rotate(90deg)"></i></div>
+          <div>
+            <div class="num">•••• •••• •••• 8156</div>
+            <div class="row between" style="margin-top:8px"><div class="cap" style="color:rgba(255,255,255,0.7)">Hannah Reeves</div><div class="cap" style="color:rgba(255,255,255,0.7)">04/26</div></div>
+          </div>
+        </div>
+        <button class="btn secondary full"><i data-lucide="plus"></i>Add a new card</button>
+        <div class="col gap-6" style="margin-top:6px">
+          <div class="overline">Account credit</div>
+          <div class="card">
+            <div class="row between">
+              <div class="col gap-4"><div class="cap">Balance</div><div class="h2">£12.50</div></div>
+              <a class="link">View history</a>
+            </div>
+            <div class="divider" style="margin:12px 0"></div>
+            <div class="cap sec">Applied automatically at checkout. Any leftover credit stays on your account.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="hi"></div>
+  </div>
+</div>
+
+<!-- Address book -->
+<div class="frame" style="left:1470px;top:1090px">
+  <div class="frame-label" data-drags-parent="1">Addresses <span class="meta">— new</span></div>
+  <div class="phone">
+    <div class="notch"></div>
+    <div class="sb"><span>9:41</span><div class="sb-icons"><i data-lucide="signal"></i><i data-lucide="wifi"></i><i data-lucide="battery-full"></i></div></div>
+    <div class="screen" data-screen-label="Addresses">
+      <div class="h transp"><div class="h-left"><div class="h-back"><i data-lucide="chevron-left"></i></div><div class="h-title">Addresses</div></div><button class="btn primary sm"><i data-lucide="plus"></i>Add</button></div>
+      <div class="body">
+        <div>
+          <div class="h1">Saved addresses</div>
+          <div class="b sec" style="margin-top:6px">Skip typing next time you book.</div>
+        </div>
+        <div class="card">
+          <div class="row between">
+            <div class="row gap-12"><div class="tile"><i data-lucide="home"></i></div><div class="col gap-4"><div class="b b7">Home</div><div class="pill active" style="align-self:flex-start">Default</div></div></div>
+            <i data-lucide="more-vertical" style="width:18px;height:18px;color:var(--t-muted)"></i>
+          </div>
+          <div class="divider" style="margin:12px 0"></div>
+          <div class="b sec sm">14 Oakwood Grove<br>Battersea, London<br>SW11 6PJ</div>
+          <div class="cap" style="margin-top:8px">Parking: Driveway</div>
+        </div>
+        <div class="card">
+          <div class="row between">
+            <div class="row gap-12"><div class="tile"><i data-lucide="briefcase"></i></div><div class="col gap-4"><div class="b b7">Work</div><div class="cap">Southwark office</div></div></div>
+            <i data-lucide="more-vertical" style="width:18px;height:18px;color:var(--t-muted)"></i>
+          </div>
+          <div class="divider" style="margin:12px 0"></div>
+          <div class="b sec sm">28 Great Guildford Street<br>London<br>SE1 0ES</div>
+          <div class="cap" style="margin-top:8px">Parking: Car park · Bay 14</div>
+        </div>
+        <div class="card">
+          <div class="row between">
+            <div class="row gap-12"><div class="tile"><i data-lucide="tent-tree"></i></div><div class="col gap-4"><div class="b b7">Mum's</div><div class="cap">Weekends only</div></div></div>
+            <i data-lucide="more-vertical" style="width:18px;height:18px;color:var(--t-muted)"></i>
+          </div>
+          <div class="divider" style="margin:12px 0"></div>
+          <div class="b sec sm">4 Elmwood Close<br>Guildford<br>GU1 3QR</div>
+          <div class="cap" style="margin-top:8px">Parking: On the street</div>
+        </div>
+      </div>
+    </div>
+    <div class="hi"></div>
+  </div>
+</div>
+
+
+<script>window.addEventListener("DOMContentLoaded",function(){if(window.lucide&&window.lucide.createIcons)window.lucide.createIcons();});</script>
+</body>
+</html>

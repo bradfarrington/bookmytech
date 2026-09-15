@@ -17,7 +17,7 @@ Deviations from the plan: the nav renders from `page.tsx` rather than inside `he
 
 **Still open (Brad):**
 - **Birmingham and Bristol have no `areas` rows.** The site says both are live, but `/mechanics/birmingham` and `/mechanics/bristol` return 404 (`/mechanics/manchester` and `/mechanics/london-z1-z2` work). Add them in `/admin/areas` to give them recruitment pages.
-- **Apply `0068`.** Until then, the three servicing summaries on the homepage and in the booking funnel still show the em dashes they were seeded with ("… change — every six months …"). So do nine seeded part names in the mechanic's quote picker. Editing the three summaries in `/admin/services` fixes the homepage immediately, without the migration.
+- ~~**Apply `0068`.**~~ **Applied by Brad, 2026-09-15.** The seeded servicing summaries and part names no longer carry em dashes.
 - **Admin-edited templates.** Any email or SMS template an admin has already customised in `/admin/emails` or `/admin/sms/templates` keeps the em dashes they typed. Code defaults are already dash-free.
 - **Mechanic app install name.** The installed mechanic app is now "Book My Tech | Mechanic". Say if you'd prefer different wording.
 

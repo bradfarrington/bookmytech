@@ -140,7 +140,7 @@ You are working on **Book My Tech**, a UK mobile-mechanic booking platform. This
 - **Services from the admin:** the services grid reads the active `/admin/services` products with real prices, and admin changes revalidate `/`. A gateway card leads into booking a specific repair. Cards link to `/book?node=…`, which now survives the reg and vehicle steps (`lib/bookings/start-node.ts`).
 - **Additive design tokens:** Inter Tight `font-display`, `surface-dark`, `brand-gradient-deep`, `shadow-float`, and ticker/pulse animations. No existing token changed. The "Marketing page pattern" in `docs/03-design-system.md` and `components/ui/section-heading.tsx` are what the next pages reuse.
 - **Owner:**
-  - **Apply `0068_copy_no_em_dashes.sql`**. It is data only, rewriting the seeded servicing summaries and part names that still contain em dashes. No schema change, so no type regen in the app.
+  - ~~Apply `0068_copy_no_em_dashes.sql`~~ **Applied (Brad, 2026-09-15).** Data only; no type regen needed in the app.
   - Admin-customised email/SMS templates keep any dashes typed into them.
 - **Mobile app:** mirror the four new tokens in `src/constants/theme.ts`. Some mobile error sentences changed punctuation only. No API or schema change.
 

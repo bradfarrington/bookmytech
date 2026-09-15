@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>html,body{overflow:auto}body{min-width:2000px;min-height:3200px;position:relative;padding:20px 60px 80px}</style>
+</head>
+<body>
+
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@600;700;800;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@0.474.0/dist/umd/lucide.min.js"></script>
+<style>
+:root{
+  --blue:#2563EB;--blue-dark:#1E3A8A;--blue-light:#3B82F6;--blue-tint:#EFF6FF;--blue-tint-strong:#DBEAFE;--blue-deepest:#0B1F52;
+  --surface:#F8FAFC;--card:#FFFFFF;--surface-dark:#0F172A;--surface-dark-deep:#0B1220;
+  --border:#E2E8F0;--border-subtle:#F1F5F9;
+  --t-primary:#0F172A;--t-secondary:#475569;--t-muted:#64748B;--t-disabled:#CBD5E1;--t-faint:#94A3B8;--t-inverse:#FFFFFF;
+  --success:#22C55E;--warning:#F59E0B;--danger:#EF4444;--plate:#FEF3C7;
+  --grad-brand:linear-gradient(135deg,#1E3A8A 0%,#2563EB 50%,#3B82F6 100%);
+  --grad-deep:linear-gradient(135deg,#0B1F52 0%,#1E3A8A 50%,#2563EB 100%);
+  --sh-card:0 4px 20px rgba(15,23,42,0.05);
+  --sh-hero:0 20px 60px rgba(15,23,42,0.25);
+  --sh-float:0 12px 32px rgba(15,23,42,0.10);
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+*{box-sizing:border-box}
+body{margin:0;background:#EEF1F5;font-family:'Inter',system-ui,sans-serif;color:var(--t-primary)}
+a{color:var(--blue);text-decoration:none}
+a:hover{color:var(--blue-dark)}
+
+.frame{position:absolute;width:390px}
+.frame-label{font-family:'Inter Tight',sans-serif;font-weight:700;font-size:15px;color:var(--t-secondary);margin-bottom:12px;letter-spacing:-0.2px;cursor:grab}
+.frame-label .meta{color:var(--t-faint);font-weight:400;margin-left:8px;font-size:13px}
+
+.phone{width:390px;height:844px;background:#fff;border-radius:48px;border:3px solid #0F172A;overflow:hidden;box-shadow:0 24px 72px rgba(15,23,42,0.18);position:relative}
+.notch{position:absolute;top:10px;left:50%;transform:translateX(-50%);width:120px;height:32px;background:#0F172A;border-radius:20px;z-index:5}
+.hi{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);width:134px;height:5px;border-radius:3px;background:rgba(15,23,42,0.85);z-index:5}
+.hi-light{background:rgba(255,255,255,0.9)}
+
+.sb{height:47px;padding:16px 30px 6px;display:flex;align-items:center;justify-content:space-between;font-family:'Inter',sans-serif;font-weight:600;font-size:15px;color:var(--t-primary);position:relative;z-index:3}
+.sb.dark{color:#fff}
+.sb .sb-icons{display:flex;gap:5px;align-items:center;color:currentColor}
+.sb .sb-icons svg{width:16px;height:16px;stroke-width:2}
+
+.screen{height:calc(100% - 47px);background:var(--surface);overflow:hidden;position:relative;display:flex;flex-direction:column}
+.screen.dark{background:var(--surface-dark-deep);color:#fff}
+.screen.grad{background:var(--grad-deep);color:#fff}
+
+.h{height:56px;padding:0 18px;display:flex;align-items:center;justify-content:space-between;background:var(--surface)}
+.h.transp{background:transparent}
+.h .h-left{display:flex;align-items:center;gap:10px;flex:1;min-width:0}
+.h-title{font-family:'Inter Tight',sans-serif;font-weight:700;font-size:17px;letter-spacing:-0.3px;color:inherit;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.h-back{width:32px;height:32px;display:flex;align-items:center;justify-content:center;color:var(--t-secondary);margin-left:-6px}
+.h-back svg{width:22px;height:22px}
+.h-avatar{width:32px;height:32px;border-radius:999px;background:#FEE2E2;color:#B91C1C;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;font-family:'Inter Tight',sans-serif}
+
+.body{padding:8px 18px 24px;flex:1;overflow-y:hidden;display:flex;flex-direction:column;gap:16px}
+.body.center{align-items:center;justify-content:center;padding-bottom:56px}
+
+.disp{font-family:'Inter Tight',sans-serif;font-weight:800;font-size:40px;letter-spacing:-1px;line-height:44px}
+.h1{font-family:'Inter Tight',sans-serif;font-weight:800;font-size:28px;letter-spacing:-0.7px;line-height:34px}
+.h2{font-family:'Inter Tight',sans-serif;font-weight:800;font-size:24px;letter-spacing:-0.5px;line-height:30px}
+.h3{font-family:'Inter Tight',sans-serif;font-weight:700;font-size:20px;letter-spacing:-0.4px;line-height:26px}
+.h4{font-family:'Inter Tight',sans-serif;font-weight:700;font-size:17px;letter-spacing:-0.2px;line-height:24px}
+.body-lg{font-size:16px;line-height:24px}
+.b{font-size:14px;line-height:21px}
+.sm{font-size:13px;line-height:20px}
+.cap{font-size:12px;line-height:17px;color:var(--t-muted)}
+.overline{font-size:11px;font-weight:700;letter-spacing:1.1px;text-transform:uppercase;color:var(--t-muted)}
+.faint{color:var(--t-faint)}
+.muted{color:var(--t-muted)}
+.sec{color:var(--t-secondary)}
+.inv{color:var(--t-inverse)}
+.center-t{text-align:center}
+.b6{font-weight:600}
+.b7{font-weight:700}
+
+.card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px;box-shadow:var(--sh-card)}
+.card.pad-lg{padding:20px}
+.card.pad-none{padding:0;overflow:hidden}
+.card.selected{background:var(--blue-tint);border-color:var(--blue);border-width:1.5px;padding:15px}
+.card.tint{background:var(--blue-tint);border-color:var(--blue-tint-strong)}
+.card.dngr{border-color:var(--danger)}
+.card.float{box-shadow:var(--sh-float)}
+
+.row{display:flex;align-items:center;gap:12px}
+.col{display:flex;flex-direction:column}
+.grow{flex:1;min-width:0}
+.between{justify-content:space-between}
+.gap-4{gap:4px}
+.gap-6{gap:6px}
+.gap-8{gap:8px}
+.gap-12{gap:12px}
+.gap-16{gap:16px}
+.gap-24{gap:24px}
+
+.tile{width:40px;height:40px;border-radius:10px;background:var(--blue-tint);color:var(--blue);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.tile.solid{background:var(--blue);color:#fff}
+.tile.dark{background:var(--surface-dark);color:#fff}
+.tile.warn-t{background:#FEF3C7;color:#B45309}
+.tile.dngr{background:#FEE2E2;color:#B91C1C}
+.tile.succ{background:#DCFCE7;color:#15803D}
+.tile.lg{width:48px;height:48px;border-radius:12px}
+.tile.xl{width:56px;height:56px;border-radius:14px}
+.tile svg{width:20px;height:20px}
+.tile.lg svg{width:24px;height:24px}
+.tile.xl svg{width:28px;height:28px}
+
+.pill{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:999px;font-size:10.5px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase}
+.pill.active{background:var(--blue-tint-strong);color:var(--blue-dark)}
+.pill.success{background:#DCFCE7;color:#15803D}
+.pill.pending{background:#FEF3C7;color:#B45309}
+.pill.error{background:#FEE2E2;color:#B91C1C}
+.pill.neutral{background:#F1F5F9;color:#334155}
+.pill.dark{background:#0F172A;color:#fff}
+.pill.outline{background:#fff;color:var(--blue);border:1px solid var(--blue)}
+
+.input{height:48px;border-radius:8px;border:1px solid var(--border);background:#fff;padding:0 14px;display:flex;align-items:center;gap:10px;color:var(--t-primary);font-size:14px}
+.input.focus{border-color:var(--blue);border-width:1.5px;padding:0 12.5px;box-shadow:0 0 0 4px rgba(37,99,235,0.10)}
+.input.err{border-color:var(--danger)}
+.input .plch{color:var(--t-faint)}
+.input .val{flex:1}
+.input svg{width:18px;height:18px;color:var(--t-muted)}
+.input-lbl{font-size:12px;font-weight:600;color:var(--t-secondary);margin-bottom:6px}
+.input-help{font-size:12px;color:var(--t-muted);margin-top:6px}
+.input-err{font-size:12px;color:var(--danger);margin-top:6px;display:flex;align-items:center;gap:4px}
+.textarea{border-radius:8px;border:1px solid var(--border);background:#fff;padding:12px 14px;color:var(--t-primary);font-size:14px;line-height:21px}
+
+.btn{height:48px;border-radius:10px;display:inline-flex;align-items:center;justify-content:center;gap:8px;font-family:'Inter',sans-serif;font-weight:700;font-size:15px;letter-spacing:-0.1px;cursor:pointer;padding:0 16px;border:none;text-decoration:none}
+.btn.primary{background:var(--blue);color:#fff;box-shadow:0 4px 12px rgba(37,99,235,0.25)}
+.btn.secondary{background:#fff;color:var(--blue);border:1.5px solid var(--blue)}
+.btn.ghost{background:transparent;color:var(--t-secondary)}
+.btn.destructive{background:var(--danger);color:#fff}
+.btn.sm{height:32px;font-size:13px;padding:0 12px;border-radius:8px}
+.btn.md{height:40px}
+.btn.full{width:100%}
+.btn svg{width:18px;height:18px}
+.btn.on-dark{background:#fff;color:var(--blue-dark)}
+
+.footer{padding:14px 18px 24px;background:var(--surface);border-top:1px solid var(--border-subtle);display:flex;flex-direction:column;gap:10px}
+.footer.transp{background:transparent;border:none}
+.footer.grad-bg{background:transparent;border:none;color:#fff}
+
+.link{color:var(--blue);font-weight:600}
+.link.on-dark{color:#fff}
+
+.divider{height:1px;background:var(--border-subtle)}
+.divider-strong{height:1px;background:var(--border)}
+
+.section-title{position:absolute;font-family:'Inter Tight',sans-serif;font-weight:800;font-size:26px;letter-spacing:-0.5px;color:var(--t-primary);cursor:grab}
+.section-sub{position:absolute;font-family:'Inter',sans-serif;font-size:14px;color:var(--t-muted);cursor:grab;max-width:900px}
+
+.dot{width:8px;height:8px;border-radius:4px;background:var(--t-disabled)}
+.dot.on{background:#fff;width:24px}
+
+.hero-tile{width:180px;height:180px;border-radius:24px;background:rgba(255,255,255,0.10);display:flex;align-items:center;justify-content:center;color:#fff;position:relative}
+.hero-tile.big svg{width:96px;height:96px;stroke-width:1.5}
+.hero-tile .halo{position:absolute;inset:-20px;border-radius:32px;background:radial-gradient(circle at 50% 40%,rgba(59,130,246,0.35),transparent 70%);z-index:0}
+
+.wordmark{font-family:'Inter Tight',sans-serif;font-weight:900;letter-spacing:-2px;font-size:44px;color:#fff}
+.wordmark .dot-blue{color:var(--blue-light)}
+.wordmark-sub{font-family:'Inter',sans-serif;font-weight:500;font-size:14px;letter-spacing:2px;color:rgba(255,255,255,0.7);text-transform:uppercase;margin-top:8px}
+</style>
+
+
+<!-- Section header -->
+<div class="section-title" style="left:60px;top:40px" data-drags-parent="1">Auth &amp; Onboarding</div>
+<div class="section-sub" style="left:60px;top:78px" data-drags-parent="1">Splash → three-slide welcome → sign-in, sign-up, forgotten-password, reset, and email-confirmation flows. Inter Tight display, deep gradient, float shadow.</div>
+
+<!-- =============== ROW 1 =============== -->
+
+<!-- Frame 1 — Splash -->
+<div class="frame" style="left:60px;top:130px">
+  <div class="frame-label" data-drags-parent="1">Splash <span class="meta">— native launch</span></div>
+  <div class="phone">
+    <div class="notch"></div>
+    <div class="sb dark"><span>9:41</span><div class="sb-icons"><i data-lucide="signal"></i><i data-lucide="wifi"></i><i data-lucide="battery-full"></i></div></div>
+    <div class="screen grad" data-screen-label="Splash">
+      <div style="flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;padding:0 32px">
+        <div style="width:96px;height:96px;border-radius:28px;background:rgba(255,255,255,0.10);display:flex;align-items:center;justify-content:center;margin-bottom:28px;box-shadow:inset 0 0 0 1px rgba(255,255,255,0.16),0 12px 40px rgba(11,31,82,0.4)">
+          <i data-lucide="wrench" style="width:44px;height:44px;color:#fff;stroke-width:2"></i>
+        </div>
+        <div class="wordmark">Book<span class="dot-blue">.</span>My<span class="dot-blue">.</span>Tech</div>
+        <div class="wordmark-sub">Mobile mechanics · Fixed price</div>
+      </div>
+      <div style="padding:0 0 60px;display:flex;justify-content:center">
+        <div style="width:36px;height:36px;border-radius:18px;border:2.5px solid rgba(255,255,255,0.25);border-top-color:#fff;animation:spin 1s linear infinite"></div>
+      </div>
+    </div>
+    <div class="hi hi-light"></div>
+  </div>
+</div>
+
+<!-- Frame 2 — Welcome 1 -->
+<div class="frame" style="left:530px;top:130px">
+  <div class="frame-label" data-drags-parent="1">Welcome 1 · Fixed price <span class="meta">— new</span></div>
+  <div class="phone">
+    <div class="notch"></div>
+    <div class="sb dark"><span>9:41</span><div class="sb-icons"><i data-lucide="signal"></i><i data-lucide="wifi"></i><i data-lucide="battery-full"></i></div></div>
+    <div class="screen grad" data-screen-label="Welcome — slide 1">
+      <div style="padding:14px 22px 0;display:flex;justify-content:flex-end"><a class="link on-dark sm" style="opacity:0.75">Skip</a></div>
+      <div style="flex:1;display:flex;align-items:center;justify-content:center;padding:0 32px">
+        <div class="hero-tile big"><div class="halo"></div>
+          <i data-lucide="pound-sterling" style="position:relative;z-index:1"></i>
+        </div>
+      </div>
+      <div style="padding:0 26px 24px">
+        <div class="h1 inv" style="font-size:34px;line-height:38px;letter-spacing:-0.9px">Fixed price.<br>No surprises.</div>
+        <div class="body-lg" style="color:rgba(255,255,255,0.78);margin-top:12px">One mechanic, one time slot, one price for the lot — no call-out fee, no hourly-rate shock.</div>
+      </div>
+      <div style="padding:0 26px 20px;display:flex;align-items:center;justify-content:space-between">
+        <div style="display:flex;gap:6px"><div class="dot on"></div><div class="dot"></div><div class="dot"></div></div>
+        <button class="btn on-dark" style="height:44px;padding:0 20px">Next <i data-lucide="arrow-right"></i></button>
+      </div>
+    </div>
+    <div class="hi hi-light"></div>
+  </div>
+</div>
+
+<!-- Frame 3 — Welcome 2 -->
+<div class="frame" style="left:1000px;top:130px">
+  <div class="frame-label" data-drags-parent="1">Welcome 2 · Mechanic to you <span class="meta">— new</span></div>
+  <div class="phone">
+    <div class="notch"></div>
+    <div class="sb dark"><span>9:41</span><div class="sb-icons"><i data-lucide="signal"></i><i data-lucide="wifi"></i><i data-lucide="battery-full"></i></div></div>
+    <div class="screen grad" data-screen-label="Welcome — slide 2">
+      <div style="padding:14px 22px 0;display:flex;justify-content:flex-end"><a class="link on-dark sm" style="opacity:0.75">Skip</a></div>
+      <div style="flex:1;display:flex;align-items:center;justify-content:center;padding:0 32px">
+        <div class="hero-tile big"><div class="halo"></div>
+          <i data-lucide="map-pinned" style="position:relative;z-index:1"></i>
+        </div>
+      </div>
+      <div style="padding:0 26px 24px">
+        <div class="h1 inv" style="font-size:34px;line-height:38px;letter-spacing:-0.9px">Your driveway<br>is our garage.</div>
+        <div class="body-lg" style="color:rgba(255,255,255,0.78);margin-top:12px">We come to your home, work or wherever the car is parked. No booking a day off, no waiting rooms.</div>
+      </div>
+      <div style="padding:0 26px 20px;display:flex;align-items:center;justify-content:space-between">
+        <div style="display:flex;gap:6px"><div class="dot"></div><div class="dot on"></div><div class="dot"></div></div>
+        <button class="btn on-dark" style="height:44px;padding:0 20px">Next <i data-lucide="arrow-right"></i></button>
+      </div>
+    </div>
+    <div class="hi hi-light"></div>
+  </div>
+</div>
+
+<!-- Frame 4 — Welcome 3 -->
+<div class="frame" style="left:1470px;top:130px">
+  <div class="frame-label" data-drags-parent="1">Welcome 3 · Live tracking <span class="meta">— new</span></div>
+  <div class="phone">
+    <div class="notch"></div>
+    <div class="sb dark"><span>9:41</span><div class="sb-icons"><i data-lucide="signal"></i><i data-lucide="wifi"></i><i data-lucide="battery-full"></i></div></div>
+    <div class="screen grad" data-screen-label="Welcome — slide 3">
+      <div style="padding:14px 22px 0;height:44px"></div>
+      <div style="flex:1;display:flex;align-items:center;justify-content:center;padding:0 32px">
+        <div class="hero-tile big"><div class="halo"></div>
+          <i data-lucide="radar" style="position:relative;z-index:1"></i>
+        </div>
+      </div>
+      <div style="padding:0 26px 24px">
+        <div class="h1 inv" style="font-size:34px;line-height:38px;letter-spacing:-0.9px">Live tracking,<br>from tap to fix.</div>
+        <div class="body-lg" style="color:rgba(255,255,255,0.78);margin-top:12px">See when your mechanic sets off, follow them to you, and pay only when the job is done.</div>
+      </div>
+      <div style="padding:0 26px 20px">
+        <div style="display:flex;gap:6px;justify-content:center;margin-bottom:16px"><div class="dot"></div><div class="dot"></div><div class="dot on"></div></div>
+        <button class="btn on-dark full" style="height:52px;font-size:16px">Get started</button>
+        <div class="cap center-t" style="color:rgba(255,255,255,0.6);margin-top:10px">Have an account? <span style="color:#fff;font-weight:600;text-decoration:underline">Sign in</span></div>
+      </div>
+    </div>
+    <div class="hi hi-light"></div>
+  </div>
+</div>
+
+<!-- =============== ROW 2 =============== -->
+
+<!-- Frame 5 — Sign in -->
+<div class="frame" style="left:60px;top:1090px">
+  <div class="frame-label" data-drags-parent="1">Sign in</div>
+  <div class="phone">
+    <div class="notch"></div>
+    <div class="sb"><span>9:41</span><div class="sb-icons"><i data-lucide="signal"></i><i data-lucide="wifi"></i><i data-lucide="battery-full"></i></div></div>
+    <div class="screen" data-screen-label="Sign in">
+      <div class="h transp"><div class="h-left"><div class="h-title">Sign in</div></div></div>
+      <div class="body" style="padding-top:0">
+        <div>
+          <div class="h1">Welcome back.</div>
+          <div class="b sec" style="margin-top:6px">Sign in to see your bookings and job history.</div>
+        </div>
+        <div style="margin-top:8px">
+          <div class="input-lbl">Email</div>
+          <div class="input"><i data-lucide="mail"></i><span class="val">hannah@example.com</span></div>
+        </div>
+        <div>
+          <div class="row between" style="margin-bottom:6px"><div class="input-lbl" style="margin:0">Password</div><a class="link" style="font-size:12px">Forgotten your password?</a></div>
+          <div class="input focus"><i data-lucide="lock"></i><span class="val">••••••••••</span><i data-lucide="eye"></i></div>
+        </div>
+        <div style="flex:1"></div>
+        <button class="btn primary full" style="height:52px">Sign in</button>
+        <div class="cap center-t">No account yet? <a class="link">Create one</a></div>
+      </div>
+    </div>
+    <div class="hi"></div>
+  </div>
+</div>
+
+<!-- Frame 6 — Sign up -->
+<div class="frame" style="left:530px;top:1090px">
+  <div class="frame-label" data-drags-parent="1">Create account</div>
+  <div class="phone">
+    <div class="notch"></div>
+    <div class="sb"><span>9:41</span><div class="sb-icons"><i data-lucide="signal"></i><i data-lucide="wifi"></i><i data-lucide="battery-full"></i></div></div>
+    <div class="screen" data-screen-label="Create account">
+      <div class="h transp"><div class="h-left"><div class="h-back"><i data-lucide="chevron-left"></i></div><div class="h-title">Create account</div></div></div>
+      <div class="body" style="padding-top:0;gap:14px">
+        <div>
+          <div class="h1">Create your account.</div>
+          <div class="b sec" style="margin-top:6px">So you can track jobs and rebook in a couple of taps.</div>
+        </div>
+        <div>
+          <div class="input-lbl">Full name</div>
+          <div class="input"><span class="val">Hannah Reeves</span></div>
+        </div>
+        <div>
+          <div class="input-lbl">Email</div>
+          <div class="input"><span class="val plch">you@example.com</span></div>
+        </div>
+        <div>
+          <div class="input-lbl">Mobile number</div>
+          <div class="input"><span class="val plch">07700 900123</span></div>
+          <div class="input-help">Optional — so we can text you when your mechanic is on the way.</div>
+        </div>
+        <div>
+          <div class="input-lbl">Password</div>
+          <div class="input"><span class="val plch">At least 8 characters</span></div>
+        </div>
+        <div style="flex:1"></div>
+        <button class="btn primary full" style="height:52px">Create account</button>
+        <div class="cap center-t">Already have an account? <a class="link">Sign in</a></div>
+      </div>
+    </div>
+    <div class="hi"></div>
+  </div>
+</div>
+
+<!-- Frame 7 — Forgot ask -->
+<div class="frame" style="left:1000px;top:1090px">
+  <div class="frame-label" data-drags-parent="1">Forgotten password · Ask</div>
+  <div class="phone">
+    <div class="notch"></div>
+    <div class="sb"><span>9:41</span><div class="sb-icons"><i data-lucide="signal"></i><i data-lucide="wifi"></i><i data-lucide="battery-full"></i></div></div>
+    <div class="screen" data-screen-label="Forgotten password — ask">
+      <div class="h transp"><div class="h-left"><div class="h-back"><i data-lucide="chevron-left"></i></div><div class="h-title">Reset password</div></div></div>
+      <div class="body" style="padding-top:0">
+        <div>
+          <div class="h1">Forgotten your password?</div>
+          <div class="b sec" style="margin-top:6px">Pop your email in and we'll send you a link to set a new one.</div>
+        </div>
+        <div style="margin-top:8px">
+          <div class="input-lbl">Email</div>
+          <div class="input"><i data-lucide="mail"></i><span class="val">hannah@example.com</span></div>
+        </div>
+        <div style="flex:1"></div>
+        <button class="btn primary full" style="height:52px">Send reset link</button>
+        <div class="cap center-t">Remembered it? <a class="link">Back to sign in</a></div>
+      </div>
+    </div>
+    <div class="hi"></div>
+  </div>
+</div>
+
+<!-- Frame 8 — Forgot sent -->
+<div class="frame" style="left:1470px;top:1090px">
+  <div class="frame-label" data-drags-parent="1">Forgotten password · Sent</div>
+  <div class="phone">
+    <div class="notch"></div>
+    <div class="sb"><span>9:41</span><div class="sb-icons"><i data-lucide="signal"></i><i data-lucide="wifi"></i><i data-lucide="battery-full"></i></div></div>
+    <div class="screen" data-screen-label="Forgotten password — sent">
+      <div class="h transp"><div class="h-left"><div class="h-title">Reset password</div></div></div>
+      <div class="body" style="padding-top:0">
+        <div class="card float pad-lg" style="border:none">
+          <div class="tile xl" style="margin-bottom:14px"><i data-lucide="mail-check"></i></div>
+          <div class="h2">Check your email.</div>
+          <div class="b sec" style="margin-top:10px">We've sent a link to <span class="b7" style="color:var(--t-primary)">hannah@example.com</span>. Tap it on this phone to set a new password.</div>
+          <div class="b muted" style="margin-top:12px">If it doesn't turn up in a few minutes, check your spam folder — it lands from <span class="b7">noreply@bookmytech.co.uk</span>.</div>
+        </div>
+        <div style="flex:1"></div>
+        <button class="btn primary full" style="height:52px">Back to sign in</button>
+        <button class="btn ghost full">Use a different email</button>
+      </div>
+    </div>
+    <div class="hi"></div>
+  </div>
+</div>
+
+<!-- =============== ROW 3 =============== -->
+
+<!-- Frame 9 — Reset ready -->
+<div class="frame" style="left:60px;top:2050px">
+  <div class="frame-label" data-drags-parent="1">Reset password · Ready</div>
+  <div class="phone">
+    <div class="notch"></div>
+    <div class="sb"><span>9:41</span><div class="sb-icons"><i data-lucide="signal"></i><i data-lucide="wifi"></i><i data-lucide="battery-full"></i></div></div>
+    <div class="screen" data-screen-label="Reset password — ready">
+      <div class="h transp"><div class="h-left"><div class="h-title">Reset password</div></div></div>
+      <div class="body" style="padding-top:0">
+        <div>
+          <div class="h1">Set a new password.</div>
+          <div class="b sec" style="margin-top:6px">Use at least 8 characters. Something memorable but not the last one.</div>
+        </div>
+        <div style="margin-top:8px">
+          <div class="input-lbl">New password</div>
+          <div class="input"><i data-lucide="lock"></i><span class="val">••••••••••••</span><i data-lucide="eye"></i></div>
+          <div class="row gap-4" style="margin-top:8px">
+            <div style="flex:1;height:4px;background:var(--success);border-radius:2px"></div>
+            <div style="flex:1;height:4px;background:var(--success);border-radius:2px"></div>
+            <div style="flex:1;height:4px;background:var(--success);border-radius:2px"></div>
+            <div style="flex:1;height:4px;background:var(--border);border-radius:2px"></div>
+          </div>
+          <div class="input-help">Looking strong.</div>
+        </div>
+        <div>
+          <div class="input-lbl">Confirm new password</div>
+          <div class="input"><i data-lucide="lock"></i><span class="val">••••••••••••</span></div>
+        </div>
+        <div style="flex:1"></div>
+        <button class="btn primary full" style="height:52px">Save new password</button>
+      </div>
+    </div>
+    <div class="hi"></div>
+  </div>
+</div>
+
+<!-- Frame 10 — Reset done -->
+<div class="frame" style="left:530px;top:2050px">
+  <div class="frame-label" data-drags-parent="1">Reset password · Done</div>
+  <div class="phone">
+    <div class="notch"></div>
+    <div class="sb"><span>9:41</span><div class="sb-icons"><i data-lucide="signal"></i><i data-lucide="wifi"></i><i data-lucide="battery-full"></i></div></div>
+    <div class="screen" data-screen-label="Reset password — done">
+      <div class="h transp"><div class="h-left"><div class="h-title">Password updated</div></div></div>
+      <div class="body" style="padding-top:0">
+        <div class="card float pad-lg" style="border:none">
+          <div class="tile xl succ" style="margin-bottom:14px"><i data-lucide="check-circle-2"></i></div>
+          <div class="h2">That's done.</div>
+          <div class="b sec" style="margin-top:10px">You're signed in on this device and can use the new password next time.</div>
+        </div>
+        <div style="flex:1"></div>
+        <button class="btn primary full" style="height:52px">Go to my bookings <i data-lucide="arrow-right"></i></button>
+      </div>
+    </div>
+    <div class="hi"></div>
+  </div>
+</div>
+
+<!-- Frame 11 — Email changed -->
+<div class="frame" style="left:1000px;top:2050px">
+  <div class="frame-label" data-drags-parent="1">Email changed · Confirmed</div>
+  <div class="phone">
+    <div class="notch"></div>
+    <div class="sb"><span>9:41</span><div class="sb-icons"><i data-lucide="signal"></i><i data-lucide="wifi"></i><i data-lucide="battery-full"></i></div></div>
+    <div class="screen" data-screen-label="Email changed">
+      <div class="h transp"><div class="h-left"><div class="h-title">Email confirmed</div></div></div>
+      <div class="body" style="padding-top:0">
+        <div class="card float pad-lg" style="border:none">
+          <div class="tile xl succ" style="margin-bottom:14px"><i data-lucide="mail-check"></i></div>
+          <div class="h2">That's done.</div>
+          <div class="b sec" style="margin-top:10px">You now sign in as <span class="b7" style="color:var(--t-primary)">hannah.new@example.com</span>. Booking emails go there too.</div>
+        </div>
+        <div class="card tint">
+          <div class="row gap-12">
+            <div class="tile"><i data-lucide="info"></i></div>
+            <div class="grow">
+              <div class="b b7">Heads up</div>
+              <div class="cap sec" style="margin-top:2px">If you have the app open on another phone, sign out and back in to pick up the change.</div>
+            </div>
+          </div>
+        </div>
+        <div style="flex:1"></div>
+        <button class="btn primary full" style="height:52px">Go to settings</button>
+      </div>
+    </div>
+    <div class="hi"></div>
+  </div>
+</div>
+
+<!-- Frame 12 — Sign-in with staff-notice card variant -->
+<div class="frame" style="left:1470px;top:2050px">
+  <div class="frame-label" data-drags-parent="1">Sign in · Staff notice</div>
+  <div class="phone">
+    <div class="notch"></div>
+    <div class="sb"><span>9:41</span><div class="sb-icons"><i data-lucide="signal"></i><i data-lucide="wifi"></i><i data-lucide="battery-full"></i></div></div>
+    <div class="screen" data-screen-label="Sign in — staff notice">
+      <div class="h transp"><div class="h-left"><div class="h-title">Sign in</div></div></div>
+      <div class="body" style="padding-top:0">
+        <div>
+          <div class="h1">Welcome back.</div>
+          <div class="b sec" style="margin-top:6px">Sign in to see your bookings and job history.</div>
+        </div>
+        <div class="card dngr" style="border-width:1.5px">
+          <div class="row gap-12">
+            <div class="tile dngr"><i data-lucide="shield-alert"></i></div>
+            <div class="grow">
+              <div class="b b7">Wrong app for this account</div>
+              <div class="cap sec" style="margin-top:4px">That account is for Book My Tech staff. This app is for customers — download the Tech app instead.</div>
+            </div>
+          </div>
+        </div>
+        <div style="margin-top:2px">
+          <div class="input-lbl">Email</div>
+          <div class="input"><i data-lucide="mail"></i><span class="val plch">you@example.com</span></div>
+        </div>
+        <div>
+          <div class="row between" style="margin-bottom:6px"><div class="input-lbl" style="margin:0">Password</div><a class="link" style="font-size:12px">Forgotten your password?</a></div>
+          <div class="input"><i data-lucide="lock"></i><span class="val plch">••••••••</span></div>
+        </div>
+        <div style="flex:1"></div>
+        <button class="btn primary full" style="height:52px">Sign in</button>
+        <div class="cap center-t">No account yet? <a class="link">Create one</a></div>
+      </div>
+    </div>
+    <div class="hi"></div>
+  </div>
+</div>
+
+
+<script>window.addEventListener("DOMContentLoaded",function(){if(window.lucide&&window.lucide.createIcons)window.lucide.createIcons();});</script>
+</body>
+</html>

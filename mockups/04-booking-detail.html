@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>html,body{overflow:auto}body{min-width:2000px;min-height:3200px;position:relative;padding:20px 60px 80px}</style>
+</head>
+<body>
+
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@600;700;800;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@0.474.0/dist/umd/lucide.min.js"></script>
+<style>
+:root{--blue:#2563EB;--blue-dark:#1E3A8A;--blue-light:#3B82F6;--blue-tint:#EFF6FF;--blue-tint-strong:#DBEAFE;--blue-deepest:#0B1F52;--surface:#F8FAFC;--card:#FFFFFF;--surface-dark:#0F172A;--surface-dark-deep:#0B1220;--border:#E2E8F0;--border-subtle:#F1F5F9;--t-primary:#0F172A;--t-secondary:#475569;--t-muted:#64748B;--t-disabled:#CBD5E1;--t-faint:#94A3B8;--t-inverse:#FFFFFF;--success:#22C55E;--warning:#F59E0B;--danger:#EF4444;--plate:#FEF3C7;--grad-brand:linear-gradient(135deg,#1E3A8A 0%,#2563EB 50%,#3B82F6 100%);--grad-deep:linear-gradient(135deg,#0B1F52 0%,#1E3A8A 50%,#2563EB 100%);--sh-card:0 4px 20px rgba(15,23,42,0.05);--sh-hero:0 20px 60px rgba(15,23,42,0.25);--sh-float:0 12px 32px rgba(15,23,42,0.10)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.35}}
+*{box-sizing:border-box}
+body{margin:0;background:#EEF1F5;font-family:'Inter',system-ui,sans-serif;color:var(--t-primary)}
+a{color:var(--blue);text-decoration:none}a:hover{color:var(--blue-dark)}
+.frame{position:absolute;width:390px}
+.frame-label{font-family:'Inter Tight',sans-serif;font-weight:700;font-size:15px;color:var(--t-secondary);margin-bottom:12px;letter-spacing:-0.2px;cursor:grab}
+.frame-label .meta{color:var(--t-faint);font-weight:400;margin-left:8px;font-size:13px}
+.phone{width:390px;height:844px;background:#fff;border-radius:48px;border:3px solid #0F172A;overflow:hidden;box-shadow:0 24px 72px rgba(15,23,42,0.18);position:relative}
+.notch{position:absolute;top:10px;left:50%;transform:translateX(-50%);width:120px;height:32px;background:#0F172A;border-radius:20px;z-index:5}
+.hi{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);width:134px;height:5px;border-radius:3px;background:rgba(15,23,42,0.85);z-index:5}
+.sb{height:47px;padding:16px 30px 6px;display:flex;align-items:center;justify-content:space-between;font-weight:600;font-size:15px;color:var(--t-primary);position:relative;z-index:3}
+.sb .sb-icons{display:flex;gap:5px;align-items:center}.sb .sb-icons svg{width:16px;height:16px;stroke-width:2}
+.screen{height:calc(100% - 47px);background:var(--surface);overflow:hidden;position:relative;display:flex;flex-direction:column}
+.h{height:52px;padding:0 18px;display:flex;align-items:center;justify-content:space-between;background:var(--surface)}
+.h.transp{background:transparent}
+.h .h-left{display:flex;align-items:center;gap:10px;flex:1;min-width:0}
+.h-title{font-family:'Inter Tight',sans-serif;font-weight:700;font-size:17px;letter-spacing:-0.3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.h-back{width:32px;height:32px;display:flex;align-items:center;justify-content:center;color:var(--t-secondary);margin-left:-6px}
+.h-back svg{width:22px;height:22px}
+.body{padding:6px 18px 20px;flex:1;overflow-y:hidden;display:flex;flex-direction:column;gap:12px}
+.disp{font-family:'Inter Tight',sans-serif;font-weight:800;font-size:36px;letter-spacing:-0.9px;line-height:40px}
+.h1{font-family:'Inter Tight',sans-serif;font-weight:800;font-size:24px;letter-spacing:-0.6px;line-height:30px}
+.h2{font-family:'Inter Tight',sans-serif;font-weight:800;font-size:20px;letter-spacing:-0.4px;line-height:26px}
+.h3{font-family:'Inter Tight',sans-serif;font-weight:700;font-size:17px;letter-spacing:-0.3px;line-height:22px}
+.h4{font-family:'Inter Tight',sans-serif;font-weight:700;font-size:15px;line-height:20px}
+.body-lg{font-size:15px;line-height:22px}
+.b{font-size:13.5px;line-height:20px}
+.sm{font-size:12.5px;line-height:18px}
+.cap{font-size:11.5px;line-height:16px;color:var(--t-muted)}
+.overline{font-size:10.5px;font-weight:700;letter-spacing:1.1px;text-transform:uppercase;color:var(--t-muted)}
+.faint{color:var(--t-faint)}.muted{color:var(--t-muted)}.sec{color:var(--t-secondary)}.inv{color:var(--t-inverse)}
+.center-t{text-align:center}.b6{font-weight:600}.b7{font-weight:700}
+.card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:12px;box-shadow:var(--sh-card)}
+.card.pad-none{padding:0;overflow:hidden}
+.card.pad-lg{padding:16px}
+.card.selected{background:var(--blue-tint);border-color:var(--blue);border-width:1.5px;padding:11px}
+.card.tint{background:var(--blue-tint);border-color:var(--blue-tint-strong)}
+.card.warn{background:#FEF3C7;border-color:var(--warning);border-width:1.5px;padding:11px}
+.card.warn-tint{background:#FEF9E7;border-color:#FCD34D}
+.card.dngr{border-color:var(--danger);border-width:1.5px;padding:11px}
+.card.dngr-tint{background:#FEF2F2;border-color:#FCA5A5}
+.card.float{box-shadow:var(--sh-float);border:none}
+.row{display:flex;align-items:center;gap:10px}
+.col{display:flex;flex-direction:column}
+.grow{flex:1;min-width:0}
+.between{justify-content:space-between}
+.gap-4{gap:4px}.gap-6{gap:6px}.gap-8{gap:8px}.gap-10{gap:10px}.gap-12{gap:12px}.gap-16{gap:16px}
+.tile{width:34px;height:34px;border-radius:9px;background:var(--blue-tint);color:var(--blue);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.tile.solid{background:var(--blue);color:#fff}
+.tile.dark{background:var(--surface-dark-deep);color:#fff}
+.tile.warn-t{background:#FEF3C7;color:#B45309}
+.tile.dngr{background:#FEE2E2;color:#B91C1C}
+.tile.succ{background:#DCFCE7;color:#15803D}
+.tile.sm{width:26px;height:26px;border-radius:7px}
+.tile.lg{width:44px;height:44px;border-radius:11px}
+.tile.xl{width:56px;height:56px;border-radius:14px}
+.tile.avatar{background:#DBEAFE;color:#1E3A8A;font-family:'Inter Tight',sans-serif;font-weight:700;font-size:14px}
+.tile svg{width:16px;height:16px}.tile.sm svg{width:13px;height:13px}.tile.lg svg{width:20px;height:20px}.tile.xl svg{width:26px;height:26px}
+.pill{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:999px;font-size:10px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase}
+.pill.active{background:var(--blue-tint-strong);color:var(--blue-dark)}
+.pill.success{background:#DCFCE7;color:#15803D}
+.pill.pending{background:#FEF3C7;color:#B45309}
+.pill.error{background:#FEE2E2;color:#B91C1C}
+.pill.neutral{background:#F1F5F9;color:#334155}
+.pill.dark{background:#0F172A;color:#fff}
+.pill.outline{background:#fff;color:var(--blue);border:1px solid var(--blue)}
+.btn{height:40px;border-radius:9px;display:inline-flex;align-items:center;justify-content:center;gap:6px;font-family:'Inter',sans-serif;font-weight:700;font-size:13px;letter-spacing:-0.1px;padding:0 12px;border:none}
+.btn.primary{background:var(--blue);color:#fff;box-shadow:0 3px 10px rgba(37,99,235,0.22)}
+.btn.secondary{background:#fff;color:var(--blue);border:1.5px solid var(--blue)}
+.btn.ghost{background:transparent;color:var(--t-secondary)}
+.btn.destructive{background:var(--danger);color:#fff}
+.btn.warn{background:#F59E0B;color:#fff}
+.btn.sm{height:28px;font-size:11.5px;padding:0 10px;border-radius:7px}
+.btn.lg{height:48px;font-size:14px}
+.btn.full{width:100%}
+.btn svg{width:15px;height:15px}
+.list-row{padding:10px 12px;display:flex;align-items:center;gap:10px}
+.list-row + .list-row{border-top:1px solid var(--border-subtle)}
+.divider{height:1px;background:var(--border-subtle)}
+.pulse{width:8px;height:8px;border-radius:4px;background:#22C55E;animation:pulse 2s ease-in-out infinite}
+.stars{display:flex;gap:2px;color:var(--warning)}
+.stars svg{width:12px;height:12px;fill:currentColor;stroke:none}
+.section-title{position:absolute;font-family:'Inter Tight',sans-serif;font-weight:800;font-size:26px;letter-spacing:-0.5px;color:var(--t-primary);cursor:grab}
+.section-sub{position:absolute;font-family:'Inter',sans-serif;font-size:14px;color:var(--t-muted);cursor:grab;max-width:900px}
+.footer{padding:10px 18px 22px;background:var(--surface);border-top:1px solid var(--border-subtle);display:flex;flex-direction:column;gap:8px}
+.chat-mine{align-self:flex-end;background:var(--blue);color:#fff;padding:8px 12px;border-radius:14px 14px 4px 14px;max-width:75%;font-size:13px;line-height:19px}
+.chat-theirs{align-self:flex-start;background:#fff;color:var(--t-primary);padding:8px 12px;border-radius:14px 14px 14px 4px;max-width:75%;font-size:13px;line-height:19px;border:1px solid var(--border)}
+.chat-meta{font-size:10.5px;color:var(--t-faint);margin:2px 4px}
+.input{height:40px;border-radius:8px;border:1px solid var(--border);background:#fff;padding:0 12px;display:flex;align-items:center;gap:8px;color:var(--t-primary);font-size:13px}
+.input .val{flex:1}.input .plch{color:var(--t-faint)}.input svg{width:14px;height:14px;color:var(--t-muted)}
+.input.focus{border-color:var(--blue);border-width:1.5px;padding:0 10.5px}
+.textarea{border-radius:8px;border:1px solid var(--border);background:#fff;padding:8px 10px;color:var(--t-primary);font-size:13px;line-height:19px}
+.input-lbl{font-size:11.5px;font-weight:600;color:var(--t-secondary);margin-bottom:5px}
+.day-chip{min-width:52px;padding:7px 4px;border-radius:11px;border:1px solid var(--border);background:#fff;display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0}
+.day-chip.on{background:var(--blue);border-color:var(--blue);color:#fff}
+.day-chip .dow{font-size:10px;font-weight:600;letter-spacing:0.8px;text-transform:uppercase;opacity:0.75}
+.day-chip .num{font-family:'Inter Tight',sans-serif;font-weight:800;font-size:15px}
+.slot-tile{padding:10px;border-radius:10px;border:1px solid var(--border);background:#fff;display:flex;flex-direction:column;gap:2px;text-align:left}
+.slot-tile.on{background:var(--blue-tint);border-color:var(--blue);border-width:1.5px;padding:9px}
+.slot-tile .win{font-family:'Inter Tight',sans-serif;font-weight:700;font-size:13px}
+.slot-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.star-big{width:38px;height:38px;color:#CBD5E1;display:flex;align-items:center;justify-content:center}
+.star-big svg{width:34px;height:34px;stroke:none;fill:currentColor}
+.star-big.on{color:var(--warning)}
+.pass-pill{padding:3px 8px;border-radius:999px;font-size:10.5px;font-weight:700;letter-spacing:0.3px;text-transform:uppercase}
+.pass-pill.pass{background:#DCFCE7;color:#15803D}
+.pass-pill.adv{background:#FEF3C7;color:#B45309}
+.pass-pill.fail{background:#FEE2E2;color:#B91C1C}
+.tl-dot{width:10px;height:10px;border-radius:5px;background:var(--blue);margin-top:5px;flex-shrink:0}
+.tl-dot.grey{background:var(--t-disabled)}
+.tl-line{width:2px;background:var(--border);position:absolute;left:4px;top:16px;bottom:-6px}
+.strike{text-decoration:line-through;color:var(--t-faint)}
+</style>
+
+
+<div class="section-title" style="left:60px;top:40px" data-drags-parent="1">Booking detail — the job before, during, after</div>
+<div class="section-sub" style="left:60px;top:78px" data-drags-parent="1">Live tracking hero, quote &amp; revision approvals, messages, reschedule, review, service report, and the dispute flow.</div>
+
+<!-- Row 1 -->
+
+<!-- Booking detail LIVE -->
+<div class="frame" style="left:60px;top:130px">
+  <div class="frame-label" data-drags-parent="1">Booking · En route</div>
+  <div class="phone">
+    <div class="notch"></div>
+    <div class="sb"><span>9:41</span><div class="sb-icons"><i data-lucide="signal"></i><i data-lucide="wifi"></i><i data-lucide="battery-full"></i></div></div>
+    <div class="screen" data-screen-label="Booking detail — live">
+      <div class="h transp"><div class="h-left"><div class="h-back"><i data-lucide="chevron-left"></i></div><div class="h-title">Job BMT-A1B2</div></div><div style="color:var(--t-muted)"><i data-lucide="more-horizontal" style="width:20px;height:20px"></i></div></div>
+      <div class="body">
+        <div>
+          <div class="h2">Front brake pads &amp; discs</div>
+          <div class="row gap-8" style="margin-top:6px"><div class="pill active"><div class="pulse" style="width:6px;height:6px"></div>En route · 12 min</div><div class="cap">Ford Focus · AB12 CDE</div></div>
+        </div>
+        <div class="card" style="padding:0;overflow:hidden">
+          <div style="height:150px;background:linear-gradient(135deg,#E0F2FE 0%,#DBEAFE 40%,#EFF6FF 100%);position:relative">
+            <div style="position:absolute;inset:0;background-image:repeating-linear-gradient(90deg,rgba(15,23,42,0.05) 0 1px,transparent 1px 32px),repeating-linear-gradient(0deg,rgba(15,23,42,0.05) 0 1px,transparent 1px 32px)"></div>
+            <svg viewBox="0 0 340 150" style="position:absolute;inset:0;width:100%;height:100%"><path d="M20 120 Q60 60 130 80 T280 40" stroke="#2563EB" stroke-width="3" fill="none" stroke-linecap="round" stroke-dasharray="6 6"/></svg>
+            <div style="position:absolute;top:26px;left:32px;width:24px;height:24px;border-radius:12px;background:var(--blue);border:3px solid #fff;box-shadow:0 4px 12px rgba(37,99,235,0.4);display:flex;align-items:center;justify-content:center"><i data-lucide="wrench" style="width:11px;height:11px;color:#fff"></i></div>
+            <div style="position:absolute;bottom:22px;right:32px"><div style="width:24px;height:24px;border-radius:12px;background:var(--surface-dark-deep);border:3px solid #fff"></div></div>
+          </div>
+          <div class="list-row" style="padding:12px">
+            <div class="tile lg avatar">A</div>
+            <div class="grow">
+              <div class="row gap-6"><div class="b b7">Alex Turner</div><div class="stars"><i data-lucide="star"></i><i data-lucide="star"></i><i data-lucide="star"></i><i data-lucide="star"></i><i data-lucide="star"></i></div></div>
+              <div class="cap" style="margin-top:2px">4.9 · 143 jobs done</div>
+            </div>
+            <button class="btn primary sm"><i data-lucide="phone"></i>Call</button>
+          </div>
+        </div>
+        <div class="card tint">
+          <div class="row gap-10">
+            <div class="tile"><i data-lucide="calendar-clock"></i></div>
+            <div class="grow">
+              <div class="b b7">New time proposed</div>
+              <div class="cap sec" style="margin-top:2px">Alex has asked to move to Thu 2–4pm.</div>
+            </div>
+          </div>
+          <div class="row gap-8" style="margin-top:10px">
+            <button class="btn primary sm" style="flex:1">Accept</button>
+            <button class="btn secondary sm" style="flex:1">Keep my time</button>
+          </div>
+        </div>
+        <div class="col gap-6">
+          <div class="overline">Details</div>
+          <div class="card pad-none">
+            <div class="list-row"><div class="cap grow">When</div><div class="b b7 sm">Thu 15 Sep · 10am–12pm</div></div>
+            <div class="list-row"><div class="cap grow">Where</div><div class="b b7 sm" style="text-align:right">14 Oakwood Grove<br>SW11 6PJ</div></div>
+            <div class="list-row"><div class="cap grow">Parking</div><div class="b b7 sm">Driveway</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="hi"></div>
+  </div>
+</div>
+
+<!-- Messages -->
+<div class="frame" style="left:530px;top:130px">
+  <div class="frame-label" data-drags-parent="1">Messages</div>
+  <div class="phone">
+    <div class="notch"></div>
+    <div class="sb"><span>9:41</span><div class="sb-icons"><i data-lucide="signal"></i><i data-lucide="wifi"></i><i data-lucide="battery-full"></i></div></div>
+    <div class="screen" data-screen-label="Messages">
+      <div class="h transp"><div class="h-left"><div class="h-back"><i data-lucide="chevron-left"></i></div><div class="tile lg avatar" style="width:36px;height:36px">A</div><div class="col gap-4" style="margin-left:2px"><div class="b b7">Alex Turner</div><div class="cap" style="color:var(--success);font-weight:600">Online</div></div></div></div>
+      <div class="body" style="gap:8px;justify-content:flex-end">
+        <div class="cap center-t" style="margin:20px 0 4px">Thursday</div>
+        <div class="chat-theirs">Hi Hannah — should be with you in about 15 min. Anywhere in particular you'd like me to park?</div>
+        <div class="chat-meta" style="align-self:flex-start">Alex · 9:12</div>
+        <div class="chat-mine">Perfect, thanks Alex! The driveway is clear — feel free to pull in.</div>
+        <div class="chat-meta" style="align-self:flex-end">You · 9:14</div>
+        <div class="chat-theirs">Great, cheers. Bringing the pads and discs with me. See you shortly 👍</div>
+        <div class="chat-meta" style="align-self:flex-start">Alex · 9:14</div>
+        <div class="chat-mine">See you soon.</div>
+        <div class="chat-meta" style="align-self:flex-end">You · 9:15 · Delivered</div>
+      </div>
+      <div style="padding:8px 14px 12px;background:#fff;border-top:1px solid var(--border);display:flex;gap:8px;align-items:flex-end">
+        <div class="grow textarea" style="min-height:40px;padding:10px 12px;color:var(--t-faint)">Type a message…</div>
+        <button class="btn primary" style="width:44px;height:44px;padding:0;border-radius:22px"><i data-lucide="send-horizontal" style="width:18px;height:18px"></i></button>
+      </div>
+    </div>
+    <div class="hi"></div>
+  </div>
+</div>
+
+<!-- Reschedule -->
+<div class="frame" style="left:1000px;top:130px">
+  <div class="frame-label" data-drags-parent="1">Reschedule</div>
+  <div class="phone">
+    <div class="notch"></div>
+    <div class="sb"><span>9:41</span><div class="sb-icons"><i data-lucide="signal"></i><i data-lucide="wifi"></i><i data-lucide="battery-full"></i></div></div>
+    <div class="screen" data-screen-label="Reschedule">
+      <div class="h transp"><div class="h-left"><div class="h-back"><i data-lucide="chevron-left"></i></div><div class="h-title">Change the time</div></div></div>
+      <div class="body">
+        <div>
+          <div class="h1">Pick a new time.</div>
+          <div class="b sec" style="margin-top:6px">Your mechanic keeps the job and is told about the change.</div>
+        </div>
+        <div class="row gap-6" style="overflow-x:auto;padding-bottom:6px">
+          <div class="day-chip"><div class="dow">Wed</div><div class="num">17</div></div>
+          <div class="day-chip on"><div class="dow">Thu</div><div class="num">18</div></div>
+          <div class="day-chip"><div class="dow">Fri</div><div class="num">19</div></div>
+          <div class="day-chip"><div class="dow">Sat</div><div class="num">20</div></div>
+          <div class="day-chip"><div class="dow">Mon</div><div class="num">22</div></div>
+        </div>
+        <div class="overline">Arrival window</div>
+        <div class="slot-grid">
+          <div class="slot-tile"><div class="win">8–10am</div><div class="cap muted">Available</div></div>
+          <div class="slot-tile"><div class="win">10am–12pm</div><div class="cap muted">Available</div></div>
+          <div class="slot-tile"><div class="win">12–2pm</div><div class="cap muted">Available</div></div>
+          <div class="slot-tile on"><div class="win" style="color:var(--blue-dark)">2–4pm</div><div class="cap" style="color:var(--blue-dark)">Selected</div></div>
+        </div>
+        <div>
+          <div class="input-lbl">Why are you moving it?</div>
+          <div class="textarea" style="min-height:68px">Something's come up at work in the morning — the afternoon would be much easier.</div>
+        </div>
+      </div>
+      <div class="footer">
+        <button class="btn primary lg full">Move to Thu 2–4pm</button>
+        <div class="cap center-t faint">Your mechanic keeps the job.</div>
+      </div>
+    </div>
+    <div class="hi"></div>
+  </div>
+</div>
+
+<!-- Review -->
+<div class="frame" style="left:1470px;top:130px">
+  <div class="frame-label" data-drags-parent="1">Review</div>
+  <div class="phone">
+    <div class="notch"></div>
+    <div class="sb"><span>9:41</span><div class="sb-icons"><i data-lucide="signal"></i><i data-lucide="wifi"></i><i data-lucide="battery-full"></i></div></div>
+    <div class="screen" data-screen-label="Review">
+      <div class="h transp"><div class="h-left"><div class="h-back"><i data-lucide="chevron-left"></i></div><div class="h-title">Leave a review</div></div></div>
+      <div class="body">
+        <div>
+          <div class="h1">How did it go?</div>
+          <div class="b sec" style="margin-top:6px">Your rating is public on your mechanic's profile.</div>
+        </div>
+        <div class="card float pad-lg center-t">
+          <div class="tile xl avatar" style="margin:0 auto">A</div>
+          <div class="h3" style="margin-top:12px">Alex Turner</div>
+          <div class="row gap-6" style="justify-content:center;margin-top:16px">
+            <div class="star-big on"><i data-lucide="star"></i></div>
+            <div class="star-big on"><i data-lucide="star"></i></div>
+            <div class="star-big on"><i data-lucide="star"></i></div>
+            <div class="star-big on"><i data-lucide="star"></i></div>
+            <div class="star-big on"><i data-lucide="star"></i></div>
+          </div>
+          <div class="b7 b" style="color:var(--warning);margin-top:10px">Brilliant</div>
+        </div>
+        <div class="overline">What stood out?</div>
+        <div class="row gap-6" style="flex-wrap:wrap">
+          <div class="pill outline" style="padding:6px 12px;text-transform:none;letter-spacing:0;font-size:12px">✓ On time</div>
+          <div class="pill outline" style="padding:6px 12px;text-transform:none;letter-spacing:0;font-size:12px">✓ Friendly</div>
+          <div class="pill neutral" style="padding:6px 12px;text-transform:none;letter-spacing:0;font-size:12px">Tidy work area</div>
+          <div class="pill outline" style="padding:6px 12px;text-transform:none;letter-spacing:0;font-size:12px">✓ Explained well</div>
+          <div class="pill neutral" style="padding:6px 12px;text-transform:none;letter-spacing:0;font-size:12px">Good value</div>
+        </div>
+        <div class="textarea" style="min-height:72px">Alex was fantastic — arrived on time, explained everything and left the driveway spotless. Would rebook in a heartbeat.</div>
+      </div>
+      <div class="footer">
+        <button class="btn primary lg full">Submit review</button>
+      </div>
+    </div>
+    <div class="hi"></div>
+  </div>
+</div>
+
+<!-- Row 2 -->
+
+<!-- Report / checklist -->
+<div class="frame" style="left:60px;top:1090px">
+  <div class="frame-label" data-drags-parent="1">Service report</div>
+  <div class="phone">
+    <div class="notch"></div>
+    <div class="sb"><span>9:41</span><div class="sb-icons"><i data-lucide="signal"></i><i data-lucide="wifi"></i><i data-lucide="battery-full"></i></div></div>
+    <div class="screen" data-screen-label="Service report">
+      <div class="h transp"><div class="h-left"><div class="h-back"><i data-lucide="chevron-left"></i></div><div class="h-title">Service report</div></div><a class="link sm" style="font-size:12px">Share</a></div>
+      <div class="body">
+        <div>
+          <div class="h1">23-point service check</div>
+          <div class="row gap-8" style="margin-top:6px"><div class="pass-pill pass">21 pass</div><div class="pass-pill adv">2 advisories</div></div>
+        </div>
+        <div class="overline">Brakes</div>
+        <div class="card pad-none">
+          <div class="list-row"><div class="grow"><div class="b b7 sm">Front pads</div></div><div class="pass-pill pass">Pass</div></div>
+          <div class="list-row"><div class="grow"><div class="b b7 sm">Front discs</div></div><div class="pass-pill pass">Pass</div></div>
+          <div class="list-row"><div class="col grow"><div class="b b7 sm">Rear pads</div><div class="cap" style="margin-top:2px">50% worn — good for another 12k miles.</div></div><div class="pass-pill adv">Advise</div></div>
+          <div class="list-row"><div class="grow"><div class="b b7 sm">Brake fluid</div></div><div class="pass-pill pass">Pass</div></div>
+        </div>
+        <div class="overline">Tyres</div>
+        <div class="card pad-none">
+          <div class="list-row"><div class="grow"><div class="b b7 sm">Front left · 4mm</div></div><div class="pass-pill pass">Pass</div></div>
+          <div class="list-row"><div class="grow"><div class="b b7 sm">Front right · 4mm</div></div><div class="pass-pill pass">Pass</div></div>
+          <div class="list-row"><div class="col grow"><div class="b b7 sm">Rear left · 2.5mm</div><div class="cap" style="margin-top:2px">Approaching the 1.6mm legal limit.</div></div><div class="pass-pill adv">Advise</div></div>
+        </div>
+        <div class="cap center-t faint" style="margin-top:2px">Advisories are things to keep an eye on; a fail is something your mechanic recommends fixing.</div>
+      </div>
+    </div>
+    <div class="hi"></div>
+  </div>
+</div>
+
+<!-- Quote -->
+<div class="frame" style="left:530px;top:1090px">
+  <div class="frame-label" data-drags-parent="1">Quote · Extra work</div>
+  <div class="phone">
+    <div class="notch"></div>
+    <div class="sb"><span>9:41</span><div class="sb-icons"><i data-lucide="signal"></i><i data-lucide="wifi"></i><i data-lucide="battery-full"></i></div></div>
+    <div class="screen" data-screen-label="Quote">
+      <div class="h transp"><div class="h-left"><div class="h-back"><i data-lucide="chevron-left"></i></div><div class="h-title">Quote</div></div></div>
+      <div class="body">
+        <div>
+          <div class="h1">Quote for extra work</div>
+          <div class="row gap-8" style="margin-top:6px"><div class="pill pending">Open · Expires 5pm</div><div class="cap">Extra work on this visit</div></div>
+        </div>
+        <div class="card tint">
+          <div class="row gap-10">
+            <div class="tile"><i data-lucide="message-square-quote"></i></div>
+            <div class="grow">
+              <div class="cap sec">From Alex</div>
+              <div class="b sec" style="margin-top:4px;font-style:italic">"Rear pads are worn thinner than they looked — safer to swap them now while I'm on the discs. Won't take long."</div>
+            </div>
+          </div>
+        </div>
+        <div class="col gap-6">
+          <div class="overline">What's quoted</div>
+          <div class="card pad-none">
+            <div class="list-row"><div class="tile"><i data-lucide="clock"></i></div><div class="grow"><div class="b b7 sm">Labour</div><div class="cap" style="margin-top:2px">1.5 hrs at £60/hr</div></div><div class="b7 b">£90</div></div>
+            <div class="list-row"><div class="tile"><i data-lucide="package"></i></div><div class="grow"><div class="b b7 sm">Rear brake pads</div><div class="cap" style="margin-top:2px">2 × £45</div></div><div class="b7 b">£90</div></div>
+            <div class="list-row"><div class="tile"><i data-lucide="wrench"></i></div><div class="grow"><div class="b b7 sm">Fitting kit</div></div><div class="b7 b">£30</div></div>
+          </div>
+        </div>
+        <div class="card" style="background:var(--surface-dark-deep);color:#fff;border:none">
+          <div class="row between">
+            <div class="col gap-4"><div class="cap" style="color:rgba(255,255,255,0.6)">Labour £90 · Parts £120</div></div>
+            <div class="disp inv" style="font-size:28px">£210</div>
+          </div>
+        </div>
+      </div>
+      <div class="footer">
+        <button class="btn primary lg full">Approve · £210</button>
+        <button class="btn ghost full">Decline</button>
+        <div class="cap center-t faint">Approving authorises £210 — nothing is charged until the work is done.</div>
+      </div>
+    </div>
+    <div class="hi"></div>
+  </div>
+</div>
+
+<!-- Revised job -->
+<div class="frame" style="left:1000px;top:1090px">
+  <div class="frame-label" data-drags-parent="1">Revised job <span class="meta">— amber</span></div>
+  <div class="phone">
+    <div class="notch"></div>
+    <div class="sb"><span>9:41</span><div class="sb-icons"><i data-lucide="signal"></i><i data-lucide="wifi"></i><i data-lucide="battery-full"></i></div></div>
+    <div class="screen" data-screen-label="Revised job">
+      <div class="h transp"><div class="h-left"><div class="h-back"><i data-lucide="chevron-left"></i></div><div class="h-title">Revised job</div></div></div>
+      <div class="body">
+        <div>
+          <div class="h1">Your mechanic has revised the job</div>
+          <div class="row gap-8" style="margin-top:6px"><div class="pill pending">Waiting on you</div><div class="cap">£45 more than booked</div></div>
+        </div>
+        <div class="card warn">
+          <div class="row gap-10">
+            <div class="tile warn-t"><i data-lucide="triangle-alert"></i></div>
+            <div class="grow">
+              <div class="b b7" style="color:#78350F">Why the booked repair isn't right</div>
+              <div class="cap" style="color:#78350F;margin-top:4px">"The discs are heavily corroded and pitted — new pads alone won't fix the pulsing under braking. Recommending pads and discs together."</div>
+            </div>
+          </div>
+        </div>
+        <div class="col gap-6">
+          <div class="overline">No longer needed</div>
+          <div class="card pad-none">
+            <div class="list-row"><div class="grow strike b sm">Front brake pads only</div><div class="strike b sm">£120</div></div>
+          </div>
+        </div>
+        <div class="col gap-6">
+          <div class="overline">Instead</div>
+          <div class="card pad-none">
+            <div class="list-row"><div class="tile"><i data-lucide="wrench"></i></div><div class="grow"><div class="b b7 sm">Front pads &amp; discs</div><div class="cap" style="margin-top:2px">2 hrs labour · genuine parts</div></div><div class="b7 b">£180</div></div>
+          </div>
+        </div>
+        <div class="col gap-6">
+          <div class="overline">Price</div>
+          <div class="card pad-none">
+            <div class="list-row"><div class="cap grow">Was</div><div class="strike b sm">£180</div></div>
+            <div class="list-row"><div class="cap grow">Now</div><div class="h3">£225</div></div>
+            <div class="list-row" style="background:#FEF3C7"><div class="cap grow" style="color:#78350F">Difference</div><div class="b7 b" style="color:#B45309">+ £45</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="footer">
+        <button class="btn primary lg full">Approve · £225</button>
+        <button class="btn ghost full">Decline</button>
+      </div>
+    </div>
+    <div class="hi"></div>
+  </div>
+</div>
+
+<!-- Dispute form -->
+<div class="frame" style="left:1470px;top:1090px">
+  <div class="frame-label" data-drags-parent="1">Report a problem</div>
+  <div class="phone">
+    <div class="notch"></div>
+    <div class="sb"><span>9:41</span><div class="sb-icons"><i data-lucide="signal"></i><i data-lucide="wifi"></i><i data-lucide="battery-full"></i></div></div>
+    <div class="screen" data-screen-label="Report a problem">
+      <div class="h transp"><div class="h-left"><div class="h-back"><i data-lucide="chevron-left"></i></div><div class="h-title">Report a problem</div></div></div>
+      <div class="body">
+        <div>
+          <div class="h1">What went wrong?</div>
+          <div class="b sec" style="margin-top:6px">We'll review this with your mechanic — they get 48 hours to respond, then Book My Tech steps in.</div>
+        </div>
+        <div class="col gap-6">
+          <div class="input-lbl">The issue</div>
+          <div class="col gap-6">
+            <div class="card selected" style="padding:11px"><div class="row gap-10"><i data-lucide="circle-check" style="width:18px;height:18px;color:var(--blue)"></i><div class="b b7 sm">Work wasn't done properly</div></div></div>
+            <div class="card" style="padding:11px"><div class="row gap-10"><i data-lucide="circle" style="width:18px;height:18px;color:var(--t-disabled)"></i><div class="b b7 sm">Vehicle damaged during the job</div></div></div>
+            <div class="card" style="padding:11px"><div class="row gap-10"><i data-lucide="circle" style="width:18px;height:18px;color:var(--t-disabled)"></i><div class="b b7 sm">Something else</div></div></div>
+          </div>
+        </div>
+        <div>
+          <div class="input-lbl">Tell us what happened</div>
+          <div class="textarea" style="min-height:60px">The brake pedal is still soft after the pads were changed and there's a squeak that wasn't there before.</div>
+        </div>
+        <div class="col gap-6">
+          <div class="input-lbl">Photos</div>
+          <div class="row gap-6" style="flex-wrap:wrap">
+            <div style="width:60px;height:60px;border-radius:10px;background:linear-gradient(135deg,#DBEAFE,#EFF6FF)"></div>
+            <div style="width:60px;height:60px;border-radius:10px;background:linear-gradient(135deg,#FEF3C7,#FEE2E2)"></div>
+            <div style="width:60px;height:60px;border-radius:10px;border:2px dashed var(--blue-tint-strong);background:var(--blue-tint);display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--blue);gap:2px"><i data-lucide="image-plus" style="width:18px;height:18px"></i><div style="font-size:9px;font-weight:700">Add</div></div>
+          </div>
+          <div class="cap faint">Up to 5 photos. They help a lot.</div>
+        </div>
+      </div>
+      <div class="footer">
+        <button class="btn primary lg full">Send to Book My Tech</button>
+      </div>
+    </div>
+    <div class="hi"></div>
+  </div>
+</div>
+
+<!-- Row 3 -->
+
+<!-- Dispute detail -->
+<div class="frame" style="left:60px;top:2050px">
+  <div class="frame-label" data-drags-parent="1">Dispute · Under review</div>
+  <div class="phone">
+    <div class="notch"></div>
+    <div class="sb"><span>9:41</span><div class="sb-icons"><i data-lucide="signal"></i><i data-lucide="wifi"></i><i data-lucide="battery-full"></i></div></div>
+    <div class="screen" data-screen-label="Dispute detail">
+      <div class="h transp"><div class="h-left"><div class="h-back"><i data-lucide="chevron-left"></i></div><div class="h-title">Job BMT-A1B2</div></div></div>
+      <div class="body">
+        <div>
+          <div class="h2">Front brake pads</div>
+          <div class="row gap-8" style="margin-top:6px"><div class="pill pending">Under review</div><div class="cap">Raised 2 Sep · £180 job</div></div>
+        </div>
+        <div class="card tint">
+          <div class="row gap-10">
+            <div class="tile"><i data-lucide="user-check"></i></div>
+            <div class="grow">
+              <div class="b b7">Alex is looking into this</div>
+              <div class="cap sec" style="margin-top:2px">They have until Thursday 5pm to respond. We'll take over if not.</div>
+            </div>
+          </div>
+        </div>
+        <div class="col gap-6">
+          <div class="overline">What you reported</div>
+          <div class="card">
+            <div class="b sec">The brake pedal is still soft after the pads were changed and there's a squeak that wasn't there before.</div>
+            <div class="divider" style="margin:10px 0"></div>
+            <div class="row between"><div class="cap">Asked for</div><div class="b b7 sm">A full refund</div></div>
+          </div>
+        </div>
+        <div class="col gap-6">
+          <div class="overline">Messages</div>
+          <div class="col gap-6">
+            <div class="chat-theirs" style="align-self:flex-start">Hi Hannah, sorry to hear this — happy to swing by tomorrow and take another look free of charge if that helps.</div>
+            <div class="chat-meta" style="align-self:flex-start">Alex · yesterday</div>
+            <div class="chat-mine" style="align-self:flex-end">Thanks Alex, please do — I'm around all afternoon.</div>
+            <div class="chat-meta" style="align-self:flex-end">You · 2 hrs ago</div>
+          </div>
+        </div>
+      </div>
+      <div style="padding:8px 14px 12px;background:#fff;border-top:1px solid var(--border);display:flex;gap:8px;align-items:center">
+        <div class="grow input plch" style="height:36px;color:var(--t-faint)">Reply…</div>
+        <button class="btn primary" style="width:40px;height:40px;padding:0;border-radius:20px"><i data-lucide="send-horizontal" style="width:16px;height:16px"></i></button>
+      </div>
+    </div>
+    <div class="hi"></div>
+  </div>
+</div>
+
+<!-- Booking with quote card overview -->
+<div class="frame" style="left:530px;top:2050px">
+  <div class="frame-label" data-drags-parent="1">Booking · Quote waiting</div>
+  <div class="phone">
+    <div class="notch"></div>
+    <div class="sb"><span>9:41</span><div class="sb-icons"><i data-lucide="signal"></i><i data-lucide="wifi"></i><i data-lucide="battery-full"></i></div></div>
+    <div class="screen" data-screen-label="Booking — quote waiting">
+      <div class="h transp"><div class="h-left"><div class="h-back"><i data-lucide="chevron-left"></i></div><div class="h-title">Job BMT-A1B2</div></div></div>
+      <div class="body">
+        <div>
+          <div class="h2">Front brake pads &amp; discs</div>
+          <div class="row gap-8" style="margin-top:6px"><div class="pill active">In progress</div><div class="cap">Ford Focus · AB12 CDE</div></div>
+        </div>
+        <div class="card tint">
+          <div class="row gap-10">
+            <div class="tile"><i data-lucide="file-text"></i></div>
+            <div class="grow">
+              <div class="b b7">Quote waiting · £210</div>
+              <div class="cap sec" style="margin-top:2px">Alex has quoted for rear brake pads.</div>
+            </div>
+            <i data-lucide="chevron-right" style="width:18px;height:18px;color:var(--blue)"></i>
+          </div>
+        </div>
+        <div class="card selected">
+          <div class="row gap-10">
+            <div class="tile solid"><i data-lucide="alert-triangle"></i></div>
+            <div class="grow">
+              <div class="b b7">Revised job waiting</div>
+              <div class="cap sec" style="margin-top:2px">£45 more · pads and discs together.</div>
+            </div>
+            <i data-lucide="chevron-right" style="width:18px;height:18px;color:var(--blue)"></i>
+          </div>
+        </div>
+        <div class="col gap-6">
+          <div class="overline">Your mechanic</div>
+          <div class="card">
+            <div class="row gap-10">
+              <div class="tile lg avatar">A</div>
+              <div class="grow">
+                <div class="b b7">Alex Turner</div>
+                <div class="row gap-4" style="margin-top:2px"><div class="stars"><i data-lucide="star"></i><i data-lucide="star"></i><i data-lucide="star"></i><i data-lucide="star"></i><i data-lucide="star"></i></div><div class="cap">4.9 · 143 jobs</div></div>
+              </div>
+              <div class="row gap-6"><button class="btn secondary sm"><i data-lucide="message-circle"></i></button><button class="btn primary sm"><i data-lucide="phone"></i>Call</button></div>
+            </div>
+          </div>
+        </div>
+        <div class="col gap-6">
+          <div class="overline">Payment</div>
+          <div class="card pad-none">
+            <div class="list-row"><div class="cap grow">Repair total</div><div class="b b7 sm">£180</div></div>
+            <div class="list-row"><div class="cap grow">Held on your card</div><div class="b b7 sm">£180</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="hi"></div>
+  </div>
+</div>
+
+<!-- Cancel booking inline -->
+<div class="frame" style="left:1000px;top:2050px">
+  <div class="frame-label" data-drags-parent="1">Booking · Cancel confirm</div>
+  <div class="phone">
+    <div class="notch"></div>
+    <div class="sb"><span>9:41</span><div class="sb-icons"><i data-lucide="signal"></i><i data-lucide="wifi"></i><i data-lucide="battery-full"></i></div></div>
+    <div class="screen" data-screen-label="Cancel booking">
+      <div class="h transp"><div class="h-left"><div class="h-back"><i data-lucide="chevron-left"></i></div><div class="h-title">Job BMT-A1B2</div></div></div>
+      <div class="body">
+        <div>
+          <div class="h2">Cancel this booking?</div>
+          <div class="b sec" style="margin-top:6px">Your mechanic will be told and a fee may apply.</div>
+        </div>
+        <div class="card dngr-tint">
+          <div class="row between">
+            <div class="col gap-4">
+              <div class="cap" style="color:#7F1D1D">Cancellation fee</div>
+              <div class="h3" style="color:#B91C1C">£20</div>
+            </div>
+            <div class="col gap-4" style="align-items:flex-end">
+              <div class="cap" style="color:#7F1D1D">Back on your card</div>
+              <div class="h3">£160</div>
+            </div>
+          </div>
+          <div class="divider" style="margin:12px 0;background:#FCA5A5"></div>
+          <div class="cap sec">Cancelling less than 24 hours before is £20; we'll refund the rest to the card you paid with.</div>
+        </div>
+        <div>
+          <div class="input-lbl">Why are you cancelling?</div>
+          <div class="textarea" style="min-height:80px">Booked with someone else by accident — sorry!</div>
+        </div>
+        <div class="col gap-6">
+          <div class="overline">Cancellation policy</div>
+          <div class="card pad-none">
+            <div class="list-row"><div class="cap grow">More than 24 hrs before</div><div class="b b7 sm" style="color:var(--success)">Free</div></div>
+            <div class="list-row"><div class="cap grow">Under 24 hrs</div><div class="b b7 sm" style="color:var(--warning)">£20</div></div>
+            <div class="list-row"><div class="cap grow">Under 2 hrs / mechanic en route</div><div class="b b7 sm" style="color:var(--danger)">£40</div></div>
+          </div>
+        </div>
+        <div style="flex:1"></div>
+      </div>
+      <div class="footer">
+        <button class="btn destructive lg full">Yes, cancel it</button>
+        <button class="btn ghost full">Keep my booking</button>
+      </div>
+    </div>
+    <div class="hi"></div>
+  </div>
+</div>
+
+<!-- Mechanic profile new -->
+<div class="frame" style="left:1470px;top:2050px">
+  <div class="frame-label" data-drags-parent="1">Mechanic profile <span class="meta">— new</span></div>
+  <div class="phone">
+    <div class="notch"></div>
+    <div class="sb"><span>9:41</span><div class="sb-icons"><i data-lucide="signal"></i><i data-lucide="wifi"></i><i data-lucide="battery-full"></i></div></div>
+    <div class="screen" data-screen-label="Mechanic profile">
+      <div class="h transp"><div class="h-left"><div class="h-back"><i data-lucide="chevron-left"></i></div><div class="h-title">Your mechanic</div></div></div>
+      <div class="body">
+        <div class="card float pad-lg center-t">
+          <div class="tile xl avatar" style="margin:0 auto;width:72px;height:72px;font-size:22px">A</div>
+          <div class="h2" style="margin-top:10px">Alex Turner</div>
+          <div class="row gap-6" style="justify-content:center;margin-top:6px"><div class="stars lg"><i data-lucide="star"></i><i data-lucide="star"></i><i data-lucide="star"></i><i data-lucide="star"></i><i data-lucide="star"></i></div><div class="b b7">4.9</div></div>
+          <div class="cap" style="margin-top:4px">143 jobs · joined 2 years ago</div>
+          <div class="row gap-8" style="justify-content:center;margin-top:14px"><button class="btn primary"><i data-lucide="phone"></i>Call</button><button class="btn secondary"><i data-lucide="message-circle"></i>Message</button></div>
+        </div>
+        <div class="col gap-6">
+          <div class="overline">About</div>
+          <div class="card"><div class="b sec">City &amp; Guilds Level 3, 12 years in trade. Ex-Ford main dealer. Loves a well-kept driveway and a proper cup of tea.</div></div>
+        </div>
+        <div class="col gap-6">
+          <div class="overline">Specialisms</div>
+          <div class="row gap-6" style="flex-wrap:wrap">
+            <div class="pill neutral" style="text-transform:none;letter-spacing:0;font-size:11.5px">Brakes</div>
+            <div class="pill neutral" style="text-transform:none;letter-spacing:0;font-size:11.5px">Servicing</div>
+            <div class="pill neutral" style="text-transform:none;letter-spacing:0;font-size:11.5px">Ford</div>
+            <div class="pill neutral" style="text-transform:none;letter-spacing:0;font-size:11.5px">Diagnostics</div>
+          </div>
+        </div>
+        <div class="col gap-6">
+          <div class="overline">Recent reviews</div>
+          <div class="card"><div class="row gap-6"><div class="stars"><i data-lucide="star"></i><i data-lucide="star"></i><i data-lucide="star"></i><i data-lucide="star"></i><i data-lucide="star"></i></div><div class="cap b7">Sarah · 3 days ago</div></div><div class="b sec" style="margin-top:6px">Absolutely spot on — sorted my brakes in an hour.</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="hi"></div>
+  </div>
+</div>
+
+
+<script>window.addEventListener("DOMContentLoaded",function(){if(window.lucide&&window.lucide.createIcons)window.lucide.createIcons();});</script>
+</body>
+</html>
