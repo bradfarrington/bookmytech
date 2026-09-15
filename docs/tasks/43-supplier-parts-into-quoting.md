@@ -1,6 +1,48 @@
 # Task 43 — Supplier parts into quoting: engine oil, the mechanic's picker, and repair→parts
 
-**Status:** 📋 Planned, not started (2026-09-11). Scoped and de-risked; **partly blocked on HaynesPro**. Read this before restarting — the split below is the point, and it is not obvious.
+**Status:** 🅿️ Parked with owner decisions (2026-09-15). **Pick this up next, before Task 48.** HaynesPro is back (Task 44) and repairs now show their parts on the vehicle page (Task 45), but **customer prices still leave parts out**. See "Owner decisions (2026-09-15)" directly below; the rest of this doc is the 2026-09-11 scoping.
+
+## The problem, as found (2026-09-15)
+
+Brad booked an **air filter** for **S28 BSW** (Ford Ranger 3.0 TDCi, 2022 on). The booking price was **labour only**. The vehicle's model page shows the part as the default: MANN 502591409 from LKQ at £29.10. Two causes:
+
+1. **Parts were never fed into customer prices.** `quoteRepairs` (`lib/haynespro/repair-booking.ts`) has one parts line, engine oil on servicing products. Task 45 built parts for the admin vehicle page only, and listed "feed the chosen parts into quotes" as the next step.
+2. **Alliance Automotive didn't answer on that same lookup**: "We couldn't reach AAG at all (network error or timeout)". Its prices are still UAT sandbox data (Task 45 open questions), so check which endpoint production calls.
+
+## Owner decisions (2026-09-15)
+
+| # | Question | Decision |
+|---|---|---|
+| 1 | Mark-up and commission | **No mark-up.** The customer pays the supplier price. **Commission comes out of the total price**, parts included (the engine already does this). |
+| 2 | A supplier doesn't answer | **It shouldn't time out.** Fetch both suppliers' parts and prices and pick the dearest, **fast**. |
+| 3 | LKQ credits (14 of 350 this month) | Expected to become **unlimited in production**. Still cache per vehicle, for speed. |
+| 4 | Which part matches count | **Only admin-confirmed part-group matches.** Any repair whose part groups are matched on that vehicle **must be priced with its parts when booking**. |
+| 5 | A cheaper part gets fitted | **Not tracked.** We price the dearest part (or the admin's chosen one, per engine variant). Buying the parts is up to the mechanic. This closes §8 Q8 below. |
+
+## What to build (proposed from the decisions; confirm while building)
+
+- **Price the parts into the quote.**
+  - For each HaynesPro job in `quoteRepairs`, take its part groups with a **confirmed** `part_group_links` row.
+  - Look both suppliers up **in parallel** and pick each part with `selectRepairPart` (the admin's choice, else the dearest).
+  - Add the parts to `breakdown.partsPence` alongside oil.
+  - A job with no confirmed matches stays labour-only.
+- **Speed and stability.**
+  - The quote is recalculated at every step (Price, Time, Address, Confirm, the hold, booking create), so cache the part prices per registration and part group. The customer then sees one price the whole way through.
+  - Give each supplier a short timeout.
+  - **Assumption to confirm:** if one supplier fails, price from the one that answered, which is what `selectRepairPart` already does. If both fail, don't book without the part price.
+  - **Investigate the AAG failure first.**
+- **Show it.**
+  - Parts appear on the price step and in Confirm's summary.
+  - **The mechanic's job sheet names the exact part to buy** (supplier, brand, part number), because decision 5 leaves buying to them.
+- **Probable SQL.** `bookings.parts_price_pence` already exists, and the app already reads it, so the parts total may need no new column. Storing the priced parts themselves (supplier, brand, part number, price per line) on the booking, so the job sheet and a later dispute can see them, needs a migration. Take the next free number when building; the dashboard plan reserved 0069 onwards for Tasks 49 to 55, so renumber those.
+- **Prerequisites.**
+  - Confirm `0067_repair_part_choices.sql` is applied. Without it, "Change" doesn't save.
+  - Seed and confirm the part-group matches for common repairs.
+- **Mobile app.**
+  - The customer price shown in the app changes: `app/api/mobile/v1/quote` already returns `partsPence`, but the figure changes.
+  - Any parts lines added to the quote or booking responses must be additive.
+  - The app needs `npm run db:types` after the migration.
+  - Tell Brad.
 
 The manual `parts` catalogue is gone (Task 42). Everything is to come from the supplier APIs instead: the mechanic's on-site quote picker, the customer booking process, and the engine oil on a service.
 

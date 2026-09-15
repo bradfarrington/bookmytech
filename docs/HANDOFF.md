@@ -121,7 +121,12 @@ You are working on **Book My Tech**, a UK mobile-mechanic booking platform. This
 
 ### 2026-09-15 — Booking flow split into the app's steps ✅ (Task 47), branch `task-47-booking-flow-split`
 
-**The web funnel now books in the app's steps:** Price → Time (`/book/time`) → Address (`/book/address`) → Confirm (`/book/slot`, unchanged URL). Detail in `docs/tasks/47-booking-flow-split.md`. Next up is Task 48, the dashboard rebuild (plan: `mockups/` structure with a top header).
+**The web funnel now books in the app's steps:** Price → Time (`/book/time`) → Address (`/book/address`) → Confirm (`/book/slot`, unchanged URL). Detail in `docs/tasks/47-booking-flow-split.md`. **Next up: the parked parts-pricing work in `docs/tasks/43-supplier-parts-into-quoting.md`**, with Brad's decisions of 2026-09-15. Customer prices still leave parts out (found booking an air filter on S28 BSW). **Then Task 48**, the dashboard rebuild (`mockups/` structure with a top header). Task 48 itself has no SQL; the plan's migrations start at Task 49 (0069).
+
+**Discount codes (checked 2026-09-15): already in both booking flows, nothing to add.**
+- **Web:** the Confirm step's "Have a discount code?" box.
+- **App:** `src/app/book/confirm.tsx` sends `promoCode` to `/checkout/prepare` and `/bookings`, and the confirmed and booking-detail screens show the discount.
+- **Watch for:** the redesign mockups don't show a discount-code field. Keep it when the app's Confirm screen is rebuilt.
 
 - **Checkout unchanged underneath.** `slot-picker.tsx` became `confirm-checkout.tsx`. Only the time and address inputs moved out. The 3-D Secure draft, `confirmedIntentId`, stranded-hold and discount-code logic are exactly as they were.
 - **Address in sessionStorage, never the URL**, keyed by the job (`lib/bookings/address-draft.ts`). The time goes in the URL (`lib/bookings/step-params.ts`).
