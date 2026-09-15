@@ -119,9 +119,31 @@ You are working on **Book My Tech**, a UK mobile-mechanic booking platform. This
 
 ## Current task
 
+### 2026-09-15 (evening) — LKQ removed; AAG parts into customer prices 🚧 (Task 43), branch `task-43-parts-in-customer-prices`
+
+**Gareth: remove LKQ entirely.** Alliance Automotive prices HaynesPro's part groups directly, so nothing needs matching. Decisions and plan: `docs/tasks/43-supplier-parts-into-quoting.md` → "Revised decisions".
+
+- **Part A ✅ LKQ removed.** Deleted:
+  - `lib/lkq` and the part-group matcher
+  - `/admin/parts/groups`
+  - the LKQ scripts
+  - the LKQ catalogue at `/admin/parts`, which now redirects to the AAG check page ("Parts supplier" in the sidebar)
+
+  The vehicle page's Parts panel is AAG only. No customer, mechanic or mobile code used LKQ.
+- **Part B 🚧** AAG parts priced into `quoteRepairs`.
+- **Owner:**
+  - apply **`0069_remove_lkq.sql`** (drops `part_group_links`, limits `repair_part_choices` to AAG, deletes LKQ cache rows), then run `npm run db:types` in the app;
+  - delete the `LKQ_*` variables on Vercel;
+  - **send AAG the dev IP `80.1.6.55`**: UAT only allows `80.6.218.98`, so every AAG call from this machine gets a Cloudflare 403;
+  - book AAG's demo call for production credentials (live needs no IP allowlist).
+- **Migration numbers:** 0069 and 0070 are Task 43's, so the dashboard plan's migrations (Tasks 49 to 55) now start at **0071**.
+- **This machine:** `tsc` shows two errors that predate this work:
+  - `leaflet` isn't installed; run `npm install`;
+  - `.next/types` holds stale references to parts pages deleted in Task 42.
+
 ### 2026-09-15 — Booking flow split into the app's steps ✅ (Task 47), branch `task-47-booking-flow-split`
 
-**The web funnel now books in the app's steps:** Price → Time (`/book/time`) → Address (`/book/address`) → Confirm (`/book/slot`, unchanged URL). Detail in `docs/tasks/47-booking-flow-split.md`. **Next up: the parked parts-pricing work in `docs/tasks/43-supplier-parts-into-quoting.md`**, with Brad's decisions of 2026-09-15. Customer prices still leave parts out (found booking an air filter on S28 BSW). **Then Task 48**, the dashboard rebuild (`mockups/` structure with a top header). Task 48 itself has no SQL; the plan's migrations start at Task 49 (0069).
+**The web funnel now books in the app's steps:** Price → Time (`/book/time`) → Address (`/book/address`) → Confirm (`/book/slot`, unchanged URL). Detail in `docs/tasks/47-booking-flow-split.md`. **Next up: the parked parts-pricing work in `docs/tasks/43-supplier-parts-into-quoting.md`**, with Brad's decisions of 2026-09-15. Customer prices still leave parts out (found booking an air filter on S28 BSW). **Then Task 48**, the dashboard rebuild (`mockups/` structure with a top header). Task 48 itself has no SQL; the plan's migrations start at Task 49, now **0071** (0069 and 0070 went to Task 43).
 
 **Discount codes (checked 2026-09-15): already in both booking flows, nothing to add.**
 - **Web:** the Confirm step's "Have a discount code?" box.
@@ -169,12 +191,12 @@ You are working on **Book My Tech**, a UK mobile-mechanic booking platform. This
 
 **Tasks 40–45 merged to `main` (fast-forward from branch `task-42-live-supplier-catalogue`).** Task 45 is still in progress; detail in `docs/tasks/45-repair-parts-linking.md`.
 
-- **Repairs show their parts:** on the vehicle model page, a repair's **Parts** button lists both suppliers' fitting parts for a registration proven to be that engine variant. The dearest part is used by default, and **Change** applies to that variant only.
-- **Part group → LKQ matching** (`/admin/parts/groups`, and **Match to LKQ** inside the Parts panel) works by checking LKQ's real parts on a real car. The choice is limited to LKQ parts that fit that car, and the match button appears only after those parts have been seen. Alliance Automotive is not part of matching: it takes part groups directly.
+- **Repairs show their parts:** on the vehicle model page, a repair's **Parts** button lists the fitting parts for a registration proven to be that engine variant, and **Change** applies to that variant only. **Since Task 43 (same evening) this is Alliance Automotive only.**
+- ~~Part group → LKQ matching (`/admin/parts/groups`, Match to LKQ)~~ **Removed with LKQ (Task 43).**
 - **Owner:**
-  - apply migration **`0067_repair_part_choices.sql`** (`0066` is applied). Until then, "Use this" on a part fails;
-  - after both migrations, run `npm run db:types` in the app (both tables are admin-only; no API or customer-read change);
-  - set the Vercel env for HaynesPro production (Task 44) and LKQ ADS before relying on the deploy.
+  - ~~apply `0067_repair_part_choices.sql`~~ **Applied (verified live 2026-09-15).** `0066` is applied too, and `0069` drops it again;
+  - run `npm run db:types` in the app after the Task 43 migrations;
+  - set the Vercel env for HaynesPro production (Task 44) before relying on the deploy.
 
 ### 2026-09-14 — HaynesPro back on production accounts ✅ (Task 44)
 

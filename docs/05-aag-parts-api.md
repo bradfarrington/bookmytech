@@ -24,6 +24,10 @@ What has been asked of AAG (2026-09-10, via Gareth): can they allowlist by **API
 
 **Resolved for UAT 2026-09-14:** AAG confirmed they have allowlisted the development IP (`80.6.218.98`, Brad's connection). The same day, requests from it reach AAG's application on UAT instead of the Cloudflare block page. If the dev connection's IP changes, the sandbox will 403 again; re-check with `curl -s https://api.ipify.org` and send AAG the new one.
 
+**Blocked again 2026-09-15:** the dev connection now appears as **`80.1.6.55`** (AAG's own `/cdn-cgi/trace` confirms it). Every UAT request gets the Cloudflare block page again, even a bare `GET /` with no credentials. Live still answers normally (`ISE0034` without credentials). **Send AAG `80.1.6.55`.**
+
+**Since 2026-09-15 AAG is the only parts supplier** (LKQ removed, Task 43), and its prices feed customer quotes.
+
 So there are two IP conversations, not one:
 
 - **Sandbox / development:** ✅ done (above).

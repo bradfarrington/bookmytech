@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { ArrowDownWideNarrow, Info, Link2, Package, RotateCcw } from "lucide-react";
+import { ArrowDownWideNarrow, Info, Package, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -13,27 +13,19 @@ import {
 } from "@/app/actions/repair-parts";
 import { Button } from "@/components/ui/button";
 import { Pill } from "@/components/ui/pill";
-import {
-  dearestOffer,
-  SUPPLIER_LABEL,
-  type SupplierOffer,
-  type SupplierPanel,
-} from "@/lib/parts/supplier-offer";
+import { dearestOffer, type SupplierOffer, type SupplierPanel } from "@/lib/parts/supplier-offer";
 import { cn, formatPrice } from "@/lib/utils";
-import { PartGroupMatcher } from "../../parts/groups/_components/part-group-matcher";
 
 // A repair's parts on one engine variant (Task 45), opened from a timed repair
 // on the admin vehicle model page.
 //
-// Nothing is fetched until the admin opens it: a first look at a vehicle and
-// part group spends LKQ catalogue credits (then cached). The default part is
-// the dearest either supplier will sell us; "Change" lists every fitting part
-// from both, and a choice applies to this engine variant only.
+// Nothing is fetched until the admin opens it. Alliance Automotive prices each
+// part group the repair uses. The default part is the dearest it will sell us,
+// "Change" lists every fitting part, and a choice applies to this engine
+// variant only.
 //
-// Money rules as on /admin/parts: supplier cost, no mark-up; surcharge never
-// added to cost; an unpriced part shows "—", never £0.00.
-
-const SHORT_SUPPLIER = { lkq: "LKQ", aag: "AAG" } as const;
+// Money rules: supplier cost, no mark-up; a core charge is never added to the
+// cost; an unpriced part says "Not priced", never £0.00.
 
 function panelOffers(panel: SupplierPanel): SupplierOffer[] {
   return panel.state === "ok" ? panel.offers : [];
@@ -57,7 +49,6 @@ function OfferSummary({ offer }: { offer: SupplierOffer }) {
         <span className="text-sm font-semibold text-text-primary">{offer.brand ?? "Unbranded"}</span>
         <span className="font-mono text-xs text-text-muted">{offer.partNumber}</span>
         {offer.tier && <Pill tone="neutral">{offer.tier}</Pill>}
-        <Pill tone="info">{SHORT_SUPPLIER[offer.supplier]}</Pill>
       </div>
       {(offer.description || offer.fitment.length > 0) && (
         <p className="mt-0.5 text-xs text-text-muted">
@@ -90,33 +81,20 @@ function PartGroupCard({
   group,
   carTypeId,
   nodeId,
-  reg,
   onUpdated,
-  onMatched,
 }: {
   group: RepairPartGroupView;
   carTypeId: number;
   nodeId: string;
-  /** The registration these parts were priced for; the LKQ matcher shows parts on it too. */
-  reg: string;
   onUpdated: (next: RepairPartGroupView) => void;
-  /** The part group's LKQ match changed, so both suppliers' parts need asking again. */
-  onMatched: () => void;
 }) {
   const [changing, setChanging] = useState(false);
-  const [matching, setMatching] = useState(false);
-  const lkqMatched = group.lkqLink.kind === "confirmed" || group.lkqLink.kind === "auto";
   const [pending, startTransition] = useTransition();
 
-  const offers = [...panelOffers(group.lkq), ...panelOffers(group.aag)].sort(
-    (a, b) => (b.costPence ?? -1) - (a.costPence ?? -1),
-  );
+  const offers = [...panelOffers(group.aag)].sort((a, b) => (b.costPence ?? -1) - (a.costPence ?? -1));
   const selection = group.selection;
   const selected = selection.source === "none" ? null : selection.offer;
-  const notes = [
-    { label: SUPPLIER_LABEL.lkq, note: panelNote(group.lkq) },
-    { label: SUPPLIER_LABEL.aag, note: panelNote(group.aag) },
-  ].filter((n) => n.note);
+  const note = panelNote(group.aag);
 
   const choose = (offer: SupplierOffer) =>
     startTransition(async () => {
@@ -158,12 +136,6 @@ function PartGroupCard({
       <div className="flex flex-wrap items-center gap-2">
         <p className="text-sm font-semibold text-text-primary">{group.description}</p>
         <span className="font-mono text-xs text-text-muted">Group {group.genartId}</span>
-        {group.lkqLink.kind === "confirmed" && <Pill tone="success">LKQ matched</Pill>}
-        {group.lkqLink.kind === "auto" && <Pill tone="accent">LKQ auto-matched</Pill>}
-        {(group.lkqLink.kind === "unmatched" || group.lkqLink.kind === "stale") && (
-          <Pill tone="pending">Not matched to LKQ</Pill>
-        )}
-        {group.lkqLink.kind === "no_match" && <Pill tone="neutral">No LKQ equivalent</Pill>}
       </div>
 
       <div className="mt-2 flex flex-col gap-2 rounded-lg bg-surface px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
@@ -178,68 +150,42 @@ function PartGroupCard({
             <Cost offer={selected} />
           </>
         ) : (
-          <p className="text-sm text-text-muted">Neither supplier returned a part we can buy for this vehicle.</p>
+          <p className="text-sm text-text-muted">Alliance Automotive didn&apos;t return a part we can buy for this vehicle.</p>
         )}
       </div>
 
       {selection.source !== "choice" && selection.missingChoice && (
         <p className="mt-2 flex items-start gap-1.5 text-xs text-amber-700">
           <Info size={12} className="mt-0.5 shrink-0" />
-          The part chosen before ({selection.missingChoice.brand ?? SHORT_SUPPLIER[selection.missingChoice.supplier]}{" "}
+          The part chosen before ({selection.missingChoice.brand ?? "Alliance Automotive"}{" "}
           {selection.missingChoice.part_number}) isn&apos;t in today&apos;s results, so the dearest is shown.
         </p>
       )}
 
-      {notes.map(({ label, note }) => (
-        <p key={label} className="mt-1.5 text-xs text-text-muted">
-          <span className="font-semibold">{label}:</span> {note}
-        </p>
-      ))}
+      {note && <p className="mt-1.5 text-xs text-text-muted">{note}</p>}
 
-      <div className="mt-2 flex flex-wrap gap-2">
-        {offers.length > 0 && (
-          <Button size="sm" variant="secondary" iconLeft={ArrowDownWideNarrow} disabled={pending} onClick={() => setChanging((v) => !v)}>
-            {changing ? "Close" : `Change (${offers.length} options)`}
-          </Button>
-        )}
-        {selection.source === "choice" && (
-          <Button size="sm" variant="tertiary" iconLeft={RotateCcw} disabled={pending} onClick={reset}>
-            Use dearest
-          </Button>
-        )}
-        <Button size="sm" variant="ghost" iconLeft={Link2} disabled={pending} onClick={() => setMatching((v) => !v)}>
-          {matching ? "Close LKQ match" : lkqMatched ? "Check LKQ match" : "Match to LKQ"}
-        </Button>
-      </div>
-
-      {matching && (
-        <div className="mt-2">
-          <PartGroupMatcher
-            genartId={group.genartId}
-            description={group.description}
-            reg={reg}
-            current={
-              lkqMatched && group.lkqLink.componentNumber && group.lkqLink.componentName
-                ? { number: group.lkqLink.componentNumber, name: group.lkqLink.componentName.trim() }
-                : null
-            }
-            confirmed={group.lkqLink.kind === "confirmed"}
-            allowNoMatch={group.lkqLink.kind !== "no_match"}
-            onMatched={() => {
-              setMatching(false);
-              onMatched();
-            }}
-          />
+      {(offers.length > 0 || selection.source === "choice") && (
+        <div className="mt-2 flex flex-wrap gap-2">
+          {offers.length > 0 && (
+            <Button size="sm" variant="secondary" iconLeft={ArrowDownWideNarrow} disabled={pending} onClick={() => setChanging((v) => !v)}>
+              {changing ? "Close" : `Change (${offers.length} options)`}
+            </Button>
+          )}
+          {selection.source === "choice" && (
+            <Button size="sm" variant="tertiary" iconLeft={RotateCcw} disabled={pending} onClick={reset}>
+              Use dearest
+            </Button>
+          )}
         </div>
       )}
 
       {changing && (
         <ul className="mt-2 max-h-96 divide-y divide-border-subtle overflow-y-auto rounded-lg border border-border">
           {offers.map((offer) => {
-            const isSelected = selected?.supplier === offer.supplier && selected.partNumber === offer.partNumber;
+            const isSelected = selected?.partNumber === offer.partNumber;
             return (
               <li
-                key={`${offer.supplier}-${offer.partNumber}`}
+                key={offer.partNumber}
                 className={cn("flex flex-col gap-2 px-3 py-2 sm:flex-row sm:items-center sm:justify-between", isSelected && "bg-blue-50")}
               >
                 <OfferSummary offer={offer} />
@@ -305,7 +251,7 @@ export function RepairParts({
         <div className="basis-full space-y-3 rounded-xl border border-border bg-surface p-3">
           {loading && (
             <p className="text-sm text-text-muted">
-              Asking LKQ and Alliance Automotive for the parts for &ldquo;{repairName}&rdquo;…
+              Asking Alliance Automotive for the parts for &ldquo;{repairName}&rdquo;…
             </p>
           )}
 
@@ -344,8 +290,7 @@ export function RepairParts({
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-xs text-text-muted">
                   Priced for <span className="font-mono font-semibold text-text-primary">{result.reg}</span>
-                  {result.vehicle ? ` · ${result.vehicle}` : ""} · LKQ credits {result.credits.used}/{result.credits.cap} this
-                  month
+                  {result.vehicle ? ` · ${result.vehicle}` : ""}
                 </p>
                 <button
                   type="button"
@@ -364,9 +309,7 @@ export function RepairParts({
                     group={group}
                     carTypeId={carTypeId}
                     nodeId={nodeId}
-                    reg={result.reg}
                     onUpdated={updateGroup}
-                    onMatched={() => load(result.reg)}
                   />
                 ))
               )}

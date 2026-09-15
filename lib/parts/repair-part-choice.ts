@@ -1,7 +1,7 @@
 // Which part a repair uses on one engine variant (Task 45).
 //
-// The default is the dearest part either supplier will sell us for that part
-// group on that vehicle (owner decision, 2026-09-14). An admin can change it
+// The default is the dearest part Alliance Automotive will sell us for that
+// part group on that vehicle (owner decision, 2026-09-14). An admin can change it
 // on the vehicle's model page; the choice is stored per engine variant +
 // repair + part group (`repair_part_choices`, migration 0067) as the part's
 // identity — supplier and part number — never its price, so the price is

@@ -1,6 +1,6 @@
 # Task 41 — LKQ Euro Car Parts: catalogue + trade pricing spike (CLI probes)
 
-**Status:** ✅ Complete (2026-09-11) — the full chain **registration → ADS catalogue → ECP trade price** is verified working against LKQ's test service on Gareth's real account `L4040300`. Scripts only: no `lib/`, no app code, no migration, no `app/api/mobile/**` change. Findings in `docs/06-lkq-parts-api.md`. Deviations from the original sketch: none, except that the "chase LKQ for the component list" step proved unnecessary — the list was fetchable from their own API (§5).
+**Status:** ✅ Complete (2026-09-11), **superseded 2026-09-15**: LKQ was removed entirely (Task 43) and these probe scripts are deleted. Originally: the full chain **registration → ADS catalogue → ECP trade price** is verified working against LKQ's test service on Gareth's real account `L4040300`. Scripts only: no `lib/`, no app code, no migration, no `app/api/mobile/**` change. Findings in `docs/06-lkq-parts-api.md`. Deviations from the original sketch: none, except that the "chase LKQ for the component list" step proved unnecessary — the list was fetchable from their own API (§5).
 
 Gareth has an LKQ Euro Car Parts trade account and LKQ issued test credentials for two separate APIs. This task proves access, captures the real response shapes, and records where the supplied documentation is wrong — **before** anyone commits to a quoting or ordering build. AAG (Task 40) stays parked.
 

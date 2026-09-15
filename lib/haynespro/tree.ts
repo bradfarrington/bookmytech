@@ -18,7 +18,6 @@
 // which is why the repair-times functions take the car type as well as the
 // repair-times dataset id. See lib/haynespro/client.ts for the rules.
 
-import { notePartGroups } from "@/lib/parts/part-groups";
 import { haynesProCall, type HaynesProSession } from "./client";
 import { parseProcessRepairTasks, type CombinedRepairTimes } from "./combine";
 import type {
@@ -194,9 +193,6 @@ export async function getRepairtimeSubnodes(
       nodeId,
     }, contentSession(carTypeId)),
   );
-  // Repair nodes name the part groups they use; record any new ones for
-  // /admin/parts/groups (Task 45). After the response, never blocking.
-  notePartGroups(nodes);
   return nodes ?? [];
 }
 
@@ -215,9 +211,6 @@ export async function getRepairNodesByIds(
       nodesIds: nodeIds,
     }, contentSession(carTypeId)),
   );
-  // Repair nodes name the part groups they use; record any new ones for
-  // /admin/parts/groups (Task 45). After the response, never blocking.
-  notePartGroups(nodes);
   return nodes ?? [];
 }
 

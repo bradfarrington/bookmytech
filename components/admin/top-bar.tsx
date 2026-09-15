@@ -34,9 +34,7 @@ const CRUMBS: Record<string, readonly [string, string]> = {
   "/admin/discounts": ["Commercial", "Discounts"],
   "/admin/discounts/new": ["Discounts", "New code"],
   "/admin/discounts/[id]": ["Discounts", "Edit code"],
-  "/admin/parts": ["Commercial", "Parts catalogue"],
-  "/admin/parts/aag-check": ["Parts", "AAG connection check"],
-  "/admin/parts/groups": ["Parts", "Part group matches"],
+  "/admin/parts/aag-check": ["Commercial", "Parts supplier"],
   "/admin/areas/setup": ["Areas", "Launch a city"],
   "/admin/areas/[id]": ["Areas", "Area detail"],
 };

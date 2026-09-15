@@ -1,5 +1,7 @@
 # Supplier APIs — LKQ Euro Car Parts (catalogue, trade pricing, stock and ordering)
 
+> **⚠️ Superseded 2026-09-15.** LKQ was removed from the codebase (Task 43, Gareth's decision). Alliance Automotive is the only parts supplier (`docs/05-aag-parts-api.md`). This doc is kept as history: none of the code, tables, scripts or env vars it names exist any more.
+
 **Written 2026-09-11.** Gareth has a trade account with **LKQ Euro Car Parts** and LKQ have issued test credentials. This doc is the single reference for what those APIs offer, what has been **verified live**, how they slot into the booking and parts flows, and what is still open. It is the parts counterpart to `docs/04-supplier-apis.md` (HaynesPro) and sits alongside `docs/05-aag-parts-api.md` (AAG, parked).
 
 Credentials are **NOT in this file** — they live in `.env.local` (gitignored) under the env names below. The supplied documents are deliberately untracked (see `.gitignore`); they carry live passwords.

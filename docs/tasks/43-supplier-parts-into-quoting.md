@@ -1,6 +1,31 @@
 # Task 43 — Supplier parts into quoting: engine oil, the mechanic's picker, and repair→parts
 
-**Status:** 🅿️ Parked with owner decisions (2026-09-15). **Pick this up next, before Task 48.** HaynesPro is back (Task 44) and repairs now show their parts on the vehicle page (Task 45), but **customer prices still leave parts out**. See "Owner decisions (2026-09-15)" directly below; the rest of this doc is the 2026-09-11 scoping.
+**Status:** 🚧 In progress (2026-09-15). **Revised the same evening: LKQ is removed entirely (Gareth) and Alliance Automotive is the only parts supplier.** Part A, removing LKQ (migration `0069_remove_lkq.sql`), is done. Part B, AAG parts in customer prices, is being built. "Revised decisions" directly below supersede the earlier decisions table; everything after it is earlier scoping, kept as history.
+
+## Revised decisions (2026-09-15, evening)
+
+| # | Decision |
+|---|---|
+| 1 | **LKQ removed entirely.** AAG prices HaynesPro's TecDoc part groups (GenArts) directly, so nothing needs matching and there is one catalogue. |
+| 2 | No mark-up. Commission comes out of the whole total, parts included (unchanged). |
+| 3 | **Default part:** AAG's **Best**-rated, the dearest within it (then Better, then Good). An admin's saved choice for the engine variant wins. |
+| 4 | A repair with no part groups from HaynesPro books without parts. Physical parts and consumables (antifreeze, screenwash, oil) **must be priced**. |
+| 5 | **Admins can switch a part group off** (tools such as "Battery charger") so it is never charged. Groups are charged by default. |
+| 6 | **A charged group AAG can't price** (down, blocked, or lists nothing for that car): use the last known AAG price if at most 7 days old, else stop the booking. |
+| 7 | `/admin/parts` (the LKQ catalogue) is removed; it redirects to the AAG check page. Parts live under each repair on the vehicle model page. |
+| 8 | Each job carries its own parts, like labour. A job chosen twice is still deduped. |
+| 9 | A cheaper part being fitted is not tracked. |
+
+**AAG access (checked 2026-09-15):**
+- **UAT sandbox:** allowlisted to `80.6.218.98` only. This connection is now `80.1.6.55`, so every call gets a Cloudflare 403 until AAG adds it.
+- **Live:** answers from here and needs credentials only, no allowlist. Production credentials follow AAG's demo call.
+
+**Pricing facts from AAG's captured replies (DV12CGU):**
+- **Brake discs** are priced per disc and sold in pairs (`RecMinOrdQty: 2`).
+- **Axles:** one GenArt quote covers both, via `FittingPosition` (`FR` / `RR`).
+- **Ratings** are Good / Better / Best, and the dearest isn't always Best.
+- **"No parts"** (`ISE0006` / `ISE0011`) currently looks the same as a failure.
+- **Surcharge:** a £0.00 surcharge is shown as a core charge.
 
 ## The problem, as found (2026-09-15)
 

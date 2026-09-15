@@ -8,10 +8,10 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { AagCheckForm } from "./_components/aag-check-form";
 import { AagStatus } from "./_components/aag-status";
 
-// AAG parts-pricing sandbox check (Task 40). Admin-only, read-only: one
+// The parts supplier page (Task 40; the only supplier since LKQ was removed in
+// Task 43). Admin-only, read-only: AAG's connection status, and one
 // registration + one TecDoc product group → AAG's fitting parts, trade prices
-// and branch stock. Exists so the owner can see what the supplier returns
-// before anything customer-facing is built on it.
+// and branch stock. A repair's parts live on the vehicle model page.
 
 export const dynamic = "force-dynamic";
 
@@ -36,9 +36,9 @@ export default async function AagCheckPage() {
             ordered and nothing is saved.
           </p>
         </div>
-        <Link href="/admin/parts">
+        <Link href="/admin/vehicles">
           <Button variant="ghost" iconLeft={ArrowLeft}>
-            Parts catalogue
+            Vehicles
           </Button>
         </Link>
       </header>

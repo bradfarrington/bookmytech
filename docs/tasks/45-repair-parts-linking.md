@@ -1,6 +1,6 @@
-# Task 45 — Link HaynesPro repairs to LKQ and AAG parts
+# Task 45 — Link HaynesPro repairs to supplier parts
 
-**Status:** 🚧 In progress (2026-09-14). Built: the part-group table (0066, **applied**), automatic recording, name matching, the review page, and **parts inside each repair on the vehicle model page**, with the dearest part by default and a per-engine-variant "Change". **Migration 0067 not yet applied.** Not yet exercised by a signed-in admin. 2026-09-15: part groups are now matched by checking **LKQ's real parts on a real car**, choosing only from LKQ parts that fit it, on the review page and inline in the Parts panel.
+**Status:** ✅ Superseded by Task 43 (2026-09-15). LKQ was removed, so the part-group matching this task built is deleted: `lib/parts/part-group-*`, `/admin/parts/groups`, the matcher and the automatic recording. Migration `0069_remove_lkq.sql` drops `part_group_links`. **What survives:** a repair's **Parts** panel on the vehicle model page, now Alliance Automotive only, with a per-engine-variant "Change" stored in `repair_part_choices` (0067, applied). The rest of this doc is the history of the LKQ approach; its unticked boxes are moot rather than deferred.
 
 Unblocked by Task 44 (HaynesPro production). This is item 3 of Task 43 ("repair → parts"), brought forward by Brad.
 

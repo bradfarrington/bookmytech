@@ -76,7 +76,7 @@ const NAV_GROUPS: readonly NavGroup[] = [
       { label: "Repairs", href: "/admin/repairs", icon: Wrench },
       { label: "Services", href: "/admin/services", icon: ClipboardCheck },
       { label: "Vehicles", href: "/admin/vehicles", icon: Car },
-      { label: "Parts", href: "/admin/parts", icon: Package },
+      { label: "Parts supplier", href: "/admin/parts/aag-check", icon: Package },
       { label: "Discounts", href: "/admin/discounts", icon: Ticket },
       { label: "SMS", href: "/admin/sms", icon: MessageSquare },
       { label: "Emails", href: "/admin/emails", icon: Mail },
