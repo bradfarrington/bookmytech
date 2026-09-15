@@ -48,7 +48,7 @@ export type SimpleResult = { ok: true } | { ok: false; error: string };
 type Admin = ReturnType<typeof createAdminClient>;
 
 const CUSTOMER_DISPUTE_WINDOW_MS = 48 * 60 * 60 * 1000;
-const ADMIN_EMAIL = process.env.ADMIN_NOTIFY_EMAIL || "help@bookmytech.co.uk";
+const ADMIN_EMAIL = process.env.ADMIN_NOTIFY_EMAIL || "support@bookmytech.co.uk";
 
 export interface DisputeBooking {
   id: string;

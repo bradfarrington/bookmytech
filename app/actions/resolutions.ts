@@ -21,7 +21,7 @@ export type SimpleResult = { ok: true } | { ok: false; error: string };
 
 type Admin = ReturnType<typeof createAdminClient>;
 
-const ADMIN_EMAIL = process.env.ADMIN_NOTIFY_EMAIL || "help@bookmytech.co.uk";
+const ADMIN_EMAIL = process.env.ADMIN_NOTIFY_EMAIL || "support@bookmytech.co.uk";
 
 /** The mechanic's email lives on the auth user, not the profile. */
 async function mechanicEmail(admin: Admin, mechanicId: string | null): Promise<string | null> {

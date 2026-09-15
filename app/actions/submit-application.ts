@@ -198,7 +198,7 @@ export async function submitApplication(
   }
 
   try {
-    const adminTo = process.env.ADMIN_ALERT_EMAIL || "help@bookmytech.co.uk";
+    const adminTo = process.env.ADMIN_ALERT_EMAIL || "support@bookmytech.co.uk";
     const { subject, html } = await renderAdminNewApplicationEmail({
       applicantName: fullName,
       postcode,

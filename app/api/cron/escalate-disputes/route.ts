@@ -16,7 +16,7 @@ import { ESCALATION_HOURS } from "@/lib/disputes/constants";
 // Next API route + vercel.json cron, not a Supabase edge function (project
 // convention). Protected by CRON_SECRET when set.
 
-const ADMIN_EMAIL = process.env.ADMIN_NOTIFY_EMAIL || "help@bookmytech.co.uk";
+const ADMIN_EMAIL = process.env.ADMIN_NOTIFY_EMAIL || "support@bookmytech.co.uk";
 
 async function runEscalation() {
   const admin = createAdminClient();

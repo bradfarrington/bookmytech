@@ -28,7 +28,7 @@ import { formatPrice } from "@/lib/utils";
 //      a REAL orphan — that passes every check on every call by definition — so
 //      a loop with one valid id would email on each hit.
 
-const ALERT_EMAIL = process.env.ADMIN_ALERT_EMAIL || "help@bookmytech.co.uk";
+const ALERT_EMAIL = process.env.ADMIN_ALERT_EMAIL || "support@bookmytech.co.uk";
 
 /** Doubles as the "we've already alerted on this intent" record — see below. */
 const ORPHAN_EVENT = "orphaned_hold";

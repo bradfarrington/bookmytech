@@ -54,7 +54,7 @@ export interface ResolveDisputeInput {
   flagMechanic?: boolean;
 }
 
-const ADMIN_EMAIL = process.env.ADMIN_NOTIFY_EMAIL || "help@bookmytech.co.uk";
+const ADMIN_EMAIL = process.env.ADMIN_NOTIFY_EMAIL || "support@bookmytech.co.uk";
 
 /**
  * `getUser()` rather than `getSession()`: it verifies the JWT with Supabase

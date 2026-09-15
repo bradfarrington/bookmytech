@@ -32,7 +32,7 @@ browser — prefixed `NEXT_PUBLIC_`) · **Required** = app breaks without it.
 | Var | Req | Type | Notes |
 |-----|-----|------|-------|
 | `RESEND_API_KEY` | ✅ | 🔑 | Resend dashboard → API Keys. Sends all transactional email (`lib/email/send.ts`). |
-| `ADMIN_ALERT_EMAIL` | ⬜ | plain | Where new-application alerts go. Falls back to `help@bookmytech.co.uk`. |
+| `ADMIN_ALERT_EMAIL` | ⬜ | plain | Where new-application alerts go. Falls back to `support@bookmytech.co.uk`. |
 | `ADMIN_NOTIFY_EMAIL` | ⬜ | plain | Admin notification recipient (general ops alerts). |
 
 ## Payments (Stripe)

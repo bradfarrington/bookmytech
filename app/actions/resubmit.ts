@@ -80,7 +80,7 @@ export async function markResubmitted(token: string): Promise<ResubmitResult> {
   if (error) return { ok: false, error: error.message };
 
   try {
-    const adminTo = process.env.ADMIN_ALERT_EMAIL || "help@bookmytech.co.uk";
+    const adminTo = process.env.ADMIN_ALERT_EMAIL || "support@bookmytech.co.uk";
     const { subject, html } = await renderAdminNewApplicationEmail({
       applicantName: full.full_name,
       postcode: full.postcode,

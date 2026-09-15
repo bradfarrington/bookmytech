@@ -35,8 +35,8 @@ and `VERCEL_URL` are set automatically — don't add them.
 | `APP_ENCRYPTION_KEY` | **Yes, to test mechanic onboarding** | 32-byte key for AES-256-GCM encryption of mechanic bank details. Generate: `openssl rand -hex 32`. Without it, application submit throws. |
 | `STRIPE_WEBHOOK_SECRET` | **Yes, for Stripe Connect sync** | Signing secret for the Stripe webhook (`/api/webhooks/stripe`). Local: run `stripe listen --forward-to localhost:3000/api/webhooks/stripe` and copy the `whsec_…` it prints. Prod: Stripe → Developers → Webhooks → endpoint signing secret. |
 | `CRON_SECRET` | Recommended | Bearer token that protects every `/api/cron/*` route. Generate any random string. Locally you can omit it (routes run open) but then **anyone can hit your crons** — set it. To fire a cron by hand: `curl -H "Authorization: Bearer <CRON_SECRET>" http://localhost:3000/api/cron/<name>`. |
-| `ADMIN_NOTIFY_EMAIL` | Recommended | Where dispatch-stall + dispute alerts go. Defaults to `help@bookmytech.co.uk` if unset. |
-| `ADMIN_ALERT_EMAIL` | Recommended | Where new/updated mechanic-application alerts go. Defaults to `help@bookmytech.co.uk`. |
+| `ADMIN_NOTIFY_EMAIL` | Recommended | Where dispatch-stall + dispute alerts go. Defaults to `support@bookmytech.co.uk` if unset. |
+| `ADMIN_ALERT_EMAIL` | Recommended | Where new/updated mechanic-application alerts go. Defaults to `support@bookmytech.co.uk`. |
 
 ### Missing — needed only for the SMS / top-up test (Task 13 Stage B)
 

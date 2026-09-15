@@ -78,7 +78,7 @@ async function runSweep() {
   }
 
   // One summary email to the admin.
-  const adminEmail = process.env.ADMIN_NOTIFY_EMAIL || "help@bookmytech.co.uk";
+  const adminEmail = process.env.ADMIN_NOTIFY_EMAIL || "support@bookmytech.co.uk";
   const bookings = toFlag
     .map(
       (b) =>
