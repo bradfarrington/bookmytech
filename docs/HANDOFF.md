@@ -147,6 +147,7 @@ You are working on **Book My Tech**, a UK mobile-mechanic booking platform. This
   4. Book AAG's demo call. Production needs live credentials and `AAG_BASE_URL`; live needs no IP allowlist.
 - **Customer app:**
   - render `quote.parts` on Price and Confirm (additive field on `POST /api/mobile/v1/quote`);
+  - `POST /checkout/prepare` also returns `parts` in the same shape, so Confirm can drop its extra `/quote` call;
   - show "+ parts" on tree nodes with `genartIds`;
   - totals now include parts.
 - **Migration numbers:** 0069 to 0071 are Task 43's, so the dashboard plan's migrations (Tasks 49 to 55) now start at **0072**.

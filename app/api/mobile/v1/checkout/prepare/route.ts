@@ -17,6 +17,12 @@ import { requireMobileUser } from "@/lib/supabase/mobile";
 //       Only transport-level problems return `{ error }` with a non-2xx:
 //       401 (no/expired token), 403 (staff account), 400/415 (bad body), 429.
 //
+// ADDITIVE (Task 43): both success arms carry `parts`, the supplier parts
+// inside `totalPence`, in the same shape as POST /quote's `parts`:
+//   [{ nodeId, name, brand, position, quantity, unitPence, linePence }]
+// (brand is null for a set price; position "front" | "rear" | null). Confirm
+// can list them without calling /quote as well. Empty for a follow-on quote.
+//
 // Thin wrapper over `prepareCheckoutFor` — the SAME function the website's
 // checkout calls through app/actions/create-booking.ts. Everything that decides
 // money happens in there: the price is re-quoted from (reg, node) server-side,

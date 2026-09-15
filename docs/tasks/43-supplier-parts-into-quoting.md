@@ -66,6 +66,7 @@
   - **Vehicle Parts panel:** shows the part customers pay for (one per axle), with a "Charge customers" switch.
 - **Mobile API.**
   - `POST /api/mobile/v1/quote` gains an additive `parts` array.
+  - `POST /api/mobile/v1/checkout/prepare` returns the same `parts` on both success arms (asked for by the app, so Confirm needs no second `/quote` call). Both routes share `customerPartLines`.
   - `partsPence` / `totalPence` now include parts.
   - A part that can't be priced gets its own `not_priceable` message.
 - **Before 0070 is applied, nothing changes.** Parts pricing switches itself off and quotes stay labour-only. Smoke-tested on the dev server: S28BSW "Renew the air filter" is £60.00 with `parts: []`, and `/book/match` returns 200.

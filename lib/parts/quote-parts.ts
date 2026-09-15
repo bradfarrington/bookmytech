@@ -242,3 +242,33 @@ export function catalogueBookingPartRows(bookingId: string, parts: readonly Quot
     priced_at: part.pricedAt,
   }));
 }
+
+/**
+ * A priced part as the customer app reads it: the `parts` lines of
+ * POST /api/mobile/v1/quote and /checkout/prepare. One mapper, so the two
+ * responses can't drift. A contract: add fields, never rename or remove them.
+ */
+export interface CustomerPartLine {
+  /** The job it belongs to. */
+  nodeId: string;
+  /** HaynesPro's name for the part group, e.g. "Brake disc". */
+  name: string;
+  /** Null for a set price. */
+  brand: string | null;
+  position: PartPosition | null;
+  quantity: number;
+  unitPence: number;
+  linePence: number;
+}
+
+export function customerPartLines(parts: readonly QuotedPart[]): CustomerPartLine[] {
+  return parts.map((part) => ({
+    nodeId: part.nodeId,
+    name: part.groupLabel,
+    brand: part.brand,
+    position: part.position,
+    quantity: part.quantity,
+    unitPence: part.unitPence,
+    linePence: part.linePence,
+  }));
+}

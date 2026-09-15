@@ -17,7 +17,7 @@ import {
 } from "@/lib/slots";
 import { dispatchBooking } from "@/lib/dispatch/dispatch";
 import { PARTS_UNAVAILABLE_MESSAGE, quoteRepairsResult, type RepairsQuote } from "@/lib/haynespro/repair-booking";
-import { catalogueBookingPartRows } from "@/lib/parts/quote-parts";
+import { catalogueBookingPartRows, customerPartLines, type CustomerPartLine } from "@/lib/parts/quote-parts";
 import { MAX_REPAIRS_PER_BOOKING, repairIdsFromInput } from "@/lib/bookings/repair-ids";
 import { quoteFollowOn, type FollowOnOrigin } from "@/lib/quotes/book-follow-on";
 import type { QuoteView } from "@/lib/quotes/load";
@@ -590,6 +590,8 @@ export type PrepareCheckoutResult =
       discountPence: number;
       /** The code as stored, when one applied. */
       promoCode: string | null;
+      /** ADDITIVE (Task 43): the supplier parts inside `totalPence`, as POST /quote returns them. */
+      parts: CustomerPartLine[];
     }
   | {
       ok: true;
@@ -599,6 +601,7 @@ export type PrepareCheckoutResult =
       chargePence: 0;
       discountPence: number;
       promoCode: string | null;
+      parts: CustomerPartLine[];
     }
   | { ok: false; error: string };
 
@@ -627,6 +630,8 @@ export async function prepareCheckoutFor(
   const ids = quote.itemIds;
   // The combined total — one hold for the whole visit.
   const totalPence = quote.breakdown.totalPence;
+  // What's in it besides labour, so Confirm can list the parts without a second call.
+  const parts = customerPartLines(quote.parts);
 
   // A discount code, then account credit on what's left (Task 35). Both are
   // BMT-funded: they reduce the amount held, never the mechanic's payout.
@@ -653,6 +658,7 @@ export async function prepareCheckoutFor(
       chargePence: 0,
       discountPence,
       promoCode: promo?.code.code ?? null,
+      parts,
     };
   }
 
@@ -708,6 +714,7 @@ export async function prepareCheckoutFor(
       chargePence,
       discountPence,
       promoCode: promo?.code.code ?? null,
+      parts,
     };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Payment error" };

@@ -10,6 +10,7 @@ import type { AagPartOffers } from "./aag-part-prices";
 import {
   catalogueBookingPartRows,
   choiceKey,
+  customerPartLines,
   priceJobParts,
   type PartsJob,
   type QuotedPart,
@@ -224,5 +225,31 @@ describe("catalogueBookingPartRows", () => {
       { ...disc, supplier: null, partNumber: null, brand: null, position: null, groupLabel: "Antifreeze", quantity: 1, unitPence: 1250, linePence: 1250, source: "set_price" },
     ]);
     expect(row).toMatchObject({ part_name: "Antifreeze", supplier: null, supplier_part_number: null, total_pence: 1250, source: "catalogue" });
+  });
+});
+
+describe("customerPartLines", () => {
+  it("is the parts shape the app reads from /quote and /checkout/prepare", () => {
+    const part: QuotedPart = {
+      nodeId: "discs",
+      genartId: 82,
+      groupLabel: "Brake disc",
+      supplier: "aag",
+      partNumber: "BRE09.7629.11",
+      brand: "BREMBO",
+      description: "B/DISC 280 * 5 (VENTED) - FRONT",
+      imageUrl: null,
+      position: "front",
+      rating: "Best",
+      quantity: 2,
+      unitPence: 4354,
+      linePence: 8708,
+      source: "default",
+      lastKnown: false,
+      pricedAt: PRICED_AT,
+    };
+    expect(customerPartLines([part])).toEqual([
+      { nodeId: "discs", name: "Brake disc", brand: "BREMBO", position: "front", quantity: 2, unitPence: 4354, linePence: 8708 },
+    ]);
   });
 });

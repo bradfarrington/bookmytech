@@ -1,4 +1,5 @@
 import { PARTS_UNAVAILABLE_MESSAGE, quoteRepairsResult } from "@/lib/haynespro/repair-booking";
+import { customerPartLines } from "@/lib/parts/quote-parts";
 import { MAX_REPAIRS_PER_BOOKING, readRepairIdList } from "@/lib/bookings/repair-ids";
 import { enforceCatalogueLimits } from "@/lib/mobile/catalogue-limits";
 import { apiError, apiOk, readJsonBody } from "@/lib/mobile/respond";
@@ -130,16 +131,9 @@ export async function POST(request: Request): Promise<Response> {
     labourPence: quote.labourPence,
     fixedPence: quote.fixedPence,
     visitHours: quote.visitHours,
-    // ADDITIVE (Task 43): the supplier parts in the price.
-    parts: quote.parts.map((p) => ({
-      nodeId: p.nodeId,
-      name: p.groupLabel,
-      brand: p.brand,
-      position: p.position,
-      quantity: p.quantity,
-      unitPence: p.unitPence,
-      linePence: p.linePence,
-    })),
+    // ADDITIVE (Task 43): the supplier parts in the price. Same mapper as
+    // /checkout/prepare, so the two can't drift.
+    parts: customerPartLines(quote.parts),
   };
 
   return apiOk({
