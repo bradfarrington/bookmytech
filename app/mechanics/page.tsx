@@ -1,329 +1,150 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, Check } from "lucide-react";
-import { CustomerNav } from "@/components/ui/customer-nav";
-import { Card } from "@/components/ui/card";
-import { Icon } from "@/components/ui/icon";
-import { Overline } from "@/components/ui/overline";
+import { ArrowRight, BadgePercent, CreditCard, Wallet, Wrench, type LucideIcon } from "lucide-react";
+import { Accordion } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
-import { Accordion, type AccordionItem } from "@/components/ui/accordion";
+import { CustomerNav } from "@/components/ui/customer-nav";
+import { FactTicker } from "@/components/ui/fact-ticker";
+import { Icon } from "@/components/ui/icon";
 import { Reveal } from "@/components/ui/reveal";
-import type { BrandIconProps } from "@/components/ui/brand-icons";
-import {
-  PoundCoinIcon,
-  CalendarBoltIcon,
-  MapPinIcon,
-  ShieldCheckIcon,
-  SmartphoneIcon,
-  BanknoteIcon,
-  ClipboardCheckIcon,
-  RocketIcon,
-} from "@/components/ui/brand-icons";
+import { SectionHeading } from "@/components/ui/section-heading";
+import { SectionWatermark } from "@/components/ui/section-watermark";
 import { Footer } from "../(customer)/_components/footer";
+import { MECHANIC_FACTS, MECHANIC_FAQS, applyHref } from "./_components/recruitment";
+import {
+  MechanicBenefits,
+  MechanicFinalCta,
+  MechanicHowItWorks,
+  MechanicRequirements,
+} from "./_components/sections";
 
 export const metadata: Metadata = {
   title: "Become a Book My Tech mechanic | Work on your terms",
   description:
-    "Join Book My Tech as a vetted mobile mechanic. Set your own hours and area, get matched to jobs near you, and get paid fast. Apply in about 10 minutes.",
+    "Join Book My Tech as a vetted mobile mechanic. Set your own hours and area, get matched to jobs near you, and get paid when the job's done. Apply in about 10 minutes.",
 };
 
-const APPLY_HREF = "/mechanics/apply/step-1";
+const APPLY_HREF = applyHref();
 
-type Benefit = { Icon: (p: BrandIconProps) => React.ReactElement; title: string; body: string };
-
-const BENEFITS: Benefit[] = [
-  {
-    Icon: PoundCoinIcon,
-    title: "Keep more of every job",
-    body: "Transparent fixed pricing and fast payouts straight to your account. No chasing invoices, no cash handling.",
-  },
-  {
-    Icon: CalendarBoltIcon,
-    title: "Work on your terms",
-    body: "Set your own hours, radius and specialisms. Go online when you want and accept only the jobs that suit you.",
-  },
-  {
-    Icon: MapPinIcon,
-    title: "Jobs come to you",
-    body: "We send you bookings near you and bring the customers: no marketing, no quoting, no time-wasters.",
-  },
-  {
-    Icon: SmartphoneIcon,
-    title: "Everything in one app",
-    body: "Job details, customer messaging, photos, parts and payment all handled in the mechanic app on your phone.",
-  },
-  {
-    Icon: BanknoteIcon,
-    title: "Fast, reliable payouts",
-    body: "Payment is pre-authorised before you arrive and paid out when you mark the job complete.",
-  },
-  {
-    Icon: ShieldCheckIcon,
-    title: "Backed and protected",
-    body: "Every job is covered by our workmanship guarantee and dispute support, so you're never on your own.",
-  },
+// How a mechanic gets paid, in order (Task 37's payout path and the mechanic
+// agreement). The service fee rate is admin-editable, so it isn't quoted.
+const PAYMENT_STEPS: { icon: LucideIcon; text: string }[] = [
+  { icon: CreditCard, text: "The customer's card is pre-authorised when they book." },
+  { icon: Wrench, text: "You do the job and mark it complete in the app." },
+  { icon: Wallet, text: "Your payout goes to your connected account." },
+  { icon: BadgePercent, text: "We take a service fee on completed jobs. No monthly fees, no lead charges." },
 ];
 
-type Step = { number: string; Icon: (p: BrandIconProps) => React.ReactElement; title: string; body: string };
-
-const STEPS: Step[] = [
-  {
-    number: "01",
-    Icon: ClipboardCheckIcon,
-    title: "Apply online",
-    body: "Tell us about yourself, your business, your specialisms and your area. Takes about 10 minutes.",
-  },
-  {
-    number: "02",
-    Icon: ShieldCheckIcon,
-    title: "Get verified",
-    body: "Our team checks your ID, insurance and qualifications, usually within a few days.",
-  },
-  {
-    number: "03",
-    Icon: RocketIcon,
-    title: "Go live & earn",
-    body: "Download the mechanic app, set your availability and start getting matched to jobs near you.",
-  },
-];
-
-const REQUIREMENTS = [
-  "Photo ID (passport or driving licence)",
-  "Public liability + trade insurance",
-  "A recognised trade qualification (e.g. NVQ Level 2/3, City & Guilds)",
-  "Your own tools and a reliable vehicle",
-  "Two references",
-  "A smartphone to run the mechanic app",
-];
-
-const STATS: { value: string; label: string }[] = [
-  { value: "Set your own", label: "hours & area" },
-  { value: "Fast", label: "payouts per job" },
-  { value: "Zero", label: "lead or quoting fees" },
-  { value: "Days", label: "to get verified" },
-];
-
-const FAQS: AccordionItem[] = [
-  {
-    question: "How much does it cost to join?",
-    answer:
-      "Applying is free. There are no monthly fees and no charges for leads. We take a transparent service fee per completed job, so you only ever pay when you earn.",
-  },
-  {
-    question: "How and when do I get paid?",
-    answer:
-      "The customer's payment is pre-authorised before the job. Once you mark the work complete, the payout goes to your connected account, with no invoicing or chasing.",
-  },
-  {
-    question: "Do I have to work set hours?",
-    answer:
-      "No. You set your own availability and service radius and go online whenever you like. Accept the jobs that suit you and ignore the ones that don't.",
-  },
-  {
-    question: "What area will I cover?",
-    answer:
-      "You choose your base area and how far you're willing to travel during your application. We only send you jobs inside that radius.",
-  },
-  {
-    question: "What do I need to get verified?",
-    answer:
-      "Photo ID, valid public liability and trade insurance, a recognised trade qualification and two references. Our team checks these as part of your application.",
-  },
-  {
-    question: "How long does approval take?",
-    answer:
-      "Most applications are reviewed within a few working days once we have all your documents. We'll keep you updated by email at every step.",
-  },
-];
-
+// Task 46: the marketing page pattern (docs/03-design-system.md). Sections in
+// order, each on its own surface: gradient hero, fact ticker, benefits (light),
+// timeline (pale blue), requirements (dark), FAQ (white), gradient CTA.
 export default function MechanicsLandingPage() {
   return (
     <>
       <CustomerNav active="For mechanics" />
-      {/* Hero */}
-      <section className="bg-brand-gradient text-white">
-        <div className="mx-auto grid max-w-content gap-10 px-4 pb-16 pt-14 sm:px-8 lg:grid-cols-[1.15fr_1fr] lg:items-center lg:gap-14 lg:pb-20 lg:pt-20">
-          <Reveal stagger trigger="mount" y={18}>
-            <Overline className="mb-3 text-white/70">For mechanics</Overline>
-            <h1 className="mb-4 text-[34px] font-extrabold leading-[1.05] tracking-[-0.025em] sm:text-[44px] lg:text-[54px]">
-              Be your own boss. We&apos;ll bring the work.
-            </h1>
-            <p className="mb-7 max-w-[560px] text-base leading-[1.55] text-white/85 sm:text-lg">
-              Join Book My Tech&apos;s network of vetted mobile mechanics. Set your own
-              hours and area, get matched to paying jobs near you, and get paid fast:
-              no marketing, no quoting, no chasing invoices.
-            </p>
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <Link href={APPLY_HREF}>
-                <Button
-                  variant="secondary"
-                  size="lg"
-                  iconRight={ArrowRight}
-                  className="border-transparent bg-white text-brand-blue hover:bg-white/90"
-                >
-                  Start your application
-                </Button>
-              </Link>
-              <Link href="#how-it-works">
-                <Button
-                  variant="ghost"
-                  size="lg"
-                  className="border-white/30 bg-transparent text-white hover:bg-white/10"
-                >
-                  See how it works
-                </Button>
-              </Link>
-            </div>
-            <p className="mt-4 text-sm text-white/70">
-              Takes about 10 minutes · free to apply · vetted in days
-            </p>
-          </Reveal>
+      <main>
+        <section className="relative overflow-hidden bg-brand-gradient-deep text-white">
+          <div aria-hidden className="hero-glow pointer-events-none absolute inset-0" />
+          <div className="relative mx-auto grid max-w-content items-center gap-12 px-4 pb-[72px] pt-14 sm:px-6 sm:pb-24 sm:pt-[88px] min-[1000px]:grid-cols-[1.15fr_1fr] min-[1000px]:gap-[72px]">
+            <Reveal stagger trigger="mount" y={18}>
+              <span className="mb-[22px] inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 py-[7px] pl-2.5 pr-3 text-xs font-semibold">
+                <span
+                  aria-hidden
+                  className="size-2 rounded-full bg-success shadow-[0_0_0_4px_rgba(34,197,94,0.24)]"
+                />
+                For mechanics in London, Birmingham, Manchester and Bristol
+              </span>
 
-          <Card className="bg-white/10 backdrop-blur lg:ml-auto" padded>
-            <Reveal as="ul" stagger y={16} className="grid grid-cols-2 gap-x-6 gap-y-7">
-              {STATS.map((s) => (
-                <li key={s.label}>
-                  <p className="text-3xl font-extrabold tracking-tight text-white">
-                    {s.value}
-                  </p>
-                  <p className="mt-1 text-sm text-white/75">{s.label}</p>
-                </li>
-              ))}
+              <h1 className="mb-[22px] font-display text-[clamp(38px,6vw,68px)] font-extrabold leading-[1.02] tracking-[-0.028em]">
+                Be your own boss.
+                <br />
+                We&apos;ll bring the{" "}
+                <em className="bg-[linear-gradient(90deg,#fff_0%,#fff_55%,#93c5fd_100%)] bg-clip-text not-italic text-transparent">
+                  work.
+                </em>
+              </h1>
+
+              <p className="mb-8 max-w-[560px] text-[17px] leading-[1.55] text-white/80">
+                Join Book My Tech&apos;s network of vetted mobile mechanics. Set your own hours and
+                area, get sent paying jobs near you, and get paid when the job&apos;s done: no
+                marketing, no quoting, no chasing invoices.
+              </p>
+
+              <div className="flex flex-wrap gap-3">
+                <Link href={APPLY_HREF}>
+                  <Button
+                    variant="secondary"
+                    size="lg"
+                    iconRight={ArrowRight}
+                    className="border-transparent bg-white font-bold text-brand-blue-dark hover:bg-surface"
+                  >
+                    Start your application
+                  </Button>
+                </Link>
+                <Link href="#how-it-works">
+                  <Button
+                    variant="ghost"
+                    size="lg"
+                    className="border-white/30 font-bold text-white hover:border-white hover:bg-white/10"
+                  >
+                    See how it works
+                  </Button>
+                </Link>
+              </div>
+              <p className="mt-4 text-sm text-white/70">
+                Takes about 10 minutes · free to apply · reviewed in days
+              </p>
             </Reveal>
-          </Card>
-        </div>
-      </section>
 
-      {/* Benefits */}
-      <section className="bg-surface">
-        <div className="mx-auto max-w-content px-4 py-14 sm:px-8 lg:py-[64px]">
-          <div className="mx-auto mb-10 max-w-[640px] text-center">
-            <Overline className="mb-2 text-brand-blue">Why join</Overline>
-            <h2 className="text-[32px] font-extrabold leading-tight tracking-[-0.025em] text-text-primary sm:text-[40px]">
-              Built around mechanics, not middlemen.
-            </h2>
-          </div>
-          <Reveal as="ul" stagger className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {BENEFITS.map((b) => (
-              <li key={b.title}>
-                <Card className="h-full">
-                  <div className="mb-3.5 flex size-12 items-center justify-center rounded-2xl bg-blue-50 ring-1 ring-inset ring-brand-blue/10">
-                    <b.Icon size={24} className="text-text-primary" />
-                  </div>
-                  <h3 className="mb-1.5 text-lg font-bold tracking-[-0.01em] text-text-primary">
-                    {b.title}
-                  </h3>
-                  <p className="text-sm leading-[1.55] text-text-secondary">{b.body}</p>
-                </Card>
-              </li>
-            ))}
-          </Reveal>
-        </div>
-      </section>
-
-      {/* How it works */}
-      <section id="how-it-works" className="border-y border-border bg-surface-card">
-        <div className="mx-auto max-w-content px-4 py-14 sm:px-8 lg:py-[64px]">
-          <div className="mx-auto mb-10 max-w-[640px] text-center">
-            <Overline className="mb-2 text-brand-blue">How it works</Overline>
-            <h2 className="text-[32px] font-extrabold leading-tight tracking-[-0.025em] text-text-primary sm:text-[40px]">
-              From application to earning in three steps.
-            </h2>
-          </div>
-          <Reveal as="ol" stagger className="grid gap-4 md:grid-cols-3">
-            {STEPS.map((s) => (
-              <li key={s.number}>
-                <Card className="h-full">
-                  <div className="mb-3.5 flex items-center justify-between">
-                    <div className="flex size-12 items-center justify-center rounded-2xl bg-blue-50 ring-1 ring-inset ring-brand-blue/10">
-                      <s.Icon size={24} className="text-text-primary" />
-                    </div>
-                    <span className="flex size-7 items-center justify-center rounded-full bg-blue-50 text-xs font-extrabold text-brand-blue">
-                      {s.number}
+            <Reveal
+              trigger="mount"
+              delay={0.2}
+              className="rounded-[20px] border border-white/15 bg-white/[0.06] p-6 backdrop-blur-[8px] sm:p-7 min-[1000px]:ml-auto min-[1000px]:max-w-[460px]"
+            >
+              <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-blue-200">
+                Getting paid
+              </p>
+              <h2 className="mt-2 font-display text-2xl font-extrabold tracking-[-0.02em]">
+                No invoices. No chasing.
+              </h2>
+              <ol className="mt-6 flex flex-col gap-4">
+                {PAYMENT_STEPS.map((step, i) => (
+                  <li key={step.text} className="flex items-start gap-3.5">
+                    <span className="relative flex size-10 shrink-0 items-center justify-center rounded-xl bg-white/10 text-white ring-1 ring-inset ring-white/15">
+                      <Icon icon={step.icon} size={18} strokeWidth={2} />
+                      <span className="absolute -right-1.5 -top-1.5 flex size-5 items-center justify-center rounded-full bg-white text-[11px] font-extrabold text-brand-blue-dark">
+                        {i + 1}
+                      </span>
                     </span>
-                  </div>
-                  <h3 className="mb-1.5 text-lg font-bold tracking-[-0.01em] text-text-primary">
-                    {s.title}
-                  </h3>
-                  <p className="text-sm leading-[1.55] text-text-secondary">{s.body}</p>
-                </Card>
-              </li>
-            ))}
-          </Reveal>
-        </div>
-      </section>
-
-      {/* What you'll need */}
-      <section className="bg-surface">
-        <div className="mx-auto grid max-w-content gap-10 px-4 py-14 sm:px-8 lg:grid-cols-2 lg:items-center lg:py-[64px]">
-          <div>
-            <Overline className="mb-2 text-brand-blue">What you&apos;ll need</Overline>
-            <h2 className="mb-3 text-[32px] font-extrabold leading-tight tracking-[-0.025em] text-text-primary sm:text-[40px]">
-              Qualified, insured, ready to go.
-            </h2>
-            <p className="mb-6 max-w-md text-base text-text-secondary">
-              We keep standards high so customers trust every mechanic on the platform.
-              Have these ready and your application will fly through.
-            </p>
-            <Link href={APPLY_HREF}>
-              <Button variant="primary" size="lg" iconRight={ArrowRight}>
-                Apply now
-              </Button>
-            </Link>
+                    <span className="pt-2 text-[15px] leading-[1.45] text-white/85">{step.text}</span>
+                  </li>
+                ))}
+              </ol>
+            </Reveal>
           </div>
-          <Card className="h-full">
-            <ul className="flex flex-col gap-3.5">
-              {REQUIREMENTS.map((r) => (
-                <li key={r} className="flex items-start gap-3">
-                  <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-success/15">
-                    <Icon icon={Check} size={13} className="text-success" />
-                  </span>
-                  <span className="text-[15px] leading-[1.5] text-text-secondary">{r}</span>
-                </li>
-              ))}
-            </ul>
-          </Card>
-        </div>
-      </section>
+        </section>
 
-      {/* FAQ */}
-      <section className="border-t border-border bg-surface-card">
-        <div className="mx-auto max-w-[820px] px-4 py-14 sm:px-8 lg:py-[64px]">
-          <div className="mb-9 text-center">
-            <Overline className="mb-2 text-brand-blue">Mechanic FAQ</Overline>
-            <h2 className="text-[32px] font-extrabold leading-tight tracking-[-0.025em] text-text-primary sm:text-[40px]">
-              Everything you need to know.
-            </h2>
+        <FactTicker facts={MECHANIC_FACTS} label="Why mechanics join Book My Tech" />
+        <MechanicBenefits />
+        <MechanicHowItWorks />
+        <MechanicRequirements applyHref={APPLY_HREF} />
+
+        <section className="relative overflow-hidden bg-white">
+          <SectionWatermark />
+          <div className="relative mx-auto max-w-content px-4 py-14 sm:px-6 sm:py-[88px]">
+            <SectionHeading eyebrow="Mechanic FAQ" title="Everything you need to know." />
+            <div className="mx-auto max-w-[820px]">
+              <Accordion items={MECHANIC_FAQS} idPrefix="mech-faq" />
+            </div>
           </div>
-          <Accordion items={FAQS} idPrefix="mech-faq" />
-        </div>
-      </section>
+        </section>
 
-      {/* Final CTA */}
-      <section className="bg-brand-gradient text-white">
-        <div className="mx-auto max-w-content px-4 py-14 text-center sm:px-8 lg:py-[72px]">
-          <h2 className="mx-auto mb-3 max-w-2xl text-[32px] font-extrabold leading-tight tracking-[-0.025em] sm:text-[40px]">
-            Ready to put your skills to work?
-          </h2>
-          <p className="mx-auto mb-7 max-w-xl text-base text-white/85 sm:text-lg">
-            Join the mechanics already growing their business with Book My Tech. Free to
-            apply, and you could be taking jobs within days.
-          </p>
-          <div className="flex justify-center">
-            <Link href={APPLY_HREF}>
-              <Button
-                variant="secondary"
-                size="lg"
-                iconRight={ArrowRight}
-                className="border-transparent bg-white text-brand-blue hover:bg-white/90"
-              >
-                Start your application
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </section>
-
+        <MechanicFinalCta
+          applyHref={APPLY_HREF}
+          title="Ready to put your skills to work?"
+          body="Free to apply, and you could be taking jobs within days."
+        />
+      </main>
       <Footer />
     </>
   );

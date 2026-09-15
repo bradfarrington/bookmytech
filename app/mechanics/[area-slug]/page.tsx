@@ -1,16 +1,29 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import Image from "next/image";
 import { notFound } from "next/navigation";
-import { ArrowRight, CheckCircle2, MapPin } from "lucide-react";
-import { PoundCoinIcon, CalendarBoltIcon, MapPinIcon } from "@/components/ui/brand-icons";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { ArrowRight, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { CustomerNav } from "@/components/ui/customer-nav";
+import { FactTicker } from "@/components/ui/fact-ticker";
+import { Icon } from "@/components/ui/icon";
+import { Reveal } from "@/components/ui/reveal";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { Footer } from "../../(customer)/_components/footer";
+import { MECHANIC_FACTS, applyHref } from "../_components/recruitment";
+import {
+  MechanicBenefits,
+  MechanicFinalCta,
+  MechanicHowItWorks,
+  MechanicRequirements,
+} from "../_components/sections";
 
 // Public, area-specific mechanic-recruitment landing page. Read via the
 // service-role client so PLANNED areas (is_active=false, not visible to anon
 // RLS) can still recruit ahead of launch. The Apply CTA carries ?area=<slug>
 // so the submitted application is tagged to this area.
+//
+// Task 46: the shared nav and footer and the same sections as /mechanics
+// (app/mechanics/_components), with the area's own headline in the hero.
 
 interface AreaRecruit {
   id: string;
@@ -49,12 +62,6 @@ export async function generateMetadata({
   };
 }
 
-const BENEFITS = [
-  { Icon: PoundCoinIcon, title: "Keep more of every job", detail: "Transparent fixed pricing, fast payouts. No chasing invoices." },
-  { Icon: CalendarBoltIcon, title: "Work on your terms", detail: "Set your hours, your radius and your specialisms. Accept the jobs that suit you." },
-  { Icon: MapPinIcon, title: "Jobs near you", detail: "We match you to bookings in your area and bring the customers to you." },
-];
-
 export default async function AreaRecruitmentPage({
   params,
 }: {
@@ -68,82 +75,59 @@ export default async function AreaRecruitmentPage({
   const blurb =
     area.recruitment_blurb ??
     `We're growing our network of vetted mobile mechanics in ${area.name}. Apply in minutes, set your own area and hours, and start getting matched to jobs near you.`;
-  const applyHref = `/mechanics/apply/step-1?area=${encodeURIComponent(area.slug)}`;
+  const href = applyHref(area.slug);
 
   return (
-    <div className="min-h-screen bg-surface">
-      <header className="border-b border-border bg-surface-card">
-        <div className="mx-auto flex max-w-content items-center justify-between px-4 py-3">
-          <Link href="/" aria-label="Book My Tech home">
-            <Image src="/logo-no-bg.png" alt="Book My Tech" width={120} height={32} className="h-8 w-auto" />
-          </Link>
-          <Link href={applyHref} className="text-sm font-semibold text-brand-blue hover:underline">
-            Apply now
-          </Link>
-        </div>
-      </header>
-
+    <>
+      <CustomerNav active="For mechanics" />
       <main>
-        {/* Hero */}
-        <section className="bg-brand-gradient px-4 py-16 text-white sm:py-24">
-          <div className="mx-auto max-w-3xl text-center">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold uppercase tracking-wide">
-              <MapPin size={13} /> {area.name}
-              {area.status === "planned" && <span className="ml-1 rounded bg-white/20 px-1.5">Launching soon</span>}
-            </span>
-            <h1 className="mt-4 text-4xl font-extrabold tracking-tight sm:text-5xl">{headline}</h1>
-            <p className="mx-auto mt-4 max-w-2xl text-lg text-blue-100">{blurb}</p>
-            <div className="mt-8 flex justify-center">
-              <Link href={applyHref}>
-                <Button variant="secondary" size="lg" iconRight={ArrowRight}>
-                  Start your application
-                </Button>
-              </Link>
-            </div>
-            <p className="mt-3 text-sm text-blue-200">Takes about 10 minutes · vetted in days</p>
-          </div>
-        </section>
-
-        {/* Benefits */}
-        <section className="mx-auto max-w-content px-4 py-16">
-          <div className="grid gap-6 sm:grid-cols-3">
-            {BENEFITS.map((b) => (
-              <div key={b.title} className="rounded-2xl border border-border bg-surface-card p-6 shadow-card">
-                <div className="flex size-12 items-center justify-center rounded-2xl bg-blue-50 ring-1 ring-inset ring-brand-blue/10">
-                  <b.Icon size={24} className="text-text-primary" />
-                </div>
-                <h2 className="mt-4 text-lg font-bold text-text-primary">{b.title}</h2>
-                <p className="mt-1.5 text-sm text-text-secondary">{b.detail}</p>
+        <section className="relative overflow-hidden bg-brand-gradient-deep text-white">
+          <div aria-hidden className="hero-glow pointer-events-none absolute inset-0" />
+          <div className="relative mx-auto max-w-[860px] px-4 pb-[72px] pt-14 text-center sm:px-6 sm:pb-24 sm:pt-[88px]">
+            <Reveal stagger trigger="mount" y={18}>
+              <span className="mb-[22px] inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-[7px] text-xs font-semibold">
+                <Icon icon={MapPin} size={13} strokeWidth={2.2} />
+                {area.name}
+                {area.status === "planned" && (
+                  <span className="rounded-full bg-white/20 px-2 py-0.5 text-[11px]">Launching soon</span>
+                )}
+              </span>
+              <h1 className="mb-[22px] font-display text-[clamp(36px,5.5vw,62px)] font-extrabold leading-[1.04] tracking-[-0.028em]">
+                {headline}
+              </h1>
+              <p className="mx-auto mb-8 max-w-[620px] text-[17px] leading-[1.55] text-white/80">
+                {blurb}
+              </p>
+              <div className="flex justify-center">
+                <Link href={href}>
+                  <Button
+                    variant="secondary"
+                    size="lg"
+                    iconRight={ArrowRight}
+                    className="border-transparent bg-white font-bold text-brand-blue-dark hover:bg-surface"
+                  >
+                    Start your application
+                  </Button>
+                </Link>
               </div>
-            ))}
-          </div>
-
-          {/* What you need */}
-          <div className="mx-auto mt-12 max-w-2xl rounded-2xl border border-border bg-surface-card p-6 shadow-card">
-            <h2 className="text-lg font-bold text-text-primary">What you&apos;ll need to apply</h2>
-            <ul className="mt-4 space-y-2.5">
-              {[
-                "Photo ID",
-                "Public liability + trade insurance",
-                "A recognised trade qualification",
-                "Two references",
-              ].map((item) => (
-                <li key={item} className="flex items-center gap-2.5 text-sm text-text-secondary">
-                  <CheckCircle2 size={18} className="shrink-0 text-success" />
-                  {item}
-                </li>
-              ))}
-            </ul>
-            <div className="mt-6">
-              <Link href={applyHref}>
-                <Button variant="primary" size="lg" fullWidth iconRight={ArrowRight}>
-                  Apply to work in {area.name}
-                </Button>
-              </Link>
-            </div>
+              <p className="mt-4 text-sm text-white/70">
+                Takes about 10 minutes · free to apply · reviewed in days
+              </p>
+            </Reveal>
           </div>
         </section>
+
+        <FactTicker facts={MECHANIC_FACTS} label="Why mechanics join Book My Tech" />
+        <MechanicBenefits />
+        <MechanicHowItWorks />
+        <MechanicRequirements applyHref={href} ctaLabel={`Apply to work in ${area.name}`} />
+        <MechanicFinalCta
+          applyHref={href}
+          title={`Start taking jobs in ${area.name}.`}
+          body="Free to apply, and you could be taking jobs within days."
+        />
       </main>
-    </div>
+      <Footer />
+    </>
   );
 }

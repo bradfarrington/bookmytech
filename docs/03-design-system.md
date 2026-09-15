@@ -194,13 +194,30 @@ Used in the trust strip below the hero. Icon + value + label, horizontal layout.
 
 Sticky, frosted top bar for customer marketing pages (Task 46). Accepts an optional `active` (the current nav item; omit it on pages that aren't one). Render it **above** the page's hero as a sibling, never inside a `<section>`: a sticky element only sticks within its parent.
 
+### `StepsTimeline`
+
+Numbered, connected steps (three or four): gradient number discs with a small icon badge, joined by a dashed connector. Vertical on phones, a row from 900px. Props: `steps: { icon, title, description }[]`. Used for "how it works" on the homepage and the mechanic pages.
+
+### `FactTicker`
+
+Full-bleed marquee of short facts under a hero. Props: `facts: { icon, value, label }[]`, `label` (accessible name). Stops under reduced motion. Only claims the product or the terms back up.
+
+### `Accordion`
+
+Question-and-answer rows, one open at a time, styled like the homepage FAQ (white bordered rows, +/− marker). Props: `items`, `defaultOpen` (index or null), `idPrefix`. Reads well on light and dark sections.
+
 ### `SectionHeading`
 
 Eyebrow + `font-display` h2 (`clamp(30px, 4vw, 46px)`) + 17px lead above a marketing section. Props: `eyebrow`, `title`, `lead`, `align` (`center` | `left`), `tone` (`light` | `dark`, the surface it sits on). Wraps itself in `Reveal`.
 
 ## Marketing page pattern (Task 46)
 
-The layout every customer marketing page follows, taken from `proposal/homepage-redesign.html`. The homepage (`app/(customer)/page.tsx`) is the worked example; reuse its pieces rather than restating classes.
+The layout every customer marketing page follows, taken from `proposal/homepage-redesign.html`. Worked examples:
+- the homepage (`app/(customer)/page.tsx`)
+- `/help`
+- `/mechanics`, with its sections shared with the area pages in `app/mechanics/_components/`
+
+Reuse their pieces rather than restating classes.
 
 - **Page shell:** `<CustomerNav />`, then `<main>` holding the sections, then `<Footer />`.
 - **Section shell:** full-width band, content in `mx-auto max-w-content px-4 sm:px-6`, vertical rhythm `py-14 sm:py-[88px]`. Sections with an in-page anchor add `scroll-mt-[68px]` so the sticky nav doesn't cover their heading.

@@ -9,10 +9,12 @@ Brad's review the same day added:
 - em dashes removed from all user-visible copy
 - a distinct look for each section, with a faded logo mark in some corners
 - the services grid driven by the admin's products, plus a gateway into booking a specific repair
+- `/help`, `/mechanics` and the area recruitment pages (`/mechanics/[area-slug]`) rebuilt in the same pattern
 
 Deviations from the plan: the nav renders from `page.tsx` rather than inside `hero.tsx`, and the mobile drawer renders outside the `<header>`, because `backdrop-filter` would otherwise clip it to the bar. **One data-only migration, `0068_copy_no_em_dashes.sql`** (rewrites seeded text; no schema change, so no type regen). **No `app/api/mobile/**` shape change** (punctuation in some error sentences only). The mobile app needs to mirror the new tokens (see "Mobile app").
 
 **Still open (Brad):**
+- **Birmingham and Bristol have no `areas` rows.** The site says both are live, but `/mechanics/birmingham` and `/mechanics/bristol` return 404 (`/mechanics/manchester` and `/mechanics/london-z1-z2` work). Add them in `/admin/areas` to give them recruitment pages.
 - **Apply `0068`.** Until then, the three servicing summaries on the homepage and in the booking funnel still show the em dashes they were seeded with ("… change — every six months …"). So do nine seeded part names in the mechanic's quote picker. Editing the three summaries in `/admin/services` fixes the homepage immediately, without the migration.
 - **Admin-edited templates.** Any email or SMS template an admin has already customised in `/admin/emails` or `/admin/sms/templates` keeps the em dashes they typed. Code defaults are already dash-free.
 - **Mechanic app install name.** The installed mechanic app is now "Book My Tech | Mechanic". Say if you'd prefer different wording.
@@ -161,6 +163,57 @@ Verified with DV12 CGU: `/book?node=c:diagnostics` lands on "Start / Diagnostics
 
 **Seeded data:** product summaries and part names come from the database, and some still carried em dashes from their seed migrations. `0068_copy_no_em_dashes.sql` rewrites them (data only). Internal-only seeded text, such as database comments and duration-rule notes, was left alone.
 
+## /help and /mechanics (Brad, 2026-09-15)
+
+Both pages, and the area recruitment pages, now follow the marketing page pattern with the shared nav and footer.
+
+**Shared pieces, so the pages can't drift apart:**
+- `components/ui/steps-timeline.tsx`: the numbered, connected timeline, lifted out of the homepage's how-it-works.
+- `components/ui/fact-ticker.tsx`: the marquee. The homepage `TrustTicker` now passes it the customer facts.
+- `components/ui/accordion.tsx`: restyled to match the homepage FAQ (white rows, +/− marker); API unchanged.
+- `app/mechanics/_components/recruitment.ts`: the mechanic benefits, steps, requirements, FAQs, ticker facts and `applyHref(areaSlug?)`, with the rules each line must stay true to.
+- `app/mechanics/_components/sections.tsx`: benefits (light), how it works (pale blue, faded mark), requirements (dark, faded mark), final CTA (gradient). Used by `/mechanics` and every area page.
+
+**`/help`:**
+- a gradient hero with jump links to each topic
+- three topic cards overlapping the hero
+- the four FAQ groups with a sticky "On this page" sidebar (desktop), on a light band with a faded mark
+- the mechanic questions in a contained dark panel
+- contact on pale blue
+
+The section uses `overflow-clip` so the sidebar can stick.
+
+**`/mechanics`:**
+- a gradient hero with a "Getting paid" card (the four real steps of the payout)
+- a mechanic facts ticker
+- benefits, timeline and requirements
+- the FAQ on white with a faded mark
+- the gradient CTA
+
+**Area pages:**
+- the old one-off header is gone; the shared nav and footer are in
+- the area chip and "Launching soon" for planned areas
+- the same sections, with every apply link tagged `?area=<slug>`
+
+**Copy corrected on these pages:**
+- **`/help`:**
+  - areas said "Greater London, expanding through…"; now all four live
+  - "light vans" is gone: the HaynesPro identification tree filters to passenger vehicles
+  - "MOT pre-checks / expanding MOT booking" was not in the catalogue; it now says we don't carry out MOT tests
+  - "Are the parts genuine?" had a warranty answer, so the question is now "Are parts covered?"
+  - unsourced "8am to 8pm, seven days a week" support hours removed
+  - payment methods now name Stripe
+- **`/mechanics`:**
+  - "Download the mechanic app" is now "set your availability in the mechanic app"
+  - "Every job is covered by our workmanship guarantee" (a customer warranty) is now "Dispute support from Book My Tech"
+  - "fast payouts" is now "paid out when you complete the job"
+
+**Verified:**
+- `tsc`, eslint, unit tests and the production build pass.
+- At 375 and 1280: no horizontal overflow, no em dash, no "DBS", no page errors.
+- The `/help` jump link lands the section at 92px, under the nav; the sidebar sticks; accordions open.
+- `/mechanics/manchester` and `/mechanics/london-z1-z2` render with area-tagged apply links.
+
 ## Parked: a public reviews feed
 
 Brad asked for new reviews to appear on the website automatically, with an admin switch to take any off. With the placeholder section gone, this waits until there are enough real reviews to show. When it's picked up:
@@ -190,6 +243,7 @@ Brad asked for new reviews to appear on the website automatically, with an admin
 - [x] Neighbouring sections have distinct treatments; faded mark in the quote, services, mechanics and FAQ sections.
 - [x] Services grid lists the active `/admin/services` products with real prices, plus a gateway card into the repair catalogue; admin changes revalidate the homepage.
 - [x] A services or gateway card's choice survives reg entry and opens the repair browser at that category (or Repairs).
+- [x] `/help`, `/mechanics` and `/mechanics/[area-slug]` follow the marketing page pattern, with the shared nav, footer and sections, and true copy.
 - [x] Reg lookup from the hero and the final CTA reaches `/book/vehicle?reg=…&postcode=…`. Verified with the real reg DV12 CGU.
 - [x] Sticky bar hidden while a lookup form is on screen, shown mid-page; its button focuses the hero reg input.
 - [x] Reduced motion stops the ticker, the pulses, the dispatch card and the Reveal entrances.

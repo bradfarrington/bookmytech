@@ -1,47 +1,54 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Mail, MessageCircle, ArrowRight } from "lucide-react";
-import { CustomerNav } from "@/components/ui/customer-nav";
-import { Card } from "@/components/ui/card";
-import { Icon } from "@/components/ui/icon";
-import { Overline } from "@/components/ui/overline";
-import { Button } from "@/components/ui/button";
-import { Accordion, type AccordionItem } from "@/components/ui/accordion";
-import type { BrandIconProps } from "@/components/ui/brand-icons";
 import {
-  CalendarBoltIcon,
-  MapPinIcon,
-  WrenchIcon,
-  PoundCoinIcon,
-  RosetteIcon,
-  ChatCheckIcon,
-  HeadsetIcon,
-} from "@/components/ui/brand-icons";
+  ArrowRight,
+  CalendarDays,
+  LayoutDashboard,
+  Mail,
+  MapPin,
+  MessageCircle,
+  PoundSterling,
+  ShieldCheck,
+  Wrench,
+  type LucideIcon,
+} from "lucide-react";
+import { Accordion, type AccordionItem } from "@/components/ui/accordion";
+import { Button } from "@/components/ui/button";
+import { CustomerNav } from "@/components/ui/customer-nav";
+import { Icon } from "@/components/ui/icon";
+import { Reveal } from "@/components/ui/reveal";
+import { SectionHeading } from "@/components/ui/section-heading";
+import { SectionWatermark } from "@/components/ui/section-watermark";
 import { Footer } from "../_components/footer";
 
 export const metadata: Metadata = {
   title: "Help & FAQ | Book My Tech",
   description:
-    "Answers to common questions about booking a mobile mechanic, pricing, payments, guarantees, areas and working with Book My Tech. Get in touch if you need a hand.",
+    "Answers to common questions about booking a mobile mechanic, pricing, payments, warranty, areas and working with Book My Tech. Get in touch if you need a hand.",
 };
 
 type FaqGroup = {
+  /** Anchor id, linked from the hero and the sidebar. */
+  id: string;
   eyebrow: string;
   heading: string;
-  Icon: (p: BrandIconProps) => React.ReactElement;
+  icon: LucideIcon;
   items: AccordionItem[];
 };
 
+// Every answer must match the customer terms (app/(customer)/terms/content.ts)
+// and the product. DBS checks were removed from the platform: never claim them.
 const FAQ_GROUPS: FaqGroup[] = [
   {
+    id: "booking",
     eyebrow: "Getting started",
-    heading: "Booking & appointments",
-    Icon: CalendarBoltIcon,
+    heading: "Booking and appointments",
+    icon: CalendarDays,
     items: [
       {
         question: "How do I book a mechanic?",
         answer:
-          "Enter your registration on the homepage, pick the service you need or describe the fault, choose a time slot, and confirm. Your job is sent to vetted mechanics nearby, and the one who accepts comes to you at home, work or the roadside.",
+          "Enter your registration on the homepage, pick the repair or service you need, choose a time slot, and confirm. Your job is sent to vetted mechanics nearby, and the one who accepts comes to you at home, work or the roadside.",
       },
       {
         question: "How quickly can someone come out?",
@@ -66,9 +73,10 @@ const FAQ_GROUPS: FaqGroup[] = [
     ],
   },
   {
+    id: "pricing",
     eyebrow: "Money",
-    heading: "Pricing & payments",
-    Icon: PoundCoinIcon,
+    heading: "Pricing and payments",
+    icon: PoundSterling,
     items: [
       {
         question: "Is the price I see the price I pay?",
@@ -83,7 +91,7 @@ const FAQ_GROUPS: FaqGroup[] = [
       {
         question: "What payment methods can I use?",
         answer:
-          "We accept all major debit and credit cards. Payments are processed securely by our payment provider; we never store your full card details.",
+          "We accept major debit and credit cards. Payments are processed securely by Stripe, and we don't store your full card details.",
       },
       {
         question: "What if the mechanic can't fix the problem?",
@@ -98,9 +106,10 @@ const FAQ_GROUPS: FaqGroup[] = [
     ],
   },
   {
+    id: "warranty",
     eyebrow: "Peace of mind",
-    heading: "Guarantees, vetting & disputes",
-    Icon: RosetteIcon,
+    heading: "Warranty, vetting and disputes",
+    icon: ShieldCheck,
     items: [
       {
         question: "How are mechanics vetted?",
@@ -108,7 +117,7 @@ const FAQ_GROUPS: FaqGroup[] = [
           "Every mechanic is vetted before they join Book My Tech. We check their ID, insurance and trade qualifications, a mechanic whose insurance lapses is taken offline until it's renewed, and we track quality through reviews.",
       },
       {
-        question: "What does the 12-month guarantee cover?",
+        question: "What does the 12-month warranty cover?",
         answer:
           "Eligible repairs are covered for defective parts or workmanship for 12 months or 12,000 miles, whichever comes first, subject to the exclusions in our terms (fair wear and tear, for example). Diagnostics and inspections aren't covered. If something isn't right, contact us and we'll look into it under the warranty.",
       },
@@ -118,31 +127,32 @@ const FAQ_GROUPS: FaqGroup[] = [
           "Raise it from your dashboard within the confirmation window. Our support team will review the booking and can hold or reverse payment while we investigate. We aim to resolve disputes fairly and quickly.",
       },
       {
-        question: "Are the parts genuine?",
+        question: "Are parts covered?",
         answer:
-          "Parts fitted on an eligible repair are covered by the same 12-month warranty as the labour.",
+          "Yes. Parts fitted on an eligible repair are covered by the same 12-month warranty as the labour.",
       },
     ],
   },
   {
+    id: "areas",
     eyebrow: "Coverage",
-    heading: "Areas & vehicles",
-    Icon: MapPinIcon,
+    heading: "Areas and vehicles",
+    icon: MapPin,
     items: [
       {
         question: "What areas do you cover?",
         answer:
-          "We're live across Greater London with mechanics expanding through Manchester, Bristol and Birmingham. Drop your postcode into the booking form to see who's covering your area.",
+          "We're live across Greater London, Birmingham, Manchester and Bristol. Add your postcode when you book and your job goes to vetted mechanics who cover your area.",
       },
       {
         question: "What vehicles can you work on?",
         answer:
-          "We cover the vast majority of cars and light vans. Enter your registration and we'll pull your make, model and engine automatically and show you the services available for it.",
+          "Most cars. Enter your registration and we'll look up your make, model and engine and show you the repairs and services available for it.",
       },
       {
         question: "Do you do MOTs?",
         answer:
-          "We offer MOT pre-checks so you can fix any issues before the test, and we're expanding MOT booking in selected areas. Enter your reg to see what's available where you are.",
+          "We don't carry out MOT tests. A service or any repairs your car needs can be booked with us before its test.",
       },
     ],
   },
@@ -166,166 +176,234 @@ const MECHANIC_FAQS: AccordionItem[] = [
   },
 ];
 
-type Topic = {
-  Icon: (p: BrandIconProps) => React.ReactElement;
-  title: string;
-  body: string;
-  href: string;
-  cta: string;
-};
-
-const TOPICS: Topic[] = [
+const TOPICS: { icon: LucideIcon; title: string; body: string; href: string; cta: string }[] = [
   {
-    Icon: CalendarBoltIcon,
-    title: "Book a service",
-    body: "Get a fixed price for your car and pick a slot in about 60 seconds.",
+    icon: CalendarDays,
+    title: "Book a repair or service",
+    body: "Get a price for your exact car and pick a time that suits you.",
     href: "/book",
     cta: "Start a booking",
   },
   {
-    Icon: ChatCheckIcon,
-    title: "Track your booking",
-    body: "Sign in to see your mechanic's status, message them and manage your jobs.",
+    icon: LayoutDashboard,
+    title: "Manage your booking",
+    body: "Sign in to follow your job, message your mechanic, and reschedule or cancel.",
     href: "/dashboard",
-    cta: "Go to dashboard",
+    cta: "Go to your dashboard",
   },
   {
-    Icon: WrenchIcon,
+    icon: Wrench,
     title: "Work with us",
-    body: "Become a vetted mobile mechanic and get matched to jobs near you.",
+    body: "Become a vetted mobile mechanic and get sent jobs near you.",
     href: "/mechanics",
     cta: "For mechanics",
   },
 ];
 
+const JUMP_LINKS = [
+  ...FAQ_GROUPS.map((g) => ({ href: `#${g.id}`, label: g.heading })),
+  { href: "#mechanics", label: "For mechanics" },
+  { href: "#contact", label: "Contact us" },
+];
+
+// Task 46: the marketing page pattern (docs/03-design-system.md). Gradient hero
+// with jump links, topic cards overlapping it, the FAQ groups with a sticky
+// "On this page" list (light), the mechanic questions in a dark panel, and
+// contact on pale blue.
 export default function HelpPage() {
   return (
     <>
       <CustomerNav active="Help" />
-      {/* Hero */}
-      <section className="bg-brand-gradient text-white">
-        <div className="mx-auto max-w-content px-4 pb-16 pt-14 text-center sm:px-8 lg:pb-20 lg:pt-20">
-          <Overline className="mb-3 text-white/70">Help centre</Overline>
-          <h1 className="mx-auto mb-4 max-w-3xl text-[34px] font-extrabold leading-[1.05] tracking-[-0.025em] sm:text-[44px] lg:text-[52px]">
-            How can we help?
-          </h1>
-          <p className="mx-auto max-w-2xl text-base text-white/85 sm:text-lg">
-            Answers to the questions we hear most about booking, pricing, payments,
-            guarantees and working with Book My Tech. Still stuck? We&apos;re a message away.
-          </p>
-        </div>
-      </section>
+      <main>
+        <section className="relative overflow-hidden bg-brand-gradient-deep text-white">
+          <div aria-hidden className="hero-glow pointer-events-none absolute inset-0" />
+          <div className="relative mx-auto max-w-content px-4 pb-32 pt-14 text-center sm:px-6 sm:pb-36 sm:pt-[88px]">
+            <Reveal stagger trigger="mount" y={18}>
+              <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-white/75">
+                Help centre
+              </p>
+              <h1 className="mx-auto mb-5 mt-3 font-display text-[clamp(38px,6vw,64px)] font-extrabold leading-[1.02] tracking-[-0.028em]">
+                How can we help?
+              </h1>
+              <p className="mx-auto max-w-2xl text-[17px] leading-[1.55] text-white/80">
+                Answers to the questions we hear most about booking, pricing, payments, the
+                warranty and working with Book My Tech. Still stuck? We&apos;re a message away.
+              </p>
+              <nav aria-label="Help topics" className="mx-auto mt-8 flex max-w-3xl flex-wrap justify-center gap-2">
+                {JUMP_LINKS.map((link) => (
+                  <a
+                    key={link.href}
+                    href={link.href}
+                    className="rounded-full border border-white/20 bg-white/10 px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-white/20"
+                  >
+                    {link.label}
+                  </a>
+                ))}
+              </nav>
+            </Reveal>
+          </div>
+        </section>
 
-      <main className="bg-surface">
-        <div className="mx-auto max-w-content px-4 py-14 sm:px-8 lg:py-[64px]">
-          {/* Quick topics */}
-          <ul className="grid gap-4 sm:grid-cols-3">
-            {TOPICS.map((t) => (
-              <li key={t.title}>
-                <Card className="flex h-full flex-col">
-                  <div className="mb-3.5 flex size-12 items-center justify-center rounded-2xl bg-blue-50 ring-1 ring-inset ring-brand-blue/10">
-                    <t.Icon size={24} className="text-text-primary" />
-                  </div>
-                  <h2 className="mb-1.5 text-lg font-bold tracking-[-0.01em] text-text-primary">
-                    {t.title}
-                  </h2>
-                  <p className="mb-4 flex-1 text-sm leading-[1.55] text-text-secondary">
-                    {t.body}
-                  </p>
+        {/* Topic cards pulled up over the hero's lower edge. */}
+        <section className="relative z-10 -mt-20">
+          <div className="mx-auto max-w-content px-4 sm:px-6">
+            <Reveal as="ul" stagger className="grid gap-4 min-[861px]:grid-cols-3">
+              {TOPICS.map((t) => (
+                <li key={t.title}>
                   <Link
                     href={t.href}
-                    className="inline-flex items-center gap-1.5 text-sm font-semibold text-brand-blue hover:text-brand-blue-dark"
+                    className="group flex h-full flex-col rounded-[20px] border border-border bg-white p-6 shadow-float transition-[translate,border-color] duration-200 hover:-translate-y-0.5 hover:border-brand-blue/35"
                   >
-                    {t.cta}
-                    <Icon icon={ArrowRight} size={15} />
+                    <span className="flex size-12 items-center justify-center rounded-2xl bg-brand-gradient-deep text-white">
+                      <Icon icon={t.icon} size={22} strokeWidth={2} />
+                    </span>
+                    <h2 className="mt-4 font-display text-xl font-extrabold tracking-[-0.015em] text-text-primary">
+                      {t.title}
+                    </h2>
+                    <p className="mt-1.5 flex-1 text-[15px] leading-[1.55] text-text-secondary">{t.body}</p>
+                    <span className="mt-4 inline-flex items-center gap-1.5 text-sm font-bold text-brand-blue group-hover:text-brand-blue-dark">
+                      {t.cta}
+                      <Icon icon={ArrowRight} size={15} strokeWidth={2.5} />
+                    </span>
                   </Link>
-                </Card>
-              </li>
-            ))}
-          </ul>
-
-          {/* Customer FAQ groups */}
-          <div className="mx-auto mt-16 max-w-[820px] flex flex-col gap-12">
-            {FAQ_GROUPS.map((group) => (
-              <section key={group.heading}>
-                <div className="mb-6 flex items-center gap-3.5">
-                  <div className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-blue-50 ring-1 ring-inset ring-brand-blue/10">
-                    <group.Icon size={24} className="text-text-primary" />
-                  </div>
-                  <div>
-                    <Overline className="mb-1 text-brand-blue">{group.eyebrow}</Overline>
-                    <h2 className="text-[24px] font-extrabold leading-tight tracking-[-0.025em] text-text-primary sm:text-[28px]">
-                      {group.heading}
-                    </h2>
-                  </div>
-                </div>
-                <Accordion
-                  items={group.items}
-                  defaultOpen={null}
-                  idPrefix={`help-${group.heading.replace(/\s+/g, "-").toLowerCase()}`}
-                />
-              </section>
-            ))}
+                </li>
+              ))}
+            </Reveal>
           </div>
+        </section>
 
-          {/* Mechanic FAQ */}
-          <div className="mx-auto mt-14 max-w-[820px]">
-            <div className="mb-6 flex items-center gap-3.5">
-              <div className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-blue-50 ring-1 ring-inset ring-brand-blue/10">
-                <WrenchIcon size={24} className="text-text-primary" />
-              </div>
-              <div>
-                <Overline className="mb-1 text-brand-blue">For mechanics</Overline>
-                <h2 className="text-[24px] font-extrabold leading-tight tracking-[-0.025em] text-text-primary sm:text-[28px]">
-                  Joining &amp; getting paid
-                </h2>
-              </div>
-            </div>
-            <Accordion items={MECHANIC_FAQS} defaultOpen={null} idPrefix="help-mechanic" />
-            <div className="mt-5">
-              <Link
-                href="/mechanics"
-                className="inline-flex items-center gap-1.5 text-sm font-semibold text-brand-blue hover:text-brand-blue-dark"
-              >
-                More about working with us
-                <Icon icon={ArrowRight} size={15} />
-              </Link>
-            </div>
-          </div>
-
-          {/* Contact */}
-          <div className="mx-auto mt-16 max-w-[820px]">
-            <Card className="bg-surface-card">
-              <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-start gap-4">
-                  <div className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-blue-50 ring-1 ring-inset ring-brand-blue/10">
-                    <HeadsetIcon size={24} className="text-text-primary" />
-                  </div>
-                  <div>
-                    <h2 className="text-xl font-extrabold tracking-[-0.02em] text-text-primary">
-                      Still need a hand?
-                    </h2>
-                    <p className="mt-1.5 max-w-md text-sm text-text-secondary">
-                      Our support team helps with bookings, payments and anything else.
-                      We&apos;re here 8am–8pm, seven days a week, and reply fast.
-                    </p>
-                  </div>
-                </div>
-                <div className="flex w-full shrink-0 flex-col gap-2.5 sm:w-auto">
-                  <a href="mailto:support@bookmytech.co.uk">
-                    <Button variant="primary" size="md" iconLeft={Mail} fullWidth>
-                      Email support
-                    </Button>
+        {/* overflow-clip, not hidden: hidden would stop the sidebar sticking. */}
+        <section className="relative overflow-clip bg-surface">
+          <SectionWatermark />
+          <div className="relative mx-auto grid max-w-content gap-10 px-4 py-14 sm:px-6 sm:py-[88px] min-[1000px]:grid-cols-[220px_minmax(0,1fr)] min-[1000px]:gap-14">
+            <aside className="hidden min-[1000px]:block">
+              <nav aria-label="Questions on this page" className="sticky top-[92px] flex flex-col gap-1">
+                <p className="mb-2 px-3 text-[11px] font-bold uppercase tracking-[0.14em] text-text-muted">
+                  On this page
+                </p>
+                {FAQ_GROUPS.map((g) => (
+                  <a
+                    key={g.id}
+                    href={`#${g.id}`}
+                    className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-semibold text-text-secondary transition-colors hover:bg-white hover:text-text-primary"
+                  >
+                    <Icon icon={g.icon} size={16} strokeWidth={2} className="text-brand-blue" />
+                    {g.heading}
                   </a>
-                  <Link href="/dashboard">
-                    <Button variant="ghost" size="md" iconLeft={MessageCircle} fullWidth>
-                      Message in-app
-                    </Button>
-                  </Link>
+                ))}
+              </nav>
+            </aside>
+
+            <div className="flex max-w-[820px] flex-col gap-14">
+              {FAQ_GROUPS.map((group) => (
+                <section key={group.id} id={group.id} className="scroll-mt-[92px]">
+                  <Reveal className="mb-6 flex items-center gap-4">
+                    <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-indigo-50 text-brand-blue">
+                      <Icon icon={group.icon} size={22} strokeWidth={2} />
+                    </span>
+                    <div>
+                      <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-brand-blue">
+                        {group.eyebrow}
+                      </p>
+                      <h2 className="mt-1 font-display text-[28px] font-extrabold leading-tight tracking-[-0.02em] text-text-primary">
+                        {group.heading}
+                      </h2>
+                    </div>
+                  </Reveal>
+                  <Accordion items={group.items} defaultOpen={null} idPrefix={`help-${group.id}`} />
+                </section>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section id="mechanics" className="scroll-mt-[68px] bg-white">
+          <div className="mx-auto max-w-content px-4 py-14 sm:px-6 sm:py-[88px]">
+            <div className="relative overflow-hidden rounded-[32px] bg-surface-dark px-6 py-12 text-white sm:px-12 sm:py-14">
+              <SectionWatermark tone="dark" />
+              <div className="relative grid items-start gap-10 min-[901px]:grid-cols-[1fr_1.3fr] min-[901px]:gap-14">
+                <div>
+                  <SectionHeading
+                    tone="dark"
+                    align="left"
+                    eyebrow="For mechanics"
+                    title="Joining and getting paid."
+                    lead="Thinking of working with us? The short answers are here, and the For Mechanics page has the rest."
+                  />
+                  <div className="flex flex-wrap gap-3">
+                    <Link href="/mechanics/apply/step-1">
+                      <Button
+                        variant="secondary"
+                        iconRight={ArrowRight}
+                        className="border-transparent bg-white font-bold text-brand-blue-dark hover:bg-surface"
+                      >
+                        Apply now
+                      </Button>
+                    </Link>
+                    <Link href="/mechanics">
+                      <Button
+                        variant="ghost"
+                        className="border-white/30 font-bold text-white hover:border-white hover:bg-white/10"
+                      >
+                        More about working with us
+                      </Button>
+                    </Link>
+                  </div>
                 </div>
+                <Accordion items={MECHANIC_FAQS} defaultOpen={null} idPrefix="help-mechanic" />
               </div>
-            </Card>
-            <p className="mt-4 text-center text-xs text-text-muted">
+            </div>
+          </div>
+        </section>
+
+        <section
+          id="contact"
+          className="relative scroll-mt-[68px] overflow-hidden border-t border-blue-100 bg-[linear-gradient(180deg,#eff6ff_0%,#e0ebff_100%)]"
+        >
+          <SectionWatermark />
+          <div className="relative mx-auto max-w-content px-4 py-14 sm:px-6 sm:py-[88px]">
+            <SectionHeading
+              eyebrow="Contact"
+              title="Still need a hand?"
+              lead="Our support team helps with bookings, payments and anything else."
+            />
+            <Reveal stagger className="mx-auto grid max-w-[820px] gap-4 min-[641px]:grid-cols-2">
+              <a
+                href="mailto:support@bookmytech.co.uk"
+                className="group flex flex-col rounded-[20px] border border-border bg-white p-6 shadow-card transition-[translate,border-color] duration-200 hover:-translate-y-0.5 hover:border-brand-blue/35"
+              >
+                <span className="flex size-12 items-center justify-center rounded-2xl bg-brand-blue text-white">
+                  <Icon icon={Mail} size={22} strokeWidth={2} />
+                </span>
+                <h3 className="mt-4 font-display text-xl font-extrabold tracking-[-0.015em] text-text-primary">
+                  Email support
+                </h3>
+                <p className="mt-1.5 text-[15px] text-text-secondary">support@bookmytech.co.uk</p>
+                <span className="mt-4 inline-flex items-center gap-1.5 text-sm font-bold text-brand-blue">
+                  Send an email
+                  <Icon icon={ArrowRight} size={15} strokeWidth={2.5} />
+                </span>
+              </a>
+              <Link
+                href="/dashboard"
+                className="group flex flex-col rounded-[20px] border border-border bg-white p-6 shadow-card transition-[translate,border-color] duration-200 hover:-translate-y-0.5 hover:border-brand-blue/35"
+              >
+                <span className="flex size-12 items-center justify-center rounded-2xl bg-brand-gradient-deep text-white">
+                  <Icon icon={MessageCircle} size={22} strokeWidth={2} />
+                </span>
+                <h3 className="mt-4 font-display text-xl font-extrabold tracking-[-0.015em] text-text-primary">
+                  Message in-app
+                </h3>
+                <p className="mt-1.5 text-[15px] text-text-secondary">
+                  Sign in to message your mechanic or raise an issue with a booking.
+                </p>
+                <span className="mt-4 inline-flex items-center gap-1.5 text-sm font-bold text-brand-blue">
+                  Go to your dashboard
+                  <Icon icon={ArrowRight} size={15} strokeWidth={2.5} />
+                </span>
+              </Link>
+            </Reveal>
+            <p className="mt-8 text-center text-[13px] text-text-muted">
               Read our{" "}
               <Link href="/terms" className="font-semibold text-brand-blue hover:underline">
                 Terms &amp; Conditions
@@ -341,9 +419,8 @@ export default function HelpPage() {
               .
             </p>
           </div>
-        </div>
+        </section>
       </main>
-
       <Footer />
     </>
   );

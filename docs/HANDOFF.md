@@ -134,6 +134,7 @@ You are working on **Book My Tech**, a UK mobile-mechanic booking platform. This
 - **Reviews:** the placeholder reviews are gone (fake-review ban, DMCC Act 2024), replaced by a "For mechanics" recruitment section. A public reviews feed with an admin switch is scoped and **parked** in the Task 46 doc.
 - **No em dashes** in any user-visible copy: website, consoles, emails, SMS. Code comments keep theirs.
 - **Section rhythm:** each homepage section now has a distinct treatment (pale blue, timeline, dark, gradient panel), with a faded logo mark (`SectionWatermark`) on some.
+- **`/help`, `/mechanics` and `/mechanics/[area-slug]` redesigned** in the same pattern. They share `StepsTimeline`, `FactTicker`, the restyled `Accordion`, and the mechanic sections and copy in `app/mechanics/_components/`. Birmingham and Bristol have no `areas` rows, so their recruitment pages 404.
 - **Services from the admin:** the services grid reads the active `/admin/services` products with real prices, and admin changes revalidate `/`. A gateway card leads into booking a specific repair. Cards link to `/book?node=…`, which now survives the reg and vehicle steps (`lib/bookings/start-node.ts`).
 - **Additive design tokens:** Inter Tight `font-display`, `surface-dark`, `brand-gradient-deep`, `shadow-float`, and ticker/pulse animations. No existing token changed. The "Marketing page pattern" in `docs/03-design-system.md` and `components/ui/section-heading.tsx` are what the next pages reuse.
 - **Owner:**
