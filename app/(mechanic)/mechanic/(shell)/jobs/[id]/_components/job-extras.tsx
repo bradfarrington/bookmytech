@@ -15,7 +15,6 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
-import { Combobox } from "@/components/ui/combobox";
 import { cn, formatPrice } from "@/lib/utils";
 import { safePriceQuoteLines, type QuoteLineInput, type QuoteLineKind } from "@/lib/quotes/pricing";
 import { QUOTABLE_STATUSES, QUOTE_KIND_LABEL, QUOTE_STATUS_LABEL } from "@/lib/quotes/status";
@@ -23,17 +22,18 @@ import type { FaultView, QuoteView } from "@/lib/quotes/load";
 import { addFaultAction, deleteFaultAction } from "@/app/actions/booking-faults";
 import {
   createQuoteAction,
-  listQuotePartsAction,
   searchJobRepairTimesAction,
+  suggestQuotePartsAction,
   withdrawQuoteAction,
 } from "@/app/actions/job-quotes";
+import type { QuotePartSuggestion } from "@/lib/quotes/mechanic";
 
 // Faults, quotes and price changes on the job (Task 33) — Gareth's "adjust the
 // labour and parts with a button to add labour and parts", "a box where
 // mechanics can add faults", and "an automatic quote tool". The automatic part:
 // a labour line's hours come from HaynesPro's book time when the mechanic picks
-// the job from this car's tree; parts come from the catalogue with the BMT
-// price filled in. Everything is priced server-side again on send; the totals
+// the job from this car's tree; the parts for that work are suggested from
+// Alliance Automotive, priced for this car (Task 43). Everything is priced server-side again on send; the totals
 // here are the same pure arithmetic, for display.
 
 /** A line to pre-fill a follow-on quote with (Task 38): the work an approved revision took off today's job. */
@@ -353,6 +353,16 @@ export function JobExtras({ bookingId, status, faults, quotes, hourlyRatePence, 
                 />
               ))}
             </ul>
+            <SuggestedParts
+              bookingId={bookingId}
+              nodeIds={lines.filter((l) => l.kind === "labour" && l.nodeId).map((l) => l.nodeId as string)}
+              onAdd={(part) =>
+                setLines((ls) => [
+                  ...ls,
+                  { key: newKey(), kind: "part", description: part.description, hours: "", quantity: String(part.quantity), unitPounds: (part.unitPence / 100).toFixed(2), nodeId: null, partId: null, faultId: null },
+                ])
+              }
+            />
             <div className="flex flex-wrap gap-2">
               <Button
                 size="sm"
@@ -527,7 +537,7 @@ function DraftLineRow({
       ) : (
         <>
           {line.kind === "part" ? (
-            <PartPicker line={line} onChange={onChange} />
+            <input value={line.description} onChange={(e) => onChange({ ...line, description: e.target.value })} placeholder="Part name, e.g. Rear brake pads" aria-label="Part" className={`${INPUT} w-full`} maxLength={200} />
           ) : (
             <input value={line.description} onChange={(e) => onChange({ ...line, description: e.target.value })} placeholder="e.g. Brake cleaner" aria-label="Description" className={`${INPUT} w-full`} maxLength={200} />
           )}
@@ -607,29 +617,91 @@ function RepairTimeSearch({
   );
 }
 
-function PartPicker({ line, onChange }: { line: DraftLine; onChange: (next: DraftLine) => void }) {
-  const [parts, setParts] = useState<Array<{ id: string; name: string; bmtPricePence: number }> | null>(null);
-  useEffect(() => {
-    let cancelled = false;
-    listQuotePartsAction().then((res) => {
-      if (!cancelled && res.ok) setParts(res.parts);
+/**
+ * The parts the quote's labour needs, priced for this car from Alliance
+ * Automotive (Task 43): the same parts and prices a customer booking the work
+ * would pay. Only labour picked from the book times has a job to look parts up
+ * by. "Add" turns a suggestion into an ordinary part line the mechanic can edit.
+ */
+function SuggestedParts({
+  bookingId,
+  nodeIds,
+  onAdd,
+}: {
+  bookingId: string;
+  nodeIds: string[];
+  onAdd: (part: QuotePartSuggestion) => void;
+}) {
+  const [state, setState] = useState<{
+    status: "loading" | "ready" | "error";
+    forKey: string;
+    parts?: QuotePartSuggestion[];
+    missing?: string[];
+    error?: string;
+  } | null>(null);
+  const [added, setAdded] = useState<Set<string>>(() => new Set());
+  const key = nodeIds.join(",");
+  if (nodeIds.length === 0) return null;
+  const current = state?.forKey === key ? state : null;
+
+  function find() {
+    setState({ status: "loading", forKey: key });
+    suggestQuotePartsAction({ bookingId, nodeIds }).then((res) => {
+      if (!res.ok) {
+        setState({ status: "error", forKey: key, error: res.error });
+        return;
+      }
+      setState({ status: "ready", forKey: key, parts: res.parts, missing: res.missing });
     });
-    return () => { cancelled = true; };
-  }, []);
-  const names = useMemo(() => (parts ?? []).map((p) => p.name), [parts]);
+  }
+
   return (
-    <div className="space-y-1">
-      <Combobox
-        value={line.description}
-        onChange={(value) => {
-          const match = (parts ?? []).find((p) => p.name.toLowerCase() === value.trim().toLowerCase());
-          onChange(match ? { ...line, description: match.name, partId: match.id, unitPounds: (match.bmtPricePence / 100).toFixed(2) } : { ...line, description: value, partId: null });
-        }}
-        options={names}
-        placeholder={parts == null ? "Loading parts…" : "Part name: pick from the catalogue or type your own"}
-        aria-label="Part"
-      />
-      <p className="text-xs text-text-muted">{line.partId ? "From the catalogue. BMT price filled in." : "Not in the catalogue. Enter the price you'll charge."}</p>
+    <div className="space-y-2 rounded-xl border border-dashed border-border bg-surface px-3 py-2.5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-xs font-semibold text-text-secondary">Parts for this work, priced for this car</p>
+        <Button size="sm" variant="ghost" iconLeft={Search} disabled={current?.status === "loading"} onClick={find}>
+          {current?.status === "loading" ? "Finding parts…" : current?.status === "ready" ? "Check again" : "Find parts"}
+        </Button>
+      </div>
+      {current?.status === "error" && <p className="text-xs text-red-700">{current.error}</p>}
+      {current?.status === "ready" && (
+        <>
+          {(current.parts ?? []).length === 0 && (current.missing ?? []).length === 0 && (
+            <p className="text-xs text-text-muted">HaynesPro lists no parts for this work.</p>
+          )}
+          {(current.parts ?? []).length > 0 && (
+            <ul className="space-y-1.5">
+              {(current.parts ?? []).map((part) => (
+                <li key={part.key} className="flex items-center justify-between gap-3 text-sm">
+                  <span className="min-w-0 text-text-primary">
+                    {part.description}
+                    {part.quantity > 1 && <span className="text-text-muted"> × {part.quantity}</span>}
+                  </span>
+                  <span className="flex shrink-0 items-center gap-2">
+                    <span className="tabular-nums text-text-secondary">{formatPrice(part.unitPence * part.quantity)}</span>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      disabled={added.has(part.key)}
+                      onClick={() => {
+                        onAdd(part);
+                        setAdded((s) => new Set(s).add(part.key));
+                      }}
+                    >
+                      {added.has(part.key) ? "Added" : "Add"}
+                    </Button>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+          {(current.missing ?? []).length > 0 && (
+            <p className="text-xs text-amber-700">
+              No price for {(current.missing ?? []).join(", ")}. Add it as a part yourself if the work needs it.
+            </p>
+          )}
+        </>
+      )}
     </div>
   );
 }

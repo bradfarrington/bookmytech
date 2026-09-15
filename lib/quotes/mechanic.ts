@@ -4,6 +4,10 @@ import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getHourlyRatePence, getTakeRateBase } from "@/lib/pricing/calculate";
 import { searchRepairCatalogue } from "@/lib/haynespro/catalogue";
+import { getRepairNodesByIds } from "@/lib/haynespro/tree";
+import { resolveVehicle } from "@/lib/haynespro/vehicle";
+import { partGroupsOnNodes } from "@/lib/parts/part-groups";
+import { partGroupName, quoteJobParts, type PartsJob, type QuotedPart } from "@/lib/parts/quote-parts";
 import { loadQuote, loadQuotesForBooking, quoteMoney, type QuoteView } from "./load";
 import { loadRevisionsForBooking, revisionMoney } from "@/lib/revisions/load";
 import { safePriceQuoteLines, type QuoteLineInput } from "./pricing";
@@ -110,8 +114,10 @@ export interface CreateQuoteInput {
 }
 
 /**
- * Price and send a quote in one go. Part lines that name a catalogue part take
- * the catalogue's BMT price and name — the mechanic never sees supplier cost.
+ * Price and send a quote in one go. Part lines are the mechanic's own: a name
+ * and a price as typed, or filled in from an Alliance Automotive suggestion
+ * (suggestQuoteParts). The frozen `parts` catalogue is no longer offered
+ * (Task 43), so a line never names one.
  */
 export async function createQuote(mechanicId: string, input: CreateQuoteInput): Promise<QuoteCreateResult> {
   const kind: QuoteKind = input.kind === "follow_on" ? "follow_on" : "now";
@@ -138,21 +144,7 @@ export async function createQuote(mechanicId: string, input: CreateQuoteInput): 
       return { ok: false, error: "The revised job is still waiting on the customer. Wait for their answer before quoting extra work." };
   }
 
-  // Catalogue parts: name + BMT price from the table.
-  const partIds = [...new Set(input.lines.map((l) => l.partId).filter((v): v is string => Boolean(v)))];
-  const partsById = new Map<string, { name: string; bmt_price_pence: number }>();
-  if (partIds.length) {
-    const { data: parts } = await admin.from("parts").select("id, name, bmt_price_pence, is_active").in("id", partIds);
-    for (const p of parts ?? []) if (p.is_active) partsById.set(p.id, { name: p.name, bmt_price_pence: p.bmt_price_pence });
-  }
-  const lines: QuoteLineInput[] = input.lines.map((l) => {
-    if (l.kind === "part" && l.partId) {
-      const part = partsById.get(l.partId);
-      if (!part) return { ...l, partId: null };
-      return { ...l, description: part.name, unitPence: part.bmt_price_pence };
-    }
-    return l;
-  });
+  const lines: QuoteLineInput[] = input.lines.map((l) => ({ ...l, partId: null }));
 
   const [hourlyRatePence, defaultRate] = await Promise.all([getHourlyRatePence(admin), getTakeRateBase(admin)]);
   const commissionRate = booking.commission_rate ?? defaultRate;
@@ -290,21 +282,71 @@ export async function searchJobRepairTimes(
   };
 }
 
-export interface QuotePartOption {
-  id: string;
-  name: string;
-  bmtPricePence: number;
+export interface QuotePartSuggestion {
+  key: string;
+  /** The labour line's HaynesPro job it belongs to. */
+  nodeId: string;
+  /** "Brake pads (rear) · BREMBO · BREP59038": what the part line is called. */
+  description: string;
+  quantity: number;
+  /** What the customer pays per unit: AAG's price with no mark-up, or the admin's set price. */
+  unitPence: number;
+  source: QuotedPart["source"];
 }
 
-/** Active catalogue parts, BMT price only — supplier cost never leaves the admin. */
-export async function listQuoteParts(): Promise<QuotePartOption[]> {
-  const admin = createAdminClient();
-  const { data } = await admin
-    .from("parts")
-    .select("id, name, bmt_price_pence")
-    .eq("is_active", true)
-    .order("name");
-  return (data ?? []).map((p) => ({ id: p.id, name: p.name, bmtPricePence: p.bmt_price_pence }));
+const MAX_SUGGESTION_JOBS = 10;
+
+/**
+ * The parts the labour on a quote needs, priced for this job's car exactly as
+ * a customer booking prices them (Task 43): HaynesPro's part groups for each
+ * job, Alliance Automotive's best-rated part (or the admin's choice or set
+ * price), one per axle when a job names neither. The mechanic adds the ones
+ * they want as ordinary part lines. `missing` names the groups with no price.
+ */
+export async function suggestQuoteParts(
+  mechanicId: string,
+  bookingId: string,
+  nodeIds: readonly string[],
+): Promise<{ ok: true; parts: QuotePartSuggestion[]; missing: string[] } | { ok: false; error: string }> {
+  const owned = await ownedBooking(bookingId, mechanicId);
+  if (!owned.ok) return owned;
+  const ids = [...new Set(nodeIds.map((id) => String(id ?? "").trim()).filter((id) => id && !id.includes(":")))].slice(
+    0,
+    MAX_SUGGESTION_JOBS,
+  );
+  if (ids.length === 0) return { ok: true, parts: [], missing: [] };
+
+  const vehicle = await resolveVehicle(owned.booking.vehicle_reg, owned.admin);
+  if (!vehicle || vehicle.repairtimeTypeId == null) {
+    return { ok: false, error: "We couldn't look up parts for this car. Add them yourself." };
+  }
+  const nodes = await getRepairNodesByIds({ carTypeId: vehicle.carTypeId, repairtimeTypeId: vehicle.repairtimeTypeId }, ids);
+  const byId = new Map(nodes.filter((n) => n.id != null).map((n) => [n.id as string, n]));
+  const jobs: PartsJob[] = ids.flatMap((id) => {
+    const node = byId.get(id) ?? (ids.length === 1 && nodes.length === 1 ? nodes[0] : undefined);
+    if (!node) return [];
+    return [
+      {
+        nodeId: id,
+        description: node.description?.trim() ?? "",
+        groups: partGroupsOnNodes([node]).map((g) => ({ genartId: g.genartId, label: g.description || `Part group ${g.genartId}` })),
+      },
+    ];
+  });
+
+  const priced = await quoteJobParts({ db: owned.admin, reg: owned.booking.vehicle_reg, carTypeId: vehicle.carTypeId, jobs });
+  return {
+    ok: true,
+    parts: priced.parts.map((part, index) => ({
+      key: `${part.nodeId}:${part.genartId}:${part.position ?? "any"}:${index}`,
+      nodeId: part.nodeId,
+      description: [partGroupName(part), part.brand, part.partNumber].filter(Boolean).join(" · ").slice(0, 200),
+      quantity: part.quantity,
+      unitPence: part.unitPence,
+      source: part.source,
+    })),
+    missing: priced.ok ? [] : [...new Set(priced.missing.map((m) => m.label))],
+  };
 }
 
 async function cancelIntentQuietly(paymentIntentId: string): Promise<void> {

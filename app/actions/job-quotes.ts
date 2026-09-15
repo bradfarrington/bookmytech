@@ -3,8 +3,8 @@
 import { requireMechanic } from "@/lib/mechanics/require-mechanic";
 import {
   createQuote,
-  listQuoteParts,
   searchJobRepairTimes,
+  suggestQuoteParts,
   withdrawQuote,
   type CreateQuoteInput,
 } from "@/lib/quotes/mechanic";
@@ -31,8 +31,9 @@ export async function searchJobRepairTimesAction(input: { bookingId: string; que
   return searchJobRepairTimes(guard.mechanicId, input.bookingId, input.query);
 }
 
-export async function listQuotePartsAction() {
+/** Alliance Automotive parts for the labour on a quote, priced for this job's car (Task 43). */
+export async function suggestQuotePartsAction(input: { bookingId: string; nodeIds: string[] }) {
   const guard = await requireMechanic();
   if (!guard.ok) return { ok: false as const, error: guard.error };
-  return { ok: true as const, parts: await listQuoteParts() };
+  return suggestQuoteParts(guard.mechanicId, input.bookingId, Array.isArray(input.nodeIds) ? input.nodeIds : []);
 }

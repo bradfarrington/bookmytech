@@ -102,7 +102,7 @@ describe("priceJobParts", () => {
     expect(result.ok && result.parts.map((p) => [p.genartId, p.linePence, p.source])).toEqual([[8, 2910, "default"]]);
   });
 
-  it("can't price a charged group AAG lists nothing for", () => {
+  it("can't price a charged group AAG lists nothing for, but keeps what it did price", () => {
     const result = priceJobParts({
       jobs: [job],
       offers: new Map<number, AagPartOffers>([
@@ -110,12 +110,58 @@ describe("priceJobParts", () => {
         [2021, { state: "empty", pricedAt: PRICED_AT }],
       ]),
     });
-    expect(result).toEqual({ ok: false, missing: [{ nodeId: "air", genartId: 2021, label: "Battery charger" }] });
+    expect(result).toMatchObject({
+      ok: false,
+      missing: [{ nodeId: "air", genartId: 2021, label: "Battery charger", position: null }],
+    });
+    expect(result.parts.map((p) => p.genartId)).toEqual([8]);
   });
 
   it("can't price a group AAG couldn't be asked about", () => {
     const result = priceJobParts({ jobs: [job], offers: new Map([[8, { state: "unavailable" }]]), uncharged: new Set([2021]) });
     expect(result.ok).toBe(false);
+  });
+
+  it("uses the admin's set price when AAG has none", () => {
+    const antifreeze: PartsJob = { nodeId: "head", description: "Remove/refit the cylinder head", groups: [{ genartId: 3356, label: "Antifreeze" }] };
+    const result = priceJobParts({
+      jobs: [antifreeze],
+      offers: new Map<number, AagPartOffers>([[3356, { state: "empty", pricedAt: PRICED_AT }]]),
+      setPrices: new Map([[3356, { pence: 1250, setAt: "2026-09-15T20:00:00.000Z" }]]),
+    });
+    expect(result).toEqual({
+      ok: true,
+      parts: [
+        {
+          nodeId: "head",
+          genartId: 3356,
+          groupLabel: "Antifreeze",
+          supplier: null,
+          partNumber: null,
+          brand: null,
+          description: null,
+          imageUrl: null,
+          position: null,
+          rating: null,
+          quantity: 1,
+          unitPence: 1250,
+          linePence: 1250,
+          source: "set_price",
+          lastKnown: false,
+          pricedAt: "2026-09-15T20:00:00.000Z",
+        },
+      ],
+    });
+  });
+
+  it("prefers AAG's price to the set price", () => {
+    const result = priceJobParts({
+      jobs: [job],
+      offers: new Map([[8, filters]]),
+      uncharged: new Set([2021]),
+      setPrices: new Map([[8, { pence: 999, setAt: PRICED_AT }]]),
+    });
+    expect(result.ok && result.parts[0]).toMatchObject({ source: "default", linePence: 2910 });
   });
 
   it("carries a last known price through", () => {
@@ -132,26 +178,27 @@ describe("priceJobParts", () => {
 });
 
 describe("catalogueBookingPartRows", () => {
+  const disc: QuotedPart = {
+    nodeId: "discs",
+    genartId: 82,
+    groupLabel: "Brake disc",
+    supplier: "aag",
+    partNumber: "BRE09.7629.11",
+    brand: "BREMBO",
+    description: "B/DISC 280 * 5 (VENTED) - FRONT",
+    imageUrl: null,
+    position: "front",
+    rating: "Best",
+    quantity: 2,
+    unitPence: 4354,
+    linePence: 8708,
+    source: "default",
+    lastKnown: false,
+    pricedAt: PRICED_AT,
+  };
+
   it("names the part and axle, and records exactly what to buy", () => {
-    const part: QuotedPart = {
-      nodeId: "discs",
-      genartId: 82,
-      groupLabel: "Brake disc",
-      supplier: "aag",
-      partNumber: "BRE09.7629.11",
-      brand: "BREMBO",
-      description: "B/DISC 280 * 5 (VENTED) - FRONT",
-      imageUrl: null,
-      position: "front",
-      rating: "Best",
-      quantity: 2,
-      unitPence: 4354,
-      linePence: 8708,
-      source: "default",
-      lastKnown: false,
-      pricedAt: PRICED_AT,
-    };
-    expect(catalogueBookingPartRows("booking-1", [part])).toEqual([
+    expect(catalogueBookingPartRows("booking-1", [disc])).toEqual([
       {
         booking_id: "booking-1",
         part_id: null,
@@ -170,5 +217,12 @@ describe("catalogueBookingPartRows", () => {
         priced_at: PRICED_AT,
       },
     ]);
+  });
+
+  it("records a set price with no supplier part", () => {
+    const [row] = catalogueBookingPartRows("booking-1", [
+      { ...disc, supplier: null, partNumber: null, brand: null, position: null, groupLabel: "Antifreeze", quantity: 1, unitPence: 1250, linePence: 1250, source: "set_price" },
+    ]);
+    expect(row).toMatchObject({ part_name: "Antifreeze", supplier: null, supplier_part_number: null, total_pence: 1250, source: "catalogue" });
   });
 });

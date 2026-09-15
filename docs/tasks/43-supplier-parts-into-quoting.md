@@ -1,6 +1,11 @@
 # Task 43 — Supplier parts into quoting: engine oil, the mechanic's picker, and repair→parts
 
-**Status:** 🚧 Built (2026-09-15), awaiting owner steps. **LKQ is removed entirely (Gareth) and Alliance Automotive is the only parts supplier.** Part A (removing LKQ, migration `0069_remove_lkq.sql`) and Part B (AAG parts in customer prices, migration `0070_aag_part_prices.sql`) are built and committed. Not yet exercised live: both migrations are unapplied, and AAG's sandbox is blocking this machine's IP. "Revised decisions" and "What shipped" directly below supersede the earlier decisions table; everything after them is earlier scoping, kept as history.
+**Status:** 🚧 Built (2026-09-15), awaiting owner steps. **LKQ is removed entirely (Gareth) and Alliance Automotive is the only parts supplier.** Built and committed:
+- **Part A:** removing LKQ (`0069_remove_lkq.sql`).
+- **Part B:** AAG parts in customer prices (`0070_aag_part_prices.sql`).
+- **Follow-ups:** set prices (`0071_part_group_set_prices.sql`) and the mechanic's part suggestions.
+
+**Live state (checked 2026-09-15):** 0069 and 0070 are applied; 0071 isn't. AAG's sandbox still blocks this machine's IP, so a repair that needs parts can't be booked until AAG allowlists it or a set price covers the group. "Revised decisions" and "What shipped" directly below supersede the earlier decisions table; everything after them is earlier scoping, kept as history.
 
 ## Revised decisions (2026-09-15, evening)
 
@@ -75,15 +80,20 @@
 - [x] The booking records each priced part, the mechanic sees the part number, and revised jobs don't double-count.
 - [x] The mobile quote response change is additive.
 - [x] `tsc` (no new errors), eslint on changed files, `npm test`. No `next build`: Brad's dev server was running on `.next`.
-- [ ] Migrations 0069 and 0070 applied. **Owner** (0070 only once AAG answers from here).
+- [x] Migrations 0069 and 0070 applied. *(Checked live 2026-09-15. 0070 went in before AAG allowlisted this machine, so repairs that need parts can't be booked here until it does.)*
+- [ ] Migration 0071 applied. **Owner.**
 - [ ] AAG allowlists `80.1.6.55`, then the S28BSW air filter is priced with its part end to end (Price, Confirm, hold, booking row, mechanic page). **Owner, then verify.**
 - [ ] AAG production credentials and `AAG_BASE_URL` set on Vercel. **Owner, after the demo call.**
 - [ ] The customer app renders `quote.parts`. **App repo.**
 
 ## Follow-ups
 
-- **Consumables:** AAG may not list antifreeze, screenwash or oil by registration. If such a group blocks bookings, add a per-group fallback price, like engine oil's £/litre.
-- **Mechanic's picker:** the on-site quote part picker still reads the frozen `parts` table (`lib/quotes/mechanic.ts`).
+- ~~**Consumables**~~ **Done (same evening).** Each part group can have a set price (`part_group_settings.set_price_pence`, migration `0071_part_group_set_prices.sql`), entered in the vehicle Parts panel.
+  - It prices a charged group only when AAG has no price, including no last known price. AAG's price always wins.
+- ~~**Mechanic's picker**~~ **Done (same evening).**
+  - **Extra-work quotes:** "Find parts" suggests the parts for the quote's labour picked from the book times, priced for the car exactly as a customer booking would be (`suggestQuoteParts`). "Add" turns a suggestion into an ordinary part line.
+  - **Change what's being done:** parts for the repairs are priced automatically, and the preview lists them. Only other parts are typed.
+  - **The old catalogue:** the frozen `parts` table is no longer read anywhere. It stays for historical rows.
 - **Endpoint:** `/api/quote` or `/classic`, once AAG says which.
 
 ## The problem, as found (2026-09-15)

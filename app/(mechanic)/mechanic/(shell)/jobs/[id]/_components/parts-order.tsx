@@ -71,10 +71,16 @@ export function PartsOrder({
                   {p.name}
                   {p.quantity > 1 && <span className="ml-1 text-text-muted">× {p.quantity}</span>}
                 </span>
-                {p.supplierPartNumber && (
+                {p.source === "catalogue" && (
                   <p className="mt-0.5 text-xs text-text-muted">
-                    Priced as Alliance Automotive{p.brand ? ` · ${p.brand}` : ""} ·{" "}
-                    <span className="font-mono">{p.supplierPartNumber}</span>
+                    {p.supplierPartNumber ? (
+                      <>
+                        Priced as Alliance Automotive{p.brand ? ` · ${p.brand}` : ""} ·{" "}
+                        <span className="font-mono">{p.supplierPartNumber}</span>
+                      </>
+                    ) : (
+                      "Set price: Alliance Automotive had no price, so buy a suitable part"
+                    )}
                   </p>
                 )}
               </div>

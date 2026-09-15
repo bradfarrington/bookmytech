@@ -3,7 +3,7 @@
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { getRepairNodesByIds } from "@/lib/haynespro/tree";
 import { cacheRegKey, resolveVehicle } from "@/lib/haynespro/vehicle";
-import { loadPartGroupSettings, isMissingTable } from "@/lib/parts/part-group-settings";
+import { isMissingColumn, isMissingTable, loadPartGroupSettings } from "@/lib/parts/part-group-settings";
 import { partGroupsOnNodes } from "@/lib/parts/part-groups";
 import {
   jobPosition,
@@ -22,7 +22,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 // costs. The part shown is the one customer quotes use (lib/parts/quote-parts.ts):
 // the admin's choice for this variant, else AAG's best-rated, dearest within
 // that rating, one per axle when the repair names neither. An admin can also
-// stop customers being charged for a part group (a tool, not a part).
+// stop customers being charged for a part group (a tool, not a part), and give
+// a part group a set price for when AAG has none (Task 43).
 //
 // Suppliers can only price a real registration, never a make/model/engine from
 // a list. So a variant is priced through a registration known to BE that
@@ -40,6 +41,8 @@ export interface RepairPartGroupView {
   description: string;
   /** Whether customers are charged for this part group (Task 43). */
   charged: boolean;
+  /** What customers pay for the group when AAG has no price, if set (migration 0071). */
+  setPricePence: number | null;
   aag: SupplierPanel;
   /** The part in use: one, or one per axle. */
   selections: JobPartSelection[];
@@ -54,7 +57,7 @@ export type RepairPartsResult =
       vehicle: string | null;
       /** HaynesPro's name for the repair: an axle in it narrows the parts. */
       repairName: string;
-      /** False until migration 0070 is applied: the charge switches can't save. */
+      /** False until migration 0070 is applied: the part group settings can't save. */
       settingsReady: boolean;
       groups: RepairPartGroupView[];
     }
@@ -147,6 +150,7 @@ export async function loadRepairPartsAction(input: {
         genartId: g.genartId,
         description,
         charged: !(settings.enabled && settings.uncharged.has(g.genartId)),
+        setPricePence: settings.enabled ? (settings.setPrices.get(g.genartId)?.pence ?? null) : null,
         aag,
         selections:
           aag.state === "ok"
@@ -257,6 +261,49 @@ export async function setPartGroupChargedAction(input: {
       error: isMissingTable(error)
         ? "Part group settings aren't set up yet. Apply migration 0070 first."
         : `Couldn't save that: ${error.message}`,
+    };
+  }
+  return { ok: true };
+}
+
+/**
+ * What customers pay for this part group when Alliance Automotive has no price
+ * for it (Task 43, migration 0071), on every repair and vehicle. Null removes it.
+ */
+export async function setPartGroupSetPriceAction(input: {
+  genartId: number;
+  description: string | null;
+  setPricePence: number | null;
+}): Promise<RepairPartActionResult> {
+  const gate = await requireAdmin();
+  if (!gate.ok) return gate;
+
+  const genartId = positiveInt(input.genartId);
+  if (!genartId) return { ok: false, error: "That part group couldn't be found." };
+  const pence = input.setPricePence == null ? null : Math.round(Number(input.setPricePence));
+  if (pence != null && (!Number.isFinite(pence) || pence < 0 || pence > 1_000_000)) {
+    return { ok: false, error: "Enter a price between £0.00 and £10,000.00." };
+  }
+
+  const { error } = await createAdminClient()
+    .from("part_group_settings")
+    .upsert(
+      {
+        genart_id: genartId,
+        description: input.description?.trim() || null,
+        set_price_pence: pence,
+        changed_by: gate.userId,
+        changed_at: new Date().toISOString(),
+      },
+      { onConflict: "genart_id" },
+    );
+  if (error) {
+    return {
+      ok: false,
+      error:
+        isMissingTable(error) || isMissingColumn(error)
+          ? "Set prices aren't set up yet. Apply migration 0071 first."
+          : `Couldn't save that: ${error.message}`,
     };
   }
   return { ok: true };

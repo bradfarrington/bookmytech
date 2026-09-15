@@ -9,15 +9,16 @@
 // for both axles, takes one per axle. Each job carries its own parts, like
 // labour (owner decisions, 2026-09-15).
 //
-// A charged group that can't be priced (AAG down, blocked or listing nothing,
-// with no answer from the last 7 days) makes the set unpriceable: the booking
-// stops rather than go out without its parts.
+// A charged group AAG can't price (down, blocked or listing nothing, with no
+// answer from the last 7 days) takes the admin's set price for the group when
+// there is one (migration 0071: consumables AAG doesn't list). Otherwise the
+// set is unpriceable: the booking stops rather than go out without its parts.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { loadAagPartOffers, type AagPartOffers } from "./aag-part-prices";
-import { loadPartGroupSettings } from "./part-group-settings";
-import { selectJobParts, type RepairPartChoiceRow } from "./repair-part-choice";
+import { loadPartGroupSettings, type PartGroupSetPrice } from "./part-group-settings";
+import { jobPosition, selectJobParts, type RepairPartChoiceRow } from "./repair-part-choice";
 import type { PartPosition, SupplierId } from "./supplier-offer";
 
 /** One part priced into a quote. Serialisable: it is snapshotted onto bookings and revisions. */
@@ -27,8 +28,10 @@ export interface QuotedPart {
   genartId: number;
   /** HaynesPro's name for the part group, e.g. "Air filter". */
   groupLabel: string;
-  supplier: SupplierId;
-  partNumber: string;
+  /** Null for a set price: no supplier part was priced. */
+  supplier: SupplierId | null;
+  /** Null for a set price. */
+  partNumber: string | null;
   brand: string | null;
   description: string | null;
   imageUrl: string | null;
@@ -37,15 +40,19 @@ export interface QuotedPart {
   rating: string | null;
   /** Units bought, in the supplier's unit of issue: 2 for brake discs. */
   quantity: number;
-  /** Supplier cost per unit, no mark-up. */
+  /** Supplier cost per unit, no mark-up; or the set price. */
   unitPence: number;
   /** unitPence × quantity. */
   linePence: number;
-  /** "chosen": an admin picked it for this engine variant; "default": best-rated, dearest within. */
-  source: "chosen" | "default";
+  /**
+   * "chosen": an admin picked it for this engine variant. "default": AAG's
+   * best-rated, dearest within. "set_price": AAG had no price, so the admin's
+   * set price for the part group.
+   */
+  source: "chosen" | "default" | "set_price";
   /** True when AAG couldn't answer and its answer from the last 7 days was used. */
   lastKnown: boolean;
-  /** When AAG gave the price, ISO. */
+  /** When the price was given (by AAG, or set by the admin), ISO. */
   pricedAt: string;
 }
 
@@ -60,10 +67,17 @@ export interface MissingPart {
   nodeId: string;
   genartId: number;
   label: string;
-  position?: PartPosition | null;
+  position: PartPosition | null;
 }
 
-export type JobPartsResult = { ok: true; parts: QuotedPart[] } | { ok: false; missing: MissingPart[] };
+/**
+ * The parts that could be priced, and any charged group that couldn't. `ok`
+ * only when nothing is missing; `parts` is filled either way, so a mechanic's
+ * suggestions can still show what was priced.
+ */
+export type JobPartsResult =
+  | { ok: true; parts: QuotedPart[] }
+  | { ok: false; parts: QuotedPart[]; missing: MissingPart[] };
 
 /** The key a repair part choice is looked up by. */
 export function choiceKey(nodeId: string, genartId: number): string {
@@ -76,22 +90,49 @@ export function priceJobParts(args: {
   offers: ReadonlyMap<number, AagPartOffers>;
   choices?: ReadonlyMap<string, RepairPartChoiceRow>;
   uncharged?: ReadonlySet<number>;
+  setPrices?: ReadonlyMap<number, PartGroupSetPrice>;
 }): JobPartsResult {
   const parts: QuotedPart[] = [];
   const missing: MissingPart[] = [];
+
+  const unpriced = (job: PartsJob, group: PartsJob["groups"][number], position: PartPosition | null) => {
+    const set = args.setPrices?.get(group.genartId);
+    if (!set) {
+      missing.push({ nodeId: job.nodeId, genartId: group.genartId, label: group.label, position });
+      return;
+    }
+    parts.push({
+      nodeId: job.nodeId,
+      genartId: group.genartId,
+      groupLabel: group.label,
+      supplier: null,
+      partNumber: null,
+      brand: null,
+      description: null,
+      imageUrl: null,
+      position,
+      rating: null,
+      quantity: 1,
+      unitPence: set.pence,
+      linePence: set.pence,
+      source: "set_price",
+      lastKnown: false,
+      pricedAt: set.setAt,
+    });
+  };
 
   for (const job of args.jobs) {
     for (const group of job.groups) {
       if (args.uncharged?.has(group.genartId)) continue;
       const lookup = args.offers.get(group.genartId);
       if (!lookup || lookup.state !== "ok") {
-        missing.push({ nodeId: job.nodeId, genartId: group.genartId, label: group.label });
+        unpriced(job, group, jobPosition(job.description));
         continue;
       }
       const choice = args.choices?.get(choiceKey(job.nodeId, group.genartId)) ?? null;
       for (const { position, selection } of selectJobParts(job.description, lookup.offers, choice)) {
         if (selection.source === "none" || selection.offer.costPence == null) {
-          missing.push({ nodeId: job.nodeId, genartId: group.genartId, label: group.label, position });
+          unpriced(job, group, position);
           continue;
         }
         const offer = selection.offer;
@@ -119,7 +160,7 @@ export function priceJobParts(args: {
     }
   }
 
-  return missing.length > 0 ? { ok: false, missing } : { ok: true, parts };
+  return missing.length > 0 ? { ok: false, parts, missing } : { ok: true, parts };
 }
 
 async function loadChoices(
@@ -164,7 +205,13 @@ export async function quoteJobParts(args: {
   ]);
   if (!offers.enabled) return { ok: true, parts: [] };
 
-  return priceJobParts({ jobs: args.jobs, offers: offers.byGenart, choices, uncharged: settings.uncharged });
+  return priceJobParts({
+    jobs: args.jobs,
+    offers: offers.byGenart,
+    choices,
+    uncharged: settings.uncharged,
+    setPrices: settings.setPrices,
+  });
 }
 
 /** "Brake disc (front)": the part group, and the axle when there is one. */

@@ -9,6 +9,7 @@ import {
   loadRepairPartsAction,
   resetRepairPartAction,
   setPartGroupChargedAction,
+  setPartGroupSetPriceAction,
   type RepairPartGroupView,
   type RepairPartsResult,
 } from "@/app/actions/repair-parts";
@@ -31,8 +32,9 @@ import { cn, formatPrice } from "@/lib/utils";
 // part group the repair uses, and the part shown is the one customer quotes use
 // (Task 43): AAG's best-rated, dearest within that rating, one per axle when the
 // repair names neither. "Change" lists every fitting part, and a choice applies
-// to this engine variant only. The switch stops customers being charged for a
-// part group on every repair (a tool, not a part).
+// to this engine variant only. Per part group, on every repair: the switch
+// stops customers being charged (a tool, not a part), and a set price is what
+// customers pay when AAG has no price (antifreeze, screenwash).
 //
 // Money rules: supplier cost, no mark-up; a core charge is never added to the
 // cost; an unpriced part says "Not priced", never £0.00.
@@ -91,6 +93,72 @@ function Cost({ offer }: { offer: SupplierOffer }) {
   );
 }
 
+function poundsToPence(value: string): number {
+  const n = Number.parseFloat(value.replace(/[£,\s]/g, ""));
+  return Number.isFinite(n) ? Math.round(n * 100) : Number.NaN;
+}
+
+/** The set price for a part group: what customers pay when AAG has no price for it. */
+function SetPriceField({
+  group,
+  onSaved,
+}: {
+  group: RepairPartGroupView;
+  onSaved: (setPricePence: number | null) => void;
+}) {
+  const [value, setValue] = useState(group.setPricePence != null ? (group.setPricePence / 100).toFixed(2) : "");
+  const [saving, startSaving] = useTransition();
+
+  const save = (remove = false) =>
+    startSaving(async () => {
+      const pence = remove || !value.trim() ? null : poundsToPence(value);
+      if (pence != null && (!Number.isFinite(pence) || pence < 0)) {
+        toast.error("Enter a price in pounds, e.g. 12.50.");
+        return;
+      }
+      const result = await setPartGroupSetPriceAction({ genartId: group.genartId, description: group.description, setPricePence: pence });
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
+      if (pence == null) setValue("");
+      onSaved(pence);
+      toast.success(
+        pence == null
+          ? `No set price for “${group.description}” any more.`
+          : `Customers pay ${formatPrice(pence)} for “${group.description}” when Alliance Automotive has no price.`,
+      );
+    });
+
+  return (
+    <form
+      className="mt-2 flex flex-wrap items-center gap-2 text-xs text-text-muted"
+      onSubmit={(e) => {
+        e.preventDefault();
+        save();
+      }}
+    >
+      <span>When Alliance Automotive has no price, charge £</span>
+      <input
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        inputMode="decimal"
+        placeholder="not set"
+        aria-label={`Set price for ${group.description}`}
+        className="h-8 w-24 rounded-button border border-border bg-surface-card px-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand-blue"
+      />
+      <Button type="submit" size="sm" variant="ghost" disabled={saving}>
+        Save
+      </Button>
+      {group.setPricePence != null && (
+        <Button type="button" size="sm" variant="ghost" disabled={saving} onClick={() => save(true)}>
+          Remove
+        </Button>
+      )}
+    </form>
+  );
+}
+
 function PartGroupCard({
   group,
   carTypeId,
@@ -112,6 +180,7 @@ function PartGroupCard({
   const offers = [...panelOffers(group.aag)].sort(byDefaultOrder);
   const note = panelNote(group.aag);
   const chosen = group.selections.some((s) => s.selection.source === "choice");
+  const unpriced = group.aag.state !== "ok" || group.selections.some((s) => s.selection.source === "none");
   const missingChoice = group.selections
     .map((s) => (s.selection.source === "choice" ? null : s.selection.missingChoice))
     .find(Boolean);
@@ -177,6 +246,9 @@ function PartGroupCard({
           <p className="text-sm font-semibold text-text-primary">{group.description}</p>
           <span className="font-mono text-xs text-text-muted">Group {group.genartId}</span>
           {!group.charged && <Pill tone="neutral">Not charged</Pill>}
+          {group.charged && group.setPricePence != null && (
+            <Pill tone="neutral">Set price {formatPrice(group.setPricePence)}</Pill>
+          )}
         </div>
         {settingsReady && (
           <label className="flex items-center gap-2 text-xs font-semibold text-text-secondary">
@@ -227,11 +299,25 @@ function PartGroupCard({
       )}
 
       {note && <p className="mt-1.5 text-xs text-text-muted">{note}</p>}
-      {group.aag.state === "empty" && group.charged && (
-        <p className="mt-1 text-xs text-amber-700">
-          A customer can&apos;t book this repair for this car while this group is charged. If it&apos;s a tool rather
-          than a part, switch it off.
-        </p>
+      {group.charged && unpriced && (
+        group.setPricePence != null ? (
+          <p className="mt-1 text-xs text-text-secondary">
+            With no Alliance Automotive price, customers pay the set price, {formatPrice(group.setPricePence)}.
+          </p>
+        ) : (
+          <p className="mt-1 text-xs text-amber-700">
+            Without a price for this group a customer can&apos;t book this repair for this car. Set a price below, or
+            switch the group off if it&apos;s a tool rather than a part.
+          </p>
+        )
+      )}
+
+      {settingsReady && group.charged && (
+        <SetPriceField
+          key={`${group.genartId}:${group.setPricePence ?? "none"}`}
+          group={group}
+          onSaved={(setPricePence) => onUpdated({ ...group, setPricePence })}
+        />
       )}
 
       {(offers.length > 0 || chosen) && (
@@ -387,8 +473,8 @@ export function RepairParts({
               )}
               <p className="text-xs text-text-muted">
                 Supplier cost, no mark-up. Customers are charged the part shown unless the group is switched off; a
-                change applies to this engine variant only.
-                {!result.settingsReady && " Charge switches appear once migration 0070 is applied."}
+                change applies to this engine variant only. The switch and the set price apply to every repair.
+                {!result.settingsReady && " Part group settings appear once migration 0070 is applied."}
               </p>
             </>
           )}

@@ -136,24 +136,25 @@ You are working on **Book My Tech**, a UK mobile-mechanic booking platform. This
   - **Price stability:** prices are cached 12 hours per registration and part group, so every step and the hold match. When AAG can't answer, its last price up to 7 days old is used; otherwise the booking stops with "We can't get a price for the parts this repair needs right now…".
   - **Where parts show:** the Price step and Confirm list them. The booking stores each part (`booking_parts.source = 'catalogue'`), and the mechanic sees the AAG part number. Revised jobs don't count them twice.
   - **Until 0070 is applied, nothing changes:** quotes stay labour-only. Smoke-tested on S28BSW.
-- **Owner, in this order:**
-  1. **Send AAG the dev IP `80.1.6.55`.** UAT only allows `80.6.218.98`, so every AAG call from this machine gets a Cloudflare 403.
-  2. Apply **`0069_remove_lkq.sql`**; this can be done any time.
-  3. Apply **`0070_aag_part_prices.sql`** only once AAG answers. The database is shared, so from then on a repair that needs parts can't be booked anywhere without an AAG price.
-  4. Run `npm run db:types` in the app after both, and delete the `LKQ_*` variables on Vercel.
-  5. Book AAG's demo call. Production needs live credentials and `AAG_BASE_URL`; live needs no IP allowlist.
+- **Follow-ups ✅ (same evening):**
+  - **Set prices:** a part group can have a set price for when AAG has none (`0071_part_group_set_prices.sql`, vehicle Parts panel), for consumables like antifreeze.
+  - **Mechanic's parts:** extra-work quotes suggest AAG parts for their labour ("Find parts"), and a revised job's repairs get their parts priced automatically. The frozen `parts` catalogue is no longer read.
+- **Live state (checked 2026-09-15):** 0069 and 0070 **are applied**, but AAG still blocks `80.1.6.55`. So any repair that needs parts currently can't be booked ("We can't get a price for the parts…").
+- **Owner:**
+  1. **Send AAG the dev IP `80.1.6.55`.** UAT only allows `80.6.218.98`. This unblocks bookings.
+  2. Apply **`0071_part_group_set_prices.sql`**. After that, a set price can cover a group AAG doesn't price.
+  3. Run `npm run db:types` in the app (0069, 0070, 0071), and delete the `LKQ_*` variables on Vercel.
+  4. Book AAG's demo call. Production needs live credentials and `AAG_BASE_URL`; live needs no IP allowlist.
 - **Customer app:**
   - render `quote.parts` on Price and Confirm (additive field on `POST /api/mobile/v1/quote`);
   - show "+ parts" on tree nodes with `genartIds`;
   - totals now include parts.
-- **Migration numbers:** 0069 and 0070 are Task 43's, so the dashboard plan's migrations (Tasks 49 to 55) now start at **0071**.
-- **This machine:** `tsc` shows two errors that predate this work:
-  - `leaflet` isn't installed; run `npm install`;
-  - `.next/types` holds stale references to parts pages deleted in Task 42.
+- **Migration numbers:** 0069 to 0071 are Task 43's, so the dashboard plan's migrations (Tasks 49 to 55) now start at **0072**.
+- **This machine:** `npm install` added `leaflet`, and `npx next typegen` cleared the stale Task 42 route types, so `tsc` is clean.
 
 ### 2026-09-15 — Booking flow split into the app's steps ✅ (Task 47), branch `task-47-booking-flow-split`
 
-**The web funnel now books in the app's steps:** Price → Time (`/book/time`) → Address (`/book/address`) → Confirm (`/book/slot`, unchanged URL). Detail in `docs/tasks/47-booking-flow-split.md`. **Next up: the parked parts-pricing work in `docs/tasks/43-supplier-parts-into-quoting.md`**, with Brad's decisions of 2026-09-15. Customer prices still leave parts out (found booking an air filter on S28 BSW). **Then Task 48**, the dashboard rebuild (`mockups/` structure with a top header). Task 48 itself has no SQL; the plan's migrations start at Task 49, now **0071** (0069 and 0070 went to Task 43).
+**The web funnel now books in the app's steps:** Price → Time (`/book/time`) → Address (`/book/address`) → Confirm (`/book/slot`, unchanged URL). Detail in `docs/tasks/47-booking-flow-split.md`. **Next up: the parked parts-pricing work in `docs/tasks/43-supplier-parts-into-quoting.md`**, with Brad's decisions of 2026-09-15. Customer prices still leave parts out (found booking an air filter on S28 BSW). **Then Task 48**, the dashboard rebuild (`mockups/` structure with a top header). Task 48 itself has no SQL; the plan's migrations start at Task 49, now **0072** (0069 to 0071 went to Task 43).
 
 **Discount codes (checked 2026-09-15): already in both booking flows, nothing to add.**
 - **Web:** the Confirm step's "Have a discount code?" box.

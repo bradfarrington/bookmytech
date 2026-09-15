@@ -78,10 +78,9 @@ function revalidate(bookingId: string) {
 
 // --- Inputs -------------------------------------------------------------------
 
-/** A part as the mechanic's panel sends it: one already on the booking, one from the catalogue, or typed. */
+/** A part as the mechanic's panel sends it: one already on the booking, or typed. */
 export interface RevisionPartInput {
   id?: string | null;
-  partId?: string | null;
   name?: string | null;
   quantity?: number | null;
   unitPence?: number | null;
@@ -101,19 +100,17 @@ export interface RevisionPreview {
 
 const MAX_PARTS = 20;
 
-async function resolveParts(
-  admin: ReturnType<typeof createAdminClient>,
+/**
+ * The mechanic's own parts: ones already on the booking, and typed ones. Parts
+ * for the repairs themselves are priced by the quote (Task 43), and the frozen
+ * `parts` catalogue is no longer offered.
+ */
+function resolveParts(
   inputs: readonly RevisionPartInput[],
   existingRows: readonly BookingPartRow[],
-): Promise<{ ok: true; parts: RevisionPart[] } | { ok: false; error: string }> {
+): { ok: true; parts: RevisionPart[] } | { ok: false; error: string } {
   if (inputs.length > MAX_PARTS) return { ok: false, error: `A job can carry up to ${MAX_PARTS} parts.` };
   const existingById = new Map(existingRows.map((r) => [r.id, r]));
-  const catalogueIds = [...new Set(inputs.map((p) => p.partId).filter((v): v is string => Boolean(v)))];
-  const catalogue = new Map<string, { name: string; bmt_price_pence: number }>();
-  if (catalogueIds.length) {
-    const { data } = await admin.from("parts").select("id, name, bmt_price_pence, is_active").in("id", catalogueIds);
-    for (const p of data ?? []) if (p.is_active) catalogue.set(p.id, { name: p.name, bmt_price_pence: p.bmt_price_pence });
-  }
   const parts: RevisionPart[] = [];
   for (const input of inputs) {
     if (input.id) {
@@ -126,12 +123,6 @@ async function resolveParts(
     }
     const quantity = Math.round(Number(input.quantity ?? 1));
     if (!Number.isInteger(quantity) || quantity <= 0 || quantity > 99) return { ok: false, error: "Enter a quantity between 1 and 99 for each part." };
-    if (input.partId) {
-      const cat = catalogue.get(input.partId);
-      if (!cat) return { ok: false, error: "One of those catalogue parts isn't available. Pick another or type it in." };
-      parts.push({ id: null, partId: input.partId, name: cat.name, quantity, unitPence: cat.bmt_price_pence, linePence: quantity * cat.bmt_price_pence, sourcing: "self" });
-      continue;
-    }
     const name = (input.name ?? "").trim().replace(/\s+/g, " ");
     if (!name) return { ok: false, error: "Give each part a name." };
     if (name.length > 200) return { ok: false, error: "Keep each part's name under 200 characters." };
@@ -171,7 +162,7 @@ async function buildPreview(
   if (repairIds.length > MAX_REPAIRS_PER_BOOKING) return { ok: false, error: `A job can carry up to ${MAX_REPAIRS_PER_BOOKING} repairs.` };
 
   const sheet = await loadJobSheet(admin, booking.id);
-  const parts = await resolveParts(admin, input.parts ?? [], sheet.partRows);
+  const parts = resolveParts(input.parts ?? [], sheet.partRows);
   if (!parts.ok) return parts;
 
   // Priced exactly as the checkout prices a basket for this car — at the

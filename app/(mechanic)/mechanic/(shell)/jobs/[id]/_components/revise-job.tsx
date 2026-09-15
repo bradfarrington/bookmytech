@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ArrowRightLeft, ChevronDown, Loader2, Plus, Search, Send, Trash2, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Combobox } from "@/components/ui/combobox";
 import { cn, formatPrice } from "@/lib/utils";
 import { groupRepairLines } from "@/lib/bookings/repair-lines";
 import { REVISABLE_STATUSES, REVISION_STATUS_LABEL, isRevisionExpired, type OnSiteCharge } from "@/lib/revisions/status";
@@ -14,7 +13,6 @@ import { onSiteFeeOptions } from "@/lib/revisions/fees";
 import { revisionMoney, type RevisionView } from "@/lib/revisions/load";
 import type { RevisionPreview, RevisionPartInput } from "@/lib/revisions/mechanic";
 import type { CatalogueHit } from "@/lib/revisions/mechanic";
-import { listQuotePartsAction } from "@/app/actions/job-quotes";
 import {
   endJobOnSiteAction,
   previewRevisionAction,
@@ -142,9 +140,7 @@ export function ReviseJob({ bookingId, status, lines, parts, revisions, fees }: 
       draftParts.map((p) =>
         p.id
           ? { id: p.id }
-          : p.partId
-            ? { partId: p.partId, quantity: Number(p.quantity) || 1 }
-            : { name: p.name, quantity: Number(p.quantity) || 1, unitPence: poundsToPence(p.unitPounds) },
+          : { name: p.name, quantity: Number(p.quantity) || 1, unitPence: poundsToPence(p.unitPounds) },
       ),
     [draftParts],
   );
@@ -329,6 +325,9 @@ export function ReviseJob({ bookingId, status, lines, parts, revisions, fees }: 
             >
               Add a part
             </Button>
+            <p className="text-xs text-text-muted">
+              Parts for the repairs on the job are priced from Alliance Automotive for you. Add a part here only for something else the job needs.
+            </p>
           </section>
 
           {/* Why */}
@@ -378,6 +377,23 @@ export function ReviseJob({ bookingId, status, lines, parts, revisions, fees }: 
                 </div>
                 {diff.durationChange !== 0 && (
                   <p className="text-xs text-text-muted">Visit now ~{preview.result.after.serviceDurationHours} h (was ~{preview.result.before.serviceDurationHours} h).</p>
+                )}
+                {(preview.result.after.catalogueParts ?? []).length > 0 && (
+                  <div className="space-y-0.5 text-xs text-text-muted">
+                    <p className="font-semibold text-text-secondary">Parts priced for these repairs</p>
+                    <ul className="space-y-0.5">
+                      {(preview.result.after.catalogueParts ?? []).map((part, i) => (
+                        <li key={`cp-${i}`} className="flex justify-between gap-3">
+                          <span className="min-w-0">
+                            {part.position ? `${part.groupLabel} (${part.position})` : part.groupLabel}
+                            {part.brand ? ` · ${part.brand}` : ""}
+                            {part.partNumber ? ` · ${part.partNumber}` : " · set price"}
+                          </span>
+                          <span className="shrink-0 tabular-nums">{formatPrice(part.linePence)}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 )}
                 <p className="text-xs text-text-secondary">{changed ? mechanicDirectionSentence(diff.differencePence) : "Nothing has changed yet. Remove or add a repair or part."}</p>
               </div>
@@ -502,28 +518,15 @@ function EndJobPanel({
 }
 
 function NewPartFields({ part, onChange }: { part: DraftPart; onChange: (next: DraftPart) => void }) {
-  const [catalogue, setCatalogue] = useState<Array<{ id: string; name: string; bmtPricePence: number }> | null>(null);
-  useEffect(() => {
-    let cancelled = false;
-    listQuotePartsAction().then((res) => {
-      if (!cancelled && res.ok) setCatalogue(res.parts);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-  const names = useMemo(() => (catalogue ?? []).map((p) => p.name), [catalogue]);
   return (
     <div className="min-w-0 flex-1 space-y-1.5">
-      <Combobox
+      <input
         value={part.name}
-        onChange={(value) => {
-          const match = (catalogue ?? []).find((p) => p.name.toLowerCase() === value.trim().toLowerCase());
-          onChange(match ? { ...part, name: match.name, partId: match.id, unitPounds: (match.bmtPricePence / 100).toFixed(2) } : { ...part, name: value, partId: null });
-        }}
-        options={names}
-        placeholder={catalogue == null ? "Loading parts…" : "Part name: pick from the catalogue or type your own"}
+        onChange={(e) => onChange({ ...part, name: e.target.value })}
+        placeholder="Part name, e.g. Wheel bearing kit"
         aria-label="Part"
+        className={`${INPUT} w-full`}
+        maxLength={200}
       />
       <div className="flex flex-wrap items-center gap-2 text-xs text-text-muted">
         <label className="flex items-center gap-1.5">
@@ -534,15 +537,14 @@ function NewPartFields({ part, onChange }: { part: DraftPart; onChange: (next: D
           Each £
           <input
             value={part.unitPounds}
-            onChange={(e) => onChange({ ...part, unitPounds: e.target.value, partId: null })}
+            onChange={(e) => onChange({ ...part, unitPounds: e.target.value })}
             inputMode="decimal"
             placeholder="0.00"
             aria-label="Unit price in pounds"
             className={`${INPUT} w-24`}
-            disabled={Boolean(part.partId)}
           />
         </label>
-        <span>{part.partId ? "Catalogue price" : "Your price"}</span>
+        <span>Your price</span>
       </div>
     </div>
   );

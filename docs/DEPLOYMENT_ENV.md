@@ -102,6 +102,9 @@ with none, **that repair can't be booked** (owner decision). So:
   AAG allowlist it. `/admin/parts/aag-check` shows what AAG last said.
 - **Parts customers shouldn't pay for:** switch the part group off in a repair's
   Parts panel on the vehicle page (`part_group_settings`).
+- **Consumables AAG doesn't price** (antifreeze, screenwash): give the part group
+  a set price in the same panel (migration 0071). It is used only when AAG has
+  no price, and stops that repair being unbookable.
 
 | Var | Req | Type | Notes |
 |-----|-----|------|-------|
