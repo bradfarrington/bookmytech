@@ -1,4 +1,4 @@
-import { PARKING_OPTIONS, type ParkingType } from "@/lib/bookings/address-draft";
+import { PARKING_OPTIONS, type ParkingType } from "@/lib/bookings/parking";
 
 // Saved addresses (Task 49): the shape both clients use, and the checks the
 // website runs before it writes. The table enforces the same limits itself

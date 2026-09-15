@@ -1,12 +1,20 @@
 import { redirect } from "next/navigation";
-import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { Caption, PageHeader, Screen, Stack } from "@/components/dashboard/ui";
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { DashboardHeader } from "../../_components/dashboard-header";
-import { RemindersForm } from "./_components/reminders-form";
+import { ReminderSettings } from "./_components/reminder-settings";
 
-export const dynamic = "force-dynamic";
+// Service reminders (Task 48, mockup 02 "Service reminders"): the master switch
+// and the three channels the reminder sender honours
+// (app/api/cron/send-reminders): push to the app, email, and SMS when there's a
+// mobile number on the profile.
+
+interface ReminderProfileRow {
+  phone: string | null;
+  reminders_enabled: boolean | null;
+  reminder_via_email: boolean | null;
+  reminder_via_sms: boolean | null;
+  reminder_via_push: boolean | null;
+}
 
 export default async function ReminderSettingsPage() {
   const supabase = await createClient();
@@ -15,40 +23,31 @@ export default async function ReminderSettingsPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const admin = createAdminClient();
-  const { data: profile } = await admin
+  const { data } = await supabase
     .from("profiles")
-    .select("full_name, avatar_url, reminders_enabled, reminder_via_email, reminder_via_sms")
+    .select("phone, reminders_enabled, reminder_via_email, reminder_via_sms, reminder_via_push")
     .eq("id", user.id)
-    .single();
+    .maybeSingle();
+  const profile = data as ReminderProfileRow | null;
+
+  // The same defaults as the sender uses for a missing value.
+  const initial = {
+    enabled: profile?.reminders_enabled ?? true,
+    email: profile?.reminder_via_email ?? true,
+    sms: profile?.reminder_via_sms ?? false,
+    push: profile?.reminder_via_push ?? true,
+  };
 
   return (
-    <div className="min-h-dvh bg-surface">
-      <DashboardHeader name={profile?.full_name ?? user.email ?? ""} avatarUrl={profile?.avatar_url ?? null} />
-
-      <main className="mx-auto w-full max-w-content px-4 py-8 sm:px-6">
-        <div className="flex max-w-xl flex-col gap-6">
-        <Link href="/dashboard/settings" className="inline-flex items-center gap-1.5 text-sm font-medium text-text-secondary hover:text-text-primary">
-          <ArrowLeft size={15} />
-          Back to settings
-        </Link>
-
-        <div>
-          <h1 className="text-2xl font-bold text-text-primary">Reminders</h1>
-          <p className="text-text-secondary">
-            Stay ahead of your car&apos;s MOT, annual service and seasonal checks.
-          </p>
-        </div>
-
-        <div className="rounded-2xl border border-border bg-surface-card p-6">
-          <RemindersForm
-            defaultEnabled={profile?.reminders_enabled ?? true}
-            defaultEmail={profile?.reminder_via_email ?? true}
-            defaultSms={profile?.reminder_via_sms ?? false}
-          />
-        </div>
-        </div>
-      </main>
-    </div>
+    <Screen>
+      <PageHeader title="Service reminders" backHref="/dashboard/settings" />
+      <Stack>
+        <p className="text-sm leading-5 text-text-secondary">
+          We&apos;ll let you know when your MOT or service is coming up, so nothing creeps up on you.
+        </p>
+        <ReminderSettings initial={initial} email={user.email ?? null} phone={profile?.phone?.trim() || null} />
+        <Caption className="text-center">You can change these any time.</Caption>
+      </Stack>
+    </Screen>
   );
 }

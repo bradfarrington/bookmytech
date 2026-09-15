@@ -116,7 +116,11 @@ export async function sendMessageFor(
     })
     .select("id")
     .single();
-  if (error) return { ok: false, error: error.message };
+  if (error) {
+    // The database's own wording is for us, not the customer or mechanic.
+    console.error("[messages] insert failed", bookingId, error.message);
+    return { ok: false, error: "We couldn't send your message. Please try again." };
+  }
 
   // Notify the customer of a mechanic's message: push to their phone, and the
   // SMS fallback when we hold a number. The unread-message sweep (cron) catches

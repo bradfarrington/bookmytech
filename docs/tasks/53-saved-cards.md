@@ -1,6 +1,6 @@
 # Task 53: Saved cards
 
-**Status:** 🚧 Backend built (2026-09-15): migration `0076_saved_cards_and_account_limits.sql`, `lib/payments/saved-cards.ts`, the payment-methods endpoints, checkout using saved cards, and account deletion removing them. The website's Payment methods page and saved cards at web checkout ship with Task 48.
+**Status:** ✅ Built (2026-09-15): migration `0076_saved_cards_and_account_limits.sql`, `lib/payments/saved-cards.ts`, the payment-methods endpoints, checkout using saved cards (web and app), account deletion removing them, and `/dashboard/settings/payment-methods`. Waiting on `0076` being applied and an end-to-end run with Stripe test cards.
 
 ## Why
 
@@ -47,8 +47,8 @@ Checkout makes the payment against the stored Stripe Customer **only if they hav
 - [x] `POST …/:id/remove` and `…/:id/default` only act on the caller's own cards, and return the updated list
 - [x] Checkout makes the hold against the Customer only when there's a saved card, and returns the session to list them
 - [x] Account deletion deletes the Stripe Customer
-- [ ] Website Payment methods page: list, add, remove, default (Task 48)
-- [ ] Web checkout lists saved cards (Task 48)
+- [x] Website Payment methods page: list, add, remove, default (Task 48)
+- [x] Web checkout lists saved cards (Task 48)
 - [ ] Tested end to end with Stripe test cards (owner, after `0076`)
 
 ## Mobile app

@@ -1,11 +1,9 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getRevisionFor } from "@/lib/revisions/customer";
 import { formatJobNumber } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
+import { PageHeader, Screen } from "@/components/dashboard/ui";
 import { RevisionApproval } from "./_components/revision-approval";
 
 export const dynamic = "force-dynamic";
@@ -14,6 +12,7 @@ export const dynamic = "force-dynamic";
 // mechanic found instead, and the new price — before the Approve button.
 // Signed-in only, like quotes: approving a dearer job authorises money on a
 // card, and the hold's ownership is proved through the intent's customer id.
+// Task 48: inside the dashboard shell, styled to mockup 04 "Revised job".
 
 export default async function CustomerRevisionPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -32,14 +31,8 @@ export default async function CustomerRevisionPage({ params }: { params: Promise
     : { data: null };
 
   return (
-    <div className="mx-auto flex max-w-lg flex-col gap-6 px-4 py-8">
-      <div className="print:hidden">
-        <Link href="/dashboard">
-          <Button variant="ghost" size="sm" iconLeft={ArrowLeft}>
-            Back to dashboard
-          </Button>
-        </Link>
-      </div>
+    <Screen>
+      <PageHeader title="Revised job" backHref={`/dashboard/bookings/${booking.id}`} />
       <RevisionApproval
         revision={revision}
         bookingRef={formatJobNumber(booking.job_number)}
@@ -48,6 +41,6 @@ export default async function CustomerRevisionPage({ params }: { params: Promise
         customerName={booking.customer_name ?? ""}
         customerEmail={booking.customer_email ?? user.email ?? ""}
       />
-    </div>
+    </Screen>
   );
 }

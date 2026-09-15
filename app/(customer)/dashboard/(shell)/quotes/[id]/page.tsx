@@ -1,11 +1,10 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getQuoteFor } from "@/lib/quotes/customer";
+import { formatBookingSlot } from "@/lib/slots";
 import { formatJobNumber } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
+import { PageHeader, Screen } from "@/components/dashboard/ui";
 import { QuoteApproval } from "./_components/quote-approval";
 
 export const dynamic = "force-dynamic";
@@ -13,6 +12,7 @@ export const dynamic = "force-dynamic";
 // The customer reviews a mechanic's quote (Task 33): every line and the total
 // before the Approve button — the T&Cs require the customer to see the
 // proposed work and its price before approving. Signed-in only.
+// Task 48: inside the dashboard shell, styled to mockup 04 "Quote".
 
 export default async function CustomerQuotePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -31,14 +31,8 @@ export default async function CustomerQuotePage({ params }: { params: Promise<{ 
     : { data: null };
 
   return (
-    <div className="mx-auto flex max-w-lg flex-col gap-6 px-4 py-8">
-      <div className="print:hidden">
-        <Link href="/dashboard">
-          <Button variant="ghost" size="sm" iconLeft={ArrowLeft}>
-            Back to dashboard
-          </Button>
-        </Link>
-      </div>
+    <Screen>
+      <PageHeader title="Quote" backHref={`/dashboard/bookings/${booking.id}`} />
       <QuoteApproval
         quote={quote}
         bookingRef={formatJobNumber(booking.job_number)}
@@ -46,7 +40,9 @@ export default async function CustomerQuotePage({ params }: { params: Promise<{ 
         mechanicName={mech?.full_name ?? "Your mechanic"}
         customerName={booking.customer_name ?? ""}
         customerEmail={booking.customer_email ?? user.email ?? ""}
+        // Formatted here, in UK time, so the server and browser render the same text.
+        expiresLabel={quote.expiresAt ? formatBookingSlot(quote.expiresAt) : null}
       />
-    </div>
+    </Screen>
   );
 }

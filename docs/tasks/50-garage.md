@@ -1,6 +1,6 @@
 # Task 50: The garage (saved vehicles)
 
-**Status:** 🚧 Backend built (2026-09-15): migration `0073_customer_vehicles.sql`, `lib/garage/`, `GET` and `POST /api/mobile/v1/garage`, and bookings adding their vehicle. The website's Garage page ships with Task 48.
+**Status:** ✅ Built (2026-09-15): migration `0073_customer_vehicles.sql`, `lib/garage/`, `GET` and `POST /api/mobile/v1/garage`, bookings adding their vehicle, and the website's Garage (`/dashboard/garage`, history at `/dashboard/garage/[id]`). Waiting on `0073` being applied. The card shows "Last job" (the latest completed booking) rather than "Last service".
 
 ## Why
 
@@ -35,7 +35,7 @@ The redesigned app's Garage (`mockups/05-account-settings.html`, "Your garage") 
 - [x] A customer can rename and remove their own vehicles, but can't write DVLA columns or add rows directly
 - [x] A signed-in booking adds its vehicle
 - [x] Account deletion removes the garage (`0077`)
-- [ ] Website Garage page with Add, nickname, MOT warning, Book, History and remove (Task 48)
+- [x] Website Garage page with Add, nickname, MOT warning, Book, History and remove (Task 48)
 
 ## Mobile app
 

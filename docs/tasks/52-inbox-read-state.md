@@ -1,6 +1,6 @@
 # Task 52: Inbox (Notifications) and read state
 
-**Status:** 🚧 Backend built (2026-09-15): migration `0075_customer_inbox_reads.sql` and `lib/inbox/`. The website's Notifications page and the header's unread dot ship with Task 48.
+**Status:** ✅ Built (2026-09-15): migration `0075_customer_inbox_reads.sql`, `lib/inbox/`, `/dashboard/inbox` and the header's unread dot. Waiting on `0075` being applied. Until then, "Mark all read" is hidden and read state doesn't persist.
 
 ## Why
 
@@ -24,8 +24,8 @@ The redesigned app has an Inbox (`mockups/02-dashboard-reminders.html`, "Notific
 - [x] Reading something on one device marks it read everywhere
 - [x] Two devices marking items read at the same moment both stick
 - [x] Before `0075`, the feed still loads and nothing errors
-- [ ] Website Notifications page with All / Bookings / Reminders tabs, day groups, unread dots and Mark all read (Task 48)
-- [ ] Unread indicator in the website's header (Task 48)
+- [x] Website Notifications page with All / Bookings / Reminders tabs, day groups, unread dots and Mark all read (Task 48)
+- [x] Unread indicator in the website's header (Task 48)
 
 ## Mobile app
 

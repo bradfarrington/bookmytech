@@ -3,9 +3,12 @@
 import { useMemo, useState } from "react";
 import { Link2 } from "lucide-react";
 import Link from "next/link";
+import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
 import { Stars } from "@/components/ui/stars";
 import { Select } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { setReviewVisibility } from "@/app/actions/admin-reviews";
 
 export interface AdminReviewRow {
   id: string;
@@ -18,6 +21,8 @@ export interface AdminReviewRow {
   bookingId: string;
   mechanicName: string;
   customerName: string;
+  /** Shown on the mechanic's profile (Task 51). True until an admin hides it. */
+  isPublic: boolean;
 }
 
 function firstName(name: string) {
@@ -43,9 +48,19 @@ const RATING_FILTER_OPTIONS: ReadonlyArray<{ value: RatingFilter; label: string 
   { value: "1", label: "1 star" },
 ];
 
-export function ReviewsTable({ reviews }: { reviews: AdminReviewRow[] }) {
+export function ReviewsTable({
+  reviews,
+  canSetVisibility = false,
+}: {
+  reviews: AdminReviewRow[];
+  /** False until migration 0074 adds `reviews.is_public`: the switches are hidden. */
+  canSetVisibility?: boolean;
+}) {
   const [ratingFilter, setRatingFilter] = useState<RatingFilter>("all");
   const [mechanicFilter, setMechanicFilter] = useState<string>("all");
+  // Optimistic "Shown on profile" values by review id, over what the server sent.
+  const [visibility, setVisibility] = useState<Record<string, boolean>>({});
+  const [saving, setSaving] = useState<ReadonlySet<string>>(() => new Set());
 
   const mechanicOptions = useMemo(() => {
     const byId = new Map<string, string>();
@@ -63,6 +78,28 @@ export function ReviewsTable({ reviews }: { reviews: AdminReviewRow[] }) {
       return true;
     });
   }, [reviews, ratingFilter, mechanicFilter]);
+
+  function changeVisibility(review: AdminReviewRow, next: boolean) {
+    setVisibility((prev) => ({ ...prev, [review.id]: next })); // optimistic
+    setSaving((prev) => new Set(prev).add(review.id));
+    setReviewVisibility(review.id, next)
+      .catch(() => ({ ok: false as const, error: "We couldn't update that review. Please try again." }))
+      .then((res) => {
+        setSaving((prev) => {
+          const rest = new Set(prev);
+          rest.delete(review.id);
+          return rest;
+        });
+        if (!res.ok) {
+          setVisibility((prev) => ({ ...prev, [review.id]: !next }));
+          toast.error(res.error);
+          return;
+        }
+        toast.success(
+          next ? "Review shown on the mechanic's profile." : "Review hidden from the mechanic's profile.",
+        );
+      });
+  }
 
   return (
     <div className="space-y-4">
@@ -86,6 +123,13 @@ export function ReviewsTable({ reviews }: { reviews: AdminReviewRow[] }) {
         </p>
       </div>
 
+      {canSetVisibility && (
+        <p className="max-w-3xl text-xs text-text-muted">
+          Switch a review off to hide it from the mechanic&apos;s profile. Hidden reviews still
+          count towards the mechanic&apos;s rating. Only reviews with a comment appear on a profile.
+        </p>
+      )}
+
       {filtered.length === 0 ? (
         <Card className="p-8 text-center text-sm text-text-muted">
           No reviews to show for these filters.
@@ -101,65 +145,80 @@ export function ReviewsTable({ reviews }: { reviews: AdminReviewRow[] }) {
                   <th className="px-5 py-3">Feedback</th>
                   <th className="px-5 py-3">Customer</th>
                   <th className="px-5 py-3">Date</th>
+                  {canSetVisibility && <th className="whitespace-nowrap px-5 py-3">Shown on profile</th>}
                   <th className="px-5 py-3"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border-subtle">
-                {filtered.map((r) => (
-                  <tr key={r.id} className="align-top hover:bg-surface/50">
-                    <td className="px-5 py-3">
-                      <span className="font-semibold text-text-primary">
-                        {r.mechanicName}
-                      </span>
-                    </td>
-                    <td className="px-5 py-3">
-                      <Stars value={r.rating} size={14} />
-                    </td>
-                    <td className="max-w-md px-5 py-3">
-                      {r.tags.length > 0 && (
-                        <div className="mb-1.5 flex flex-wrap gap-1.5">
-                          {r.tags.map((t) => (
-                            <span
-                              key={t}
-                              className="rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-brand-blue"
-                            >
-                              {t}
-                            </span>
-                          ))}
-                        </div>
+                {filtered.map((r) => {
+                  const shown = visibility[r.id] ?? r.isPublic;
+                  return (
+                    <tr key={r.id} className="align-top hover:bg-surface/50">
+                      <td className="px-5 py-3">
+                        <span className="font-semibold text-text-primary">
+                          {r.mechanicName}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3">
+                        <Stars value={r.rating} size={14} />
+                      </td>
+                      <td className="max-w-md px-5 py-3">
+                        {r.tags.length > 0 && (
+                          <div className="mb-1.5 flex flex-wrap gap-1.5">
+                            {r.tags.map((t) => (
+                              <span
+                                key={t}
+                                className="rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-brand-blue"
+                              >
+                                {t}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        {r.comment ? (
+                          <p className="text-sm leading-relaxed text-text-secondary">
+                            {r.comment}
+                          </p>
+                        ) : (
+                          r.tags.length === 0 && (
+                            <span className="text-text-muted">No comment</span>
+                          )
+                        )}
+                        {r.mechanicResponse && (
+                          <p className="mt-1.5 inline-flex items-center gap-1 text-xs text-text-muted">
+                            <Link2 size={12} />
+                            Mechanic replied
+                          </p>
+                        )}
+                      </td>
+                      <td className="px-5 py-3 text-text-secondary">
+                        {firstName(r.customerName)}
+                      </td>
+                      <td className="whitespace-nowrap px-5 py-3 text-text-muted">
+                        {formatDate(r.createdAt)}
+                      </td>
+                      {canSetVisibility && (
+                        <td className="px-5 py-3">
+                          <Switch
+                            size="sm"
+                            checked={shown}
+                            disabled={saving.has(r.id)}
+                            label={`Show ${firstName(r.customerName)}'s review on ${r.mechanicName}'s profile`}
+                            onChange={(next) => changeVisibility(r, next)}
+                          />
+                        </td>
                       )}
-                      {r.comment ? (
-                        <p className="text-sm leading-relaxed text-text-secondary">
-                          {r.comment}
-                        </p>
-                      ) : (
-                        r.tags.length === 0 && (
-                          <span className="text-text-muted">No comment</span>
-                        )
-                      )}
-                      {r.mechanicResponse && (
-                        <p className="mt-1.5 inline-flex items-center gap-1 text-xs text-text-muted">
-                          <Link2 size={12} />
-                          Mechanic replied
-                        </p>
-                      )}
-                    </td>
-                    <td className="px-5 py-3 text-text-secondary">
-                      {firstName(r.customerName)}
-                    </td>
-                    <td className="px-5 py-3 text-text-muted">
-                      {formatDate(r.createdAt)}
-                    </td>
-                    <td className="px-5 py-3 text-right">
-                      <Link
-                        href={`/admin/jobs/${r.bookingId}`}
-                        className="text-sm font-semibold text-brand-blue hover:underline"
-                      >
-                        View job
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
+                      <td className="px-5 py-3 text-right">
+                        <Link
+                          href={`/admin/jobs/${r.bookingId}`}
+                          className="whitespace-nowrap text-sm font-semibold text-brand-blue hover:underline"
+                        >
+                          View job
+                        </Link>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

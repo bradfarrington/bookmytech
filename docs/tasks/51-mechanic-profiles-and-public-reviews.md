@@ -1,6 +1,6 @@
 # Task 51: Mechanic profiles and public reviews
 
-**Status:** 🚧 Backend built (2026-09-15): migration `0074_mechanic_profiles_and_public_reviews.sql` and `lib/mechanics/profile.ts`. The website's mechanic profile page, the admin "Shown on profile" switch and the review consent line ship with Task 48.
+**Status:** ✅ Built (2026-09-15): migration `0074_mechanic_profiles_and_public_reviews.sql`, `lib/mechanics/profile.ts`, `/dashboard/mechanics/[id]`, the "Shown on profile" switch on `/admin/reviews` (hidden until `0074` is applied) and the consent line on both web review forms. Waiting on `0074` being applied.
 
 ## Why
 
@@ -22,9 +22,9 @@ This follows the parked public-reviews plan in Task 46, with one difference: a r
 - [ ] `0074` applied (owner)
 - [x] A customer can read specialisms and the approval date for mechanics they've booked, and nothing new about anyone else
 - [x] A customer can read other customers' public reviews (with a comment, first name only) for mechanics they've booked
-- [ ] Admin can hide or show a review on `/admin/reviews` (Task 48)
-- [ ] Website mechanic profile page (Task 48)
-- [ ] Review forms carry the consent line (Task 48)
+- [x] Admin can hide or show a review on `/admin/reviews` (Task 48)
+- [x] Website mechanic profile page (Task 48)
+- [x] Review forms carry the consent line (Task 48). App side is in the handover brief
 
 ## Mobile app
 

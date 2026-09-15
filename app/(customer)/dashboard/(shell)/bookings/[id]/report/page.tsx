@@ -1,13 +1,26 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ArrowLeft, Car, Gauge, User, Wrench } from "lucide-react";
+import { Wrench } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatJobNumber } from "@/lib/utils";
 import { repairLinesFor, type BookingRepairRow } from "@/lib/bookings/repair-lines";
 import { loadBookingChecklists, productIdsInLines } from "@/lib/checklists/load";
 import { resultLabel } from "@/lib/checklists/checklists";
-import { Button } from "@/components/ui/button";
+import {
+  ButtonLink,
+  Caption,
+  DetailRow,
+  ListCard,
+  ListRow,
+  Notice,
+  Overline,
+  PageHeader,
+  Screen,
+  Section,
+  Stack,
+  StatusPill,
+  type PillTone,
+} from "@/components/dashboard/ui";
 import { PrintButton } from "./_components/print-button";
 
 export const dynamic = "force-dynamic";
@@ -18,14 +31,17 @@ export const dynamic = "force-dynamic";
 // (/dashboard/* is gated in proxy.ts); ownership proved the way the dashboard
 // does it, then read through the service-role client so the job photos
 // (booking_media has no customer policy) can be shown too.
+//
+// Task 48: restyled to mockup 04 "Service report". Same data; still printable
+// (the screen header and the "Book a repair" prompt hide in print).
 
-const RESULT_TONE: Record<string, string> = {
-  pass: "bg-green-50 text-success",
-  checked: "bg-green-50 text-success",
-  advisory: "bg-amber-50 text-amber-700",
-  fail: "bg-red-50 text-red-700",
-  not_checked: "bg-surface text-text-secondary",
-  na: "bg-surface text-text-secondary",
+const RESULT_TONE: Record<string, PillTone> = {
+  pass: "success",
+  checked: "success",
+  advisory: "pending",
+  fail: "error",
+  not_checked: "neutral",
+  na: "neutral",
 };
 
 export default async function BookingReportPage({ params }: { params: Promise<{ id: string }> }) {
@@ -71,148 +87,134 @@ export default async function BookingReportPage({ params }: { params: Promise<{ 
     ? new Date(when).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "Europe/London" })
     : "Date not set";
   const finished = booking.status === "completed";
+  const hasInspection = checklists.some((c) => c.checklist.kind === "inspection");
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-8 print:px-0">
-      <div className="flex items-center justify-between gap-3 print:hidden">
-        <Link href="/dashboard">
-          <Button variant="ghost" size="sm" iconLeft={ArrowLeft}>
-            Back to dashboard
-          </Button>
-        </Link>
-        <PrintButton />
+    <Screen className="print:max-w-none print:px-0 print:pb-0">
+      <div className="print:hidden">
+        <PageHeader title="Service report" backHref={`/dashboard/bookings/${booking.id}`} action={<PrintButton />} />
       </div>
 
-      <header className="rounded-2xl bg-brand-gradient p-6 text-white shadow-hero print:bg-none print:p-0 print:text-text-primary print:shadow-none">
-        <p className="text-sm font-semibold uppercase tracking-widest text-blue-200 print:text-text-muted">
-          {finished ? "Your report" : "Report in progress"}
-        </p>
-        <h1 className="mt-1 text-2xl font-extrabold tracking-tight">
-          {checklists.map((c) => c.name).join(" + ")}
-        </h1>
-        <p className="mt-1 text-sm text-blue-100 print:text-text-secondary">
-          Ref {formatJobNumber(booking.job_number)} · {dateLabel}
-        </p>
-        <dl className="mt-4 grid grid-cols-1 gap-3 text-sm sm:grid-cols-3">
-          <div className="flex items-start gap-2">
-            <Car size={16} className="mt-0.5 shrink-0 text-blue-200 print:text-text-muted" />
-            <div>
-              <dt className="text-xs uppercase tracking-wide text-blue-200 print:text-text-muted">Vehicle</dt>
-              <dd className="font-semibold">
-                {vehicle} · <span className="font-mono uppercase">{booking.vehicle_reg}</span>
-              </dd>
-            </div>
-          </div>
-          <div className="flex items-start gap-2">
-            <Gauge size={16} className="mt-0.5 shrink-0 text-blue-200 print:text-text-muted" />
-            <div>
-              <dt className="text-xs uppercase tracking-wide text-blue-200 print:text-text-muted">Mileage</dt>
-              <dd className="font-semibold">
-                {booking.mileage != null ? `${Number(booking.mileage).toLocaleString("en-GB")} miles` : "Not recorded"}
-              </dd>
-            </div>
-          </div>
-          <div className="flex items-start gap-2">
-            <User size={16} className="mt-0.5 shrink-0 text-blue-200 print:text-text-muted" />
-            <div>
-              <dt className="text-xs uppercase tracking-wide text-blue-200 print:text-text-muted">Mechanic</dt>
-              <dd className="font-semibold">{mechanic?.full_name ?? "Your mechanic"}</dd>
-            </div>
-          </div>
-        </dl>
-      </header>
-
-      {checklists.map((list) => {
-        const inspection = list.checklist.kind === "inspection";
-        const byItem = new Map(list.results.map((r) => [r.item_id, r]));
-        return (
-          <section key={list.checklist.id} className="space-y-4">
-            <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <h2 className="text-lg font-bold text-text-primary">{list.name}</h2>
-              <p className="text-sm text-text-muted">
-                {list.progress.answered} of {list.progress.total} items
-              </p>
-            </div>
-
-            {inspection && (
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                {[
-                  ["Pass", list.progress.pass, "text-success"],
-                  ["Advisory", list.progress.advisory, "text-amber-700"],
-                  ["Fail", list.progress.fail, "text-red-700"],
-                  ["Not checked", list.progress.notChecked, "text-text-secondary"],
-                ].map(([label, count, tone]) => (
-                  <div key={label as string} className="rounded-xl border border-border bg-surface-card px-3 py-2.5 text-center">
-                    <p className={`text-2xl font-extrabold tabular-nums ${tone}`}>{count as number}</p>
-                    <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">{label as string}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {list.sections.map((section) => (
-              <div key={section.section} className="overflow-hidden rounded-2xl border border-border bg-surface-card">
-                {list.sections.length > 1 && (
-                  <h3 className="border-b border-border bg-surface px-4 py-2.5 text-sm font-bold text-text-primary">
-                    {section.section}
-                  </h3>
-                )}
-                <ul className="divide-y divide-border-subtle">
-                  {section.items.map((item) => {
-                    const r = byItem.get(item.id);
-                    return (
-                      <li key={item.id} className="flex flex-col gap-1 px-4 py-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
-                        <div className="min-w-0">
-                          <p className="text-sm text-text-primary">{item.label}</p>
-                          {r?.comment && (
-                            <p className="mt-1 rounded-lg bg-surface px-3 py-2 text-sm text-text-secondary">{r.comment}</p>
-                          )}
-                        </div>
-                        <span
-                          className={`inline-flex shrink-0 self-start rounded-full px-2.5 py-1 text-xs font-semibold ${
-                            r ? RESULT_TONE[r.result] ?? "bg-surface text-text-secondary" : "bg-surface text-text-muted"
-                          }`}
-                        >
-                          {r ? resultLabel(r.result) : "Not yet answered"}
-                        </span>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            ))}
-          </section>
-        );
-      })}
-
-      {photos.length > 0 && (
-        <section className="space-y-3">
-          <h2 className="text-lg font-bold text-text-primary">Photos from your mechanic</h2>
-          <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            {photos.map((p) => (
-              <li key={p.id} className="overflow-hidden rounded-xl border border-border bg-surface">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={p.url} alt="Job photo" className="aspect-square w-full object-cover" />
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
-      {finished && (checklists.some((c) => c.progress.advisory > 0 || c.progress.fail > 0)) && (
-        <div className="rounded-2xl border border-brand-blue/30 bg-blue-50 p-5 print:hidden">
-          <p className="flex items-center gap-2 text-sm font-bold text-text-primary">
-            <Wrench size={16} className="text-brand-blue" />
-            Something needs attention?
-          </p>
-          <p className="mt-1 text-sm text-text-secondary">
-            Book the repair for {vehicle} and we&apos;ll price it from the manufacturer&apos;s book time.
-          </p>
-          <Link href={`/book/repairs?reg=${encodeURIComponent(booking.vehicle_reg)}`} className="mt-3 inline-block">
-            <Button size="sm">Book a repair</Button>
-          </Link>
+      <Stack>
+        <div>
+          <Overline>{finished ? "Your report" : "Report in progress"}</Overline>
+          <h2 className="mt-1 font-display text-2xl font-extrabold leading-[30px] tracking-[-0.6px] text-text-primary">
+            {checklists.map((c) => c.name).join(" + ")}
+          </h2>
+          <Caption className="mt-1">
+            Ref {formatJobNumber(booking.job_number)} · {dateLabel}
+          </Caption>
         </div>
-      )}
-    </div>
+
+        <ListCard className="print:shadow-none">
+          <DetailRow
+            label="Vehicle"
+            value={
+              <>
+                {vehicle} · <span className="font-mono uppercase">{booking.vehicle_reg}</span>
+              </>
+            }
+          />
+          <DetailRow
+            label="Mileage"
+            value={booking.mileage != null ? `${Number(booking.mileage).toLocaleString("en-GB")} miles` : "Not recorded"}
+          />
+          <DetailRow label="Mechanic" value={mechanic?.full_name ?? "Your mechanic"} />
+        </ListCard>
+
+        {checklists.map((list) => {
+          const inspection = list.checklist.kind === "inspection";
+          const byItem = new Map(list.results.map((r) => [r.item_id, r]));
+          return (
+            <section key={list.checklist.id} className="flex flex-col gap-3">
+              <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                <h3 className="font-display text-[17px] font-bold leading-[22px] tracking-[-0.3px] text-text-primary">
+                  {list.name}
+                </h3>
+                <Caption>
+                  {list.progress.answered} of {list.progress.total} items
+                </Caption>
+              </div>
+
+              {inspection && (
+                <div className="flex flex-wrap gap-2">
+                  <StatusPill tone="success">{list.progress.pass} pass</StatusPill>
+                  <StatusPill tone="pending">
+                    {list.progress.advisory} {list.progress.advisory === 1 ? "advisory" : "advisories"}
+                  </StatusPill>
+                  <StatusPill tone="error">{list.progress.fail} fail</StatusPill>
+                  <StatusPill tone="neutral">{list.progress.notChecked} not checked</StatusPill>
+                </div>
+              )}
+
+              {list.sections.map((section) => {
+                const rows = (
+                  <ListCard className="print:shadow-none">
+                    {section.items.map((item) => {
+                      const r = byItem.get(item.id);
+                      return (
+                        <ListRow
+                          key={item.id}
+                          className="print:break-inside-avoid"
+                          title={item.label}
+                          titleClassName="font-semibold"
+                          caption={r?.comment ? <span className="whitespace-pre-wrap">{r.comment}</span> : undefined}
+                          trailing={
+                            <StatusPill tone={r ? (RESULT_TONE[r.result] ?? "neutral") : "neutral"}>
+                              {r ? resultLabel(r.result) : "Not yet answered"}
+                            </StatusPill>
+                          }
+                        />
+                      );
+                    })}
+                  </ListCard>
+                );
+                return list.sections.length > 1 ? (
+                  <Section key={section.section} title={section.section}>
+                    {rows}
+                  </Section>
+                ) : (
+                  <div key={section.section}>{rows}</div>
+                );
+              })}
+            </section>
+          );
+        })}
+
+        {hasInspection && (
+          <Caption className="text-center">
+            An advisory is something that will need attention. A fail is defective, unsafe or needs repair.
+          </Caption>
+        )}
+
+        {photos.length > 0 && (
+          <Section title="Photos from your mechanic">
+            <ul className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+              {photos.map((p) => (
+                <li key={p.id} className="overflow-hidden rounded-xl border border-border bg-surface-card print:break-inside-avoid">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={p.url} alt="Job photo" className="aspect-square w-full object-cover" />
+                </li>
+              ))}
+            </ul>
+          </Section>
+        )}
+
+        {finished && checklists.some((c) => c.progress.advisory > 0 || c.progress.fail > 0) && (
+          <Notice
+            icon={Wrench}
+            title="Something needs attention?"
+            className="print:hidden"
+            action={
+              <ButtonLink href={`/book/repairs?reg=${encodeURIComponent(booking.vehicle_reg)}`} size="sm">
+                Book a repair
+              </ButtonLink>
+            }
+          >
+            Book the repair for {vehicle} and we&apos;ll price it from the manufacturer&apos;s book time.
+          </Notice>
+        )}
+      </Stack>
+    </Screen>
   );
 }

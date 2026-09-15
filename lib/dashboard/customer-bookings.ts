@@ -71,6 +71,11 @@ export interface CustomerBooking {
   /** The rating the customer left, once reviewed. */
   rating: number | null;
   dispute: { id: string; status: string } | null;
+  /**
+   * False for a guest-era booking matched by email (no customer_id). Some
+   * flows, such as raising a dispute, only accept bookings linked to the account.
+   */
+  ownedByAccount: boolean;
   /** "Wed 3 Sep · 8am–10am", or "Any of … · All day" while several days are open. */
   whenLabel: string;
 }
@@ -297,6 +302,7 @@ async function hydrate(admin: Admin, rows: Row[]): Promise<CustomerBooking[]> {
       pendingRevision: revisions.get(row.id) ?? null,
       rating: ratings.get(row.id) ?? null,
       dispute: disputes.get(row.id) ?? null,
+      ownedByAccount: row.customer_id != null,
       whenLabel: formatBookingWhen({
         scheduled_at: str(row.scheduled_at),
         slot_window: str(row.slot_window),

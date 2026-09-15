@@ -1,14 +1,23 @@
 import { redirect } from "next/navigation";
-import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { DashboardHeader } from "../../../_components/dashboard-header";
 import { DisputeForm } from "@/components/disputes/dispute-form";
+import { PageHeader, Screen, Stack } from "@/components/dashboard/ui";
 
 export const dynamic = "force-dynamic";
 
+// Raise a dispute about a completed job (Task 48: inside the dashboard shell,
+// mockup 04 "Report a problem"). The form is the shared
+// components/disputes/dispute-form.tsx, which the mechanic side also uses, so
+// it keeps its own look.
+
 const WINDOW_MS = 48 * 60 * 60 * 1000;
+
+/** Completed, and completed no more than 48 hours ago. Outside the component so render stays pure. */
+function inDisputeWindow(status: string | undefined, completedAt: string | null | undefined): boolean {
+  const completedMs = completedAt ? new Date(completedAt).getTime() : 0;
+  return status === "completed" && completedMs > 0 && Date.now() - completedMs <= WINDOW_MS;
+}
 
 export default async function NewDisputePage({
   params,
@@ -23,11 +32,6 @@ export default async function NewDisputePage({
   if (!user) redirect("/login");
 
   const admin = createAdminClient();
-  const { data: profile } = await admin
-    .from("profiles")
-    .select("full_name, avatar_url")
-    .eq("id", user.id)
-    .single();
 
   const { data: booking } = await admin
     .from("bookings")
@@ -37,9 +41,7 @@ export default async function NewDisputePage({
 
   // Must be the customer's own, completed, and inside the 48h window.
   const owns = booking?.customer_id === user.id;
-  const completedMs = booking?.completed_at ? new Date(booking.completed_at).getTime() : 0;
-  const inWindow =
-    booking?.status === "completed" && completedMs > 0 && Date.now() - completedMs <= WINDOW_MS;
+  const inWindow = inDisputeWindow(booking?.status, booking?.completed_at);
 
   // An existing dispute means they should go to it, not open another.
   const { data: existing } = booking
@@ -53,17 +55,16 @@ export default async function NewDisputePage({
   const svc = booking.repair_description ?? "Your booking";
 
   return (
-    <div className="min-h-dvh bg-surface">
-      <DashboardHeader name={profile?.full_name ?? user.email ?? ""} avatarUrl={profile?.avatar_url ?? null} />
-      <main className="mx-auto w-full max-w-content px-4 py-8 sm:px-6">
-        <div className="flex max-w-xl flex-col gap-6">
-        <Link href="/dashboard" className="inline-flex items-center gap-1.5 text-sm font-medium text-text-secondary hover:text-text-primary">
-          <ArrowLeft size={15} />
-          Back to dashboard
-        </Link>
+    <Screen>
+      <PageHeader title="Report a problem" backHref={`/dashboard/bookings/${bookingId}`} />
+      <Stack>
         <div>
-          <h1 className="text-2xl font-bold text-text-primary">Raise a dispute</h1>
-          <p className="text-text-secondary">We&apos;ll work with you and your mechanic to put it right.</p>
+          <h2 className="font-display text-2xl font-extrabold leading-[30px] tracking-[-0.6px] text-text-primary">
+            What went wrong?
+          </h2>
+          <p className="mt-1.5 text-sm leading-5 text-text-secondary">
+            We&apos;ll work with you and your mechanic to put it right.
+          </p>
         </div>
         <DisputeForm
           bookingId={bookingId}
@@ -72,8 +73,7 @@ export default async function NewDisputePage({
           serviceName={svc}
           redirectBase="/dashboard/disputes"
         />
-        </div>
-      </main>
-    </div>
+      </Stack>
+    </Screen>
   );
 }

@@ -670,11 +670,19 @@ export function ConfirmCheckout({
         />
       );
     }
-    // Pre-auth: place the manual-capture hold via Stripe Elements.
+    // Pre-auth: place the manual-capture hold via Stripe Elements. A customer
+    // with a saved card (Task 53) gets a CustomerSession, so the card form lists
+    // those cards. Absent on older parked drafts and for everyone else.
     return (
       <Elements
         stripe={stripePromise}
-        options={{ clientSecret: checkout.clientSecret, appearance: { theme: "stripe" } }}
+        options={{
+          clientSecret: checkout.clientSecret,
+          appearance: { theme: "stripe" },
+          ...(checkout.customerSessionClientSecret
+            ? { customerSessionClientSecret: checkout.customerSessionClientSecret }
+            : {}),
+        }}
       >
         <CheckoutForm
           {...common}
@@ -742,7 +750,7 @@ export function ConfirmCheckout({
       {!selectedSlotOpen && (
         <div className="rounded-[20px] border border-amber-200 bg-white p-5 shadow-card sm:p-6">
           <p className="mb-4 font-display text-lg font-extrabold text-text-primary">Pick a new time</p>
-          <TimePicker value={time} onChange={setTime} now={now} />
+          <TimePicker value={time} onChange={setTime} now={now} postcode={address?.postcode} />
         </div>
       )}
 

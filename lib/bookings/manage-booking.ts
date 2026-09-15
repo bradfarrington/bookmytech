@@ -7,6 +7,7 @@ import { renderTemplateEmail } from "@/emails/resolve";
 import { sendSms } from "@/lib/sms/send-sms";
 import { renderSmsTemplate } from "@/lib/sms/render-template";
 import { formatBookingSlot } from "@/lib/slots";
+import { rescheduleSlotWindow } from "@/lib/bookings/reschedule-window";
 import { formatJobNumber, formatPrice } from "@/lib/utils";
 import { ownsBooking, type BookingCaller } from "@/lib/bookings/ownership";
 import { splitCommission } from "@/lib/quotes/pricing";
@@ -54,9 +55,9 @@ export type { BookingCaller } from "@/lib/bookings/ownership";
 export const CANCELLABLE = ["sourcing_mechanic", "confirmed", "en_route"] as const;
 export const RESCHEDULABLE = ["sourcing_mechanic", "confirmed"] as const;
 
-// "Thu 4 Sep · 14:00" in UK time. A rescheduled booking is an exact time, so no
-// window; a formatter without an explicit zone printed BST an hour early on
-// Vercel (UTC).
+// "Thu 4 Sep · 14:00" in UK time, for an exact time with no window (a
+// mechanic's proposed move, or a customer's move that kept no window); a
+// formatter without an explicit zone printed BST an hour early on Vercel (UTC).
 function fmt(iso: string): string {
   return formatBookingSlot(iso);
 }
@@ -344,12 +345,19 @@ export async function cancelBookingFor(
  * Customer reschedules to a new slot, keeping the same mechanic. Applied
  * directly (not a proposal) — the mechanic is notified and can re-propose or
  * cancel from their own tools if the new time doesn't work for them.
+ *
+ * `slotWindow` (optional, Task 48): the 2-hour arrival window the customer
+ * picked, e.g. "2pm–4pm". It is kept on the booking only when it is one of the
+ * six 2-hour labels AND `newIso` is that window's start
+ * (lib/bookings/reschedule-window.ts). Omitted, or anything that fails that
+ * check, and the move is an exact time with no window, exactly as before.
  */
 export async function rescheduleBookingFor(
   bookingId: string,
   newIso: string,
   reason: string,
   caller: BookingCaller,
+  slotWindow?: string | null,
 ): Promise<CustomerBookingResult> {
   const when = new Date(newIso);
   if (!newIso || Number.isNaN(when.getTime()))
@@ -363,15 +371,17 @@ export async function rescheduleBookingFor(
   if (!(RESCHEDULABLE as readonly string[]).includes(booking.status))
     return { ok: false, error: "This booking can no longer be rescheduled." };
 
+  const keptWindow = rescheduleSlotWindow(newIso, slotWindow);
   const trimmed = reason.trim() || null;
   const { error } = await admin
     .from("bookings")
     .update({
       scheduled_at: when.toISOString(),
-      // The customer picked a specific time, so the arrival window no longer
-      // applies — clear it so displays show the exact rescheduled time. Any
-      // choice of days they offered (Task 28) is withdrawn the same way.
-      slot_window: null,
+      // A 2-hour window the customer picked (and whose start is the new time)
+      // is kept. Otherwise they picked a specific time, so the arrival window
+      // no longer applies: clear it so displays show the exact rescheduled
+      // time. Any choice of days they offered (Task 28) is withdrawn either way.
+      slot_window: keptWindow,
       candidate_days: null,
       // Supersede any pending mechanic proposal — the customer just set the time.
       reschedule_proposed_at: null,
@@ -387,10 +397,19 @@ export async function rescheduleBookingFor(
     actor_id: userId,
     actor_role: "customer",
     reason: trimmed,
-    payload: { from: booking.scheduled_at, to: when.toISOString(), by: "customer" },
+    payload: {
+      from: booking.scheduled_at,
+      to: when.toISOString(),
+      by: "customer",
+      // Additive (Task 48): present only when a window was kept, so an
+      // exact-time move's event is exactly what it always was.
+      ...(keptWindow ? { slot_window: keptWindow } : {}),
+    },
   });
 
-  const slotLabel = fmt(when.toISOString());
+  // "Thu 18 Sep · 2pm–4pm" when a window was kept; otherwise the exact time,
+  // identical to fmt() (formatBookingSlot with no window).
+  const slotLabel = formatBookingSlot(when.toISOString(), keptWindow);
   const ref = formatJobNumber(booking.job_number);
 
   const moveMechTo = await mechanicEmail(admin, booking.mechanic_id);

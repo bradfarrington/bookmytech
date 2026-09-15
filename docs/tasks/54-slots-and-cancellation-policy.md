@@ -1,6 +1,12 @@
 # Task 54: Mechanics per arrival window, and the cancellation policy endpoint
 
-**Status:** 🚧 Backend built (2026-09-15): `GET /api/mobile/v1/slots`, `GET /api/mobile/v1/cancellation-policy`, `lib/availability/`, `lib/bookings/cancellation-policy.ts`, and dispatch's coverage check moved into `lib/dispatch/eligibility.ts`. The website's Time step count and the cancel page's policy table ship with Task 48.
+**Status:** ✅ Built (2026-09-15): `GET /api/mobile/v1/slots`, `GET /api/mobile/v1/cancellation-policy`, `lib/availability/`, `lib/bookings/cancellation-policy.ts`, and dispatch's coverage check moved into `lib/dispatch/eligibility.ts`. The website shows the counts on the Time step and on reschedule, and the policy table on `/dashboard/bookings/[id]/cancel`.
+
+**Checked against the live database (dev server, 2026-09-15):**
+- The policy endpoint returned £0, £30 and £50.
+- `/slots?day=2026-09-22&postcode=NG12 7GG` counted 3 mechanics per window, 2 from 6pm to 8pm and 3 for all day; without the postcode it counted 4.
+- A past day was refused with a 400.
+- Neither endpoint needs a migration.
 
 ## Why
 
@@ -37,8 +43,8 @@ Response: `{ day, areaChecked, windows: [{ window, startHour, mechanics, bookabl
 - [x] `GET /slots` counts only mechanics who cover the postcode, are inside their hours and have no clashing job (unit-tested)
 - [x] Dispatch behaviour unchanged after the eligibility extraction
 - [x] `GET /cancellation-policy` returns the live fee tiers
-- [ ] Website Time step shows the count under each window (Task 48)
-- [ ] Website cancel page shows the policy table (Task 48)
+- [x] Website Time step shows the count under each window (Task 48)
+- [x] Website cancel page shows the policy table (Task 48)
 - [ ] `0076` applied (owner). The rate limits work without it, from code defaults
 
 ## Mobile app

@@ -1,13 +1,15 @@
 import { redirect } from "next/navigation";
-import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { MessagesSquare } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { DashboardHeader } from "../../_components/dashboard-header";
 import { DisputeDetail } from "@/components/disputes/dispute-detail";
 import { loadDispute } from "@/lib/disputes/load";
+import { Notice, PageHeader, Screen, Stack } from "@/components/dashboard/ui";
 
 export const dynamic = "force-dynamic";
+
+// One dispute, for the customer (Task 48: inside the dashboard shell). The body
+// is the shared components/disputes/dispute-detail.tsx, which the mechanic and
+// admin sides also use, so it keeps its own look.
 
 export default async function CustomerDisputePage({
   params,
@@ -24,25 +26,20 @@ export default async function CustomerDisputePage({
   const loaded = await loadDispute(id, user.id);
   if (!loaded || loaded.viewerRole !== "customer") redirect("/dashboard");
 
-  const admin = createAdminClient();
-  const { data: profile } = await admin
-    .from("profiles")
-    .select("full_name, avatar_url")
-    .eq("id", user.id)
-    .single();
+  const talking = loaded.data.status === "opened" || loaded.data.status === "responded";
 
   return (
-    <div className="min-h-dvh bg-surface">
-      <DashboardHeader name={profile?.full_name ?? user.email ?? ""} avatarUrl={profile?.avatar_url ?? null} />
-      <main className="mx-auto w-full max-w-content px-4 py-8 sm:px-6">
-        <div className="flex max-w-xl flex-col gap-6">
-        <Link href="/dashboard" className="inline-flex items-center gap-1.5 text-sm font-medium text-text-secondary hover:text-text-primary">
-          <ArrowLeft size={15} />
-          Back to dashboard
-        </Link>
+    <Screen>
+      <PageHeader title="Dispute" backHref={`/dashboard/bookings/${loaded.bookingId}`} />
+      <Stack>
+        {talking && (
+          <Notice icon={MessagesSquare} title="Talk it through with your mechanic">
+            Replies appear in the conversation below. If you can&apos;t sort it out between you, ask Book My Tech to
+            step in.
+          </Notice>
+        )}
         <DisputeDetail data={loaded.data} viewerRole="customer" isOpener={loaded.isOpener} />
-        </div>
-      </main>
-    </div>
+      </Stack>
+    </Screen>
   );
 }

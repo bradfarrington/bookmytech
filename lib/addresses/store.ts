@@ -33,11 +33,17 @@ function writeError(error: { code?: string; message?: string }): string {
   return "We couldn't save that address. Please try again.";
 }
 
-/** The caller's addresses, default first, then oldest first. */
-export async function listAddresses(db: SupabaseClient): Promise<AddressList> {
-  const { data, error } = await db
-    .from("customer_addresses")
-    .select(ADDRESS_COLUMNS)
+/**
+ * The caller's addresses, default first, then oldest first.
+ *
+ * Pass `customerId`. RLS alone scopes a customer to their own rows, but 0072
+ * also lets admins read every row, so an admin's session would otherwise get
+ * everyone's addresses.
+ */
+export async function listAddresses(db: SupabaseClient, customerId?: string): Promise<AddressList> {
+  let query = db.from("customer_addresses").select(ADDRESS_COLUMNS);
+  if (customerId) query = query.eq("customer_id", customerId);
+  const { data, error } = await query
     .order("is_default", { ascending: false })
     .order("created_at", { ascending: true });
   if (error) {

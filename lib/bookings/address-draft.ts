@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { PARKING_OPTIONS, type ParkingType } from "./parking";
 
 // The address typed on the booking funnel's Address step (Task 47), carried to
 // the Confirm step. sessionStorage, not the URL: it's personal data, and the
@@ -9,14 +10,9 @@ import { useSyncExternalStore } from "react";
 // Client-only. The server has no storage, so `useAddressDraft` reports
 // `undefined` there and on the first client render, then the stored value.
 
-export type ParkingType = "driveway" | "street" | "car_park" | "other";
-
-export const PARKING_OPTIONS: ReadonlyArray<{ value: ParkingType; label: string }> = [
-  { value: "driveway", label: "Driveway" },
-  { value: "street", label: "On the street" },
-  { value: "car_park", label: "Car park" },
-  { value: "other", label: "Other" },
-];
+// The parking vocabulary lives in ./parking.ts, which server components can
+// import. Re-exported here so existing imports keep working.
+export { PARKING_OPTIONS, type ParkingType };
 
 export interface AddressDraft {
   context: string;

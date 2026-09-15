@@ -1,18 +1,90 @@
-import { redirect } from "next/navigation";
+import { Suspense } from "react";
 import Link from "next/link";
-import { ArrowLeft, ChevronRight } from "lucide-react";
+import { redirect } from "next/navigation";
+import { Bell, CreditCard, KeyRound, LifeBuoy, Mail, MailCheck, MapPin } from "lucide-react";
+import { signOut } from "@/app/actions/sign-out";
+import {
+  AvatarTile,
+  Button,
+  Caption,
+  ListCard,
+  ListRow,
+  Notice,
+  PageHeader,
+  Panel,
+  Screen,
+  Section,
+  Stack,
+} from "@/components/dashboard/ui";
+import { listAddresses, type AddressList } from "@/lib/addresses/store";
+import { listSavedCards } from "@/lib/payments/saved-cards";
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { DashboardHeader } from "../_components/dashboard-header";
-import { SettingsForm } from "./_components/settings-form";
-import { EmailForm } from "./_components/email-form";
+import { DetailsForm } from "./_components/details-form";
 
-export const dynamic = "force-dynamic";
+// Account (Task 48, mockup 05 "Settings"): profile card, the details form, the
+// account rows, support, sign out and delete.
+//
+// Supabase's email-change link returns here as ?email=changed (the redirect
+// URL is registered in Supabase, so it stays this exact path).
+
+interface ProfileRow {
+  full_name: string | null;
+  phone: string | null;
+  avatar_url: string | null;
+  created_at: string | null;
+  reminders_enabled: boolean | null;
+}
+
+const MONTH_YEAR = new Intl.DateTimeFormat("en-GB", {
+  month: "long",
+  year: "numeric",
+  timeZone: "Europe/London",
+});
+
+const CARD_BRANDS: Record<string, string> = {
+  visa: "Visa",
+  mastercard: "Mastercard",
+  amex: "Amex",
+  discover: "Discover",
+  diners: "Diners Club",
+  jcb: "JCB",
+  unionpay: "UnionPay",
+  cartes_bancaires: "Cartes Bancaires",
+  eftpos_au: "eftpos",
+  interac: "Interac",
+};
+
+function addressCaption(result: AddressList): string {
+  if (!result.ok) return "Manage your addresses";
+  const address = result.addresses.find((a) => a.isDefault) ?? result.addresses[0];
+  return address ? address.label : "Add an address";
+}
+
+/** Stripe is a network call, so this caption streams in rather than holding the page. */
+async function CardsCaption({ userId }: { userId: string }) {
+  const result = await listSavedCards(userId);
+  if (!result.ok) return <>Manage your cards</>;
+  const card = result.cards.find((c) => c.isDefault) ?? result.cards[0];
+  if (!card) return <>Add a card</>;
+  return (
+    <>
+      {CARD_BRANDS[card.brand] ?? "Card"} · {card.last4}
+    </>
+  );
+}
+
+function CaptionPlaceholder() {
+  return (
+    <span className="inline-block h-3 w-24 animate-pulse rounded bg-border-subtle align-middle motion-reduce:animate-none">
+      <span className="sr-only">Loading</span>
+    </span>
+  );
+}
 
 export default async function SettingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ email?: string }>;
+  searchParams: Promise<{ email?: string | string[] }>;
 }) {
   const { email: emailFlag } = await searchParams;
   const supabase = await createClient();
@@ -21,63 +93,113 @@ export default async function SettingsPage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const admin = createAdminClient();
-  const { data: profile } = await admin
-    .from("profiles")
-    .select("full_name, phone, avatar_url")
-    .eq("id", user.id)
-    .single();
+  const [{ data }, addresses] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("full_name, phone, avatar_url, created_at, reminders_enabled")
+      .eq("id", user.id)
+      .maybeSingle(),
+    listAddresses(supabase, user.id),
+  ]);
+  const profile = data as ProfileRow | null;
+
+  const email = user.email ?? "";
+  const name = profile?.full_name?.trim() || email || "You";
+  const memberSince = profile?.created_at ? MONTH_YEAR.format(new Date(profile.created_at)) : null;
+  const remindersOn = profile?.reminders_enabled ?? true;
 
   return (
-    <div className="min-h-dvh bg-surface">
-      <DashboardHeader name={profile?.full_name ?? user.email ?? ""} avatarUrl={profile?.avatar_url ?? null} />
+    <Screen>
+      <PageHeader title="Settings" />
+      <Stack>
+        {emailFlag === "changed" &&
+          (user.new_email ? (
+            // Secure Email Change: one of the two links has been opened.
+            <Notice icon={MailCheck} title="Thanks, that's one confirmed">
+              Open the link we sent to your other address to finish changing your email.
+            </Notice>
+          ) : (
+            <Notice icon={MailCheck} title="Email address changed">
+              You now sign in as <span className="break-all font-semibold text-text-primary">{email}</span>.
+            </Notice>
+          ))}
 
-      <main className="mx-auto w-full max-w-content px-4 py-8 sm:px-6">
-        <div className="flex max-w-xl flex-col gap-6">
-        <Link href="/dashboard" className="inline-flex items-center gap-1.5 text-sm font-medium text-text-secondary hover:text-text-primary">
-          <ArrowLeft size={15} />
-          Back to dashboard
-        </Link>
-
-        <div>
-          <h1 className="text-2xl font-bold text-text-primary">Account settings</h1>
-          <p className="text-text-secondary">Manage your details and preferences.</p>
-        </div>
-
-        <div className="rounded-2xl border border-border bg-surface-card p-6">
-          <h2 className="mb-4 text-sm font-bold uppercase tracking-wide text-text-muted">Your details</h2>
-          <SettingsForm
-            defaultName={profile?.full_name ?? ""}
-            defaultPhone={profile?.phone ?? ""}
-          />
-        </div>
-
-        <div className="rounded-2xl border border-border bg-surface-card p-6">
-          <h2 className="mb-4 text-sm font-bold uppercase tracking-wide text-text-muted">Email address</h2>
-          {emailFlag === "changed" && (
-            <p className="mb-4 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
-              Thanks, that confirmation has been received. Once you&apos;ve confirmed from both your
-              old and new addresses, the change is complete and your current address is shown below.
-            </p>
-          )}
-          <EmailForm currentEmail={user.email ?? ""} />
-        </div>
-
-        <Link
-          href="/dashboard/settings/reminders"
-          className="flex items-center justify-between gap-4 rounded-2xl border border-border bg-surface-card p-6 transition-colors hover:border-brand-blue/40"
-        >
-          <div>
-            <h2 className="text-sm font-bold uppercase tracking-wide text-text-muted">Reminders</h2>
-            <p className="mt-2 text-sm text-text-secondary">
-              Choose whether we remind you about your MOT, annual service and
-              seasonal checks, and how we reach you.
-            </p>
+        <Panel tone="float" padding="lg" className="text-center">
+          <div className="flex justify-center">
+            <AvatarTile name={name} src={profile?.avatar_url} size="xl" />
           </div>
-          <ChevronRight size={18} className="shrink-0 text-text-muted" />
-        </Link>
+          <div className="mt-2.5 font-display text-lg font-bold leading-6 tracking-[-0.3px] text-text-primary">
+            {name}
+          </div>
+          <Caption className="mt-0.5 break-all">{email}</Caption>
+          {memberSince && <Caption className="mt-0.5">Member since {memberSince}</Caption>}
+        </Panel>
+
+        <Section title="Your details">
+          <DetailsForm defaultName={profile?.full_name ?? ""} defaultPhone={profile?.phone ?? ""} />
+        </Section>
+
+        <Section title="Account">
+          <ListCard>
+            <ListRow
+              href="/dashboard/settings/reminders"
+              icon={Bell}
+              title="Service reminders"
+              caption={remindersOn ? "On" : "Off"}
+            />
+            <ListRow
+              href="/dashboard/settings/email"
+              icon={Mail}
+              title="Email address"
+              caption={<span className="block truncate">{email}</span>}
+            />
+            <ListRow
+              href="/dashboard/settings/password"
+              icon={KeyRound}
+              title="Password"
+              caption="Change the password you sign in with"
+            />
+            <ListRow
+              href="/dashboard/settings/payment-methods"
+              icon={CreditCard}
+              title="Payment methods"
+              caption={
+                <Suspense fallback={<CaptionPlaceholder />}>
+                  <CardsCaption userId={user.id} />
+                </Suspense>
+              }
+            />
+            <ListRow
+              href="/dashboard/settings/addresses"
+              icon={MapPin}
+              title="Addresses"
+              caption={<span className="block truncate">{addressCaption(addresses)}</span>}
+            />
+          </ListCard>
+        </Section>
+
+        <Section title="Support">
+          <ListCard>
+            <ListRow href="/dashboard/help" icon={LifeBuoy} title="Help centre" caption="FAQs and get in touch" />
+          </ListCard>
+        </Section>
+
+        <form action={signOut} className="mt-2">
+          <input type="hidden" name="redirectTo" value="/login" />
+          <Button type="submit" variant="ghost" full>
+            Sign out
+          </Button>
+        </form>
+
+        <div className="text-center">
+          <Link
+            href="/dashboard/settings/delete"
+            className="text-sm font-semibold text-danger transition-colors hover:text-red-700"
+          >
+            Delete account
+          </Link>
         </div>
-      </main>
-    </div>
+      </Stack>
+    </Screen>
   );
 }

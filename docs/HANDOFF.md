@@ -119,6 +119,54 @@ You are working on **Book My Tech**, a UK mobile-mechanic booking platform. This
 
 ## Current task
 
+### 2026-09-15 (late) — New customer dashboard and the data behind it 🚧 (Tasks 48 to 54), branch `task-43-parts-in-customer-prices`
+
+**The website's dashboard now uses the app redesign (`mockups/`), with a top header instead of bottom tabs.** The data the redesigned app was waiting on is built too. Detail: `docs/tasks/48-customer-dashboard-rebuild.md` to `54-slots-and-cancellation-policy.md`.
+
+**Data (Tasks 49 to 54).** Migrations `0072` to `0077`, all additive:
+
+| Task | What | Where |
+|---|---|---|
+| 49 | Saved addresses | Customer CRUD under RLS, one default kept by triggers |
+| 50 | The garage | `customer_vehicles`, seeded from past bookings; DVLA details server-written |
+| 51 | Mechanic profile extras and public reviews | `mechanic_cards` gains `specialisms` and `approved_at`; `mechanic_public_reviews` view; admin hide switch |
+| 52 | Inbox read state | `customer_inbox_reads` plus two RPCs |
+| 53 | Saved cards | `stripe_customers` (service-role only, deliberately not a `profiles` column) |
+| 54 | Mechanics per arrival window, cancellation policy | Endpoints only |
+
+- **Account deletion** now also covers addresses, garage, inbox state and the Stripe Customer.
+- **New mobile endpoints:**
+  - `GET` and `POST /garage`
+  - `/account/payment-methods` (list, add, remove, default)
+  - `GET /slots`
+  - `GET /cancellation-policy`
+
+  Additive fields: `customerId` and `customerSessionClientSecret` on `/checkout/prepare`, and `slotWindow` on `/bookings/:id/reschedule`.
+- **Checkout** makes the hold against the Stripe Customer only when there's a saved card (Brad's decision).
+
+**Website (Task 48)**
+- **Shell:** the signed-in screens sit in `app/(customer)/dashboard/(shell)/` (URLs unchanged), with shared blocks in `components/dashboard/ui.tsx` and one booking loader, `lib/dashboard/customer-bookings.ts`. The loader fixes the old dashboard's looser email match.
+- **New screens:**
+  - booking detail (with a live map while on the way), messages, reschedule, cancel, review
+  - mechanic profile, garage, inbox
+  - account screens: email, password, delete, reminders with push, payment methods, addresses
+  - help centre
+- **Booking flow and admin:** saved addresses on the Address step, counts per window on the Time step, saved cards at checkout, and the review visibility switch on `/admin/reviews`.
+
+**Checked:**
+- `tsc`, eslint and 548 unit tests pass.
+- All migrations parse (pglast).
+- `/slots` and `/cancellation-policy` answered correctly against the live database.
+
+**Not yet checked:** any dashboard screen in a browser (needs a signed-in customer), `next build`, and the saved-card flow with Stripe test cards.
+
+**Owner:**
+1. Apply `0071` to `0077` in order. `0077` needs `0072`, `0073` and `0075`.
+2. **Customer app:** send the app's Claude `docs/mobile-app-brief-2026-09-15.md` (addresses, garage, profile, inbox, cards, slots, policy, reschedule window). It runs `npm run db:types` once the migrations are in.
+3. **AAG:** still needs to allowlist `80.1.6.55` (Task 43 below). Until then, repairs with parts can't be booked.
+
+**Task 43 migration numbers:** unchanged. The dashboard work took `0072` to `0077`.
+
 ### 2026-09-15 (evening) — LKQ removed; AAG parts into customer prices 🚧 (Task 43), branch `task-43-parts-in-customer-prices`
 
 **Gareth: remove LKQ entirely.** Alliance Automotive prices HaynesPro's part groups directly, so nothing needs matching. Decisions and plan: `docs/tasks/43-supplier-parts-into-quoting.md` → "Revised decisions".

@@ -1,11 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { Gift, Copy, Check, Share2 } from "lucide-react";
+import { Check, Copy, Gift, Share2 } from "lucide-react";
+import { REFERRAL_BONUS_PENCE, REFERRAL_WELCOME_PENCE } from "@/lib/credits/constants";
 import { formatPrice } from "@/lib/utils";
+import { Button, Overline, Panel, Tile } from "@/components/dashboard/ui";
 
-// Give-£10-get-£10 referral card (Task 11 Stage 3). The referee gets credit off
-// their first booking; the referrer gets credit once the referee completes a job.
+// The referral card (Task 11 Stage 3), in the dashboard's building blocks. The
+// friend gets REFERRAL_WELCOME_PENCE off their first booking; the customer gets
+// REFERRAL_BONUS_PENCE once that friend completes a job.
 export function ReferralCard({
   code,
   shareUrl,
@@ -16,6 +19,8 @@ export function ReferralCard({
   creditPence: number;
 }) {
   const [copied, setCopied] = useState(false);
+  const give = formatPrice(REFERRAL_WELCOME_PENCE);
+  const get = formatPrice(REFERRAL_BONUS_PENCE);
 
   async function copy() {
     try {
@@ -23,7 +28,7 @@ export function ReferralCard({
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      // clipboard blocked — no-op; the code is on screen to copy manually
+      // Clipboard blocked: the code is on screen to copy by hand.
     }
   }
 
@@ -32,66 +37,50 @@ export function ReferralCard({
       try {
         await navigator.share({
           title: "Book My Tech",
-          text: "Get £10 off your first mobile mechanic booking with Book My Tech.",
+          text: `Get ${give} off your first mobile mechanic booking with Book My Tech.`,
           url: shareUrl,
         });
         return;
       } catch {
-        // user cancelled or unsupported — fall through to copy
+        // Cancelled or unsupported: fall back to copying.
       }
     }
     copy();
   }
 
   return (
-    <section className="@container overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-brand-blue to-brand-blue-dark p-6 text-white">
+    <Panel padding="lg">
       <div className="flex items-start gap-3">
-        <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-white/15">
-          <Gift size={20} />
-        </span>
+        <Tile icon={Gift} />
         <div className="min-w-0">
-          <h2 className="text-lg font-bold">Give £10, get £10</h2>
-          <p className="mt-0.5 text-sm text-blue-100">
-            Share your code. Friends get {formatPrice(1000)} off their first booking,
-            and you get {formatPrice(1000)} when they complete it.
+          <div className="font-display text-base font-bold leading-[22px] tracking-[-0.2px] text-text-primary">
+            Give {give}, get {get}
+          </div>
+          <p className="mt-1 text-[13px] leading-[19px] text-text-secondary">
+            Friends get {give} off their first booking, and you get {get} when they complete it.
           </p>
         </div>
       </div>
 
       {creditPence > 0 && (
-        <p className="mt-4 rounded-lg bg-white/15 px-3 py-2 text-sm font-semibold">
+        <div className="mt-3.5 rounded-[10px] border border-green-200 bg-green-50 px-3 py-2 text-[13px] font-semibold leading-[19px] text-green-800">
           You have {formatPrice(creditPence)} in credit. It&apos;s applied automatically at checkout.
-        </p>
+        </div>
       )}
 
-      {/* Container query, not a viewport breakpoint: on desktop this card sits in a
-          ~340px sidebar, where the side-by-side row crammed the code, wrapped
-          "Copy link" and clipped the share button. Go horizontal only when the
-          card itself is wide enough (@lg = 32rem). */}
-      <div className="mt-4 flex flex-col gap-2 @lg:flex-row">
-        <div className="flex min-w-0 flex-1 items-center justify-between gap-3 rounded-lg bg-white/15 px-3 py-2.5">
-          <span className="whitespace-nowrap text-xs uppercase tracking-wide text-blue-100">Your code</span>
-          <span className="truncate font-mono text-base font-bold tracking-wider">{code}</span>
-        </div>
-        <div className="flex shrink-0 gap-2">
-          <button
-            type="button"
-            onClick={copy}
-            className="inline-flex h-11 flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg bg-white px-4 text-sm font-semibold text-brand-blue transition-colors hover:bg-blue-50"
-          >
-            {copied ? <Check size={16} /> : <Copy size={16} />}
-            {copied ? "Copied!" : "Copy link"}
-          </button>
-          <button
-            type="button"
-            onClick={share}
-            aria-label="Share"
-            className="inline-flex size-11 shrink-0 items-center justify-center rounded-lg bg-white/15 text-white transition-colors hover:bg-white/25"
-          >
-            <Share2 size={16} />
-          </button>
-        </div>
+      <div className="mt-3.5 flex items-center justify-between gap-3 rounded-[10px] border border-border bg-surface px-3 py-2.5">
+        <Overline>Your code</Overline>
+        <span className="truncate font-mono text-[15px] font-bold tracking-wider text-text-primary">{code}</span>
       </div>
-    </section>
+
+      <div className="mt-2.5 flex gap-2">
+        <Button icon={copied ? Check : Copy} className="flex-1" onClick={copy}>
+          {copied ? "Copied" : "Copy link"}
+        </Button>
+        <Button variant="secondary" icon={Share2} className="w-11 px-0" aria-label="Share" onClick={share}>
+          <span className="sr-only">Share</span>
+        </Button>
+      </div>
+    </Panel>
   );
 }

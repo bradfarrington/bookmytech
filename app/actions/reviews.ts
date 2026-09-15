@@ -30,6 +30,42 @@ export async function submitReview(
 }
 
 /**
+ * A signed-in customer reviews a completed booking from their dashboard
+ * (/dashboard/bookings/[id]/review, Task 48).
+ *
+ * Unlike `submitReview` above, this resolves the caller from the cookie session
+ * and passes it to the core, so ownership is enforced exactly as on the mobile
+ * route: knowing a booking id is not enough to review someone else's job. The
+ * caller is never a parameter; see app/actions/customer-bookings.ts for why.
+ */
+export async function submitReviewAsCustomer(
+  bookingId: string,
+  input: { rating: number; tags: string[]; comment: string },
+): Promise<ReviewResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Please sign in to leave a review." };
+
+  // A server action takes whatever the browser sends, so shape it before the core reads it.
+  const result = await submitReviewFor(
+    bookingId,
+    {
+      rating: Number(input?.rating),
+      tags: Array.isArray(input?.tags) ? input.tags.filter((t): t is string => typeof t === "string") : [],
+      comment: typeof input?.comment === "string" ? input.comment : "",
+    },
+    { userId: user.id, email: user.email ?? null },
+  );
+  if (result.ok) {
+    revalidatePath("/dashboard");
+    revalidatePath(`/dashboard/bookings/${bookingId}`);
+  }
+  return result;
+}
+
+/**
  * Mechanic leaves (or edits) their single reply to a review. Mechanics have no
  * write rights on `reviews` under RLS, so we verify ownership in the RLS-aware
  * client, then write the response via service-role.

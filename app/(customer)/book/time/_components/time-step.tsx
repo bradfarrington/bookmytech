@@ -35,7 +35,7 @@ export function TimeStep({ base, initialTime }: TimeStepProps) {
   return (
     <div className="flex flex-col gap-6">
       <div className="rounded-[20px] border border-border bg-white p-5 shadow-card sm:p-6">
-        <TimePicker value={value} onChange={setValue} now={now} />
+        <TimePicker value={value} onChange={setValue} now={now} postcode={base.postcode} />
       </div>
 
       <div className="sticky bottom-4 z-10 rounded-2xl border border-border bg-white p-4 shadow-float">

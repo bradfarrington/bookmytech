@@ -556,7 +556,7 @@ keeps that spec's history readable rather than rewriting it.
 |---|---|---|
 | `GET /bookings/:id/cancel-quote` | `quoteCancellation` | `lib/bookings/manage-booking.ts` |
 | `POST /bookings/:id/cancel` `{reason}` | `cancelBooking` | ″ |
-| `POST /bookings/:id/reschedule` `{scheduledAt, reason}` | `rescheduleBooking` | ″ |
+| `POST /bookings/:id/reschedule` `{scheduledAt, reason, slotWindow?}` (`slotWindow` additive, Task 48: keeps a 2-hour window) | `rescheduleBooking` | ″ |
 | `POST /bookings/:id/reschedule-response` `{decision}` | `respondToReschedule` | ″ |
 | `POST /bookings/:id/review` `{rating, tags?, comment?}` | `submitReview` | `lib/reviews/submit-review.ts` |
 | `POST /bookings/:id/disputes` | `openDispute` | `lib/disputes/core.ts` |

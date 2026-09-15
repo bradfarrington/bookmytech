@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 
 export type ProfileState = { ok?: boolean; error?: string } | null;
 
-// Customer account settings — name + contact number. Runs under the user's own
+// Customer account settings: name and contact number. Runs under the user's own
 // session: the profiles "update own profile" policy (0010) covers name/phone,
 // so no service-role needed.
 export async function updateCustomerProfile(
@@ -21,15 +21,20 @@ export async function updateCustomerProfile(
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return { error: "Please sign in." };
+  if (!user) return { error: "Please sign in again to update your details." };
 
   const { error } = await supabase
     .from("profiles")
     .update({ full_name: fullName, phone: phone || null })
     .eq("id", user.id);
-  if (error) return { error: error.message };
+  if (error) {
+    console.error("[customer-profile] update failed", user.id, error.message);
+    return { error: "We couldn't save your details. Please try again." };
+  }
 
   revalidatePath("/dashboard/settings");
+  // The Text message row there shows the number.
+  revalidatePath("/dashboard/settings/reminders");
   revalidatePath("/dashboard");
   return { ok: true };
 }

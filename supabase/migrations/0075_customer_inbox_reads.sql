@@ -71,7 +71,7 @@ begin
   insert into public.customer_inbox_reads (customer_id, read_ids, updated_at)
   values (auth.uid(), array[p_item_id], now())
   on conflict (customer_id) do update
-    set read_ids   = (array[p_item_id] || array_remove(public.customer_inbox_reads.read_ids, p_item_id))[1:200],
+    set read_ids   = (array[p_item_id] || array_remove(customer_inbox_reads.read_ids, p_item_id))[1:200],
         updated_at = now();
 end;
 $$;

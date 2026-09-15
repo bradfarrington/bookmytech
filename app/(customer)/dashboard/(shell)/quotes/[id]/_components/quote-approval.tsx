@@ -3,8 +3,19 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Check, CheckCircle2, X } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { CheckCircle2, Clock, MessageSquareQuote, Package, Wrench, X } from "lucide-react";
+import {
+  Button,
+  Caption,
+  ListCard,
+  ListRow,
+  Panel,
+  Section,
+  Stack,
+  StatusPill,
+  Tile,
+  type PillTone,
+} from "@/components/dashboard/ui";
 import { HoldPayment, useResumeHold } from "@/components/customer/hold-payment";
 import { formatPrice } from "@/lib/utils";
 import { QUOTE_KIND_LABEL, QUOTE_STATUS_LABEL, isQuoteExpired } from "@/lib/quotes/status";
@@ -16,6 +27,9 @@ import { approveQuote, confirmQuotePayment, declineQuote } from "@/app/actions/c
 // increased — so the card is collected again here (components/customer/
 // hold-payment.tsx, shared with revised jobs since Task 37), and the quote is
 // only approved once `confirmQuotePayment` has proved the hold against Stripe.
+//
+// Task 48: styled to mockup 04 "Quote" with the dashboard building blocks. The
+// stages, calls and redirects are unchanged.
 
 interface QuoteApprovalProps {
   quote: QuoteView;
@@ -24,6 +38,8 @@ interface QuoteApprovalProps {
   mechanicName: string;
   customerName: string;
   customerEmail: string;
+  /** "Thu 18 Sep · 17:00", formatted on the server; null when the quote has no expiry. */
+  expiresLabel: string | null;
 }
 
 type Stage =
@@ -32,7 +48,15 @@ type Stage =
   | { phase: "confirming" }
   | { phase: "done"; outcome: "approved" | "declined" };
 
-export function QuoteApproval({ quote, bookingRef, bookingStatus, mechanicName, customerName, customerEmail }: QuoteApprovalProps) {
+export function QuoteApproval({
+  quote,
+  bookingRef,
+  bookingStatus,
+  mechanicName,
+  customerName,
+  customerEmail,
+  expiresLabel,
+}: QuoteApprovalProps) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [stage, setStage] = useState<Stage>({ phase: "review" });
@@ -87,76 +111,119 @@ export function QuoteApproval({ quote, bookingRef, bookingStatus, mechanicName, 
     });
   }
 
-  const statusLine =
+  const status: { tone: PillTone; label: string } =
     stage.phase === "done"
       ? stage.outcome === "approved"
-        ? "Approved"
-        : "Declined"
+        ? { tone: "success", label: "Approved" }
+        : { tone: "neutral", label: "Declined" }
       : quote.status === "sent" && isQuoteExpired(quote)
-        ? "Expired"
-        : QUOTE_STATUS_LABEL[quote.status];
+        ? { tone: "neutral", label: "Expired" }
+        : open
+          ? { tone: "pending", label: "Waiting on you" }
+          : { tone: quote.status === "approved" ? "success" : "neutral", label: QUOTE_STATUS_LABEL[quote.status] };
+
+  const splitAddsUp = quote.labourPence > 0 && quote.partsPence > 0 && quote.labourPence + quote.partsPence === quote.totalPence;
 
   return (
-    <div className="flex flex-col gap-4">
-      <header>
-        <p className="text-sm font-semibold uppercase tracking-widest text-brand-blue">Quote from {mechanicName}</p>
-        <h1 className="mt-1 text-2xl font-bold text-text-primary">{quote.title ?? QUOTE_KIND_LABEL[quote.kind]}</h1>
-        <p className="mt-1 text-sm text-text-secondary">
-          Job {bookingRef} · {quote.kind === "follow_on" ? "a return visit" : "extra work on your current job"} · {statusLine}
-        </p>
-      </header>
-
-      {/* The lines and the total — always shown before the buttons. */}
-      <div className="overflow-hidden rounded-2xl border border-border bg-surface-card">
-        <ul className="divide-y divide-border-subtle">
-          {quote.lines.map((l) => (
-            <li key={l.id} className="flex items-start justify-between gap-3 px-4 py-3 text-sm">
-              <div className="min-w-0">
-                <p className="text-text-primary">{l.description}</p>
-                <p className="text-xs text-text-muted">
-                  {l.kind === "labour"
-                    ? `Labour · ${l.hours} h × ${formatPrice(l.unitPence)}`
-                    : l.kind === "part"
-                      ? `Part${l.quantity > 1 ? ` × ${l.quantity}` : ""}${l.quantity > 1 ? ` · ${formatPrice(l.unitPence)} each` : ""}`
-                      : l.quantity > 1
-                        ? `× ${l.quantity} · ${formatPrice(l.unitPence)} each`
-                        : ""}
-                </p>
-              </div>
-              <span className="shrink-0 font-semibold tabular-nums text-text-primary">{formatPrice(l.linePence)}</span>
-            </li>
-          ))}
-        </ul>
-        <div className="flex items-baseline justify-between border-t border-border bg-surface px-4 py-3">
-          <span className="text-sm font-bold text-text-primary">Total</span>
-          <span className="text-2xl font-extrabold tracking-tight text-text-primary">{formatPrice(quote.totalPence)}</span>
+    <Stack>
+      <div>
+        <h2 className="font-display text-2xl font-extrabold leading-[30px] tracking-[-0.6px] text-text-primary">
+          {quote.title ?? QUOTE_KIND_LABEL[quote.kind]}
+        </h2>
+        <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+          <StatusPill tone={status.tone}>{status.label}</StatusPill>
+          <Caption>{quote.kind === "follow_on" ? "A return visit" : "Extra work on your current job"}</Caption>
         </div>
+        <Caption className="mt-1.5">
+          From {mechanicName} · Job {bookingRef}
+          {open && expiresLabel ? ` · Expires ${expiresLabel}` : ""}
+        </Caption>
       </div>
 
       {quote.note && (
-        <p className="rounded-xl bg-surface px-4 py-3 text-sm text-text-secondary">
-          <span className="font-semibold text-text-primary">Note from your mechanic: </span>
-          {quote.note}
-        </p>
+        <Panel tone="tint">
+          <div className="flex items-start gap-2.5">
+            <Tile icon={MessageSquareQuote} size="sm" className="bg-white" />
+            <div className="min-w-0 flex-1">
+              <Caption className="text-text-secondary">From {mechanicName}</Caption>
+              <p className="mt-1 whitespace-pre-wrap text-[13.5px] italic leading-5 text-text-secondary">
+                &ldquo;{quote.note}&rdquo;
+              </p>
+            </div>
+          </div>
+        </Panel>
       )}
 
+      {/* The lines and the total — always shown before the buttons. */}
+      <Section title="What's quoted">
+        <ListCard>
+          {quote.lines.map((l) => {
+            const detail =
+              l.kind === "labour"
+                ? `Labour · ${l.hours} h × ${formatPrice(l.unitPence)}`
+                : l.kind === "part"
+                  ? `Part${l.quantity > 1 ? ` × ${l.quantity}` : ""}${l.quantity > 1 ? ` · ${formatPrice(l.unitPence)} each` : ""}`
+                  : l.quantity > 1
+                    ? `× ${l.quantity} · ${formatPrice(l.unitPence)} each`
+                    : "";
+            return (
+              <ListRow
+                key={l.id}
+                leading={<Tile icon={l.kind === "labour" ? Clock : l.kind === "part" ? Package : Wrench} size="sm" />}
+                title={l.description}
+                caption={detail || undefined}
+                trailing={
+                  <span className="shrink-0 text-sm font-bold tabular-nums text-text-primary">{formatPrice(l.linePence)}</span>
+                }
+              />
+            );
+          })}
+        </ListCard>
+      </Section>
+
+      <Panel tone="dark">
+        <div className="flex items-center justify-between gap-4">
+          <div className="min-w-0 text-xs leading-4 text-white/60">
+            <div>Total</div>
+            {splitAddsUp && (
+              <div className="mt-0.5">
+                Labour {formatPrice(quote.labourPence)} · Parts {formatPrice(quote.partsPence)}
+              </div>
+            )}
+          </div>
+          <div className="font-display text-[28px] font-extrabold leading-8 tracking-[-0.7px] text-white tabular-nums">
+            {formatPrice(quote.totalPence)}
+          </div>
+        </div>
+      </Panel>
+
       {stage.phase === "done" ? (
-        <p className={`flex items-start gap-2 rounded-xl px-4 py-3 text-sm font-medium ${stage.outcome === "approved" ? "bg-green-50 text-success" : "bg-surface text-text-secondary"}`}>
-          <CheckCircle2 size={16} className="mt-0.5 shrink-0" />
-          {stage.outcome === "approved"
-            ? quote.kind === "now"
-              ? `Approved. ${formatPrice(quote.totalPence)} is authorised on your card and will be charged with the job when it's complete. Your mechanic has been told to go ahead.`
-              : "Approved."
-            : "Declined. Your mechanic won't carry out this work."}
-        </p>
+        <Panel>
+          <div className="flex items-start gap-3">
+            <Tile
+              icon={stage.outcome === "approved" ? CheckCircle2 : X}
+              tone={stage.outcome === "approved" ? "success" : "neutral"}
+              size="sm"
+            />
+            <p className="min-w-0 flex-1 text-[13px] leading-[19px] text-text-secondary">
+              {stage.outcome === "approved"
+                ? quote.kind === "now"
+                  ? `Approved. ${formatPrice(quote.totalPence)} is authorised on your card and will be charged with the job when it's complete. Your mechanic has been told to go ahead.`
+                  : "Approved."
+                : "Declined. Your mechanic won't carry out this work."}
+            </p>
+          </div>
+        </Panel>
       ) : !open ? (
-        <p className="rounded-xl bg-surface px-4 py-3 text-sm text-text-secondary">
-          {quote.status === "approved"
-            ? "You've approved this quote."
-            : quote.status === "sent"
-              ? "This quote has expired. Ask your mechanic to send it again if you'd still like the work done."
-              : `This quote is ${QUOTE_STATUS_LABEL[quote.status].toLowerCase()}.`}
-        </p>
+        <Panel>
+          <p className="text-[13px] leading-[19px] text-text-secondary">
+            {quote.status === "approved"
+              ? "You've approved this quote."
+              : quote.status === "sent"
+                ? "This quote has expired. Ask your mechanic to send it again if you'd still like the work done."
+                : `This quote is ${QUOTE_STATUS_LABEL[quote.status].toLowerCase()}.`}
+          </p>
+        </Panel>
       ) : stage.phase === "pay" ? (
         <HoldPayment
           clientSecret={stage.clientSecret}
@@ -174,23 +241,25 @@ export function QuoteApproval({ quote, bookingRef, bookingStatus, mechanicName, 
           onBack={() => setStage({ phase: "review" })}
         />
       ) : stage.phase === "confirming" ? (
-        <p className="rounded-xl bg-surface px-4 py-3 text-sm text-text-secondary">Confirming your payment…</p>
+        <Panel>
+          <p className="text-[13px] leading-[19px] text-text-secondary">Confirming your payment…</p>
+        </Panel>
       ) : (
-        <div className="flex flex-col gap-3">
-          <p className="rounded-xl bg-blue-50 px-4 py-3 text-[13px] leading-relaxed text-text-secondary">
+        <div className="sticky bottom-0 z-10 -mx-4 mt-1 flex flex-col gap-2 border-t border-border-subtle bg-surface px-4 pb-5 pt-3 sm:-mx-6 sm:px-6">
+          <Button size="lg" full disabled={pending} onClick={approve}>
+            {quote.kind === "now" ? `Approve · ${formatPrice(quote.totalPence)}` : "Approve and pick a date"}
+          </Button>
+          <Button variant="ghost" full disabled={pending} onClick={decline}>
+            Decline
+          </Button>
+          <Caption className="text-center">
             {quote.kind === "now"
               ? `Approving authorises ${formatPrice(quote.totalPence)} on your card now. Nothing is charged until the job is complete, and the work only goes ahead once you've approved.`
               : "Approving doesn't take any payment. You'll pick a date for the return visit next, and your mechanic is offered the job first."}
             {bookingStatus !== "in_progress" && quote.kind === "now" && " This job is no longer in progress."}
-          </p>
-          <Button size="lg" fullWidth iconLeft={Check} disabled={pending} onClick={approve}>
-            {quote.kind === "now" ? `Approve and authorise ${formatPrice(quote.totalPence)}` : "Approve and pick a date"}
-          </Button>
-          <Button size="lg" fullWidth variant="secondary" iconLeft={X} disabled={pending} onClick={decline}>
-            Decline
-          </Button>
+          </Caption>
         </div>
       )}
-    </div>
+    </Stack>
   );
 }

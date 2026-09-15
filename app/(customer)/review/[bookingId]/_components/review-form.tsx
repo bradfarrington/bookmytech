@@ -133,6 +133,10 @@ export function ReviewForm({ bookingId, mechanicName, tags, initialRating = 0 }:
         {pending && <Loader2 size={16} className="animate-spin" />}
         {pending ? "Submitting…" : "Submit review"}
       </button>
+
+      <p className="-mt-3 text-center text-[13px] text-text-muted">
+        Your first name, rating and comment may be shown on your mechanic&apos;s profile.
+      </p>
     </div>
   );
 }

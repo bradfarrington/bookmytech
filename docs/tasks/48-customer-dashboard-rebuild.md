@@ -1,6 +1,6 @@
 # Task 48: Customer dashboard rebuild (web)
 
-**Status:** 🚧 In progress (2026-09-15). Shell, shared building blocks and the booking loader are built; screens are being built on them.
+**Status:** 🚧 Built (2026-09-15), not yet checked in a browser. Every screen in the table exists; `tsc`, eslint and the unit tests pass. Waiting on a signed-in look against the mockups, `next build`, and migrations `0072` to `0077` for the screens that use new tables (until then they show "not available yet").
 
 ## Why
 
@@ -74,13 +74,49 @@ The customer app was redesigned (`mockups/01` to `05`, identical to `bmt-custome
 - **Cookie-session callers only.** Nothing in a URL or form decides whose data is read.
 - **Next 16:** read `node_modules/next/dist/docs/` before using an unfamiliar API.
 
+## What shipped
+
+**Screens.** Every screen in the table above exists at its route. Built on the shared blocks, with each screen's rules in small pure modules and unit tests:
+- Home logic: `_home/booking-logic.ts`
+- Garage display
+- Inbox grouping and icons
+- Card labels
+- Password strength
+- The reschedule window check
+
+**Changes to shared code**
+- **Reschedule keeps the window.** `rescheduleBookingFor` takes an optional `slotWindow`, kept when it's a 2-hour label whose start is the new time (`lib/bookings/reschedule-window.ts`). The website sends it. The mobile route accepts it additively, and old builds are unchanged.
+- **Signed-in review action.** `submitReviewAsCustomer` (`app/actions/reviews.ts`) enforces ownership. The public `submitReview` is unchanged.
+- **Parking vocabulary** moved to `lib/bookings/parking.ts`, which server components can import. `address-draft.ts` re-exports it.
+- **Chat errors:** a failed message now returns a sentence, not the database's error text (`lib/messages/send.ts`). This also reaches the mobile messages route.
+- **Saved addresses:** `listAddresses` takes the customer id, because RLS also lets an admin read every row.
+- **Rate limits:** the website's garage and card actions and both availability actions use the same limits as the app endpoints.
+
+**Cleanup.** Home has its own route group, `(shell)/(home)/`, so its skeleton only shows for Home. Every other screen gets a generic one. The old dashboard components are deleted. The ⋮ menu moved to `components/dashboard/overflow-menu.tsx`.
+
+**Deviations from the mockups, all to keep claims true or match what exists**
+- **Left out:**
+  - no illustrated map, ETA, "Online" or "Delivered"
+  - no "Book MOT" button: the MOT warning uses the normal Book button
+  - no Change email password field: it would be bypassable, since the change goes browser to Supabase
+  - no "6 years / HMRC" line on Delete account
+  - no chat or phone in Help centre
+- **Reworded:**
+  - Garage shows "Last job", not "Last service"
+  - the third cancellation tier reads "Once your mechanic is on the way"
+- **Booking detail map:** it shows the mechanic's live position from `mechanic_locations`, only while they're on the way, and nothing when there's no fresh fix.
+- **Reschedule:** offers 14 days, and no All day (the core can't store it on a move).
+- **Disputes:** the form and detail body are the shared `components/disputes/*`, left as they are because the mechanic side uses them. So they don't yet match the mockup's option cards.
+- **Web account deletion:** refuses staff accounts. It has no rate limit of its own; Supabase throttles the password check.
+- **Report a problem:** isn't offered on guest-era bookings. `/dashboard/disputes/new` only accepts bookings linked to the account.
+
 ## Acceptance criteria
 
-- [ ] Every screen in the table exists and matches its mockup frame, at phone width and desktop
-- [ ] No bottom tab bar; the header carries the four destinations, Book, and the unread dot
-- [ ] Old dashboard components no longer used are deleted
-- [ ] `tsc`, `eslint` and unit tests pass; `next build` passes (run when Brad's dev server is off)
-- [ ] Checked in a browser against the mockups
+- [ ] Every screen in the table exists and matches its mockup frame, at phone width and desktop. They exist; the visual check is outstanding.
+- [x] No bottom tab bar; the header carries the four destinations, Book, and the unread dot
+- [x] Old dashboard components no longer used are deleted
+- [ ] `tsc`, `eslint` and unit tests pass; `next build` passes (run when Brad's dev server is off). `tsc`, eslint and 548 unit tests pass; `next build` not run.
+- [ ] Checked in a browser against the mockups. Needs a signed-in customer; not done.
 
 ## Mobile app
 

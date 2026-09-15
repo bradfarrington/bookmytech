@@ -1,6 +1,6 @@
 # Task 49: Saved addresses
 
-**Status:** 🚧 Backend built (2026-09-15): migration `0072_customer_addresses.sql` and `lib/addresses/`. The website's Addresses page and the booking flow's saved-address picker ship with Task 48.
+**Status:** ✅ Built (2026-09-15): migration `0072_customer_addresses.sql`, `lib/addresses/`, the Addresses screens (`/dashboard/settings/addresses`, `/new`, `/[id]`) and saved addresses on the booking flow's Address step. Waiting on `0072` being applied. On the Address step, only customer sessions are offered addresses, and when a postcode was already given only a saved address at that postcode is pre-filled.
 
 ## Why
 
@@ -37,8 +37,8 @@ The redesigned app has an Addresses screen (`mockups/05-account-settings.html`, 
 - [x] A postcode typed without its space is stored with it; a district on its own is refused
 - [x] Exactly one default whenever a customer has any addresses
 - [x] Account deletion removes them (`0077`)
-- [ ] Website Addresses page (Task 48)
-- [ ] The booking flow's Address step offers saved addresses (Task 48)
+- [x] Website Addresses page (Task 48)
+- [x] The booking flow's Address step offers saved addresses (Task 48)
 
 ## Mobile app
 

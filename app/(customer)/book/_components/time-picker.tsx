@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import {
   ALL_DAY_SLOT,
@@ -15,6 +15,7 @@ import {
   upcomingDayKeys,
 } from "@/lib/slots";
 import type { BookingTimeParams } from "@/lib/bookings/step-params";
+import { checkSlotAvailability } from "@/app/actions/slot-availability";
 
 // The day and arrival-window picker (Task 47), used by the Time step and by
 // Confirm when a window closes mid-checkout. Controlled: the parent owns the
@@ -56,19 +57,87 @@ export function isTimeOpen(value: TimeValue, now: Date): boolean {
   return !!value.slot && new Date(value.slot).getTime() - now.getTime() >= MIN_LEAD_MINUTES * 60_000;
 }
 
+// --- Mechanics per window (Task 54) -----------------------------------------
+//
+// "4 mechanics" under each window, for the day on screen near the booking's
+// postcode. A hint, never a gate: it never disables a window, and anything
+// short of a clean answer for that postcode (loading, an error, no postcode,
+// nobody free) shows nothing. Answers are kept per day, so paging back through
+// the day chips doesn't ask again.
+
+/** window label → mechanics free, or null when there's nothing to show that day. */
+type DayCounts = Record<string, number> | null;
+
+function mechanicsLabel(count: number): string {
+  return count === 1 ? "1 mechanic" : `${count} mechanics`;
+}
+
+function useMechanicCounts(day: string, area: string | null, enabled: boolean): DayCounts | undefined {
+  const [answers, setAnswers] = useState<Record<string, DayCounts>>({});
+  const asked = useRef(new Set<string>());
+  const key = area ? `${day}|${area}` : null;
+
+  useEffect(() => {
+    if (!enabled || !key || !area || asked.current.has(key)) return;
+    asked.current.add(key);
+    checkSlotAvailability(day, area)
+      .then((result): DayCounts => {
+        if (!result.ok || !result.areaChecked) return null;
+        const counts: Record<string, number> = {};
+        for (const w of result.windows) {
+          if (w.bookable && w.mechanics > 0) counts[w.window] = w.mechanics;
+        }
+        return counts;
+      })
+      .catch((): DayCounts => null)
+      .then((counts) => setAnswers((prev) => ({ ...prev, [key]: counts })));
+  }, [day, area, key, enabled]);
+
+  return key ? answers[key] : undefined;
+}
+
+/**
+ * The count under a window. The line is always there once counts are on, and
+ * fades in when there's a number, so the grid doesn't grow when the answer lands.
+ */
+function CountLine({ count, active }: { count: number | undefined; active: boolean }) {
+  const shown = typeof count === "number" && count > 0;
+  return (
+    <span
+      aria-hidden={!shown}
+      className={cn(
+        "block h-4 text-[12px] font-medium leading-4 transition-opacity duration-200",
+        shown ? "opacity-100" : "opacity-0",
+        active ? "text-brand-blue-dark" : "text-text-muted",
+      )}
+    >
+      {shown ? mechanicsLabel(count) : null}
+    </span>
+  );
+}
+
 interface TimePickerProps {
   value: TimeValue;
   onChange: (next: TimeValue) => void;
   now: Date;
+  /**
+   * The booking's postcode, for the mechanics count under each window. Leave
+   * it out and no counts are shown (the picker looks as it always has).
+   */
+  postcode?: string | null;
 }
 
-export function TimePicker({ value, onChange, now }: TimePickerProps) {
+export function TimePicker({ value, onChange, now, postcode }: TimePickerProps) {
   const days = upcomingDayKeys(now);
   const [selectedDay, setSelectedDay] = useState(() => {
     const chosen = value.slot ? londonDateKey(new Date(value.slot)) : null;
     if (chosen && days.includes(chosen)) return chosen;
     return days.find((day) => dayHasBookableSlot(day, now)) ?? days[0];
   });
+
+  const area = postcode?.trim().toUpperCase() || null;
+  const countsEnabled = Boolean(area);
+  const dayCounts = useMechanicCounts(selectedDay, area, !value.flexible);
 
   const openFlexDays = value.days.filter((day) => isSlotBookable(day, ALL_DAY_SLOT, now));
 
@@ -187,14 +256,20 @@ export function TimePicker({ value, onChange, now }: TimePickerProps) {
                   aria-pressed={active}
                   onClick={() => onChange({ flexible: false, days: [], slot: iso, window: slot.window })}
                   className={cn(
-                    "rounded-xl border px-3 py-3.5 text-center font-display text-[15px] font-extrabold transition-colors",
+                    "flex flex-col items-center gap-0.5 rounded-xl border px-3 text-center transition-colors",
+                    countsEnabled ? "py-2.5" : "py-3.5",
                     active
                       ? "border-brand-blue bg-blue-50 text-brand-blue-dark ring-1 ring-inset ring-brand-blue"
                       : "border-border bg-white text-text-primary hover:border-brand-blue/50",
-                    "disabled:cursor-not-allowed disabled:text-text-muted disabled:line-through disabled:opacity-50 disabled:hover:border-border",
+                    "disabled:cursor-not-allowed disabled:text-text-muted disabled:opacity-50 disabled:hover:border-border",
                   )}
                 >
-                  {slot.window}
+                  <span className={cn("font-display text-[15px] font-extrabold", !bookable && "line-through")}>
+                    {slot.window}
+                  </span>
+                  {countsEnabled && (
+                    <CountLine count={bookable ? dayCounts?.[slot.window] : undefined} active={active} />
+                  )}
                 </button>
               );
             })}
@@ -230,6 +305,9 @@ export function TimePicker({ value, onChange, now }: TimePickerProps) {
                   All day
                 </span>
                 <span className="text-[12px] text-text-muted">8am to 8pm, if you&apos;re flexible</span>
+                {countsEnabled && (
+                  <CountLine count={bookable ? dayCounts?.[ALL_DAY_SLOT.window] : undefined} active={active} />
+                )}
               </button>
             );
           })()}

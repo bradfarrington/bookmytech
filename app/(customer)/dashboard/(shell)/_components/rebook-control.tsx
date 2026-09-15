@@ -3,14 +3,14 @@
 import Link from "next/link";
 import { useState } from "react";
 import { RotateCcw } from "lucide-react";
+import { buttonClass } from "@/components/dashboard/ui";
+import { rebookHref } from "../_home/booking-logic";
 
 // One-tap rebook with a "same mechanic if available" preference (Task 11 Stage
-// 1). When we know the repair nodes we deep-link straight to the price/match
-// step with the vehicle + postcode pre-filled (skipping reg lookup / repair
-// browse) — every job of a multi-job booking comes along (Task 24); otherwise
-// (legacy service-era booking with no repair node) we fall back to the start
-// of the booking flow. Ticking "same mechanic" threads ?pref=<mechanicId>
-// through to /book/slot, which dispatchBooking uses to offer the job to that
+// 1). Where it goes is `rebookHref` (shared with Home's "Book again" link): the
+// match step with the vehicle and every repair filled in, or the start of the
+// booking flow for a legacy booking. Ticking "same mechanic" adds
+// ?pref=<mechanicId>, which dispatchBooking uses to offer the job to that
 // mechanic first.
 export function RebookControl({
   reg,
@@ -30,50 +30,36 @@ export function RebookControl({
   mechanicId: string | null;
   mechanicName: string | null;
   /**
-   * The card's other actions (raise / view dispute). They render on the SAME
-   * row as "Book again", with the preference tickbox on its own line beneath
-   * both. Previously the caller laid them out as siblings of this whole stack
-   * with `items-end`, which aligned the dispute button to the bottom of the
-   * stack — so it sat next to the tickbox rather than next to the button, and
-   * read as though the tickbox belonged to it.
+   * Other actions that sit on the SAME row as "Book again", with the
+   * preference tickbox on its own line beneath both, so the tickbox can't read
+   * as belonging to them.
    */
   children?: React.ReactNode;
 }) {
   const [sameMechanic, setSameMechanic] = useState(true);
 
-  let href: string;
-  if (repairNodeIds.length > 0) {
-    const params = new URLSearchParams({ reg, repairs: repairNodeIds.join(",") });
-    if (postcode) params.set("postcode", postcode);
-    if (make) params.set("make", make);
-    if (model) params.set("model", model);
-    if (mechanicId && sameMechanic) params.set("pref", mechanicId);
-    href = `/book/match?${params.toString()}`;
-  } else {
-    href = `/book?reg=${encodeURIComponent(reg)}`;
-  }
-
+  const href = rebookHref(
+    { vehicleReg: reg, postcode, repairNodeIds, vehicleMake: make, vehicleModel: model },
+    mechanicId && sameMechanic ? mechanicId : null,
+  );
   const canPreferMechanic = Boolean(mechanicId && repairNodeIds.length > 0);
 
   return (
     <div className="flex w-full flex-col gap-2.5">
       <div className="flex flex-wrap items-center gap-2">
-        <Link
-          href={href}
-          className="inline-flex h-9 items-center gap-1.5 rounded-button border border-brand-blue px-3.5 text-sm font-semibold text-brand-blue transition-colors hover:bg-blue-50"
-        >
-          <RotateCcw size={15} />
+        <Link href={href} className={buttonClass({ variant: "secondary", size: "md" })}>
+          <RotateCcw size={16} strokeWidth={2.2} aria-hidden />
           Book again
         </Link>
         {children}
       </div>
       {canPreferMechanic && (
-        <label className="flex w-fit cursor-pointer items-center gap-2 text-xs text-text-secondary">
+        <label className="flex w-fit cursor-pointer items-center gap-2 text-xs leading-4 text-text-secondary">
           <input
             type="checkbox"
             checked={sameMechanic}
             onChange={(e) => setSameMechanic(e.target.checked)}
-            className="size-3.5 rounded border-border text-brand-blue focus:ring-brand-blue/30"
+            className="size-4 rounded border-border accent-brand-blue"
           />
           Same mechanic if available
           {mechanicName ? ` (${mechanicName})` : ""}

@@ -1,5 +1,6 @@
 import { Star, MessageSquare, Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { isMissingColumn } from "@/lib/supabase/errors";
 import { KPI } from "@/components/ui/kpi";
 import { Stars } from "@/components/ui/stars";
 import { Overline } from "@/components/ui/overline";
@@ -14,22 +15,44 @@ function one<T>(value: T | T[] | null | undefined): T | null {
   return value ?? null;
 }
 
+const REVIEW_COLUMNS = `id, rating, tags, comment, mechanic_response, created_at, mechanic_id, booking_id,
+       booking:bookings(customer_name),
+       mechanic:mechanics(profile:profiles!inner(full_name))`;
+
+interface ReviewQueryRow {
+  id: string;
+  rating: number;
+  tags: unknown;
+  comment: string | null;
+  mechanic_response: string | null;
+  created_at: string;
+  mechanic_id: string;
+  booking_id: string;
+  booking: unknown;
+  mechanic: unknown;
+  /** Absent until migration 0074 is applied. */
+  is_public?: boolean | null;
+}
+
 export default async function AdminReviewsPage() {
   const supabase = await createClient();
 
   // Admins can read every review (RLS policy "Admins can view all reviews",
   // 0012). We join the booking for the customer's display name and the
   // mechanic's profile for their name.
-  const { data: rows, error } = await supabase
+  //
+  // `is_public` (Task 51) arrives with migration 0074. Until that's applied the
+  // column doesn't exist: read the reviews without it and hide the switches.
+  const withVisibility = await supabase
     .from("reviews")
-    .select(
-      `id, rating, tags, comment, mechanic_response, created_at, mechanic_id, booking_id,
-       booking:bookings(customer_name),
-       mechanic:mechanics(profile:profiles!inner(full_name))`,
-    )
+    .select(`${REVIEW_COLUMNS}, is_public`)
     .order("created_at", { ascending: false });
+  const visibilityAvailable = !isMissingColumn(withVisibility.error);
+  const { data: rows, error } = visibilityAvailable
+    ? withVisibility
+    : await supabase.from("reviews").select(REVIEW_COLUMNS).order("created_at", { ascending: false });
 
-  const reviews: AdminReviewRow[] = (rows ?? []).map((r) => {
+  const reviews: AdminReviewRow[] = ((rows ?? []) as unknown as ReviewQueryRow[]).map((r) => {
     const mechanic = one(
       r.mechanic as never as {
         profile?: { full_name?: string | null } | { full_name?: string | null }[];
@@ -49,6 +72,8 @@ export default async function AdminReviewsPage() {
       customerName:
         one(r.booking as never as { customer_name?: string })?.customer_name ??
         "Customer",
+      // Reviews publish by default (0074).
+      isPublic: r.is_public ?? true,
     };
   });
 
@@ -107,7 +132,7 @@ export default async function AdminReviewsPage() {
             />
           </div>
 
-          <ReviewsTable reviews={reviews} />
+          <ReviewsTable reviews={reviews} canSetVisibility={visibilityAvailable} />
         </>
       )}
     </div>
