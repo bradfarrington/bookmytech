@@ -80,7 +80,7 @@ const CREDIT_SOURCE_LABEL: Record<string, string> = {
 };
 
 function formatDate(iso: string | null): string {
-  if (!iso) return "—";
+  if (!iso) return "No date";
   return new Date(iso).toLocaleDateString("en-GB", {
     day: "numeric",
     month: "short",
@@ -253,7 +253,7 @@ export default async function CustomerDetailPage({
         <Stat label="Account credit" value={formatPrice(creditBalance)} />
         <Stat
           label="Avg rating given"
-          value={avgRating ? avgRating.toFixed(1) : "—"}
+          value={avgRating ? avgRating.toFixed(1) : "n/a"}
           hint={reviews.length ? `${reviews.length} review${reviews.length === 1 ? "" : "s"}` : undefined}
         />
       </div>
@@ -296,8 +296,8 @@ export default async function CustomerDetailPage({
               <h2 className="text-sm font-bold uppercase tracking-wide text-text-muted">
                 Contact
               </h2>
-              <Row icon={Mail} label="Email" value={email ?? (isDeleted ? "Removed on deletion" : "—")} />
-              <Row icon={Phone} label="Phone" value={profile.phone ?? "—"} />
+              <Row icon={Mail} label="Email" value={email ?? (isDeleted ? "Removed on deletion" : "Not set")} />
+              <Row icon={Phone} label="Phone" value={profile.phone ?? "Not set"} />
               <Row
                 icon={Calendar}
                 label="Last booking"
@@ -309,7 +309,7 @@ export default async function CustomerDetailPage({
               <h2 className="text-sm font-bold uppercase tracking-wide text-text-muted">
                 Referrals
               </h2>
-              <Row icon={Gift} label="Their referral code" value={profile.referral_code ?? "—"} />
+              <Row icon={Gift} label="Their referral code" value={profile.referral_code ?? "Not set"} />
               <Row
                 icon={Gift}
                 label="Referred by"
@@ -398,7 +398,7 @@ export default async function CustomerDetailPage({
                         </Link>
                         <p className="text-xs text-text-muted">
                           {b.job_number ? `${formatJobNumber(b.job_number)} · ` : ""}
-                          {b.vehicle_reg ?? "—"}
+                          {b.vehicle_reg ?? "No reg"}
                           {b.postcode ? ` · ${b.postcode}` : ""}
                         </p>
                       </td>
@@ -408,7 +408,7 @@ export default async function CustomerDetailPage({
                         </Pill>
                       </td>
                       <td className="px-5 py-3 text-text-secondary">
-                        {b.scheduled_at ? formatBookingWhen(b) : "—"}
+                        {b.scheduled_at ? formatBookingWhen(b) : "Not scheduled"}
                       </td>
                       <td className="px-5 py-3">
                         <span className="font-semibold text-text-primary">
@@ -440,7 +440,7 @@ export default async function CustomerDetailPage({
         (disputes.length === 0 ? (
           <EmptyState
             title="No disputes"
-            body="Disputes raised on this customer's jobs — by them or by the mechanic — will appear here."
+            body="Disputes raised on this customer's jobs, by them or by the mechanic, will appear here."
           />
         ) : (
           <div className="space-y-4">

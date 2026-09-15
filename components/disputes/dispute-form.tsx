@@ -171,7 +171,7 @@ export function DisputeForm({
             [
               { k: "full", label: `Full refund (${formatPrice(totalPence)})` },
               { k: "partial", label: "Partial refund" },
-              { k: "none", label: "Not after a refund — just flagging it" },
+              { k: "none", label: "Not after a refund, just flagging it" },
             ] as { k: RefundRequestKind; label: string }[]
           ).map((opt) => (
             <label key={opt.k} className="flex items-center gap-2.5 text-sm text-text-primary">

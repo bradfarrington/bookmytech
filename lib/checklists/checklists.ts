@@ -41,7 +41,7 @@ export function isValidResult(kind: ChecklistKind, result: string): result is Ch
 
 export function resultLabel(result: string | null | undefined): string {
   const found = [...SERVICE_RESULTS, ...INSPECTION_RESULTS].find((r) => r.value === result);
-  return found?.label ?? "—";
+  return found?.label ?? "Not answered";
 }
 
 // --- Rows, as the tables hold them -----------------------------------------
@@ -180,5 +180,5 @@ export function checklistProgress(
 /** The sentence completion is refused with, or null when the checklist is done. */
 export function unfinishedMessage(name: string, progress: ChecklistProgress): string | null {
   if (progress.unanswered <= 0) return null;
-  return `Finish the ${name} first — ${progress.unanswered} item${progress.unanswered === 1 ? " still needs" : "s still need"} an answer.`;
+  return `Finish the ${name} first: ${progress.unanswered} item${progress.unanswered === 1 ? " still needs" : "s still need"} an answer.`;
 }

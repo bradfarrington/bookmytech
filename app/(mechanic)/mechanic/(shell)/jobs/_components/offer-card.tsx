@@ -45,11 +45,11 @@ export function OfferCard({ offer }: { offer: OfferView }) {
       // picker is the first thing they see (Task 21). Anything else stays on
       // the feed.
       if (result.needsArrivalWindow && result.bookingId) {
-        toast.success("Job accepted — now pick an arrival window.");
+        toast.success("Job accepted. Now pick an arrival window.");
         router.push(`/mechanic/jobs/${result.bookingId}`);
         return;
       }
-      toast.success("Job accepted — it's yours.");
+      toast.success("Job accepted. It's yours.");
       router.refresh();
     });
   }

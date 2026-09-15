@@ -36,7 +36,7 @@ export function NeedsAttention({ data }: { data: NeedsAttentionData }) {
         <div className="flex items-start gap-2.5 rounded-xl bg-green-50 px-3.5 py-3">
           <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-green-600" />
           <p className="text-sm text-green-800">
-            All clear — no undersupplied areas, performance flags, or open
+            All clear: no undersupplied areas, performance flags, or open
             disputes right now.
           </p>
         </div>

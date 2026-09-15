@@ -56,8 +56,8 @@ export function OfferScreen(props: OfferScreenProps) {
         // The job page opens with the arrival-window picker for an all-day job.
         toast.success(
           res.needsArrivalWindow
-            ? "Job accepted — now pick an arrival window."
-            : "Job accepted — it's yours.",
+            ? "Job accepted. Now pick an arrival window."
+            : "Job accepted. It's yours.",
         );
         router.push(`/mechanic/jobs/${res.bookingId ?? bookingId}`);
       } else {
@@ -106,7 +106,7 @@ export function OfferScreen(props: OfferScreenProps) {
           <span className="relative inline-flex size-2.5 rounded-full bg-amber-500" />
         </span>
         <Zap size={15} className="shrink-0" />
-        First to accept wins — be quick.
+        First to accept wins. Be quick.
       </div>
 
       <div className="flex-1 space-y-4 overflow-y-auto p-4">

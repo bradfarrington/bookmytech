@@ -139,9 +139,9 @@ The current `app/globals.css` defines:
 Task 46 added, inside the same `@theme` (see the file for the full block):
 `--color-surface-dark`, `--font-display`, `--shadow-float`,
 `--background-image-brand-gradient-deep`, `--animate-ticker` and
-`--animate-live-pulse` with their keyframes. Outside `@theme`, three decorative
-`@utility` classes (`hero-glow`, `final-glow`, `coverage-blobs`) paint the
-marketing sections' light. They are page decoration, not tokens, and the mobile
+`--animate-live-pulse` with their keyframes. Outside `@theme`, two decorative
+`@utility` classes (`hero-glow`, `final-glow`) paint the gradient sections'
+light. They are page decoration, not tokens, and the mobile
 app does not mirror them.
 
 Adding a new token? Add a CSS variable inside `@theme`. The corresponding Tailwind utility is generated on next build.
@@ -211,7 +211,11 @@ The layout every customer marketing page follows, taken from `proposal/homepage-
 - **Buttons:** `primary` for the main CTA, `dark` for the nav CTA, `ghost` for secondary links, `secondary` with a white background on gradients. Bold labels (`font-bold`).
 - **Icon tiles:** 44px, `rounded-xl`, `bg-indigo-50 text-brand-blue` (solid `bg-brand-blue text-white` for a featured item).
 - **Grids:** collapse to one column around 900px; a row of cards may become a horizontal scroll-snap carousel below 561px.
-- **Copy rule:** a proposal's stats, prices, places and testimonials are placeholders. Every figure that ships must be real (live catalogue prices, confirmed areas) or already approved on the live site.
+- **Copy rules** (apply to all copy, not just marketing pages):
+  - **Only facts.** A proposal's stats, prices, places and testimonials are placeholders. Every figure and claim that ships must be backed by the product, the live catalogue or the customer terms (`app/(customer)/terms/content.ts`).
+  - **Never claim DBS checks.** They were removed from the platform; say "vetted" instead.
+  - **No testimonials** that aren't from real customers (DMCC Act 2024).
+  - **No em dashes (—)** in user-visible text. Use a comma, colon, full stop, parentheses, or "to" for ranges. Page titles separate with " | ". Show a word ("n/a", "Not set"), not a dash, for an empty value.
 
 ## UX principles (from the brief)
 

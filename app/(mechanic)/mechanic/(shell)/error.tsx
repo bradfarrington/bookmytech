@@ -23,7 +23,7 @@ export default function MechanicError({
   return (
     <ErrorState
       title="This screen didn't load"
-      description="Any job updates you've already saved are safe. This is usually a patchy connection — try again, and if it persists your jobs list should still work."
+      description="Any job updates you've already saved are safe. This is usually a patchy connection. Try again, and if it persists your jobs list should still work."
       error={error}
       retry={unstable_retry}
       homeHref="/mechanic/jobs"

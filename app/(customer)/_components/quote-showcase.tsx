@@ -36,7 +36,7 @@ export function QuoteShowcase() {
         <SectionHeading
           eyebrow="The price you see"
           title="Is the price you pay."
-          lead="Repairs are priced from the manufacturer's own repair times for your exact car — parts, labour and call-out in one figure, shown before you book."
+          lead="Repairs are priced from the manufacturer's own repair times for your exact car: parts, labour and call-out in one figure, shown before you book."
         />
 
         <Reveal className="mx-auto max-w-[980px] overflow-hidden rounded-3xl border border-border bg-white shadow-card">

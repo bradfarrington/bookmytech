@@ -92,7 +92,7 @@ export async function deleteFault(mechanicId: string, faultId: string): Promise<
     .maybeSingle();
   if (!fault) return { ok: false, error: "That fault no longer exists." };
   if (fault.mechanic_id !== mechanicId) return { ok: false, error: "This isn't your fault note." };
-  if (fault.quote_id) return { ok: false, error: "This fault has a quote against it — withdraw the quote first." };
+  if (fault.quote_id) return { ok: false, error: "This fault has a quote against it. Withdraw the quote first." };
   const { error } = await admin.from("booking_faults").delete().eq("id", faultId);
   if (error) return { ok: false, error: error.message };
   revalidate(fault.booking_id);
@@ -133,9 +133,9 @@ export async function createQuote(mechanicId: string, input: CreateQuoteInput): 
   if (kind === "now") {
     const existing = await loadQuotesForBooking(admin, booking.id);
     if (quoteMoney(existing).pendingNow)
-      return { ok: false, error: "A quote is already waiting on the customer — withdraw it before sending another." };
+      return { ok: false, error: "A quote is already waiting on the customer. Withdraw it before sending another." };
     if (revisionMoney(await loadRevisionsForBooking(admin, booking.id)).pending)
-      return { ok: false, error: "The revised job is still waiting on the customer — wait for their answer before quoting extra work." };
+      return { ok: false, error: "The revised job is still waiting on the customer. Wait for their answer before quoting extra work." };
   }
 
   // Catalogue parts: name + BMT price from the table.

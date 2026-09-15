@@ -35,7 +35,7 @@ export function vehicleLabel(
 // £45.99 is stored as 4599 pence. Formats with a £ prefix; whole-pound
 // amounts are shown without the trailing .00 (e.g. £45 not £45.00).
 export function formatPrice(pence: number): string {
-  if (!Number.isFinite(pence)) return "—";
+  if (!Number.isFinite(pence)) return "n/a";
   const pounds = pence / 100;
   return pounds % 1 === 0
     ? `£${pounds.toFixed(0)}`
@@ -67,10 +67,10 @@ export function slugify(input: string): string {
 
 // Formats a booking's sequential job number for display, zero-padded to at
 // least 5 digits: 1 → "00001", 42 → "00042", 123456 → "123456". Numbers only —
-// callers add any "#" or "Job " prefix in their own markup. Returns "—" when
+// callers add any "#" or "Job " prefix in their own markup. Returns "n/a" when
 // the number is missing (e.g. a legacy row the backfill hasn't reached).
 export function formatJobNumber(jobNumber: number | null | undefined): string {
-  if (jobNumber == null || !Number.isFinite(jobNumber)) return "—";
+  if (jobNumber == null || !Number.isFinite(jobNumber)) return "n/a";
   return String(Math.trunc(jobNumber)).padStart(5, "0");
 }
 

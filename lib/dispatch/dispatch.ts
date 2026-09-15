@@ -130,7 +130,7 @@ export async function dispatchBooking(bookingId: string): Promise<DispatchResult
       bookingId,
       jobCoords
         ? `No online mechanic has ${booking.postcode} inside their service radius (${mechanics.length} online checked).`
-        : `Couldn't place postcode "${booking.postcode}" on the map — it may be mistyped. Only mechanics based in district ${jobArea || "?"} could be matched, and none were online.`,
+        : `Couldn't place postcode "${booking.postcode}" on the map; it may be mistyped. Only mechanics based in district ${jobArea || "?"} could be matched, and none were online.`,
     );
     return { offered: 0, usedFallback };
   }

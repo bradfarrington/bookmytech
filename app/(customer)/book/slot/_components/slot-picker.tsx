@@ -89,11 +89,11 @@ interface CheckoutDraft {
 
 /** Shown when a discount code ran out between the hold and the booking. */
 const PROMO_GONE_NOTICE =
-  "That discount code was used up while you were checking out, so we couldn't apply it. Your card wasn't charged and we've released the hold — please book again.";
+  "That discount code was used up while you were checking out, so we couldn't apply it. Your card wasn't charged and we've released the hold. Please book again.";
 
 /** Shown on the picker when the customer is sent back to choose again. */
 const SLOT_PASSED_NOTICE =
-  "That arrival window has passed while you were checking out. Pick another time — your card is already authorised, so you won't need to enter it again.";
+  "That arrival window has passed while you were checking out. Pick another time. Your card is already authorised, so you won't need to enter it again.";
 
 /** `pi_3abc..._secret_xyz` → `pi_3abc...` */
 function intentIdFrom(clientSecret: string): string {
@@ -636,7 +636,7 @@ export function SlotPicker({
         <Loader2 size={28} className="animate-spin text-brand-blue" />
         <p className="text-base font-semibold text-text-primary">Confirming your booking…</p>
         <p className="text-sm text-text-secondary">
-          Your bank has approved the payment. Please don&apos;t close this page — we&apos;re
+          Your bank has approved the payment. Please don&apos;t close this page. We&apos;re
           finishing your booking now.
         </p>
       </div>
@@ -656,7 +656,7 @@ export function SlotPicker({
             </p>
             <p className="mt-1 text-sm text-amber-800">
               Your bank approved the payment, but something went wrong saving your job.
-              Please don&apos;t book again — get in touch and we&apos;ll sort it out and
+              Please don&apos;t book again. Get in touch and we&apos;ll sort it out and
               release the hold if you&apos;d rather start over. Nothing has actually been
               charged, and the hold releases itself within 7 days.
             </p>
@@ -670,8 +670,8 @@ export function SlotPicker({
                 className="font-semibold underline"
               >
                 help@bookmytech.co.uk
-              </a>{" "}
-              — we already know about this one and are looking at it.
+              </a>.{" "}
+              We already know about this one and are looking at it.
             </p>
           </div>
         </div>
@@ -868,7 +868,7 @@ export function SlotPicker({
 
         {!dayHasBookableSlot(selectedDay, now) && (
           <p className="mt-3 rounded-lg bg-surface px-4 py-3 text-sm text-text-secondary">
-            No more arrival windows today — pick another day above.
+            No more arrival windows today. Pick another day above.
           </p>
         )}
       </div>
@@ -929,7 +929,7 @@ export function SlotPicker({
                 You&apos;re signed in as {wrongRole === "mechanic" ? "a mechanic" : "an admin"}
               </p>
               <p className="mt-0.5 text-[13px] text-amber-800">
-                Staff accounts can&apos;t book — the job wouldn&apos;t show on a customer
+                Staff accounts can&apos;t book: the job wouldn&apos;t show on a customer
                 dashboard. Sign out to book (or test the flow) as a customer.
               </p>
             </div>
@@ -957,7 +957,7 @@ export function SlotPicker({
             </p>
             <p className="mt-0.5 text-[13px] text-text-muted">
               {accountMode === "signin"
-                ? "You've booked with us before — enter your password."
+                ? "You've booked with us before. Enter your password."
                 : "We'll create your account so you can track this job, message your mechanic and rebook in a tap."}
             </p>
           </div>
@@ -987,7 +987,7 @@ export function SlotPicker({
               type="tel"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
-              placeholder="Mobile number (optional — for text updates)"
+              placeholder="Mobile number (optional, for text updates)"
               autoComplete="tel"
               className={inputClass}
             />
@@ -1041,7 +1041,7 @@ export function SlotPicker({
 
       {availableCreditPence > 0 && (
         <p className="rounded-lg bg-green-50 px-4 py-3 text-sm font-medium text-success">
-          You have {formatPrice(availableCreditPence)} in credit — it&apos;ll be applied at the next step.
+          You have {formatPrice(availableCreditPence)} in credit. It&apos;ll be applied at the next step.
         </p>
       )}
 
@@ -1050,7 +1050,7 @@ export function SlotPicker({
       {appliedPromo ? (
           <p className="flex items-center gap-2 rounded-lg bg-green-50 px-4 py-3 text-sm font-medium text-success">
             <CheckCircle2 size={16} />
-            Code {appliedPromo} applied — the saving shows at the next step.
+            Code {appliedPromo} applied. The saving shows at the next step.
           </p>
       ) : promoOpen ? (
           <div className="flex gap-2">
@@ -1419,7 +1419,7 @@ function CheckoutForm({
         <p className="flex items-start gap-2 rounded-lg bg-green-50 px-4 py-3 text-sm font-medium text-success">
           <CheckCircle2 size={16} className="mt-0.5 shrink-0" />
           <span>
-            Your card is already authorised for {formatPrice(checkout.chargePence)} — nothing more
+            Your card is already authorised for {formatPrice(checkout.chargePence)}. Nothing more
             to enter. Confirm below to finish your booking.
           </span>
         </p>
@@ -1451,8 +1451,8 @@ function CheckoutForm({
             : `Pre-authorise ${formatPrice(checkout.chargePence)}`}
       </Button>
       <p className="text-center text-[11px] text-text-muted">
-        No money is taken now. Your card is pre-authorised only — charged when the job is complete.
-        {" "}Free to cancel more than 24 hours before your slot — see our{" "}
+        No money is taken now. Your card is pre-authorised only, charged when the job is complete.
+        {" "}Free to cancel more than 24 hours before your slot. See our{" "}
         <Link
           href="/cancellation-policy"
           target="_blank"
@@ -1526,7 +1526,7 @@ function FreeCheckoutForm({
       />
 
       <p className="rounded-lg bg-green-50 px-4 py-3 text-sm font-medium text-success">
-        Your account credit covers this booking in full — there&apos;s nothing to pay.
+        Your account credit covers this booking in full. There&apos;s nothing to pay.
       </p>
 
       {error && (

@@ -35,9 +35,9 @@ export function AreaStatusControl({
       } else {
         toast.success(
           value === "active"
-            ? "Area activated — now pricing bookings."
+            ? "Area activated. Now pricing bookings."
             : value === "paused"
-              ? "Area paused — no new bookings priced here."
+              ? "Area paused. No new bookings priced here."
               : "Area set to planned.",
         );
       }

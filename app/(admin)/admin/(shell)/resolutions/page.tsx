@@ -92,7 +92,7 @@ export default async function AdminResolutionsPage() {
                     </Link>
                   </td>
                   <td className="px-4 py-3 text-text-primary">
-                    {one(c.mechanic)?.full_name ?? "—"}
+                    {one(c.mechanic)?.full_name ?? "Unassigned"}
                   </td>
                   <td className="px-4 py-3 text-text-primary">
                     {c.reason_label}

@@ -125,16 +125,19 @@ You are working on **Book My Tech**, a UK mobile-mechanic booking platform. This
 
 - **Kept ours:** the nav links, the hero's GSAP live dispatch animation, and the footer content.
 - **New nav everywhere it's shared:** sticky and frosted, on `/`, `/help`, `/mechanics` and the legal pages. It renders **above** each page's hero, never inside it. Only the nav changed on those pages.
-- **Copy rewritten wherever the proposal invented facts:**
-  - live mechanic counts and six cities
-  - repair prices and a free MOT
-  - a picked, named mechanic
-  - a placeholder company number
+- **Only true copy:**
+  - no invented counts, ratings or prices
+  - **"DBS-checked" removed everywhere**, because DBS checks were dropped from the platform
+  - `/help`, `/mechanics` and the booking price page corrected: cancellation fees, verification, payout, warranty, "No fix, no fee"
+  - the ticker lists facts backed by the terms
+- **Areas:** all four live (London, Birmingham, Manchester, Bristol), on a real UK map.
+- **Reviews:** the placeholder reviews are gone (fake-review ban, DMCC Act 2024), replaced by a "For mechanics" recruitment section. A public reviews feed with an admin switch is scoped and **parked** in the Task 46 doc.
+- **No em dashes** in any user-visible copy: website, consoles, emails, SMS. Code comments keep theirs.
 - **Additive design tokens:** Inter Tight `font-display`, `surface-dark`, `brand-gradient-deep`, `shadow-float`, and ticker/pulse animations. No existing token changed. The "Marketing page pattern" in `docs/03-design-system.md` and `components/ui/section-heading.tsx` are what the next pages reuse.
 - **Owner:**
-  - confirm the areas: London live; Manchester, Birmingham and Bristol coming soon
-  - confirm the reviews and headline figures, which are carried over unchanged
-- **Mobile app:** mirror the four new tokens in `src/constants/theme.ts`. No API or schema change.
+  - Admin-customised email/SMS templates keep any dashes typed into them.
+  - The "Servicing" card advertises products that are still inactive.
+- **Mobile app:** mirror the four new tokens in `src/constants/theme.ts`. Some mobile error sentences changed punctuation only. No API or schema change.
 
 ### 2026-09-15 — Repair → parts linking, merged to `main` 🚧 (Task 45)
 

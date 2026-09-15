@@ -90,7 +90,7 @@ export default async function SmsLogsPage({
                   <td className="whitespace-nowrap px-5 py-3 font-medium text-text-primary">
                     {r.recipient_phone}
                   </td>
-                  <td className="max-w-md px-5 py-3 text-text-secondary">{r.message_body ?? "—"}</td>
+                  <td className="max-w-md px-5 py-3 text-text-secondary">{r.message_body ?? "No message"}</td>
                   <td className="px-5 py-3">
                     <span
                       className={cn(

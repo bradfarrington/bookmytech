@@ -72,7 +72,7 @@ async function runSweep() {
       booking_id: b.id,
       event_type: "note",
       actor_role: "system",
-      reason: `No mechanic accepted within ${STALL_MINUTES} minutes — needs attention.`,
+      reason: `No mechanic accepted within ${STALL_MINUTES} minutes. Needs attention.`,
       payload: { kind: "dispatch_stalled" },
     });
   }
@@ -82,7 +82,7 @@ async function runSweep() {
   const bookings = toFlag
     .map(
       (b) =>
-        `#${formatJobNumber(b.job_number)} · ${serviceName(b)} · ${b.area ?? b.postcode ?? "—"} · ${formatPrice(b.total_pence ?? 0)}`,
+        `#${formatJobNumber(b.job_number)} · ${serviceName(b)} · ${b.area ?? b.postcode ?? "No area"} · ${formatPrice(b.total_pence ?? 0)}`,
     )
     .join("|");
   const { subject, html } = await renderTemplateEmail("dispatch_stall_alert", {

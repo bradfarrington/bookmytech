@@ -102,7 +102,7 @@ function describe(e: ActivityEvent): { icon: LucideIcon; label: string; tone: To
       return { icon: MessageSquare, label: "Message sent", tone: "neutral" };
     case "note":
       return p.kind === "dispatch_stalled"
-        ? { icon: TriangleAlert, label: "Dispatch stalled — needs attention", tone: "error" }
+        ? { icon: TriangleAlert, label: "Dispatch stalled, needs attention", tone: "error" }
         : { icon: Activity, label: "Note added", tone: "neutral" };
     default:
       return { icon: Activity, label: e.eventType, tone: "neutral" };

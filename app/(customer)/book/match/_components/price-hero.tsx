@@ -58,7 +58,7 @@ function hours(n: number): string {
 
 function timeLabel(line: PriceHeroLine): string {
   if (line.product) return line.linePence != null ? `Fixed price · ${formatPrice(line.linePence)}` : "Fixed price";
-  if (line.chargedHours === 0) return "No extra time — covered by the other work";
+  if (line.chargedHours === 0) return "No extra time: covered by the other work";
   if (line.chargedHours < line.rawHours) return `${hours(line.chargedHours)} · reduced, overlaps with other work`;
   return hours(line.rawHours);
 }
@@ -157,8 +157,8 @@ export function PriceHero({
               </p>
               <p className="mt-0.5 text-xs text-blue-200">
                 {oil.source === "haynespro"
-                  ? "The manufacturer's stated capacity for your engine — included in the price above"
-                  : "Estimated — your mechanic adjusts it to what your engine takes"}
+                  ? "The manufacturer's stated capacity for your engine, included in the price above"
+                  : "Estimated: your mechanic adjusts it to what your engine takes"}
               </p>
             </div>
             <span className="shrink-0 font-semibold text-white">{formatPrice(oil.pence)}</span>
@@ -214,7 +214,8 @@ export function PriceHero({
         {[
           { icon: ShieldCheck, label: "Vetted professional" },
           { icon: Star, label: "12-month guarantee" },
-          { icon: Wrench, label: "No fix, no fee" },
+          // Not "No fix, no fee": an on-site diagnostic fee can apply (Task 37).
+          { icon: Wrench, label: "Extra work needs your OK" },
         ].map(({ icon: Icon, label }) => (
           <div
             key={label}
@@ -232,9 +233,8 @@ export function PriceHero({
       <div className="rounded-xl border border-border-subtle bg-surface p-4 text-sm text-text-secondary leading-relaxed">
         <p className="font-semibold text-text-primary">What happens next?</p>
         <p className="mt-1">
-          Once confirmed, we&apos;ll match you with the best available mechanic in
-          your area. You&apos;ll receive a confirmation email as soon as one accepts —
-          usually within minutes.
+          Once confirmed, your job is sent to vetted mechanics in your area.
+          You&apos;ll receive a confirmation email as soon as one accepts.
         </p>
       </div>
     </div>

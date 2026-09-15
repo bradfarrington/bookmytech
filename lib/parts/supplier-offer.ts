@@ -179,7 +179,7 @@ export function lkqOffers(
       const notes: string[] = [];
       if (row.supersededTo) notes.push(`Superseded to ${row.supersededTo}`);
       if (row.surchargePence != null) {
-        notes.push("Carries a surcharge — shown separately, not added to the cost");
+        notes.push("Carries a surcharge (shown separately, not added to the cost)");
       }
       if (!isBuyable(row)) notes.push("Not priced on this account");
 
@@ -234,7 +234,7 @@ export function aagOffers(
     const notes: string[] = [];
     if (line.lockout && !line.sellable) notes.push(`Locked out: ${line.lockout}`);
     if (line.surchargePence != null) {
-      notes.push("Carries a core charge — shown separately, not added to the cost");
+      notes.push("Carries a core charge (shown separately, not added to the cost)");
     }
     if (line.minOrderQty > 1) notes.push(`Minimum order ${line.minOrderQty}`);
 

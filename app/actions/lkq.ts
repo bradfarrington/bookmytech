@@ -128,7 +128,7 @@ export async function pingLkqAction(): Promise<
 
   const greeting = await helloFromLkq();
   if (!greeting) {
-    return { ok: false, error: "No reply from LKQ's pricing service — it looks unreachable." };
+    return { ok: false, error: "No reply from LKQ's pricing service; it looks unreachable." };
   }
   return { ok: true, message: greeting };
 }
@@ -182,7 +182,7 @@ export async function lookupVehicleCatalogueAction(input: {
     const missing = missingLkqEnv();
     return {
       ok: false,
-      error: `LKQ's catalogue isn't configured here — missing ${missing.ads.join(", ")}.`,
+      error: `LKQ's catalogue isn't configured here (missing ${missing.ads.join(", ")}).`,
     };
   }
 

@@ -187,7 +187,7 @@ const CATALOGUE_UNAVAILABLE: CatalogueFailure = {
   code: "vehicle_not_matched",
   retryable: true,
   message:
-    "We can't price repairs online at the moment — that's a problem on our " +
+    "We can't price repairs online at the moment. That's a problem on our " +
     "side, not with your registration. Please get in touch and we'll sort it " +
     "for you, or try again a little later.",
 };

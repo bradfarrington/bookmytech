@@ -36,7 +36,7 @@ export function revisionRefusal(
 ): string | null {
   if (revision.status === "approved") return null; // idempotent approve handled by the caller
   if (revision.status !== "sent") return "This revised job is no longer open.";
-  if (isRevisionExpired(revision, now)) return "This revised job has expired — ask your mechanic to send it again.";
+  if (isRevisionExpired(revision, now)) return "This revised job has expired. Ask your mechanic to send it again.";
   if (!REVISABLE_STATUSES.includes(bookingStatus))
     return "This job is no longer in progress, so the revised job can't be approved.";
   return null;

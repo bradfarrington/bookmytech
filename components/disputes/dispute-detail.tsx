@@ -131,7 +131,7 @@ export function DisputeDetail({
         <div className="flex flex-wrap gap-3">
           {canWithdraw && (
             <Button variant="secondary" onClick={() => run(() => withdrawDispute(data.disputeId))} disabled={pending} iconLeft={pending ? Loader2 : undefined}>
-              {data.openedByRole === viewerRole ? "Withdraw — we've sorted it" : "Close dispute"}
+              {data.openedByRole === viewerRole ? "Withdraw (we've sorted it)" : "Close dispute"}
             </Button>
           )}
           {canEscalate && (

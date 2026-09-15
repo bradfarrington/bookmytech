@@ -56,7 +56,7 @@ function insuranceItem(
       key,
       label,
       verdict: "manual",
-      note: `File is ${(size / 1024 / 1024).toFixed(1)} MB (over 5 MB) — review manually.`,
+      note: `File is ${(size / 1024 / 1024).toFixed(1)} MB (over 5 MB). Review manually.`,
       docColumn: key,
     };
   }
@@ -69,7 +69,7 @@ function presenceItem(
   path: string | null,
 ): ChecklistItemResult {
   return path
-    ? { key, label, verdict: "manual", note: "File present — verify contents.", docColumn: key }
+    ? { key, label, verdict: "manual", note: "File present. Verify contents.", docColumn: key }
     : { key, label, verdict: "fail", note: "No file uploaded.", docColumn: key };
 }
 

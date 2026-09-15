@@ -50,8 +50,8 @@ export function ArrivalWindowPicker({ bookingId, days }: ArrivalWindowPickerProp
       if (res.ok) {
         toast.success(
           multiDay
-            ? "Day and arrival window confirmed — the customer's been told."
-            : "Arrival window confirmed — the customer's been told.",
+            ? "Day and arrival window confirmed. The customer's been told."
+            : "Arrival window confirmed. The customer's been told.",
         );
       } else {
         toast.error(res.error);
@@ -83,8 +83,8 @@ export function ArrivalWindowPicker({ bookingId, days }: ArrivalWindowPickerProp
           </h2>
           <p className="mt-0.5 text-sm text-text-secondary">
             {multiDay
-              ? "The customer is happy with any of these days. Choose the day and the 2-hour window you'll arrive in — they'll be told straight away."
-              : "The customer booked all day. Choose the 2-hour window you'll arrive in — they'll be told straight away. You can also leave it as all day."}
+              ? "The customer is happy with any of these days. Choose the day and the 2-hour window you'll arrive in. They'll be told straight away."
+              : "The customer booked all day. Choose the 2-hour window you'll arrive in. They'll be told straight away. You can also leave it as all day."}
           </p>
         </div>
       </div>
@@ -146,7 +146,7 @@ export function ArrivalWindowPicker({ bookingId, days }: ArrivalWindowPickerProp
             <p className="flex items-center gap-1.5">
               <TriangleAlert size={12} className="shrink-0 text-amber-600" />
               You also have {options.allDayJobs.map((j) => `#${j.jobNumber}`).join(", ")} booked as all
-              day{multiDay ? ` on ${dayLabel}` : ""} — plan around{" "}
+              day{multiDay ? ` on ${dayLabel}` : ""}. Plan around{" "}
               {options.allDayJobs.length === 1 ? "it" : "them"}.
             </p>
           )}
@@ -223,9 +223,9 @@ export function ArrivalWindowPicker({ bookingId, days }: ArrivalWindowPickerProp
         <p className="rounded-lg bg-surface-card px-4 py-3 text-sm text-text-secondary">
           {multiDay
             ? anyDaySelectable
-              ? "No windows left on this day — pick another day above."
-              : "No windows left on any of the offered days — the job stays open."
-            : "No windows left today — the job stays all day."}
+              ? "No windows left on this day. Pick another day above."
+              : "No windows left on any of the offered days. The job stays open."
+            : "No windows left today. The job stays all day."}
         </p>
       )}
     </Card>

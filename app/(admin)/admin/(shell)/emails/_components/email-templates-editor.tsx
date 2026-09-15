@@ -143,7 +143,7 @@ function TemplateCard({ template }: { template: EmailTemplateRow }) {
         setEnabled(!next);
         toast.error(res.error);
       } else {
-        toast.success(next ? `"${template.label}" is on.` : `"${template.label}" is off — it won't send.`);
+        toast.success(next ? `"${template.label}" is on.` : `"${template.label}" is off. It won't send.`);
       }
     });
   }

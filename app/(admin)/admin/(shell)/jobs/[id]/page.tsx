@@ -243,8 +243,8 @@ export default async function BookingDetailPage({ params }: PageProps) {
         <div className="space-y-6 lg:col-span-2">
           <Card className="space-y-4 p-6">
             <CardTitle icon={User}>Customer</CardTitle>
-            <Row icon={User} label="Name" value={booking.customer_name ?? "—"} />
-            <Row icon={Mail} label="Email" value={booking.customer_email ?? "—"} />
+            <Row icon={User} label="Name" value={booking.customer_name ?? "Not given"} />
+            <Row icon={Mail} label="Email" value={booking.customer_email ?? "Not given"} />
           </Card>
 
           <Card className="space-y-4 p-6">
@@ -257,7 +257,7 @@ export default async function BookingDetailPage({ params }: PageProps) {
                 [booking.vehicle_make, booking.vehicle_model].filter(Boolean).join(" "),
               ]
                 .filter(Boolean)
-                .join(" · ") || "—"}
+                .join(" · ") || "Not given"}
             />
             <Row
               icon={Wrench}
@@ -306,13 +306,13 @@ export default async function BookingDetailPage({ params }: PageProps) {
             <Row
               icon={CalendarClock}
               label="Scheduled"
-              value={booking.scheduled_at ? formatBookingWhen(booking) : "—"}
+              value={booking.scheduled_at ? formatBookingWhen(booking) : "Not scheduled"}
             />
             {isFlexibleBooking(booking) && (
               <Row
                 icon={CalendarClock}
                 label="Days offered"
-                value={`${formatCandidateDays([...(booking.candidate_days as string[])].sort())} — the mechanic picks one and a 2-hour window`}
+                value={`${formatCandidateDays([...(booking.candidate_days as string[])].sort())} (the mechanic picks one and a 2-hour window)`}
               />
             )}
             <Row
@@ -453,7 +453,7 @@ export default async function BookingDetailPage({ params }: PageProps) {
                               {r?.comment && <p className="mt-0.5 text-xs text-text-muted">{r.comment}</p>}
                             </div>
                             <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${tone}`}>
-                              {r ? resultLabel(r.result) : "—"}
+                              {r ? resultLabel(r.result) : "Not answered"}
                             </span>
                           </li>
                         );
@@ -472,12 +472,12 @@ export default async function BookingDetailPage({ params }: PageProps) {
               label="Address"
               value={[booking.address_line_1, booking.address_line_2, booking.postcode]
                 .filter(Boolean)
-                .join(", ") || "—"}
+                .join(", ") || "Not given"}
             />
             <Row
               icon={MapPin}
               label="Parking"
-              value={booking.parking_type ? PARKING_LABEL[booking.parking_type] ?? booking.parking_type : "—"}
+              value={booking.parking_type ? PARKING_LABEL[booking.parking_type] ?? booking.parking_type : "Not given"}
             />
             {booking.special_instructions && (
               <Row icon={ListChecks} label="Instructions" value={booking.special_instructions} />
@@ -561,7 +561,7 @@ export default async function BookingDetailPage({ params }: PageProps) {
               parts they front.{" "}
               {split.snapshot
                 ? "Locked at booking time."
-                : "Estimated — predates the pricing snapshot."}{" "}
+                : "Estimated: predates the pricing snapshot."}{" "}
               Paid out automatically on completion.
             </p>
           </Card>

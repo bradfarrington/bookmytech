@@ -87,7 +87,7 @@ function serviceName(b: CommsBooking): string {
 function customerVars(b: CommsBooking): Record<string, string> {
   const vehicle = [b.vehicle_reg, [b.vehicle_make, b.vehicle_model].filter(Boolean).join(" ")]
     .filter(Boolean)
-    .join(" — ");
+    .join(", ");
   const when = b.scheduled_at
     ? new Date(b.scheduled_at).toLocaleString("en-GB", {
         weekday: "long",
@@ -461,7 +461,7 @@ export async function sendCaseCustomerEmail(input: SendCaseEmailInput): Promise<
     admin,
     input.caseId,
     guard.userId,
-    `✉️ Emailed the customer (${auditLabel}) — subject: "${subject}".`,
+    `✉️ Emailed the customer (${auditLabel}). Subject: "${subject}".`,
   );
 
   revalidatePath(`/admin/resolutions/${input.caseId}`);
@@ -497,7 +497,7 @@ export async function sendCaseCustomerSms(input: SendCaseSmsInput): Promise<Simp
 
   const sent = await sendSms({ to: booking.customer_phone, body });
   if (!sent)
-    return { ok: false, error: "SMS didn't send — check SMS is enabled and has credits." };
+    return { ok: false, error: "SMS didn't send. Check SMS is enabled and has credits." };
 
   await logCaseNote(
     admin,

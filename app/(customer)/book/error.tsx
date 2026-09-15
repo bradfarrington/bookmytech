@@ -25,7 +25,7 @@ export default function BookError({
   return (
     <ErrorState
       title="We couldn't finish that step"
-      description="Something went wrong partway through your booking. You have not been charged — a card is only ever charged once a job is complete. Try again, or get in touch and we'll book it for you."
+      description="Something went wrong partway through your booking. You have not been charged: a card is only ever charged once a job is complete. Try again, or get in touch and we'll book it for you."
       error={error}
       retry={unstable_retry}
       homeHref="/book"

@@ -147,7 +147,7 @@ export async function lookupAagPanel(reg: string, group: PartGroupMapping): Prom
     return {
       state: "not_mapped",
       message:
-        "We can't ask Alliance Automotive for this part — we don't yet know which of their product groups matches it.",
+        "We can't ask Alliance Automotive for this part. We don't yet know which of their product groups matches it.",
     };
   }
 

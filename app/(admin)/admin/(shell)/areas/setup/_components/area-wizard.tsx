@@ -227,7 +227,7 @@ export function AreaWizard() {
               />
             </div>
             <span className="text-xs font-normal text-text-muted">
-              Planned paid-acquisition spend for the launch. Informational — drives
+              Planned paid-acquisition spend for the launch. Informational: drives
               the launch plan, not billing.
             </span>
           </label>
@@ -252,7 +252,7 @@ export function AreaWizard() {
               <ul className="mt-2 space-y-1 text-xs text-text-muted">
                 <li>{prefixes.length} postcode prefixes · ×{Number(multiplier).toFixed(3)} labour</li>
                 <li>
-                  Target {targetMechanics || "—"} mechanics
+                  {targetMechanics ? `Target ${targetMechanics} mechanics` : "No mechanic target set"}
                   {budget ? ` · ${formatPrice(Math.round(Number(budget) * 100))} acquisition` : ""}
                 </li>
                 <li>Save as planned to recruit first, or activate to start pricing bookings now.</li>

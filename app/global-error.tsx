@@ -43,7 +43,7 @@ export default function GlobalError({
             "Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif",
         }}
       >
-        <title>Something went wrong — Book My Tech</title>
+        <title>Something went wrong | Book My Tech</title>
 
         <main style={{ maxWidth: "420px", textAlign: "center" }}>
           <div
@@ -85,7 +85,7 @@ export default function GlobalError({
             }}
           >
             Book My Tech hit an unexpected problem. Nothing you&apos;ve booked is
-            affected — this is a display error on our side.
+            affected. This is a display error on our side.
           </p>
 
           <div

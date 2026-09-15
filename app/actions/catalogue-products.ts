@@ -212,7 +212,7 @@ export async function deleteProduct(id: string): Promise<ProductResult> {
     admin.from("booking_repairs").select("id", { count: "exact", head: true }).eq("node_id", nodeId),
   ]);
   if ((bookings ?? 0) > 0 || (lines ?? 0) > 0)
-    return { ok: false, error: "Bookings reference this product — switch it off instead of deleting it." };
+    return { ok: false, error: "Bookings reference this product. Switch it off instead of deleting it." };
   const { error } = await admin.from("catalogue_products").delete().eq("id", id);
   if (error) return { ok: false, error: error.message };
   revalidate();

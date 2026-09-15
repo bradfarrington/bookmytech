@@ -201,7 +201,7 @@ async function postAds(
         state: authish ? "auth_failed" : "unreachable",
         errorCode: String(res.status),
         detail: authish
-          ? "The LKQ catalogue rejected our API key — it must be sent in an `ApiKey` header."
+          ? "The LKQ catalogue rejected our API key. It must be sent in an `ApiKey` header."
           : `The LKQ catalogue responded HTTP ${res.status}.`,
         endpoint: url,
       });

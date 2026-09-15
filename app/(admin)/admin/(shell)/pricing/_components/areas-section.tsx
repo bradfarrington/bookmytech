@@ -118,7 +118,7 @@ function AreaRow({ area }: { area: AreaRowData }) {
       </button>
       {isDefault ? (
         <span className="text-center text-text-disabled" title="The Default area can't be deleted">
-          —
+          n/a
         </span>
       ) : (
         <button

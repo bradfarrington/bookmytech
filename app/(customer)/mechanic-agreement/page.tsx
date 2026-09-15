@@ -5,9 +5,9 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { PREAMBLE, buildSections } from "./content";
 
 export const metadata: Metadata = {
-  title: "Mechanic Terms & Conditions — Book My Tech",
+  title: "Mechanic Terms & Conditions | Book My Tech",
   description:
-    "The terms mechanics work under on Book My Tech — vetting, independent status, bookings, additional work, the platform fee, warranty duties, conduct, and suspension or removal.",
+    "The terms mechanics work under on Book My Tech: vetting, independent status, bookings, additional work, the platform fee, warranty duties, conduct, and suspension or removal.",
 };
 
 // Public so an applicant can read the terms BEFORE applying, which is the point
@@ -27,7 +27,7 @@ export default async function MechanicTermsPage() {
     <LegalPage
       eyebrow="Legal"
       title="Mechanic Terms & Conditions"
-      intro="The terms you work under as an independent mechanic on Book My Tech — how bookings, additional work, the platform fee, the warranty and our standards work."
+      intro="The terms you work under as an independent mechanic on Book My Tech: how bookings, additional work, the platform fee, the warranty and our standards work."
       lastUpdated="26 August 2026"
       preamble={PREAMBLE}
       sections={buildSections(takeRate)}

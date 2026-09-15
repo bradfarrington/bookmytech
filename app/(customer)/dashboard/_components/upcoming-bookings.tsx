@@ -218,7 +218,7 @@ function UpcomingRow({
                   released.
                 </>
               ) : (
-                <>No cancellation fee applies — your full pre-authorisation is released.</>
+                <>No cancellation fee applies. Your full pre-authorisation is released.</>
               )}
             </p>
           ) : (

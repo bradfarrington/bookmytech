@@ -113,7 +113,7 @@ export default async function MechanicJobDetailPage({ params }: PageProps) {
     const job: LatLng | null = await geocodePostcode(booking.postcode);
     if (base && job) distanceMiles = haversineMiles(base, job);
   }
-  const distanceLabel = distanceMiles != null ? `${distanceMiles.toFixed(1)} mi` : "—";
+  const distanceLabel = distanceMiles != null ? `${distanceMiles.toFixed(1)} mi` : "Unknown";
 
   // --- Timeline (assigned jobs only; offered-but-unassigned have no access) -
   const { data: eventRows } = await supabase
@@ -173,7 +173,7 @@ export default async function MechanicJobDetailPage({ params }: PageProps) {
   if (distanceMiles != null) {
     matchReasons.push({
       label: "Close to you",
-      detail: `${distanceMiles.toFixed(1)} mi from your base — inside your ${radiusMiles}-mile area`,
+      detail: `${distanceMiles.toFixed(1)} mi from your base, inside your ${radiusMiles}-mile area`,
     });
   } else {
     matchReasons.push({
@@ -225,7 +225,7 @@ export default async function MechanicJobDetailPage({ params }: PageProps) {
       : null;
 
   const address =
-    [booking.address_line_1, booking.address_line_2, booking.postcode].filter(Boolean).join(", ") || "—";
+    [booking.address_line_1, booking.address_line_2, booking.postcode].filter(Boolean).join(", ") || "Not given";
 
   const detail: JobDetailProps = {
     bookingId: booking.id,

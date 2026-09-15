@@ -3,36 +3,38 @@ import { SectionHeading } from "@/components/ui/section-heading";
 
 type FaqItem = { question: string; answer: string };
 
+// Every answer must match the customer terms (app/(customer)/terms/content.ts).
+// DBS checks were removed from the platform: never claim them.
 const FAQS: FaqItem[] = [
   {
     question: "How are mechanics vetted?",
     answer:
-      "Every mechanic on Book My Tech is DBS-checked, fully insured, and holds a recognised trade qualification. We verify documents directly with the issuing bodies before they take their first job.",
+      "Every mechanic is vetted before they join Book My Tech. We check their ID, insurance and trade qualifications, and a mechanic whose insurance lapses is taken offline until it's renewed.",
   },
   {
     question: "What if I'm not happy with the work?",
     answer:
-      "Every job is backed by a 12-month parts and labour guarantee. If something isn't right, message us in-app and we'll send a mechanic back at no extra charge.",
+      "Eligible repairs are covered by our warranty on parts and labour for 12 months or 12,000 miles, whichever comes first. If something isn't right, contact us and we'll look into it under the warranty.",
   },
   {
     question: "Do I pay upfront?",
     answer:
-      "No. We pre-authorise the payment when you book, but we only charge you when the job is finished and you've confirmed it's been done properly.",
+      "No. Your card is pre-authorised when you book, and you're only charged when your mechanic completes the job. If they find extra work, nothing more is done or charged unless you approve it.",
   },
   {
     question: "What areas do you cover?",
     answer:
-      "We're live across Greater London, with Manchester, Birmingham and Bristol coming soon. Enter your reg and postcode at the top of the page to get started.",
+      "We're live across Greater London, Birmingham, Manchester and Bristol. Enter your reg and postcode at the top of the page to get started.",
   },
   {
     question: "What if the mechanic can't fix the problem?",
     answer:
-      "A diagnostic inspection is a set price (from £59.99). Your mechanic finds the fault, tells you what it needs and quotes for the repair — you decide whether to go ahead.",
+      "A diagnostic inspection is a set price (from £59.99). Your mechanic finds the fault, tells you what it needs and quotes for the repair, and you decide whether to go ahead.",
   },
   {
     question: "Is the price I see the price I pay?",
     answer:
-      "Yes. Our quotes include parts, labour and call-out — no hidden fees. If the job turns out to be different from what we quoted, we'll talk you through it before any work begins.",
+      "Yes, for the job you booked: parts, labour and call-out, with no hidden fees. If your mechanic finds the car needs something different, they'll send you the new price to approve before any extra work is done.",
   },
 ];
 

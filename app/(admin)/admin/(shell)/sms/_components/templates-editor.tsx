@@ -116,7 +116,7 @@ function TemplateCard({ template }: { template: TemplateRow }) {
         setEnabled(!next);
         toast.error(res.error);
       } else {
-        toast.success(next ? `"${template.label}" is on.` : `"${template.label}" is off — it won't send.`);
+        toast.success(next ? `"${template.label}" is on.` : `"${template.label}" is off. It won't send.`);
       }
     });
   }
@@ -185,7 +185,7 @@ function TemplateCard({ template }: { template: TemplateRow }) {
 
       <div className="rounded-button bg-surface px-3 py-2">
         <p className="text-[10px] font-semibold uppercase tracking-wide text-text-muted">Preview</p>
-        <p className="mt-0.5 text-sm text-text-secondary">{preview || "—"}</p>
+        <p className="mt-0.5 text-sm text-text-secondary">{preview || "Nothing to preview"}</p>
       </div>
 
       <div className="flex items-center gap-2">

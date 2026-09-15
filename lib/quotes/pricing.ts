@@ -132,9 +132,9 @@ export function priceQuoteLines(
   });
 
   const totalPence = labourPence + partsPence;
-  if (totalPence <= 0) return { ok: false, error: "The quote comes to £0 — add a price to at least one line." };
+  if (totalPence <= 0) return { ok: false, error: "The quote comes to £0. Add a price to at least one line." };
   if (totalPence > MAX_QUOTE_PENCE)
-    return { ok: false, error: `That's over £${MAX_QUOTE_PENCE / 100} — check the prices.` };
+    return { ok: false, error: `That's over £${MAX_QUOTE_PENCE / 100}. Check the prices.` };
 
   return {
     ok: true,

@@ -96,7 +96,7 @@ export function RemindersForm({
       <Toggle
         name="reminder_via_sms"
         label="Text message"
-        hint="SMS reminders are rolling out soon — turn this on to opt in."
+        hint="SMS reminders are rolling out soon. Turn this on to opt in."
         checked={sms}
         onChange={setSms}
         disabled={!enabled}

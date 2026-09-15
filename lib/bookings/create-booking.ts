@@ -486,11 +486,11 @@ export async function createBooking(
   ].filter(Boolean);
   const payLine =
     mode === "free"
-      ? `Covered in full (${formatPrice(price.totalPence)}${reductions.length ? ` — ${reductions.join(" and ")}` : ""}). Nothing to pay.`
+      ? `Covered in full (${formatPrice(price.totalPence)}${reductions.length ? `: ${reductions.join(" and ")}` : ""}). Nothing to pay.`
       : `Amount pre-authorised${reductions.length ? ` (after ${reductions.join(" and ")})` : ""}: ${formatPrice(chargedPence)}`;
   // UK time explicitly — this runs on a UTC server, and "6pm" in BST is 17:00Z.
   const whenLabel = candidateDays
-    ? `Any of ${formatCandidateDays(candidateDays)} · All day — your mechanic will confirm the day`
+    ? `Any of ${formatCandidateDays(candidateDays)} · All day (your mechanic will confirm the day)`
     : `${new Date(scheduledAt).toLocaleDateString("en-GB", {
         weekday: "long",
         day: "numeric",
@@ -505,7 +505,7 @@ export async function createBooking(
               timeZone: BOOKING_TIME_ZONE,
             })}`
       }`;
-  const vehicleLabel = `${vehicleReg ? `${vehicleReg} — ` : ""}${vehicleMake}${
+  const vehicleLabel = `${vehicleReg ? `${vehicleReg}, ` : ""}${vehicleMake}${
     vehicleModel ? ` ${vehicleModel}` : ""
   }`;
   renderTemplateEmail("booking_confirmed", {
@@ -653,7 +653,7 @@ export async function prepareCheckoutFor(
       // is captured days later. Both funnels collect a card and nothing else:
       // the website's PaymentElement and the app's PaymentSheet.
       payment_method_types: ["card"],
-      description: `Book My Tech — ${ids.length > 1 ? `${ids.length} repairs` : "repair"} pre-authorisation`,
+      description: `Book My Tech: ${ids.length > 1 ? `${ids.length} repairs` : "repair"} pre-authorisation`,
       // Who this hold belongs to, so it can be proved later. Nothing reads it
       // during checkout — it exists for lib/stripe/release-hold.ts, which
       // cancels a hold the customer abandoned and must confirm the intent is

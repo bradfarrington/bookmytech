@@ -145,10 +145,10 @@ export async function sendTestSms(phone: string): Promise<SmsResult> {
 
   const sent = await sendSms({
     to: trimmed,
-    body: "Test SMS from Book My Tech — your SMS notifications are working.",
+    body: "Test SMS from Book My Tech. Your SMS notifications are working.",
   });
   if (!sent)
-    return { ok: false, error: "Twilio rejected the message — check the number and sender." };
+    return { ok: false, error: "Twilio rejected the message. Check the number and sender." };
 
   revalidatePath("/admin/sms");
   return { ok: true };
@@ -181,7 +181,7 @@ export async function sendCustomSms(input: {
 
   const sent = await sendSms({ to, body });
   if (!sent)
-    return { ok: false, error: "Twilio rejected the message — check the number and sender." };
+    return { ok: false, error: "Twilio rejected the message. Check the number and sender." };
 
   revalidatePath("/admin/sms");
   return { ok: true };

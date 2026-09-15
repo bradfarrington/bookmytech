@@ -250,8 +250,8 @@ export function JobDetail(props: JobDetailProps) {
           {/* Customer */}
           <Card className="space-y-4 p-6">
             <CardTitle icon={User}>Customer</CardTitle>
-            <Row icon={User} label="Name" value={customerName || "—"} />
-            <Row icon={MapPin} label="Address" value={address || "—"} />
+            <Row icon={User} label="Name" value={customerName || "Not given"} />
+            <Row icon={MapPin} label="Address" value={address || "Not given"} />
             <div className="flex items-start gap-3">
               <Phone size={16} className="mt-1 shrink-0 text-text-muted" />
               <div className="min-w-0 flex-1">
@@ -359,13 +359,13 @@ export function JobDetail(props: JobDetailProps) {
               <CardTitle icon={Clock}>Can&apos;t finish today?</CardTitle>
               <ol className="list-decimal space-y-1 pl-5 text-sm text-text-secondary">
                 <li>
-                  <strong className="text-text-primary">Trim today&apos;s job</strong> — in <em>Change what&apos;s being done</em> below, remove what you won&apos;t get to; the customer approves and pays only for that.
+                  <strong className="text-text-primary">Trim today&apos;s job</strong>: in <em>Change what&apos;s being done</em> below, remove what you won&apos;t get to; the customer approves and pays only for that.
                 </li>
                 <li>
                   <strong className="text-text-primary">Complete &amp; charge</strong> as normal.
                 </li>
                 <li>
-                  <strong className="text-text-primary">Quote the rest</strong> — the job page then offers a follow-on quote pre-filled with what you took off; the customer books the return visit and you&apos;re offered it first.
+                  <strong className="text-text-primary">Quote the rest</strong>: the job page then offers a follow-on quote pre-filled with what you took off; the customer books the return visit and you&apos;re offered it first.
                 </li>
               </ol>
               <div className="flex flex-wrap gap-2">

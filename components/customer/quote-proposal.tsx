@@ -27,7 +27,7 @@ export function QuoteProposal({ quote, compact = false }: { quote: PendingQuoteS
         </p>
         <p className="mt-0.5 text-xs text-text-secondary">
           {quote.title ? `${quote.title} · ` : ""}
-          {quote.kind === "follow_on" ? "A return visit" : "Extra work on this job"} — review and approve, or decline.
+          {quote.kind === "follow_on" ? "A return visit" : "Extra work on this job"}: review and approve, or decline.
           Nothing is charged until you approve.
         </p>
       </div>

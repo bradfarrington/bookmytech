@@ -21,7 +21,7 @@ export default function CustomerError({
   return (
     <ErrorState
       title="Something went wrong"
-      description="We hit a problem loading this page. Nothing you've done has been lost — try again, and if it keeps happening let us know."
+      description="We hit a problem loading this page. Nothing you've done has been lost. Try again, and if it keeps happening let us know."
       error={error}
       retry={unstable_retry}
     />

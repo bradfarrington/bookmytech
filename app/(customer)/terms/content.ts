@@ -424,7 +424,7 @@ export function buildSections(tiers: CancelFeeTiers): LegalSection[] {
           ["Mechanic has already started travelling to customer", fee(tiers.enRoute)],
           [
             "Mechanic arrives, finds the booked repair is not what the vehicle needs, and you decline the revised work",
-            `${fee(tiers.diagnostic)} on-site diagnostic fee, or the fee above — whichever the mechanic applies`,
+            `${fee(tiers.diagnostic)} on-site diagnostic fee, or the fee above, whichever the mechanic applies`,
           ],
         ],
       },

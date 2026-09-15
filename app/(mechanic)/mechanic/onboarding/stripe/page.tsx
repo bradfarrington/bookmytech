@@ -35,7 +35,7 @@ export default async function StripeOnboardingPage({ searchParams }: PageProps) 
 
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-text-primary">
-          Get paid — connect your bank
+          Get paid: connect your bank
         </h1>
         <p className="mt-1.5 text-sm text-text-muted">
           Book My Tech pays you through Stripe. Connect your bank account so your

@@ -285,7 +285,7 @@ function Specialisms({
   return (
     <Card padded={false}>
       <SectionHeader icon={Wrench} title="Specialisms">
-        The work you&apos;re strongest at — shown on your profile. You&apos;re
+        The work you&apos;re strongest at, shown on your profile. You&apos;re
         offered every job in your travel range either way.
       </SectionHeader>
       <div className="grid grid-cols-2 gap-3 p-5 sm:grid-cols-3">

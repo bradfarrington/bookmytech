@@ -148,7 +148,7 @@ export function LiveMonitor({ rows }: { rows: MonitorRow[] }) {
                         {r.area}
                       </span>
                     ) : (
-                      <span className="text-text-muted">—</span>
+                      <span className="text-text-muted">No area</span>
                     )}
                   </td>
                   <td className="px-5 py-3">

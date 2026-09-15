@@ -17,11 +17,11 @@ const OLD_WAY = [
 
 const OUR_WAY = [
   "One reg, and prices for your exact car.",
-  "Home, work or roadside — pick a time that suits you.",
+  "Home, work or roadside: pick a time that suits you.",
   "Sent to vetted mechanics nearby; the first to accept takes the job.",
   "Price shown before you book. Extra work only with your approval.",
   "Card pre-authorised, charged only when the job's done.",
-  "DBS-checked, insured, and guaranteed for 12 months.",
+  "Vetted, insured mechanics and a 12-month warranty on eligible repairs.",
 ];
 
 export function Compare() {

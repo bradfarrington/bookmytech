@@ -16,7 +16,7 @@ export function AuthShell({
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center bg-surface px-4 py-12">
       <div className="w-full max-w-sm">
-        <Link href="/" className="mb-8 flex justify-center" aria-label="Book My Tech — home">
+        <Link href="/" className="mb-8 flex justify-center" aria-label="Book My Tech home">
           <Image src="/logo-no-bg.png" alt="Book My Tech" width={200} height={56} priority className="h-12 w-auto" />
         </Link>
 

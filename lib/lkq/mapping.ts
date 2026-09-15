@@ -90,7 +90,7 @@ export const PART_GROUPS: readonly PartGroupMapping[] = [
     component: "000437",
     componentName: "Control Arm / Wishbone Bush",
     confidence: "assumed",
-    note: "LKQ's entry is the bush, AAG's GenArt is the arm — the two columns may list different parts.",
+    note: "LKQ's entry is the bush, AAG's GenArt is the arm, so the two columns may list different parts.",
   },
   {
     key: "clutch",

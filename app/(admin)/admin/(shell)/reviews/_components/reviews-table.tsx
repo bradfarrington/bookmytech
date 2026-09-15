@@ -134,7 +134,7 @@ export function ReviewsTable({ reviews }: { reviews: AdminReviewRow[] }) {
                         </p>
                       ) : (
                         r.tags.length === 0 && (
-                          <span className="text-text-muted">—</span>
+                          <span className="text-text-muted">No comment</span>
                         )
                       )}
                       {r.mechanicResponse && (

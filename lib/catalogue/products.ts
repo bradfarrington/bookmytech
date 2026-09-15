@@ -44,7 +44,7 @@ export const PRODUCT_CATEGORIES: readonly ProductCategoryDef[] = [
     key: "diagnostics",
     id: "c:diagnostics",
     label: "Diagnostics",
-    blurb: "Warning lights, won't start, strange noises — a mechanic finds the fault",
+    blurb: "Warning lights, won't start, strange noises: a mechanic finds the fault",
   },
   {
     key: "servicing",

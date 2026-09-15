@@ -47,8 +47,8 @@ export default async function MechanicResolutionsPage() {
           </div>
           <h2 className="text-lg font-bold text-text-primary">No cases yet</h2>
           <p className="max-w-sm text-sm text-text-secondary">
-            If you hit a problem with a job — you can&apos;t complete it, the customer&apos;s
-            unreachable, or anything else — raise a case and we&apos;ll help sort it.
+            If you hit a problem with a job (you can&apos;t complete it, the customer&apos;s
+            unreachable, or anything else), raise a case and we&apos;ll help sort it.
           </p>
         </Card>
       ) : (

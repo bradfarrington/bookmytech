@@ -9,7 +9,7 @@ import type { MetadataRoute } from "next";
 // mechanic area.
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Book My Tech — Mechanic",
+    name: "Book My Tech | Mechanic",
     short_name: "Book My Tech",
     description: "Manage your jobs, earnings and reviews on the go.",
     start_url: "/mechanic",

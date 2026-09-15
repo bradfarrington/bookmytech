@@ -3,7 +3,7 @@ import Image from "next/image";
 import { MechanicLoginForm } from "./_components/login-form";
 
 export const metadata: Metadata = {
-  title: "Sign in — Book My Tech for mechanics",
+  title: "Sign in | Book My Tech for mechanics",
 };
 
 export default function MechanicLoginPage() {
@@ -37,7 +37,7 @@ export default function MechanicLoginPage() {
             Mechanic dashboard
           </p>
           <p className="text-3xl font-bold tracking-tight lg:text-4xl">
-            Your jobs, your schedule, your earnings — all in one place.
+            Your jobs, your schedule, your earnings, all in one place.
           </p>
           <p className="mt-4 leading-relaxed text-white/75">
             Sign in to see live job offers in your area, manage your day, and

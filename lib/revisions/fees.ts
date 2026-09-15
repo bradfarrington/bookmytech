@@ -23,7 +23,7 @@ export function onSiteFeeOptions(fees: { diagnosticPence: number; enRoutePence: 
     {
       kind: "cancellation",
       label: `Charge the cancellation fee (${formatPrice(fees.enRoutePence)})`,
-      hint: "The en-route fee — you travelled to them.",
+      hint: "The en-route fee (you travelled to them).",
       pence: Math.max(0, Math.round(fees.enRoutePence)),
     },
     {

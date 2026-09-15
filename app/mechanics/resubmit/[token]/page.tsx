@@ -14,7 +14,7 @@ function Shell({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen bg-surface">
       <header className="border-b border-border bg-surface-card">
         <div className="mx-auto flex max-w-content items-center px-4 py-3">
-          <Link href="/" aria-label="Book My Tech — home">
+          <Link href="/" aria-label="Book My Tech home">
             <Image src="/logo-no-bg.png" alt="Book My Tech" width={120} height={32} className="h-8 w-auto" />
           </Link>
         </div>

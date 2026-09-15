@@ -7,7 +7,7 @@ export default function BookLayout({ children }: { children: React.ReactNode }) 
       {/* Minimal header */}
       <header className="border-b border-border bg-surface-card">
         <div className="mx-auto flex max-w-content items-center justify-between px-4 py-3.5">
-          <Link href="/" aria-label="Book My Tech — home" className="flex items-center">
+          <Link href="/" aria-label="Book My Tech home" className="flex items-center">
             <Image src="/logo-cropped.png" alt="Book My Tech" width={1463} height={368} priority className="h-9 w-auto sm:h-10" />
           </Link>
           <a

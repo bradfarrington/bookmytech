@@ -143,11 +143,11 @@ function QuoteResult({ result }: { result: Extract<AagCheckResult, { ok: true }>
                     )}
                   </td>
                   <td className="px-3 py-3">
-                    <div className="text-text-primary">{line.brand ?? "—"}</div>
+                    <div className="text-text-primary">{line.brand ?? "No brand"}</div>
                     <div className="text-xs text-text-muted">{line.rating ?? ""}</div>
                   </td>
                   <td className="px-3 py-3 text-right tabular-nums text-text-primary">
-                    {line.costPence == null ? "—" : formatPrice(line.costPence)}
+                    {line.costPence == null ? "Not priced" : formatPrice(line.costPence)}
                     {line.surchargePence ? <div className="text-xs text-text-muted">+{formatPrice(line.surchargePence)} core</div> : null}
                   </td>
                   <td className="px-3 py-3 text-right tabular-nums text-text-secondary">{line.minOrderQty}</td>

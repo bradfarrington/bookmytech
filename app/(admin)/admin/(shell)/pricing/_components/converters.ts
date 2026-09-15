@@ -6,14 +6,14 @@ import { formatPrice, parsePrice } from "@/lib/utils";
 
 export const pounds = {
   toInput: (pence: number) => (pence / 100).toFixed(2),
-  toDisplay: (pence: number | null) => (pence == null ? "—" : formatPrice(pence)),
+  toDisplay: (pence: number | null) => (pence == null ? "Not set" : formatPrice(pence)),
   parse: (raw: string) => parsePrice(raw),
 };
 
 export const percent = {
   toInput: (rate: number) => String(Math.round(rate * 1000) / 10), // 0.15 → "15"
   toDisplay: (rate: number | null) =>
-    rate == null ? "—" : `${Math.round(rate * 1000) / 10}%`,
+    rate == null ? "Not set" : `${Math.round(rate * 1000) / 10}%`,
   parse: (raw: string): number | null => {
     const n = Number(raw.replace("%", "").trim());
     if (!Number.isFinite(n) || n < 0 || n > 90) return null;
@@ -24,7 +24,7 @@ export const percent = {
 export const hours = {
   toInput: (h: number) => String(Math.round(h * 100) / 100),
   toDisplay: (h: number | null) =>
-    h == null ? "—" : `${Math.round(h * 100) / 100}h`,
+    h == null ? "Not set" : `${Math.round(h * 100) / 100}h`,
   parse: (raw: string): number | null => {
     const n = Number(raw.replace(/h$/i, "").trim());
     if (!Number.isFinite(n) || n <= 0 || n > 99.99) return null;
@@ -34,7 +34,7 @@ export const hours = {
 
 export const multiplier = {
   toInput: (m: number) => String(m),
-  toDisplay: (m: number | null) => (m == null ? "—" : `×${m.toFixed(3)}`),
+  toDisplay: (m: number | null) => (m == null ? "Not set" : `×${m.toFixed(3)}`),
   parse: (raw: string): number | null => {
     const n = Number(raw.replace("×", "").trim());
     if (!Number.isFinite(n) || n < 0.1 || n > 5) return null;

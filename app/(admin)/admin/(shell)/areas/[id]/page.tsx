@@ -197,7 +197,7 @@ export default async function AdminAreaDetailPage({
                   </Link>
                   <div className="text-xs text-text-muted">
                     {a.postcode} ·{" "}
-                    {a.submitted_at ? new Date(a.submitted_at).toLocaleDateString("en-GB") : "—"}
+                    {a.submitted_at ? new Date(a.submitted_at).toLocaleDateString("en-GB") : "No date"}
                   </div>
                 </div>
                 <Pill tone={APP_STATUS_TONE[a.status] ?? "neutral"}>{a.status.replace(/_/g, " ")}</Pill>

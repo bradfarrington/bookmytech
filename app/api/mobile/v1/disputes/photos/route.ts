@@ -40,7 +40,7 @@ import { apiError, apiOk } from "@/lib/mobile/respond";
 export async function POST(request: Request): Promise<Response> {
   const contentType = request.headers.get("content-type")?.toLowerCase() ?? "";
   if (!contentType.includes("multipart/form-data")) {
-    return apiError("Something went wrong — please update the app and try again.", 415);
+    return apiError("Something went wrong. Please update the app and try again.", 415);
   }
 
   const auth = await mobileActionCaller(request, "upload");

@@ -35,7 +35,7 @@ export async function setOwnAvailability(
     if (!mechanic?.stripe_payouts_enabled) {
       return {
         ok: false,
-        error: "Connect your bank account before going online — Settings → Get paid.",
+        error: "Connect your bank account before going online: Settings → Get paid.",
       };
     }
   }

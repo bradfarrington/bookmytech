@@ -224,7 +224,7 @@ async function callEcp(
       res.status === 401 || res.status === 403 ? "auth_failed" : "unreachable",
       String(res.status),
       res.status === 401 || res.status === 403
-        ? "LKQ refused the request before it reached their API — check the credentials and the IP allowlist."
+        ? "LKQ refused the request before it reached their API. Check the credentials and the IP allowlist."
         : `LKQ's pricing service responded HTTP ${res.status}.`,
     );
     return null;
@@ -294,7 +294,7 @@ async function mintSession(
       "auth_failed",
       status || null,
       status.toUpperCase() === "INVALID CREDENTIALS"
-        ? "LKQ rejected the pricing credentials — check LKQ_ECP_PCID, LKQ_ECP_PASSWORD and LKQ_ECP_ACCOUNT."
+        ? "LKQ rejected the pricing credentials. Check LKQ_ECP_PCID, LKQ_ECP_PASSWORD and LKQ_ECP_ACCOUNT."
         : "LKQ wouldn't open a pricing session.",
     );
     return null;

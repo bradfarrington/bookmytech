@@ -45,7 +45,7 @@ export default async function AdminMechanicsListPage() {
     return {
       id: r.id,
       full_name: profile?.full_name ?? null,
-      email: auth?.email ?? "—",
+      email: auth?.email ?? "No email",
       base_postcode: r.base_postcode,
       status: r.status as MechanicRow["status"],
       // Invited until they've signed in at least once via the magic link.

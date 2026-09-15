@@ -22,7 +22,7 @@ import {
 import { Footer } from "../(customer)/_components/footer";
 
 export const metadata: Metadata = {
-  title: "Become a Book My Tech mechanic — work on your terms",
+  title: "Become a Book My Tech mechanic | Work on your terms",
   description:
     "Join Book My Tech as a vetted mobile mechanic. Set your own hours and area, get matched to jobs near you, and get paid fast. Apply in about 10 minutes.",
 };
@@ -45,7 +45,7 @@ const BENEFITS: Benefit[] = [
   {
     Icon: MapPinIcon,
     title: "Jobs come to you",
-    body: "We match you to bookings near you and bring the customers — no marketing, no quoting, no time-wasters.",
+    body: "We send you bookings near you and bring the customers: no marketing, no quoting, no time-wasters.",
   },
   {
     Icon: SmartphoneIcon,
@@ -55,7 +55,7 @@ const BENEFITS: Benefit[] = [
   {
     Icon: BanknoteIcon,
     title: "Fast, reliable payouts",
-    body: "Payment is pre-authorised before you arrive and released as soon as the job's marked complete and approved.",
+    body: "Payment is pre-authorised before you arrive and paid out when you mark the job complete.",
   },
   {
     Icon: ShieldCheckIcon,
@@ -77,7 +77,7 @@ const STEPS: Step[] = [
     number: "02",
     Icon: ShieldCheckIcon,
     title: "Get verified",
-    body: "We check your ID, insurance and qualifications directly with the issuing bodies — usually within a few days.",
+    body: "Our team checks your ID, insurance and qualifications, usually within a few days.",
   },
   {
     number: "03",
@@ -107,12 +107,12 @@ const FAQS: AccordionItem[] = [
   {
     question: "How much does it cost to join?",
     answer:
-      "Applying is free. There are no monthly fees and no charges for leads — we take a transparent service fee per completed job, so you only ever pay when you earn.",
+      "Applying is free. There are no monthly fees and no charges for leads. We take a transparent service fee per completed job, so you only ever pay when you earn.",
   },
   {
     question: "How and when do I get paid?",
     answer:
-      "The customer's payment is pre-authorised before the job. Once you mark the work complete and it's approved, the payout is released to your connected account — no invoicing or chasing.",
+      "The customer's payment is pre-authorised before the job. Once you mark the work complete, the payout goes to your connected account, with no invoicing or chasing.",
   },
   {
     question: "Do I have to work set hours?",
@@ -127,7 +127,7 @@ const FAQS: AccordionItem[] = [
   {
     question: "What do I need to get verified?",
     answer:
-      "Photo ID, valid public liability and trade insurance, a recognised trade qualification and two references. We verify these directly with the issuing bodies before your first job.",
+      "Photo ID, valid public liability and trade insurance, a recognised trade qualification and two references. Our team checks these as part of your application.",
   },
   {
     question: "How long does approval take?",
@@ -150,7 +150,7 @@ export default function MechanicsLandingPage() {
             </h1>
             <p className="mb-7 max-w-[560px] text-base leading-[1.55] text-white/85 sm:text-lg">
               Join Book My Tech&apos;s network of vetted mobile mechanics. Set your own
-              hours and area, get matched to paying jobs near you, and get paid fast —
+              hours and area, get matched to paying jobs near you, and get paid fast:
               no marketing, no quoting, no chasing invoices.
             </p>
             <div className="flex flex-col gap-3 sm:flex-row">
@@ -307,7 +307,7 @@ export default function MechanicsLandingPage() {
           </h2>
           <p className="mx-auto mb-7 max-w-xl text-base text-white/85 sm:text-lg">
             Join the mechanics already growing their business with Book My Tech. Free to
-            apply — you could be taking jobs within days.
+            apply, and you could be taking jobs within days.
           </p>
           <div className="flex justify-center">
             <Link href={APPLY_HREF}>

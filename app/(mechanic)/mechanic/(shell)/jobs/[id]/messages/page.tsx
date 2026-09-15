@@ -44,7 +44,7 @@ export default async function MechanicMessagesPage({ params }: PageProps) {
 
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-text-primary">
-          Messages — {customerName}
+          Messages with {customerName}
         </h1>
         <p className="text-sm text-text-muted">About your {repairName} booking.</p>
       </div>

@@ -141,7 +141,7 @@ export function RepairSearch({
         <>
           {query && (
             <p className="text-xs text-text-muted">
-              Keep typing — at least {MIN_SEARCH_QUERY_LENGTH} letters to search.
+              Keep typing: at least {MIN_SEARCH_QUERY_LENGTH} letters to search.
             </p>
           )}
           {children}
@@ -184,7 +184,7 @@ export function RepairSearch({
               atCap={atCap}
               groupHref={hrefs.groupHref}
               bookHref={hrefs.bookHref}
-              groupCaption={() => "A group of repairs — open it to see them"}
+              groupCaption={() => "A group of repairs: open it to see them"}
               emptyLabel={
                 <>
                   Nothing matches &ldquo;{trimmed}&rdquo;. Try fewer or different words, or
@@ -195,7 +195,7 @@ export function RepairSearch({
           )}
           {truncated && !searching && hits.length > 0 && (
             <p className="text-xs text-text-muted">
-              Not every repair was checked — be more specific to find others, or browse the
+              Not every repair was checked. Be more specific to find others, or browse the
               categories.
             </p>
           )}

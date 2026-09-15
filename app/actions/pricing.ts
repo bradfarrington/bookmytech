@@ -181,7 +181,7 @@ export async function deleteArea(areaId: string): Promise<PricingResult> {
     .select("id", { count: "exact", head: true })
     .eq("area_id", areaId);
   if (count && count > 0)
-    return { ok: false, error: `Can't delete — ${count} booking(s) use this area. Deactivate it instead.` };
+    return { ok: false, error: `Can't delete: ${count} booking(s) use this area. Deactivate it instead.` };
 
   const { error } = await admin.from("areas").delete().eq("id", areaId);
   if (error) return { ok: false, error: error.message };

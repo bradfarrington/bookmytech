@@ -47,7 +47,7 @@ export function EarningsBreakdown({
           label="Parts ordered via BMT"
           value={`– ${formatPrice(bmtPartsPence)}`}
           muted
-          hint="BMT supplies these — their cost comes off your payout"
+          hint="BMT supplies these; their cost comes off your payout"
         />
       )}
       <div className="my-1 border-t border-border" />

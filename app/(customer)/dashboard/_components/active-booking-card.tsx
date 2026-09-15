@@ -153,7 +153,7 @@ export function ActiveBookingCard({ booking, mechanic }: ActiveBookingCardProps)
           </div>
         ) : (
           <div className="rounded-xl border border-dashed border-border bg-surface p-3 text-sm text-text-secondary">
-            We&apos;re finding your mechanic — you&apos;ll be able to message and track
+            We&apos;re finding your mechanic. You&apos;ll be able to message and track
             them here the moment one accepts.
           </div>
         )}

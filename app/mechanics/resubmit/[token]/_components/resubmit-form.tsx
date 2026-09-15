@@ -85,7 +85,7 @@ export function ResubmitForm({ token, vatRegistered }: { token: string; vatRegis
       <Card className="space-y-3">
         <p className="text-sm font-semibold text-text-primary">Re-upload documents</p>
         <p className="text-xs text-text-muted">
-          Only replace the ones we asked about — the rest stay as they were.
+          Only replace the ones we asked about. The rest stay as they were.
         </p>
         {docs.map((d) => (
           <DocRow key={d.type} token={token} docType={d.type} label={d.label} hint={d.hint} />

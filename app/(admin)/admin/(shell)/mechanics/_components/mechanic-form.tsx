@@ -154,7 +154,7 @@ export function MechanicForm({ services }: MechanicFormProps) {
         <div className={FIELD_LABEL}>
           <span>Specialisms</span>
           <span className="text-xs font-normal text-text-muted">
-            The work this mechanic is strongest at — profile and vetting
+            The work this mechanic is strongest at. Profile and vetting
             context only. Jobs are offered to every mechanic in range.
           </span>
           {services.length === 0 ? (

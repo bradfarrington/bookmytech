@@ -104,7 +104,7 @@ export function MechanicsTable({ mechanics }: MechanicsTableProps) {
                   <td className="px-5 py-3">
                     <div className="flex items-center gap-2">
                       <span className="font-semibold text-text-primary">
-                        {mechanic.full_name ?? "—"}
+                        {mechanic.full_name ?? "No name"}
                       </span>
                       {mechanic.is_pro && (
                         <Sparkles size={14} className="text-brand-blue" aria-label="Pro" />
@@ -116,7 +116,7 @@ export function MechanicsTable({ mechanics }: MechanicsTableProps) {
                     {mechanic.activated ? (
                       <Pill tone={statusTone(mechanic.status)}>{statusLabel(mechanic.status)}</Pill>
                     ) : (
-                      <Pill tone="pending" title="Invite sent — not yet accepted">
+                      <Pill tone="pending" title="Invite sent, not yet accepted">
                         Invited
                       </Pill>
                     )}
@@ -133,7 +133,7 @@ export function MechanicsTable({ mechanics }: MechanicsTableProps) {
                         </span>
                       </span>
                     ) : (
-                      <span className="text-text-muted">—</span>
+                      <span className="text-text-muted">Not set</span>
                     )}
                   </td>
                   <td className="px-5 py-3">
@@ -143,7 +143,7 @@ export function MechanicsTable({ mechanics }: MechanicsTableProps) {
                         <span className="font-semibold">{mechanic.rating.toFixed(2)}</span>
                       </span>
                     ) : (
-                      <span className="text-text-muted">—</span>
+                      <span className="text-text-muted">No ratings</span>
                     )}
                   </td>
                   <td className="px-5 py-3 text-text-secondary">{mechanic.job_count}</td>

@@ -22,7 +22,7 @@ const PAGE_SIZE = 50;
 function vehicleLabel(reg: string | null, make: string | null, model: string | null): string {
   const parts = [make, model].filter(Boolean).join(" ");
   if (reg && parts) return `${reg} · ${parts}`;
-  return reg || parts || "—";
+  return reg || parts || "No vehicle";
 }
 
 interface AdminJobsPageProps {
@@ -70,7 +70,7 @@ export default async function AdminJobsPage({ searchParams }: AdminJobsPageProps
     id: b.id,
     jobNumber: b.job_number,
     service: b.repair_description ?? "Vehicle repair",
-    customer: b.customer_name ?? "—",
+    customer: b.customer_name ?? "No name",
     vehicle: vehicleLabel(b.vehicle_reg, b.vehicle_make, b.vehicle_model),
     area: b.area,
     mechanic: b.mechanic_id ? mechanicName.get(b.mechanic_id) ?? "Assigned" : null,
@@ -83,7 +83,7 @@ export default async function AdminJobsPage({ searchParams }: AdminJobsPageProps
           slot_window: b.slot_window,
           candidate_days: b.candidate_days,
         })
-      : "—",
+      : "Not scheduled",
   }));
 
   // Filter options come from a distinct-area view (0042) rather than whatever

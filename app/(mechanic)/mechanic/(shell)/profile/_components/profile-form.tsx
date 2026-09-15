@@ -132,7 +132,7 @@ export function ProfileForm(props: ProfileFormProps) {
           onChange={(e) => setBio(e.target.value)}
           rows={4}
           className={FIELD}
-          placeholder="A short intro customers will see — experience, specialisms, anything that builds trust."
+          placeholder="A short intro customers will see: experience, specialisms, anything that builds trust."
         />
       </div>
 

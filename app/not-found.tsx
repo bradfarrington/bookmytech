@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 // and scanners hit. The useful destinations are links instead.
 
 export const metadata: Metadata = {
-  title: "Page not found — Book My Tech",
+  title: "Page not found | Book My Tech",
   robots: { index: false, follow: true },
 };
 
@@ -67,7 +67,7 @@ export default function NotFound() {
           </h1>
           <p className="mx-auto mt-3 max-w-md text-base leading-[1.6] text-text-secondary">
             The link may be out of date, or the page may have moved. Everything
-            still works — here&apos;s the way back.
+            still works. Here&apos;s the way back.
           </p>
 
           <div className="mt-7">

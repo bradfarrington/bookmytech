@@ -44,7 +44,7 @@ const SEGMENT_OPTIONS: ReadonlyArray<{ value: Segment; label: string }> = [
 ];
 
 function formatDate(iso: string | null): string {
-  if (!iso) return "—";
+  if (!iso) return "No date";
   return new Date(iso).toLocaleDateString("en-GB", {
     day: "numeric",
     month: "short",
@@ -157,7 +157,7 @@ export function CustomersTable({
           <p className="mx-auto mt-1 max-w-md text-sm text-text-muted">
             {filtering
               ? "Try a different search or filter."
-              : "Customer accounts are created during the booking flow — the first booking will put someone here."}
+              : "Customer accounts are created during the booking flow. The first booking will put someone here."}
           </p>
         </Card>
       ) : (
@@ -196,10 +196,10 @@ export function CustomersTable({
                         )}
                       </div>
                       <p className="text-xs text-text-muted">
-                        {c.deleted_at || isDeletedSentinelEmail(c.email) ? "Account deleted" : (c.email ?? "—")}
+                        {c.deleted_at || isDeletedSentinelEmail(c.email) ? "Account deleted" : (c.email ?? "No email")}
                       </p>
                     </td>
-                    <td className="px-5 py-3 text-text-secondary">{c.phone ?? "—"}</td>
+                    <td className="px-5 py-3 text-text-secondary">{c.phone ?? "No phone"}</td>
                     <td className="px-5 py-3 text-text-secondary">
                       {formatDate(c.joined_at)}
                       {!c.last_sign_in_at && (

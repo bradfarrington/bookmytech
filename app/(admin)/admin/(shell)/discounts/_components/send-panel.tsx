@@ -71,7 +71,7 @@ export function SendPanel({
       }
       toast.success(
         res.failed > 0
-          ? `Sent to ${res.sent}; ${res.failed} failed — see the list below.`
+          ? `Sent to ${res.sent}; ${res.failed} failed. See the list below.`
           : `${code} sent to ${res.sent} customer${res.sent === 1 ? "" : "s"}.`,
       );
       setChosen([]);
@@ -90,7 +90,7 @@ export function SendPanel({
 
       {!isActive && (
         <p className="rounded-button border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-          This code is switched off — turn it on below before sending it.
+          This code is switched off. Turn it on below before sending it.
         </p>
       )}
 

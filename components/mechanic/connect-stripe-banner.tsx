@@ -39,7 +39,7 @@ export function ConnectStripeBanner() {
             Connect your bank account to start taking jobs
           </p>
           <p className="mt-0.5 text-sm text-text-muted">
-            We verify your details on a secure, hosted page — it takes a couple
+            We verify your details on a secure, hosted page. It takes a couple
             of minutes. You can&apos;t go online until this is done.
           </p>
         </div>

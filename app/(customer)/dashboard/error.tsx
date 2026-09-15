@@ -19,7 +19,7 @@ export default function DashboardError({
   return (
     <ErrorState
       title="We couldn't load your account"
-      description="Your bookings are safe — this is a problem displaying them, not with the jobs themselves. Try again in a moment."
+      description="Your bookings are safe. This is a problem displaying them, not with the jobs themselves. Try again in a moment."
       error={error}
       retry={unstable_retry}
       homeHref="/dashboard"

@@ -78,7 +78,7 @@ export function RepairsPreview() {
         <SectionHeading
           align="left"
           eyebrow="What we do"
-          title="Everything your car needs — without the garage."
+          title="Everything your car needs, without the garage."
           lead="Repairs are priced from the manufacturer's repair times for your exact car. Diagnostics and inspections come at set prices you'll see up front."
         />
 

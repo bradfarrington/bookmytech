@@ -216,7 +216,7 @@ export async function resolveDispute(
       .limit(1);
     if (!prior?.length) {
       const r = await refundPayment(money.stripe_payment_intent_id, refundPence);
-      if (!r.ok) return { ok: false, error: `Refund failed: ${r.error}. Nothing was changed — try again.` };
+      if (!r.ok) return { ok: false, error: `Refund failed: ${r.error}. Nothing was changed. Try again.` };
       await admin.from("booking_events").insert({
         booking_id: dispute.booking_id,
         event_type: "payment_refunded",
@@ -244,7 +244,7 @@ export async function resolveDispute(
 
   // 3) Compensation credit.
   if (creditPence > 0 && money?.customer_id) {
-    await grantCredit(admin, money.customer_id, creditPence, "compensation", `Dispute resolution — booking ${ref}`);
+    await grantCredit(admin, money.customer_id, creditPence, "compensation", `Dispute resolution: booking ${ref}`);
   }
 
   // 4) Flag the mechanic on a loss.
@@ -270,7 +270,7 @@ export async function resolveDispute(
       await applySuspension(
         admin,
         booking.mechanic_id,
-        "3 or more disputes lost in 30 days — suspended pending review.",
+        "3 or more disputes lost in 30 days. Suspended pending review.",
         null,
         userId,
       );

@@ -98,7 +98,7 @@ export async function requireMobileUser(request: Request): Promise<MobileAuthRes
   const supabase = createMobileClient(token);
   const { data, error } = await supabase.auth.getUser();
   if (error || !data.user) {
-    return { ok: false, status: 401, error: "Your session has expired — please sign in again." };
+    return { ok: false, status: 401, error: "Your session has expired. Please sign in again." };
   }
 
   // Role decides what a caller may do (staff sessions can't book, for one). Read

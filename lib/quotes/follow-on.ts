@@ -110,6 +110,6 @@ export function followOnRefusal(quote: QuoteView): string | null {
   if (quote.kind !== "follow_on") return "That quote isn't for a return visit.";
   if (quote.followOnBookingId) return "You've already booked this return visit.";
   if (quote.status !== "sent" && quote.status !== "approved") return "This quote is no longer open.";
-  if (isQuoteExpired(quote)) return "This quote has expired — ask your mechanic to send it again.";
+  if (isQuoteExpired(quote)) return "This quote has expired. Ask your mechanic to send it again.";
   return null;
 }

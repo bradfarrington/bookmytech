@@ -52,7 +52,7 @@ export interface BundleCardProps {
 const KEEP = "__keep__";
 
 function hours(h: number | null): string {
-  return h == null ? "—" : `${Number(h.toFixed(2))}h`;
+  return h == null ? "No time" : `${Number(h.toFixed(2))}h`;
 }
 
 function optionHours(option: BundleCardOption, jobs: BundleCardJob[]): number | null {
@@ -155,7 +155,7 @@ export function BundleCard({ bundle, jobs, options, destinations, readOnly }: Bu
       <div className="space-y-2.5 border-b border-border-subtle px-4 py-3">
         <p className="text-[11px] font-semibold uppercase tracking-wide text-text-muted">Jobs in this combined repair</p>
         {jobs.length === 0 ? (
-          <p className="text-xs text-amber-700">No jobs yet — search below, or use &ldquo;Combine…&rdquo; on a job in the tree.</p>
+          <p className="text-xs text-amber-700">No jobs yet. Search below, or use &ldquo;Combine…&rdquo; on a job in the tree.</p>
         ) : (
           <ul className="flex flex-wrap gap-1.5">
             {jobs.map((job) => (
@@ -192,7 +192,7 @@ export function BundleCard({ bundle, jobs, options, destinations, readOnly }: Bu
         <p className="text-[11px] font-semibold uppercase tracking-wide text-text-muted">
           What customers can book
           {!readOnly && options.length > 1 && (
-            <span className="ml-1 font-normal normal-case tracking-normal">— tick the jobs each option includes</span>
+            <span className="ml-1 font-normal normal-case tracking-normal">(tick the jobs each option includes)</span>
           )}
         </p>
         <ul className="mt-2 space-y-3">
@@ -283,7 +283,7 @@ export function BundleCard({ bundle, jobs, options, destinations, readOnly }: Bu
                 onSubmit={(e) => {
                   e.preventDefault();
                   run(() => addBundleOption({ bundleId: bundle.id, label: optionLabel }), {
-                    success: "Option added — tick the jobs it includes.",
+                    success: "Option added. Tick the jobs it includes.",
                     onSuccess: () => {
                       setAddingOption(false);
                       setOptionLabel("");

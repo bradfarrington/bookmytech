@@ -176,7 +176,7 @@ export default async function ConfirmedPage({ params }: ConfirmedPageProps) {
               )
             }
           />
-          <Row label="Vehicle" value={`${booking.vehicle_reg}${vehicle ? ` — ${vehicle}` : ""}`} />
+          <Row label="Vehicle" value={`${booking.vehicle_reg}${vehicle ? ` (${vehicle})` : ""}`} />
           {slotDate && <Row label="Date & time" value={slotDate} />}
           {booking.address_line_1 && (
             <Row label="Address" value={booking.address_line_1} />

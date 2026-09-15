@@ -199,7 +199,7 @@ export default async function MechanicEarningsPage() {
           {ledgerBalance < 0 && (
             <p className="mt-3 text-xs text-red-700">
               A refund on one of your jobs was covered by Book My Tech. This amount is
-              being recovered from your upcoming payouts — your next job&apos;s earnings
+              being recovered from your upcoming payouts: your next job&apos;s earnings
               clear it first, then the rest is paid out as normal.
             </p>
           )}
@@ -221,13 +221,13 @@ export default async function MechanicEarningsPage() {
         />
         <KPI
           label="Average per job"
-          value={monthJobs > 0 ? formatPrice(avgPerJob) : "—"}
+          value={monthJobs > 0 ? formatPrice(avgPerJob) : "n/a"}
           delta={monthJobs > 0 ? "This month" : "No jobs yet"}
           icon={Calculator}
         />
         <KPI
           label="Projected"
-          value={monthJobs > 0 ? formatPrice(projectedPence) : "—"}
+          value={monthJobs > 0 ? formatPrice(projectedPence) : "n/a"}
           delta={`End of ${monthLabel} (run rate)`}
           icon={TrendingUp}
         />

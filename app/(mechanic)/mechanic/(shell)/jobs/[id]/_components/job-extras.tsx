@@ -164,7 +164,7 @@ export function JobExtras({ bookingId, status, faults, quotes, hourlyRatePence, 
   function send() {
     run(
       () => createQuoteAction({ bookingId, kind, title, note, lines: toInputs(lines) }),
-      kind === "now" ? "Quote sent — don't start until it shows Approved." : "Quote sent for a return visit.",
+      kind === "now" ? "Quote sent. Don't start until it shows Approved." : "Quote sent for a return visit.",
       () => {
         setBuilderOpen(false);
         setLines([]);
@@ -264,7 +264,7 @@ export function JobExtras({ bookingId, status, faults, quotes, hourlyRatePence, 
                       ))}
                     </ul>
                     {q.status === "approved" && q.kind === "now" && (
-                      <p className="mt-1.5 text-xs font-semibold text-success">Approved and authorised — go ahead. Paid with the job.</p>
+                      <p className="mt-1.5 text-xs font-semibold text-success">Approved and authorised. Go ahead. Paid with the job.</p>
                     )}
                     {q.status === "sent" && q.kind === "now" && (
                       <p className="mt-1.5 text-xs font-semibold text-amber-700">Don&apos;t start this work until it shows Approved.</p>
@@ -293,7 +293,7 @@ export function JobExtras({ bookingId, status, faults, quotes, hourlyRatePence, 
           <div className="space-y-2 rounded-xl border border-brand-blue/30 bg-blue-50/50 px-3.5 py-3">
             <p className="text-sm font-semibold text-text-primary">Send a follow-on quote for the rest</p>
             <p className="text-xs text-text-secondary">
-              {followOnPrefill.length} item{followOnPrefill.length === 1 ? " was" : "s were"} taken off today&apos;s job when it was revised. Quote {followOnPrefill.length === 1 ? "it" : "them"} for a return visit — the customer books it from the quote and you&apos;re offered the job first.
+              {followOnPrefill.length} item{followOnPrefill.length === 1 ? " was" : "s were"} taken off today&apos;s job when it was revised. Quote {followOnPrefill.length === 1 ? "it" : "them"} for a return visit. The customer books it from the quote and you&apos;re offered the job first.
             </p>
             <Button size="sm" iconLeft={Plus} onClick={openBuilderForTheRest} disabled={pending}>
               Quote the rest of the work
@@ -324,7 +324,7 @@ export function JobExtras({ bookingId, status, faults, quotes, hourlyRatePence, 
                   value={kind}
                   onChange={setKind}
                   options={[
-                    ...(canQuoteNow ? [{ value: "now" as const, label: "Do it today — add to this job" }] : []),
+                    ...(canQuoteNow ? [{ value: "now" as const, label: "Do it today: add to this job" }] : []),
                     ...(canQuoteFollowOn ? [{ value: "follow_on" as const, label: "Book a return visit" }] : []),
                   ]}
                   aria-label="Kind of quote"
@@ -337,7 +337,7 @@ export function JobExtras({ bookingId, status, faults, quotes, hourlyRatePence, 
             </div>
             {kind === "now" && pendingNow && (
               <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                A quote is already waiting on the customer — withdraw it first to send another for this visit.
+                A quote is already waiting on the customer. Withdraw it first to send another for this visit.
               </p>
             )}
 
@@ -600,7 +600,7 @@ function RepairTimeSearch({
               </button>
             </li>
           ))}
-          {truncated && <li className="px-3 py-1.5 text-[11px] text-text-muted">Closest matches — be more specific to find others.</li>}
+          {truncated && <li className="px-3 py-1.5 text-[11px] text-text-muted">Closest matches. Be more specific to find others.</li>}
         </ul>
       )}
     </div>
@@ -626,10 +626,10 @@ function PartPicker({ line, onChange }: { line: DraftLine; onChange: (next: Draf
           onChange(match ? { ...line, description: match.name, partId: match.id, unitPounds: (match.bmtPricePence / 100).toFixed(2) } : { ...line, description: value, partId: null });
         }}
         options={names}
-        placeholder={parts == null ? "Loading parts…" : "Part name — pick from the catalogue or type your own"}
+        placeholder={parts == null ? "Loading parts…" : "Part name: pick from the catalogue or type your own"}
         aria-label="Part"
       />
-      <p className="text-xs text-text-muted">{line.partId ? "From the catalogue — BMT price filled in." : "Not in the catalogue — enter the price you'll charge."}</p>
+      <p className="text-xs text-text-muted">{line.partId ? "From the catalogue. BMT price filled in." : "Not in the catalogue. Enter the price you'll charge."}</p>
     </div>
   );
 }

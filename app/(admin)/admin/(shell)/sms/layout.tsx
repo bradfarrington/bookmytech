@@ -11,7 +11,7 @@ export default function SmsLayout({ children }: { children: React.ReactNode }) {
           Prepaid SMS credits power booking updates, reminders and message
           nudges. Buy credits, edit the message templates, send one-off texts,
           and review what&apos;s been sent. Each delivered text costs one credit.
-          Any text — and any email, under Emails — can be switched off from its
+          Any text (and any email, under Emails) can be switched off from its
           template.
         </p>
       </header>

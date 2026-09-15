@@ -31,7 +31,7 @@ export default async function AdminServicesPage() {
           <Overline>Commercial</Overline>
           <h1 className="mt-1 text-3xl font-bold tracking-tight text-text-primary">Services</h1>
           <p className="mt-1.5 max-w-2xl text-sm text-text-muted">
-            Diagnostics, servicing and pre-purchase inspections at a set price — the things the
+            Diagnostics, servicing and pre-purchase inspections at a set price: the things the
             manufacturer&apos;s repair times don&apos;t cover. Customers see them beside Repairs at the
             top of the catalogue. A service that includes engine oil adds it at the per-litre price
             under{" "}

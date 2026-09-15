@@ -86,9 +86,9 @@ export default async function AdminCasePage({ params }: { params: Promise<{ id: 
             #{kase.shortRef} · {svc}
           </Link>
         </Detail>
-        <Detail label="Mechanic">{mechanic?.full_name ?? "—"}</Detail>
-        <Detail label="Customer">{booking?.customer_name ?? "—"}</Detail>
-        <Detail label="Vehicle">{booking?.vehicle_reg ?? "—"}</Detail>
+        <Detail label="Mechanic">{mechanic?.full_name ?? "Unassigned"}</Detail>
+        <Detail label="Customer">{booking?.customer_name ?? "Not given"}</Detail>
+        <Detail label="Vehicle">{booking?.vehicle_reg ?? "Not given"}</Detail>
       </div>
 
       <div className="rounded-xl border border-border bg-surface p-4">

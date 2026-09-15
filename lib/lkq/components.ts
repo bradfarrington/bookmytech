@@ -50,14 +50,14 @@ export function searchComponents(query: string, limit = 50): AdsComponent[] {
   return [...exact, ...prefix, ...contains].slice(0, limit);
 }
 
-/** "000027 — Brake Disc", the shape the Combobox primitive takes (plain strings). */
+/** "000027: Brake Disc", the shape the Combobox primitive takes (plain strings). */
 export function componentOptionLabel(component: AdsComponent): string {
-  return `${component.ComponentNumber} — ${component.ComponentName}`;
+  return `${component.ComponentNumber}: ${component.ComponentName}`;
 }
 
 /** Recover the component number from a label the Combobox handed back. */
 export function componentNumberFromLabel(label: string): string {
   const text = String(label ?? "").trim();
-  const [head] = text.split("—");
+  const [head] = text.split(":");
   return (head ?? text).trim();
 }

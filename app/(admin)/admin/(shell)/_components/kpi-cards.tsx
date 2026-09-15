@@ -41,7 +41,7 @@ export function KpiCards({ kpis }: { kpis: OverviewKpis }) {
       />
       <KPI
         label="Take-rate"
-        value={kpis.takeRatePct != null ? `${+kpis.takeRatePct.toFixed(1)}%` : "—"}
+        value={kpis.takeRatePct != null ? `${+kpis.takeRatePct.toFixed(1)}%` : "n/a"}
         icon={Percent}
         delta={kpis.takeRatePct != null ? "Platform fee share of GMV" : "No bookings yet"}
       />
@@ -52,7 +52,7 @@ export function KpiCards({ kpis }: { kpis: OverviewKpis }) {
       />
       <KPI
         label="Avg time-to-accept"
-        value={kpis.avgAcceptSecs != null ? fmtDuration(kpis.avgAcceptSecs) : "—"}
+        value={kpis.avgAcceptSecs != null ? fmtDuration(kpis.avgAcceptSecs) : "n/a"}
         icon={Timer}
         delta={kpis.avgAcceptSecs != null ? "Offer → accepted" : "No accepts yet"}
       />

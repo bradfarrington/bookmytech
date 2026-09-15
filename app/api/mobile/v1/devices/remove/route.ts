@@ -27,7 +27,7 @@ export async function POST(request: Request): Promise<Response> {
 
   const { token } = parsed.body;
   if (typeof token !== "string" || !token.trim()) {
-    return apiError("Something went wrong — please try again.", 400);
+    return apiError("Something went wrong. Please try again.", 400);
   }
 
   const { error } = await createAdminClient()
@@ -37,7 +37,7 @@ export async function POST(request: Request): Promise<Response> {
     .eq("customer_id", auth.caller.userId);
   if (error) {
     console.error("[devices/remove] delete failed", error);
-    return apiError("We couldn't update your notification settings — please try again later.", 500);
+    return apiError("We couldn't update your notification settings. Please try again later.", 500);
   }
 
   return apiOk({ ok: true });

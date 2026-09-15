@@ -3,7 +3,7 @@ import { AuthShell } from "../../_components/auth-shell";
 import { CustomerSetPasswordForm } from "./_components/set-password-form";
 
 export const metadata: Metadata = {
-  title: "Set your password — Book My Tech",
+  title: "Set your password | Book My Tech",
 };
 
 // Customers land here from the "set a new password" link in a reset email (a
@@ -12,7 +12,7 @@ export default function CustomerSetPasswordPage() {
   return (
     <AuthShell
       title="Choose a new password"
-      subtitle="You're signed in — pick a password and you're back in."
+      subtitle="You're signed in. Pick a password and you're back in."
     >
       <CustomerSetPasswordForm />
     </AuthShell>

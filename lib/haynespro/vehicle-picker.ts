@@ -259,7 +259,7 @@ export async function applyManualVehicleSelection(
       ok: false,
       code: "unavailable",
       error:
-        "We can't change your vehicle at the moment — that's a problem on our side. " +
+        "We can't change your vehicle at the moment. That's a problem on our side. " +
         "Please try again a little later.",
     };
   }

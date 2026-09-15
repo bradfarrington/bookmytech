@@ -26,7 +26,7 @@ export interface PlatformSettings {
 
 const litres = {
   toInput: (l: number) => String(Math.round(l * 10) / 10),
-  toDisplay: (l: number | null) => (l == null ? "—" : `${Math.round(l * 10) / 10} L`),
+  toDisplay: (l: number | null) => (l == null ? "Not set" : `${Math.round(l * 10) / 10} L`),
   parse: (raw: string): number | null => {
     const n = Number(raw.replace(/l$/i, "").trim());
     if (!Number.isFinite(n) || n < 0 || n > 30) return null;
@@ -55,7 +55,7 @@ function CombineModeSelect({ initial }: { initial: RepairCombineMode }) {
             toast.error(result.error);
             return;
           }
-          toast.success("Saved — applies to new quotes.");
+          toast.success("Saved. Applies to new quotes.");
         });
       }}
       options={COMBINE_OPTIONS}
@@ -100,7 +100,7 @@ export function PlatformDefaultsSection({ settings }: { settings: PlatformSettin
           </p>
         </div>
         <div className="overflow-hidden rounded-2xl border border-border bg-surface-card">
-          <Row label="Hourly labour rate" hint="Global — every service's price = duration × this">
+          <Row label="Hourly labour rate" hint="Global: every service's price = duration × this">
             <InlineNumber
               value={settings.hourly_rate_pence}
               {...pounds}
@@ -200,7 +200,7 @@ export function PlatformDefaultsSection({ settings }: { settings: PlatformSettin
           </Row>
           <Row
             label="On-site diagnostic"
-            hint="When the mechanic finds the booked repair isn't what's needed and the customer declines the revised job — the mechanic may charge this or the en-route fee"
+            hint="When the mechanic finds the booked repair isn't what's needed and the customer declines the revised job, the mechanic may charge this or the en-route fee"
           >
             <InlineNumber
               value={settings.on_site_diagnostic_fee_pence}

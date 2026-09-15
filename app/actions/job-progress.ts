@@ -64,7 +64,7 @@ async function transition(
   if (booking.status !== from)
     return {
       ok: false as const,
-      error: "This job has already moved on — refresh the page.",
+      error: "This job has already moved on. Refresh the page.",
       booking: null,
       admin: null,
     };
@@ -210,7 +210,7 @@ export async function completeAndCharge(bookingId: string): Promise<JobProgressR
   if (booking.mechanic_id !== guard.mechanicId)
     return { ok: false, error: "This isn't your job." };
   if (booking.status !== "in_progress")
-    return { ok: false, error: "This job has already moved on — refresh the page." };
+    return { ok: false, error: "This job has already moved on. Refresh the page." };
 
   // Checklist gate (Task 32): a service or inspection can't complete until
   // every item has an answer and the mileage is recorded — the report is what
@@ -240,14 +240,14 @@ export async function completeAndCharge(bookingId: string): Promise<JobProgressR
   if (quotes.pendingNow)
     return {
       ok: false,
-      error: "A quote is still waiting on the customer — withdraw it or wait for their answer before completing.",
+      error: "A quote is still waiting on the customer. Withdraw it or wait for their answer before completing.",
     };
   // A revised job still waiting on the customer blocks completion too (Task
   // 37): the job sheet — and the price — isn't settled until they answer.
   if (revisionMoney(await loadRevisionsForBooking(admin, bookingId)).pending)
     return {
       ok: false,
-      error: "The revised job is still waiting on the customer — withdraw it or wait for their answer before completing.",
+      error: "The revised job is still waiting on the customer. Withdraw it or wait for their answer before completing.",
     };
 
   // --- Capture the pre-authorisation ---------------------------------------
@@ -301,7 +301,7 @@ export async function completeAndCharge(bookingId: string): Promise<JobProgressR
 
   if (booking.stripe_payment_intent_id && stripe) {
     const base = await captureIntent(booking.stripe_payment_intent_id, baseChargePence);
-    if (!base.ok) return { ok: false, error: `Couldn't take payment: ${base.error}. The job stays open — try again.` };
+    if (!base.ok) return { ok: false, error: `Couldn't take payment: ${base.error}. The job stays open. Try again.` };
     captured = true;
     if (base.chargeId) charges.push({ id: base.chargeId, capturedPence: base.amount });
   }
@@ -313,7 +313,7 @@ export async function completeAndCharge(bookingId: string): Promise<JobProgressR
         continue;
       }
       const q = await captureIntent(quote.stripePaymentIntentId, quote.totalPence);
-      if (!q.ok) return { ok: false, error: `Couldn't take the payment for the approved quote: ${q.error}. The job stays open — try again.` };
+      if (!q.ok) return { ok: false, error: `Couldn't take the payment for the approved quote: ${q.error}. The job stays open. Try again.` };
       captured = true;
       if (q.chargeId) charges.push({ id: q.chargeId, capturedPence: q.amount });
       await admin

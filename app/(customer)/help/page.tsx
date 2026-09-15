@@ -20,7 +20,7 @@ import {
 import { Footer } from "../_components/footer";
 
 export const metadata: Metadata = {
-  title: "Help & FAQ — Book My Tech",
+  title: "Help & FAQ | Book My Tech",
   description:
     "Answers to common questions about booking a mobile mechanic, pricing, payments, guarantees, areas and working with Book My Tech. Get in touch if you need a hand.",
 };
@@ -41,22 +41,22 @@ const FAQ_GROUPS: FaqGroup[] = [
       {
         question: "How do I book a mechanic?",
         answer:
-          "Enter your registration on the homepage, pick the service you need or describe the fault, choose a time slot, and confirm. We'll match you to a vetted mechanic and they'll come to you — at home, work or the roadside.",
+          "Enter your registration on the homepage, pick the service you need or describe the fault, choose a time slot, and confirm. Your job is sent to vetted mechanics nearby, and the one who accepts comes to you at home, work or the roadside.",
       },
       {
         question: "How quickly can someone come out?",
         answer:
-          "Most jobs are booked within about four hours, and same-day or next-day slots are usually available. You'll see the earliest times for your area when you pick a slot.",
+          "You can book from an hour ahead, with 2-hour arrival windows between 8am and 8pm, or an all-day slot if you're flexible. You'll see the times available when you pick a slot.",
       },
       {
         question: "Where can the mechanic work on my car?",
         answer:
-          "Anywhere it's safe and legal to — your driveway, a workplace car park, or the roadside. You choose the location when you book. Some jobs need a reasonably level, accessible spot; we'll flag it if so.",
+          "Anywhere it's safe and legal to: your driveway, a workplace car park, or the roadside. You choose the location when you book. Some jobs need a reasonably level, accessible spot; we'll flag it if so.",
       },
       {
         question: "Can I reschedule or cancel a booking?",
         answer:
-          "Yes — manage your bookings from your dashboard. You can reschedule or cancel free of charge up to the start of your slot. Since nothing is charged until the job's complete, cancelling costs you nothing.",
+          "Yes, from your dashboard. Rescheduling is free. Cancelling is free more than 24 hours before your slot; a fee applies closer to the time or once your mechanic is on the way. Our cancellation policy lists the current fees.",
       },
       {
         question: "What if I'm not at home when the mechanic arrives?",
@@ -73,12 +73,12 @@ const FAQ_GROUPS: FaqGroup[] = [
       {
         question: "Is the price I see the price I pay?",
         answer:
-          "Yes. Our quotes include parts, labour and call-out — no hidden fees. If the job turns out to be different from what we quoted, we'll talk you through it and agree a price before any further work begins.",
+          "Yes, for the job you booked: parts, labour and call-out, with no hidden fees. If your mechanic finds the car needs something different, they'll send you the new price to approve before any extra work is done.",
       },
       {
         question: "Do I pay upfront?",
         answer:
-          "No. We pre-authorise the payment when you book — this reserves the funds but doesn't charge you. We only take payment once the job is finished and you've confirmed it's been done properly.",
+          "No. We pre-authorise the payment when you book, which reserves the funds but doesn't charge you. You're only charged when your mechanic completes the job.",
       },
       {
         question: "What payment methods can I use?",
@@ -88,12 +88,12 @@ const FAQ_GROUPS: FaqGroup[] = [
       {
         question: "What if the mechanic can't fix the problem?",
         answer:
-          "A diagnostic inspection is a set price (from £59.99). Your mechanic finds the fault, tells you what it needs and quotes for the repair — you decide whether to go ahead.",
+          "A diagnostic inspection is a set price (from £59.99). Your mechanic finds the fault, tells you what it needs and quotes for the repair, and you decide whether to go ahead.",
       },
       {
         question: "How do refunds work?",
         answer:
-          "If a booking is cancelled before any work is captured, the pre-authorisation is released in full. Where a refund is due after payment — for example following a dispute — it's returned to your original payment method.",
+          "If a booking is cancelled before any work is captured, the pre-authorisation is released in full. Where a refund is due after payment (for example, following a dispute), it's returned to your original payment method.",
       },
     ],
   },
@@ -105,12 +105,12 @@ const FAQ_GROUPS: FaqGroup[] = [
       {
         question: "How are mechanics vetted?",
         answer:
-          "Every mechanic on Book My Tech is DBS-checked, fully insured, and holds a recognised trade qualification. We verify documents directly with the issuing bodies before they take their first job, and we track quality through reviews.",
+          "Every mechanic is vetted before they join Book My Tech. We check their ID, insurance and trade qualifications, a mechanic whose insurance lapses is taken offline until it's renewed, and we track quality through reviews.",
       },
       {
         question: "What does the 12-month guarantee cover?",
         answer:
-          "Every job is backed by a 12-month parts and labour guarantee, subject to fair wear and tear. If a fault with the original work recurs within that period, message us and we'll arrange for it to be put right at no extra charge.",
+          "Eligible repairs are covered for defective parts or workmanship for 12 months or 12,000 miles, whichever comes first, subject to the exclusions in our terms (fair wear and tear, for example). Diagnostics and inspections aren't covered. If something isn't right, contact us and we'll look into it under the warranty.",
       },
       {
         question: "What if I'm not happy with the work?",
@@ -120,7 +120,7 @@ const FAQ_GROUPS: FaqGroup[] = [
       {
         question: "Are the parts genuine?",
         answer:
-          "We fit genuine or OE-quality parts as standard, covered by the same 12-month guarantee as the labour.",
+          "Parts fitted on an eligible repair are covered by the same 12-month warranty as the labour.",
       },
     ],
   },
@@ -152,12 +152,12 @@ const MECHANIC_FAQS: AccordionItem[] = [
   {
     question: "How do I become a Book My Tech mechanic?",
     answer:
-      "Head to the For Mechanics page and start your application. It takes about 10 minutes — tell us about your business, specialisms and area, upload your documents, and we'll verify you within a few days.",
+      "Head to the For Mechanics page and start your application. It takes about 10 minutes: tell us about your business, specialisms and area, upload your documents, and we'll review your application within a few days.",
   },
   {
     question: "How and when do mechanics get paid?",
     answer:
-      "The customer's payment is pre-authorised before the job and released to your connected account as soon as the work is marked complete and approved — no invoicing or chasing.",
+      "The customer's payment is pre-authorised before the job and paid out to your connected account when you mark the work complete, with no invoicing or chasing.",
   },
   {
     question: "Do mechanics have to work set hours?",
@@ -210,7 +210,7 @@ export default function HelpPage() {
             How can we help?
           </h1>
           <p className="mx-auto max-w-2xl text-base text-white/85 sm:text-lg">
-            Answers to the questions we hear most — about booking, pricing, payments,
+            Answers to the questions we hear most about booking, pricing, payments,
             guarantees and working with Book My Tech. Still stuck? We&apos;re a message away.
           </p>
         </div>

@@ -3,7 +3,7 @@ import { LegalPage } from "../_components/legal-page";
 import { PREAMBLE, SECTIONS } from "./content";
 
 export const metadata: Metadata = {
-  title: "Cookie Policy — Book My Tech",
+  title: "Cookie Policy | Book My Tech",
   description:
     "What cookies and similar technologies Book My Tech uses, why we use them, which ones need your consent, and how to change your choice.",
 };

@@ -72,7 +72,7 @@ export async function notifyCustomerRevisionSent(booking: RevisionBookingContact
   }
   sendPushToCustomer(booking.customer_id, {
     title: "Your mechanic has revised the job",
-    body: `${revision.after.repairDescription} — ${formatPrice(revision.after.totalPence)} (${difference}). Tap to review.`,
+    body: `${revision.after.repairDescription}: ${formatPrice(revision.after.totalPence)} (${difference}). Tap to review.`,
     bookingId: booking.id,
   }).catch(() => {});
 }
@@ -114,7 +114,7 @@ export async function notifyCustomerJobEndedOnSite(
   const feeLine =
     args.feePence > 0
       ? `${args.feeLabel}: ${formatPrice(args.feePence)} has been charged to your card. The rest of your pre-authorisation has been released.`
-      : "Nothing has been charged — your whole pre-authorisation has been released.";
+      : "Nothing has been charged. Your whole pre-authorisation has been released.";
   if (booking.customer_email) {
     const to = booking.customer_email;
     renderTemplateEmail("job_ended_on_site", {

@@ -16,7 +16,7 @@ export const PICKER_UNAVAILABLE = {
   ok: false as const,
   code: "unavailable" as const,
   message:
-    "We can't load the vehicle list at the moment — that's a problem on our side. " +
+    "We can't load the vehicle list at the moment. That's a problem on our side. " +
     "Please try again a little later.",
 };
 

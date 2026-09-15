@@ -225,7 +225,7 @@ export function ProductForm({
             />
             <span className="text-xs font-normal text-text-muted">
               What the mechanic ticks through on the job; the customer gets it back as a report.
-              {checklists.length === 0 && " No checklists exist yet — apply migration 0061."}
+              {checklists.length === 0 && " No checklists exist yet. Apply migration 0061."}
             </span>
           </label>
           {chosenChecklist?.kind === "inspection" && (

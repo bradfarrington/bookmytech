@@ -56,7 +56,7 @@ export default async function SettingsPage({
           <h2 className="mb-4 text-sm font-bold uppercase tracking-wide text-text-muted">Email address</h2>
           {emailFlag === "changed" && (
             <p className="mb-4 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
-              Thanks — that confirmation has been received. Once you&apos;ve confirmed from both your
+              Thanks, that confirmation has been received. Once you&apos;ve confirmed from both your
               old and new addresses, the change is complete and your current address is shown below.
             </p>
           )}
@@ -71,7 +71,7 @@ export default async function SettingsPage({
             <h2 className="text-sm font-bold uppercase tracking-wide text-text-muted">Reminders</h2>
             <p className="mt-2 text-sm text-text-secondary">
               Choose whether we remind you about your MOT, annual service and
-              seasonal checks — and how we reach you.
+              seasonal checks, and how we reach you.
             </p>
           </div>
           <ChevronRight size={18} className="shrink-0 text-text-muted" />

@@ -156,7 +156,7 @@ export default async function OfferPage({ params }: PageProps) {
         vehicle={[booking.vehicle_make, booking.vehicle_model].filter(Boolean).join(" ") || "Vehicle"}
         reg={booking.vehicle_reg}
         whenLabel={formatBookingWhen(booking, { relative: true })}
-        where={booking.area ?? booking.postcode ?? "—"}
+        where={booking.area ?? booking.postcode ?? "Location not set"}
         distanceLabel={distanceLabel}
         notes={booking.special_instructions}
         earningsPence={mechanicSharePence(booking.total_pence ?? 0, booking.commission_rate ?? 0.15)}

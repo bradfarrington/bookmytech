@@ -44,7 +44,7 @@ export interface HaynesProHealth {
 export function describeAuthStatus(code: number | null): string {
   switch (code) {
     case 1:
-      return "HaynesPro doesn't recognise our distributor account (unknown company) — usually an expired or cancelled licence.";
+      return "HaynesPro doesn't recognise our distributor account (unknown company). This usually means an expired or cancelled licence.";
     case 2:
       return "HaynesPro rejected our distributor password.";
     case 3:
@@ -54,7 +54,7 @@ export function describeAuthStatus(code: number | null): string {
     case 6:
       return "Our HaynesPro account isn't licensed for this operation.";
     case 7:
-      return "HaynesPro has temporarily banned us (too many failed attempts) — this clears itself after about 20 minutes.";
+      return "HaynesPro has temporarily banned us (too many failed attempts). This clears itself after about 20 minutes.";
     default:
       return `HaynesPro refused our credentials (status ${code ?? "unknown"}).`;
   }

@@ -63,7 +63,7 @@ export default async function AdminDisputesPage() {
       <div>
         <h1 className="text-2xl font-bold text-text-primary">Disputes</h1>
         <p className="text-text-secondary">
-          {open.length} open · {needsArbitration} awaiting your arbitration. You mediate — step in when the parties can&apos;t resolve it themselves.
+          {open.length} open · {needsArbitration} awaiting your arbitration. You mediate: step in when the parties can&apos;t resolve it themselves.
         </p>
       </div>
 

@@ -57,7 +57,7 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 function formatDate(iso: string | null): string {
-  if (!iso) return "—";
+  if (!iso) return "No date";
   return new Date(iso).toLocaleString("en-GB", {
     day: "2-digit",
     month: "short",
@@ -234,7 +234,7 @@ export function BookingsTable({
                           {b.area}
                         </span>
                       ) : (
-                        <span className="text-text-muted">—</span>
+                        <span className="text-text-muted">No area</span>
                       )}
                     </td>
                     <td className="px-5 py-3 text-text-secondary">

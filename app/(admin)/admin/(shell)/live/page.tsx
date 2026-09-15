@@ -80,7 +80,7 @@ export default async function AdminLiveMonitorPage() {
     id: b.id,
     jobNumber: b.job_number,
     service: b.repair_description ?? "Vehicle repair",
-    customer: b.customer_name ?? "—",
+    customer: b.customer_name ?? "No name",
     mechanic: b.mechanic_id ? profileName.get(b.mechanic_id) ?? "Assigned" : null,
     area: b.area,
     status: b.status,
@@ -124,7 +124,7 @@ export default async function AdminLiveMonitorPage() {
           </span>
         </h1>
         <p className="mt-1.5 text-sm text-text-muted">
-          What&apos;s happening across the marketplace right now — refreshes every
+          What&apos;s happening across the marketplace right now. Refreshes every
           15 seconds.
         </p>
       </header>

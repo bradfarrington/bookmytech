@@ -148,9 +148,9 @@ export async function acceptOffer(offerId: string): Promise<OfferActionResult> {
       ref,
       when: slotLabel,
       optional_note: isFlexible
-        ? "You offered a choice of days — your mechanic will confirm which day and a 2-hour arrival window."
+        ? "You offered a choice of days. Your mechanic will confirm which day and a 2-hour arrival window."
         : isAllDay
-          ? "You booked an all-day slot — your mechanic will confirm a 2-hour arrival window for the day."
+          ? "You booked an all-day slot. Your mechanic will confirm a 2-hour arrival window for the day."
           : "",
     })
       .then(({ subject, html }) => sendEmail({ to, subject, html }))

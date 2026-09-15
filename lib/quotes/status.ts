@@ -39,7 +39,7 @@ export function respondRefusal(
 ): string | null {
   if (quote.status === "approved") return null; // idempotent approve / no-op decline handled by the caller
   if (quote.status !== "sent") return "This quote is no longer open.";
-  if (isQuoteExpired(quote, now)) return "This quote has expired — ask your mechanic to send it again.";
+  if (isQuoteExpired(quote, now)) return "This quote has expired. Ask your mechanic to send it again.";
   if (quote.kind === "now" && bookingStatus !== "in_progress")
     return "This job is no longer in progress, so this quote can't be approved.";
   return null;

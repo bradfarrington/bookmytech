@@ -82,7 +82,7 @@ export function AagStatus({
       <div className="flex items-center gap-2.5 rounded-button border border-border bg-surface-card px-4 py-2.5 text-sm text-text-secondary">
         <CheckCircle2 size={16} className="shrink-0 text-success" />
         <span>
-          {host} connected — last successful call {relative(health.at)}.
+          {host} connected. Last successful call {relative(health.at)}.
         </span>
       </div>
     );
@@ -92,7 +92,7 @@ export function AagStatus({
     <div className="flex items-center gap-2.5 rounded-button border border-border bg-surface-card px-4 py-2.5 text-sm text-text-muted">
       <CheckCircle2 size={16} className="shrink-0 text-text-disabled" />
       <span>
-        {host} is configured. No call recorded yet — run a check below and the
+        {host} is configured. No call recorded yet. Run a check below and the
         status will show here.
       </span>
     </div>

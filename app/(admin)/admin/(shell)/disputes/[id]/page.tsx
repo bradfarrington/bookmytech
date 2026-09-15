@@ -73,8 +73,8 @@ export default async function AdminDisputeDetailPage({
   const suggestion = closed
     ? null
     : rating >= 4.8 && firstBooking
-      ? "Lean to the customer — a strong-rated mechanic vs a first-time customer; give benefit of the doubt."
-      : "Neutral — weigh both accounts and the evidence on their merits.";
+      ? "Lean to the customer: a strong-rated mechanic vs a first-time customer; give benefit of the doubt."
+      : "Neutral: weigh both accounts and the evidence on their merits.";
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-6">
@@ -95,9 +95,9 @@ export default async function AdminDisputeDetailPage({
 
       {/* Case file */}
       <div className="grid gap-3 sm:grid-cols-2">
-        <Info label="Customer" value={customer?.full_name ?? booking.customer_name ?? "—"} sub={`${customerBookings ?? 0} booking(s)`} />
-        <Info label="Mechanic" value={mechProfile?.full_name ?? "—"} sub={mech ? `${rating.toFixed(1)}★ · ${mech.job_count ?? 0} jobs` : "—"} link={booking.mechanic_id ? `/admin/mechanics/${booking.mechanic_id}` : undefined} />
-        <Info label="Vehicle" value={[booking.vehicle_make, booking.vehicle_model].filter(Boolean).join(" ") || "—"} sub={booking.vehicle_reg ?? ""} />
+        <Info label="Customer" value={customer?.full_name ?? booking.customer_name ?? "No name"} sub={`${customerBookings ?? 0} booking(s)`} />
+        <Info label="Mechanic" value={mechProfile?.full_name ?? "Unassigned"} sub={mech ? `${rating.toFixed(1)}★ · ${mech.job_count ?? 0} jobs` : undefined} link={booking.mechanic_id ? `/admin/mechanics/${booking.mechanic_id}` : undefined} />
+        <Info label="Vehicle" value={[booking.vehicle_make, booking.vehicle_model].filter(Boolean).join(" ") || "Not set"} sub={booking.vehicle_reg ?? ""} />
         <Info
           label="Payment"
           value={formatPrice(chargedPence)}

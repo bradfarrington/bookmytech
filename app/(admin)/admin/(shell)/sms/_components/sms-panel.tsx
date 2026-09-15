@@ -60,7 +60,7 @@ export function SmsPanel({
   useEffect(() => {
     const purchase = params.get("purchase");
     if (purchase === "success") {
-      toast.success("Payment received — credits will appear here shortly.");
+      toast.success("Payment received. Credits will appear here shortly.");
     } else if (purchase === "cancelled") {
       toast("Purchase cancelled.");
     }
@@ -142,9 +142,9 @@ function BalanceAndToggle({ balance, smsEnabled }: { balance: number; smsEnabled
             {balance.toLocaleString("en-GB")}
           </p>
           {balance === 0 ? (
-            <p className="text-xs font-medium text-danger">Out of credits — SMS won&apos;t send.</p>
+            <p className="text-xs font-medium text-danger">Out of credits. SMS won&apos;t send.</p>
           ) : low ? (
-            <p className="text-xs font-medium text-warning">Running low — top up soon.</p>
+            <p className="text-xs font-medium text-warning">Running low. Top up soon.</p>
           ) : null}
         </div>
       </div>
@@ -290,7 +290,7 @@ function TestSendSection({ enabled, balance }: { enabled: boolean; balance: numb
     start(async () => {
       const res = await sendTestSms(phone);
       if (res.ok) {
-        toast.success("Test SMS sent — 1 credit used.");
+        toast.success("Test SMS sent (1 credit used).");
         setPhone("");
       } else {
         toast.error(res.error);
@@ -303,7 +303,7 @@ function TestSendSection({ enabled, balance }: { enabled: boolean; balance: numb
       <SectionHeading title="Send a test" subtitle="Sends one real SMS and uses one credit." />
       {blocked && (
         <p className="rounded-button bg-warning/10 px-3 py-2 text-xs font-medium text-warning">
-          {!enabled ? "Enable SMS above to send a test." : "No credits — buy some first."}
+          {!enabled ? "Enable SMS above to send a test." : "No credits. Buy some first."}
         </p>
       )}
       <div className="flex flex-wrap items-end gap-3">
@@ -340,7 +340,7 @@ function ComposeSection({ enabled, balance }: { enabled: boolean; balance: numbe
     start(async () => {
       const res = await sendCustomSms({ to: phone, body: message });
       if (res.ok) {
-        toast.success("Message sent — 1 credit used.");
+        toast.success("Message sent (1 credit used).");
         setPhone("");
         setMessage("");
       } else {
@@ -357,7 +357,7 @@ function ComposeSection({ enabled, balance }: { enabled: boolean; balance: numbe
       />
       {blocked && (
         <p className="rounded-button bg-warning/10 px-3 py-2 text-xs font-medium text-warning">
-          {!enabled ? "Enable SMS above to send." : "No credits — buy some first."}
+          {!enabled ? "Enable SMS above to send." : "No credits. Buy some first."}
         </p>
       )}
       <label className={FIELD_LABEL}>

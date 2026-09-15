@@ -130,7 +130,7 @@ function Half({ label, configured, missing, health }: HalfProps) {
           <span className="text-sm font-semibold text-text-primary">{label}</span>
           <Pill tone="neutral">Ready</Pill>
         </div>
-        <p className="mt-0.5 text-xs text-text-muted">Configured — no call recorded yet.</p>
+        <p className="mt-0.5 text-xs text-text-muted">Configured. No call recorded yet.</p>
       </div>
     </div>
   );

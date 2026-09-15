@@ -24,10 +24,10 @@ export function RevisionProposal({ revision, compact = false }: { revision: Pend
       <ArrowRightLeft size={compact ? 18 : 20} className="shrink-0 text-amber-700" />
       <div className="min-w-0 flex-1">
         <p className={`font-semibold text-text-primary ${compact ? "text-sm" : ""}`}>
-          Your mechanic has revised the job — {formatPrice(revision.afterTotalPence)} ({differenceLabel(revision.differencePence)})
+          Your mechanic has revised the job: {formatPrice(revision.afterTotalPence)} ({differenceLabel(revision.differencePence)})
         </p>
         <p className="mt-0.5 text-xs text-text-secondary">
-          {revision.repairDescription} — the repair you booked isn&apos;t what your car needs. Review and approve, or decline. Nothing changes until you do.
+          {revision.repairDescription}. The repair you booked isn&apos;t what your car needs. Review and approve, or decline. Nothing changes until you do.
         </p>
       </div>
       <ChevronRight size={16} className="shrink-0 text-amber-700" />

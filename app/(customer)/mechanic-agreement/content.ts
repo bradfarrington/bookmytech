@@ -516,7 +516,7 @@ export function buildSections(takeRate: number): LegalSection[] {
         head: ["Description", "Amount"],
         rows: [
           ["Customer booking price", formatPrice(EXAMPLE_TOTAL_PENCE)],
-          [`Book My Tech platform fee — ${pct} inclusive of VAT`, formatPrice(feePence)],
+          [`Book My Tech platform fee (${pct} inclusive of VAT)`, formatPrice(feePence)],
           ["Mechanic amount before any other applicable deductions", formatPrice(EXAMPLE_TOTAL_PENCE - feePence)],
         ],
       },
@@ -941,7 +941,7 @@ export function buildSections(takeRate: number): LegalSection[] {
     ],
   },
   {
-    heading: "Serious Breach — Off-Platform Work",
+    heading: "Serious Breach: Off-Platform Work",
     blocks: [
       { type: "p", text: "Because Book My Tech operates a managed marketplace, deliberately taking customers or work away from the platform is a serious breach of these Terms." },
       { type: "p", text: "This includes:" },

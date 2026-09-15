@@ -62,7 +62,7 @@ export default async function MechanicProfilePage() {
         <StatTile
           icon={Star}
           label="Rating"
-          value={mechanic && mechanic.rating > 0 ? `${mechanic.rating.toFixed(1)} ★` : "—"}
+          value={mechanic && mechanic.rating > 0 ? `${mechanic.rating.toFixed(1)} ★` : "No ratings yet"}
         />
         <StatTile icon={Briefcase} label="Total jobs" value={mechanic?.job_count ?? 0} />
         <StatTile
@@ -71,7 +71,7 @@ export default async function MechanicProfilePage() {
           value={
             memberSince
               ? new Date(memberSince).toLocaleDateString("en-GB", { month: "short", year: "numeric" })
-              : "—"
+              : "Not known"
           }
         />
         <StatTile

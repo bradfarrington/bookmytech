@@ -29,7 +29,7 @@ export function ProductsTable({ products }: { products: CatalogueProductRow[] })
   if (products.length === 0) {
     return (
       <Card className="px-4 py-8 text-center text-sm text-text-muted">
-        Nothing here yet — add a product and it appears in the catalogue at once.
+        Nothing here yet. Add a product and it appears in the catalogue at once.
       </Card>
     );
   }

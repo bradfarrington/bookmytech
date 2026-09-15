@@ -76,7 +76,7 @@ export async function notifyCustomerQuoteSent(booking: QuoteBookingContact, quot
   }
   sendPushToCustomer(booking.customer_id, {
     title: "Your mechanic has sent a quote",
-    body: `${total} for ${quote.kind === "follow_on" ? "a return visit" : "extra work"} — tap to review.`,
+    body: `${total} for ${quote.kind === "follow_on" ? "a return visit" : "extra work"}. Tap to review.`,
     bookingId: booking.id,
   }).catch(() => {});
 }

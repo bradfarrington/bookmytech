@@ -179,7 +179,7 @@ export function LiveLookupForm({ disabled }: { disabled: boolean }) {
           )}
 
           <p className="border-t border-border px-4 py-2.5 text-xs text-text-muted">
-            Everything LKQ lists for this vehicle. Pick one for live prices — a part you
+            Everything LKQ lists for this vehicle. Pick one for live prices: a part you
             haven&apos;t priced on this vehicle before spends one credit, and is free after that.
           </p>
         </Card>
@@ -238,7 +238,7 @@ export function LiveLookupForm({ disabled }: { disabled: boolean }) {
 
           <p className="text-xs text-text-muted">
             Costs are what BMT pays the supplier, passed through with no mark-up. Surcharges are
-            shown separately and are <strong>not</strong> added to the cost — whether LKQ&apos;s
+            shown separately and are <strong>not</strong> added to the cost; whether LKQ&apos;s
             price already includes them is still unconfirmed.
           </p>
         </div>

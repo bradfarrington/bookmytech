@@ -109,7 +109,7 @@ export function JobSearch({ bundleId, poolIds }: { bundleId: string; poolIds: st
           ))}
           {truncated && (
             <li className="px-3 py-2 text-[11px] text-text-muted">
-              Closest matches — not every job was checked. Be more specific to find others.
+              Closest matches: not every job was checked. Be more specific to find others.
             </li>
           )}
         </ul>

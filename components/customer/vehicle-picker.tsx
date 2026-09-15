@@ -150,7 +150,7 @@ export function VehiclePicker({
   if (outage) {
     return (
       <Notice>
-        We can&apos;t load the vehicle list at the moment — that&apos;s a problem on our
+        We can&apos;t load the vehicle list at the moment. That&apos;s a problem on our
         side, not with your registration. Please try again a little later, or get in
         touch and we&apos;ll sort it for you.
       </Notice>
@@ -208,7 +208,7 @@ export function VehiclePicker({
 
       <Field
         label="Engine / variant"
-        hint="This is what sets the price — check the engine size and power match your car."
+        hint="This is what sets the price. Check the engine size and power match your car."
       >
         <Select
           value={typeId}

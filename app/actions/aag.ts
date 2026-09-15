@@ -39,7 +39,7 @@ export async function checkAagQuoteAction(input: {
   if (!reg) return { ok: false, error: "Enter a registration." };
   if (!/^\d{1,6}$/.test(genart)) return { ok: false, error: "Enter a numeric TecDoc GenArt id (82 = brake discs)." };
   if (!isAagConfigured()) {
-    return { ok: false, error: "AAG isn't configured on this environment — add the AAG_* values first." };
+    return { ok: false, error: "AAG isn't configured on this environment. Add the AAG_* values first." };
   }
 
   const body = await aagQuote(reg, genart);

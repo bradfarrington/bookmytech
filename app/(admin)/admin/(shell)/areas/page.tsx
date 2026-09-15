@@ -92,7 +92,7 @@ export default async function AdminAreasPage() {
             Areas &amp; demand
           </h1>
           <p className="mt-1.5 max-w-2xl text-sm text-text-muted">
-            Operational areas across the network — demand, supply and GMV per
+            Operational areas across the network: demand, supply and GMV per
             city. Launch a new city with the setup wizard.
           </p>
         </div>

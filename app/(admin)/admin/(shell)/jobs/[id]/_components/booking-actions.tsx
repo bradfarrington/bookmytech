@@ -60,7 +60,7 @@ export function BookingActions({
   if (isClosed) {
     return (
       <p className="text-sm text-text-muted">
-        This booking is cancelled — no further actions are available.
+        This booking is cancelled. No further actions are available.
       </p>
     );
   }
@@ -149,7 +149,7 @@ export function BookingActions({
           <p className="mt-1.5 text-xs text-text-muted">
             Refunds the customer&apos;s card from Book My Tech&apos;s balance.{" "}
             {hasMechanic
-              ? "This amount is recovered from the mechanic — their balance goes negative and it's netted off their next payout."
+              ? "This amount is recovered from the mechanic: their balance goes negative and it's netted off their next payout."
               : "No mechanic is assigned, so Book My Tech absorbs this refund."}
           </p>
         </div>

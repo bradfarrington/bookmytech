@@ -41,18 +41,18 @@ export async function readJsonBody<T = unknown>(request: Request): Promise<JsonB
   if (!contentType.toLowerCase().includes("application/json")) {
     return {
       ok: false,
-      response: apiError("Something went wrong — please update the app and try again.", 415),
+      response: apiError("Something went wrong. Please update the app and try again.", 415),
     };
   }
 
   try {
     const body = (await request.json()) as T;
     if (!body || typeof body !== "object") {
-      return { ok: false, response: apiError("Something went wrong — please try again.", 400) };
+      return { ok: false, response: apiError("Something went wrong. Please try again.", 400) };
     }
     return { ok: true, body };
   } catch {
-    return { ok: false, response: apiError("Something went wrong — please try again.", 400) };
+    return { ok: false, response: apiError("Something went wrong. Please try again.", 400) };
   }
 }
 

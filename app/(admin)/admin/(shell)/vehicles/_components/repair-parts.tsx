@@ -72,7 +72,7 @@ function Cost({ offer }: { offer: SupplierOffer }) {
   return (
     <div className="shrink-0 text-right">
       <div className={cn("text-sm font-semibold", offer.costPence == null && "text-text-muted")}>
-        {offer.costPence == null ? "—" : formatPrice(offer.costPence)}
+        {offer.costPence == null ? "Not priced" : formatPrice(offer.costPence)}
       </div>
       {offer.quantityOfFit && offer.quantityOfFit > 1 && offer.costPence != null && (
         <div className="whitespace-nowrap text-xs text-text-muted">
@@ -320,7 +320,7 @@ export function RepairParts({
               }}
             >
               <p className="text-sm text-text-primary">
-                Suppliers only price a real vehicle. Enter a registration for this engine variant — we&apos;ll
+                Suppliers only price a real vehicle. Enter a registration for this engine variant. We&apos;ll
                 check it&apos;s the right car and remember it.
               </p>
               {result.reason && <p className="text-sm text-amber-700">{result.reason}</p>}

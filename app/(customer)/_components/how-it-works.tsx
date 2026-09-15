@@ -23,7 +23,7 @@ const STEPS: Step[] = [
     icon: Wrench,
     title: "Pick what's wrong.",
     description:
-      "A repair, a diagnostic, a service or an inspection — each priced for your exact car before you book.",
+      "A repair, a diagnostic, a service or an inspection, each priced for your exact car before you book.",
   },
   {
     number: "03",

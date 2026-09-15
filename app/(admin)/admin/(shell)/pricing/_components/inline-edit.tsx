@@ -33,7 +33,7 @@ export function InlineNumber({
   onSave,
   ariaLabel,
   clearable = false,
-  placeholder = "—",
+  placeholder = "Not set",
   className,
 }: InlineNumberProps) {
   const [current, setCurrent] = useState<number | null>(value);
@@ -144,7 +144,7 @@ export function InlineText({
   display,
   onSave,
   ariaLabel,
-  placeholder = "—",
+  placeholder = "Not set",
   className,
 }: InlineTextProps) {
   const [current, setCurrent] = useState(value);

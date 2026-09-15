@@ -96,7 +96,7 @@ export function StripeOnboardingPanel({
         <>
           <p className="text-sm text-text-secondary">
             {hasAccount && onboardingComplete
-              ? "We have your details but payouts aren't enabled yet — this can take a few minutes. Re-check below."
+              ? "We have your details but payouts aren't enabled yet. This can take a few minutes. Re-check below."
               : hasAccount
                 ? "You started onboarding but haven't finished. Pick up where you left off."
                 : "We securely collect your bank details and verify your identity on a secure hosted page. It takes a couple of minutes."}

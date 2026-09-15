@@ -48,7 +48,7 @@ export const SMS_TEMPLATE_DEFS: readonly SmsTemplateDef[] = [
       { name: "ref", description: "Short booking reference", example: "A1B2C3D4" },
     ],
     defaultBody:
-      "Booking received with Book My Tech (ref {{ref}}). We're finding your mechanic — you'll hear from us shortly.",
+      "Booking received with Book My Tech (ref {{ref}}). We're finding your mechanic. You'll hear from us shortly.",
   },
   {
     key: "mechanic_confirmed",
@@ -61,7 +61,7 @@ export const SMS_TEMPLATE_DEFS: readonly SmsTemplateDef[] = [
       { name: "ref", description: "Booking reference", example: "00123" },
     ],
     defaultBody:
-      "Good news — {{mechanic}} has accepted your Book My Tech booking (ref {{ref}}) for {{when}}. We'll text you when they set off.",
+      "Good news: {{mechanic}} has accepted your Book My Tech booking (ref {{ref}}) for {{when}}. We'll text you when they set off.",
   },
   {
     key: "replacement_confirmed",
@@ -149,7 +149,7 @@ export const SMS_TEMPLATE_DEFS: readonly SmsTemplateDef[] = [
     audience: "customer",
     variables: [],
     defaultBody:
-      "Your Book My Tech job is complete — paid in full with your account credit. Thanks!",
+      "Your Book My Tech job is complete and paid in full with your account credit. Thanks!",
   },
   {
     key: "booking_cancelled_fee",
@@ -202,7 +202,7 @@ export const SMS_TEMPLATE_DEFS: readonly SmsTemplateDef[] = [
       { name: "cta", description: "Suggested action", example: "book your MOT" },
       { name: "url", description: "Link to act on it", example: "https://bookmytech.co.uk/book" },
     ],
-    defaultBody: "{{label}} for {{vehicle_reg}}: {{cta}} — {{url}}",
+    defaultBody: "{{label}} for {{vehicle_reg}}: {{cta}} at {{url}}",
   },
 
   // --- Discount codes (Task 35) -----------------------------------------------
@@ -216,7 +216,7 @@ export const SMS_TEMPLATE_DEFS: readonly SmsTemplateDef[] = [
       { name: "offer", description: "What it's worth", example: "10% off" },
       { name: "url", description: "Link to book", example: "https://bookmytech.co.uk/book" },
     ],
-    defaultBody: "Book My Tech: here's {{offer}} your next booking — use code {{code}} at checkout. {{url}}",
+    defaultBody: "Book My Tech: here's {{offer}} your next booking. Use code {{code}} at checkout. {{url}}",
   },
 
   // --- Quotes (Task 33) --------------------------------------------------------
@@ -243,7 +243,7 @@ export const SMS_TEMPLATE_DEFS: readonly SmsTemplateDef[] = [
       { name: "difference", description: "Signed difference from what was booked", example: "+£19.00" },
       { name: "url", description: "Link to review it", example: "https://bookmytech.co.uk/dashboard/revisions/…" },
     ],
-    defaultBody: "Book My Tech: your mechanic has revised the job — new total {{after_total}} ({{difference}}). Nothing changes until you approve: {{url}}",
+    defaultBody: "Book My Tech: your mechanic has revised the job. New total {{after_total}} ({{difference}}). Nothing changes until you approve: {{url}}",
   },
   {
     key: "job_ended_on_site",
@@ -254,7 +254,7 @@ export const SMS_TEMPLATE_DEFS: readonly SmsTemplateDef[] = [
       { name: "ref", description: "Job number", example: "00123" },
       { name: "fee_line", description: "What was charged", example: "£59.99 charged, the rest released." },
     ],
-    defaultBody: "Book My Tech: job {{ref}} has ended — the booked repair wasn't what your car needed and the revised job was declined. {{fee_line}}",
+    defaultBody: "Book My Tech: job {{ref}} has ended: the booked repair wasn't what your car needed and the revised job was declined. {{fee_line}}",
   },
 
   // --- Mechanic ---------------------------------------------------------------
@@ -268,7 +268,7 @@ export const SMS_TEMPLATE_DEFS: readonly SmsTemplateDef[] = [
       { name: "job", description: "The revised job", example: "Renew the front wheel bearing" },
       { name: "after_total", description: "The revised total", example: "£111.00" },
     ],
-    defaultBody: "Book My Tech: the customer approved the revised job on {{ref}} — {{job}}, {{after_total}}. Go ahead; it's paid with the job.",
+    defaultBody: "Book My Tech: the customer approved the revised job on {{ref}}: {{job}}, {{after_total}}. Go ahead; it's paid with the job.",
   },
   {
     key: "mech_revision_declined",
@@ -279,7 +279,7 @@ export const SMS_TEMPLATE_DEFS: readonly SmsTemplateDef[] = [
       { name: "ref", description: "Job number", example: "00123" },
       { name: "job", description: "The revised job", example: "Renew the front wheel bearing" },
     ],
-    defaultBody: "Book My Tech: the customer declined the revised job on {{ref}}. Don't carry out that work — choose how to end the job from the job page.",
+    defaultBody: "Book My Tech: the customer declined the revised job on {{ref}}. Don't carry out that work. Choose how to end the job from the job page.",
   },
   {
     key: "mech_quote_approved",
@@ -290,7 +290,7 @@ export const SMS_TEMPLATE_DEFS: readonly SmsTemplateDef[] = [
       { name: "ref", description: "Job number", example: "00123" },
       { name: "total", description: "Quote total", example: "£87.00" },
     ],
-    defaultBody: "Book My Tech: the customer approved your {{total}} quote on job {{ref}} — go ahead. It's paid with the job.",
+    defaultBody: "Book My Tech: the customer approved your {{total}} quote on job {{ref}}. Go ahead. It's paid with the job.",
   },
   {
     key: "mech_quote_declined",
@@ -336,7 +336,7 @@ export const SMS_TEMPLATE_DEFS: readonly SmsTemplateDef[] = [
       { name: "slot", description: "The agreed date/time", example: "Thu 4 Sep · 14:00" },
     ],
     defaultBody:
-      "Book My Tech: the customer accepted your new time for job {{ref}} — it's now {{slot}}.",
+      "Book My Tech: the customer accepted your new time for job {{ref}}. It's now {{slot}}.",
   },
   {
     key: "mech_reschedule_declined",

@@ -172,7 +172,7 @@ export function ReviseJob({ bookingId, status, lines, parts, revisions, fees }: 
   function send() {
     run(
       () => sendRevisionAction({ bookingId, repairIds, parts: partsInput, reason, note }),
-      "Revised job sent — don't start the new work until it shows Approved.",
+      "Revised job sent. Don't start the new work until it shows Approved.",
       () => setOpen(false),
     );
   }
@@ -187,7 +187,7 @@ export function ReviseJob({ bookingId, status, lines, parts, revisions, fees }: 
       <div className="space-y-3">
         <RevisionSummary revision={r} />
         <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">
-          Waiting for the customer — don&apos;t start the revised work until it shows Approved.
+          Waiting for the customer. Don&apos;t start the revised work until it shows Approved.
           {r.expiresAt && ` Open until ${new Date(r.expiresAt).toLocaleString("en-GB", { weekday: "short", hour: "numeric", minute: "2-digit" })}.`}
         </p>
         <button
@@ -211,7 +211,7 @@ export function ReviseJob({ bookingId, status, lines, parts, revisions, fees }: 
             <ArrowRightLeft size={12} /> Revised · was {formatPrice(money.approved.before.totalPence)}, now {formatPrice(money.approved.after.totalPence)}
           </p>
           <p className="text-xs text-text-muted">
-            The customer approved the revised job — the job sheet above is the new one. A job can be revised once; complete it, then send a follow-on quote for anything else.
+            The customer approved the revised job. The job sheet above is the new one. A job can be revised once; complete it, then send a follow-on quote for anything else.
           </p>
         </div>
       )}
@@ -230,7 +230,7 @@ export function ReviseJob({ bookingId, status, lines, parts, revisions, fees }: 
       {!money.approved && canRevise && !open && !money.declined && (
         <div className="space-y-2">
           <p className="text-sm text-text-secondary">
-            Booked the wrong repair? Change the job here — swap the repair, keep or drop parts, add what&apos;s needed — and the customer approves the new job at its new price, up or down. Found extra work <em>on top</em> of the booked job? Use <strong>Extra work &amp; faults</strong> below instead.
+            Booked the wrong repair? Change the job here (swap the repair, keep or drop parts, add what&apos;s needed) and the customer approves the new job at its new price, up or down. Found extra work <em>on top</em> of the booked job? Use <strong>Extra work &amp; faults</strong> below instead.
           </p>
           <Button size="sm" variant="secondary" iconLeft={ArrowRightLeft} onClick={() => setOpen(true)} disabled={pending}>
             Change what&apos;s being done
@@ -253,7 +253,7 @@ export function ReviseJob({ bookingId, status, lines, parts, revisions, fees }: 
           {/* Repairs */}
           <section className="space-y-2">
             <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">Repairs</p>
-            {chosen.length === 0 && <p className="text-xs text-text-muted">Nothing on the job — add a repair below.</p>}
+            {chosen.length === 0 && <p className="text-xs text-text-muted">Nothing on the job. Add a repair below.</p>}
             <ul className="space-y-1.5">
               {chosen.map((c) => (
                 <li key={c.id} className="flex items-center justify-between gap-3 rounded-xl border border-border bg-surface-card px-3 py-2">
@@ -333,13 +333,13 @@ export function ReviseJob({ bookingId, status, lines, parts, revisions, fees }: 
 
           {/* Why */}
           <label className="flex flex-col gap-1 text-xs font-semibold text-text-muted">
-            Why the booked repair isn&apos;t right — the customer reads this
+            Why the booked repair isn&apos;t right (the customer reads this)
             <textarea
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               rows={2}
               maxLength={500}
-              placeholder="e.g. The pads are fine — the noise is a worn front wheel bearing."
+              placeholder="e.g. The pads are fine; the noise is a worn front wheel bearing."
               className={`${INPUT} h-auto py-2`}
             />
           </label>
@@ -350,7 +350,7 @@ export function ReviseJob({ bookingId, status, lines, parts, revisions, fees }: 
 
           {/* Preview — the server's figures, the ones the customer will see. */}
           <div className="rounded-xl bg-surface-card px-3.5 py-3 text-sm">
-            {repairIds.length === 0 && <p className="text-xs text-red-700">Keep or add at least one repair — a job can&apos;t be empty.</p>}
+            {repairIds.length === 0 && <p className="text-xs text-red-700">Keep or add at least one repair. A job can&apos;t be empty.</p>}
             {repairIds.length > 0 && (preview.state === "loading" || (preview.state === "ready" && !previewCurrent)) && (
               <p className="flex items-center gap-2 text-xs text-text-muted">
                 <Loader2 size={14} className="animate-spin" /> Pricing…
@@ -379,7 +379,7 @@ export function ReviseJob({ bookingId, status, lines, parts, revisions, fees }: 
                 {diff.durationChange !== 0 && (
                   <p className="text-xs text-text-muted">Visit now ~{preview.result.after.serviceDurationHours} h (was ~{preview.result.before.serviceDurationHours} h).</p>
                 )}
-                <p className="text-xs text-text-secondary">{changed ? mechanicDirectionSentence(diff.differencePence) : "Nothing has changed yet — remove or add a repair or part."}</p>
+                <p className="text-xs text-text-secondary">{changed ? mechanicDirectionSentence(diff.differencePence) : "Nothing has changed yet. Remove or add a repair or part."}</p>
               </div>
             )}
           </div>
@@ -388,7 +388,7 @@ export function ReviseJob({ bookingId, status, lines, parts, revisions, fees }: 
             Send to customer
           </Button>
           <p className="text-xs text-text-muted">
-            The customer approves the new job — if it costs more they authorise the difference on their card; if less, the difference is released when you complete. Don&apos;t start the revised work until it shows Approved.
+            The customer approves the new job. If it costs more they authorise the difference on their card; if less, the difference is released when you complete. Don&apos;t start the revised work until it shows Approved.
           </p>
         </div>
       )}
@@ -459,7 +459,7 @@ function EndJobPanel({
           The customer {revision.status === "declined" ? "declined" : "didn't answer"} the revised job
         </p>
         <p className="text-xs text-text-secondary">
-          Don&apos;t carry out the revised work. You can end the job here — the amount you choose is taken from the customer&apos;s hold, the rest is released, and it&apos;s paid to you minus the platform fee like any job.
+          Don&apos;t carry out the revised work. You can end the job here: the amount you choose is taken from the customer&apos;s hold, the rest is released, and it&apos;s paid to you minus the platform fee like any job.
         </p>
         <ul className="space-y-1.5">
           {options.map((o) => (
@@ -484,7 +484,7 @@ function EndJobPanel({
             onClick={() => {
               if (!picked) return;
               const sentence = picked.pence > 0 ? `Charge ${formatPrice(picked.pence)} and end this job? The rest of their hold is released.` : "End this job with no charge? Their whole hold is released.";
-              if (window.confirm(sentence)) run(() => endJobOnSiteAction({ bookingId, charge: picked.kind, note }), "Job ended — the customer's been told.");
+              if (window.confirm(sentence)) run(() => endJobOnSiteAction({ bookingId, charge: picked.kind, note }), "Job ended. The customer's been told.");
             }}
           >
             {picked && picked.pence > 0 ? `Charge ${formatPrice(picked.pence)} and end the job` : "End the job"}
@@ -494,7 +494,7 @@ function EndJobPanel({
           </button>
         </div>
         <p className="text-xs text-text-muted">
-          Or carry on with the original job as booked — nothing to press here; just complete it as normal when it&apos;s done.
+          Or carry on with the original job as booked. Nothing to press here; just complete it as normal when it&apos;s done.
         </p>
       </div>
     </div>
@@ -522,7 +522,7 @@ function NewPartFields({ part, onChange }: { part: DraftPart; onChange: (next: D
           onChange(match ? { ...part, name: match.name, partId: match.id, unitPounds: (match.bmtPricePence / 100).toFixed(2) } : { ...part, name: value, partId: null });
         }}
         options={names}
-        placeholder={catalogue == null ? "Loading parts…" : "Part name — pick from the catalogue or type your own"}
+        placeholder={catalogue == null ? "Loading parts…" : "Part name: pick from the catalogue or type your own"}
         aria-label="Part"
       />
       <div className="flex flex-wrap items-center gap-2 text-xs text-text-muted">
@@ -590,7 +590,7 @@ function CatalogueSearch({ bookingId, exclude, onPick }: { bookingId: string; ex
     <div className="space-y-1.5">
       <label className="relative block">
         <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
-        <input value={query} onChange={(e) => onQuery(e.target.value)} placeholder="Add a repair — search this car, e.g. wheel bearing" aria-label="Search repairs for this car" className={`${INPUT} w-full pl-9 pr-9`} />
+        <input value={query} onChange={(e) => onQuery(e.target.value)} placeholder="Add a repair: search this car, e.g. wheel bearing" aria-label="Search repairs for this car" className={`${INPUT} w-full pl-9 pr-9`} />
         {searching && <Loader2 size={14} className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-text-muted" />}
       </label>
       {hits.length > 0 && (
@@ -618,7 +618,7 @@ function CatalogueSearch({ bookingId, exclude, onPick }: { bookingId: string; ex
           ))}
           {truncated && (
             <li className="flex items-center gap-1 px-3 py-1.5 text-[11px] text-text-muted">
-              <ChevronDown size={11} /> Closest matches — be more specific to find others.
+              <ChevronDown size={11} /> Closest matches. Be more specific to find others.
             </li>
           )}
         </ul>

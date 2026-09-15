@@ -55,7 +55,7 @@ export function OnlineToggle({ initialStatus, payoutsEnabled }: OnlineToggleProp
       aria-pressed={isOnline}
       title={
         locked
-          ? "You're on a job — finish it to change availability"
+          ? "You're on a job. Finish it to change availability"
           : isOnline
             ? "Tap to go offline"
             : !payoutsEnabled

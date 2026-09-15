@@ -64,7 +64,7 @@ export function DetailActions({
           placeholder={
             isReject
               ? "e.g. Insurance certificate has expired."
-              : "e.g. Your trade insurance certificate is unreadable — please re-upload a clear copy."
+              : "e.g. Your trade insurance certificate is unreadable. Please re-upload a clear copy."
           }
           className={TEXTAREA}
           autoFocus

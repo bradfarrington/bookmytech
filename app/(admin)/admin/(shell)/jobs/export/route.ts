@@ -135,7 +135,7 @@ export async function GET(request: NextRequest) {
         console.error("Jobs CSV export failed", err);
         controller.enqueue(
           encoder.encode(
-            `"EXPORT INCOMPLETE — an error occurred, this file is missing rows."\r\n`,
+            `"EXPORT INCOMPLETE: an error occurred, this file is missing rows."\r\n`,
           ),
         );
         controller.close();

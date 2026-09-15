@@ -132,7 +132,7 @@ export default async function MechanicJobsPage() {
       serviceName: b.repair_description ?? "Vehicle repair",
       vehicle: [b.vehicle_make, b.vehicle_model].filter(Boolean).join(" ") || "Vehicle",
       reg: b.vehicle_reg ?? "",
-      area: b.area ?? b.postcode ?? "—",
+      area: b.area ?? b.postcode ?? "Location not set",
       distanceLabel,
       slot: formatBookingWhen(b, { relative: true }),
       earningsPence: mechanicSharePence(b.total_pence ?? 0, b.commission_rate ?? 0.15),
@@ -188,12 +188,12 @@ export default async function MechanicJobsPage() {
         : b.slot_window ??
           (b.scheduled_at
             ? new Date(b.scheduled_at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/London" })
-            : "—");
+            : "No time set");
       scheduleItems.push({
         bookingId: b.id,
         time,
         title,
-        where: b.area ?? b.postcode ?? "—",
+        where: b.area ?? b.postcode ?? "Location not set",
         earnings: formatPrice(mechanicSharePence(b.total_pence ?? 0, b.commission_rate ?? 0.15)),
         status,
         isNext,

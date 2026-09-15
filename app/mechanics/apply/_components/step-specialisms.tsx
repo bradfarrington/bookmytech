@@ -42,7 +42,7 @@ export function StepSpecialisms({ services }: { services: ServiceOption[] }) {
     >
       <div className={FIELD_LABEL}>
         <span>What do you work on?</span>
-        <span className={FIELD_HINT}>Select all that apply — shown on your profile.</span>
+        <span className={FIELD_HINT}>Select all that apply (shown on your profile).</span>
         {services.length === 0 ? (
           <p className="text-sm text-text-muted">
             No specialisms defined. Please try again later.
@@ -68,7 +68,7 @@ export function StepSpecialisms({ services }: { services: ServiceOption[] }) {
       </div>
 
       <div className={FIELD_LABEL}>
-        <span>Service radius — {data.serviceRadiusMiles} miles</span>
+        <span>Service radius: {data.serviceRadiusMiles} miles</span>
         <input
           type="range"
           min={1}

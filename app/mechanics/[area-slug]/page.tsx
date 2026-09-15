@@ -50,7 +50,7 @@ export async function generateMetadata({
 }
 
 const BENEFITS = [
-  { Icon: PoundCoinIcon, title: "Keep more of every job", detail: "Transparent fixed pricing, fast payouts — no chasing invoices." },
+  { Icon: PoundCoinIcon, title: "Keep more of every job", detail: "Transparent fixed pricing, fast payouts. No chasing invoices." },
   { Icon: CalendarBoltIcon, title: "Work on your terms", detail: "Set your hours, your radius and your specialisms. Accept the jobs that suit you." },
   { Icon: MapPinIcon, title: "Jobs near you", detail: "We match you to bookings in your area and bring the customers to you." },
 ];
@@ -74,7 +74,7 @@ export default async function AreaRecruitmentPage({
     <div className="min-h-screen bg-surface">
       <header className="border-b border-border bg-surface-card">
         <div className="mx-auto flex max-w-content items-center justify-between px-4 py-3">
-          <Link href="/" aria-label="Book My Tech — home">
+          <Link href="/" aria-label="Book My Tech home">
             <Image src="/logo-no-bg.png" alt="Book My Tech" width={120} height={32} className="h-8 w-auto" />
           </Link>
           <Link href={applyHref} className="text-sm font-semibold text-brand-blue hover:underline">

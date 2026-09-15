@@ -72,7 +72,7 @@ export default async function AdminChecklistsPage() {
           );
         })}
         {rows.length === 0 && !error && (
-          <li className="text-sm text-text-muted">No checklists yet — apply migration 0061 to seed them.</li>
+          <li className="text-sm text-text-muted">No checklists yet. Apply migration 0061 to seed them.</li>
         )}
       </ul>
     </div>

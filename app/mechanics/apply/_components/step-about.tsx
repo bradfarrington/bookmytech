@@ -85,7 +85,7 @@ export function StepAbout() {
             maxLength={8}
             className={`${FIELD_INPUT} uppercase`}
           />
-          <span className={FIELD_HINT}>Where you're based — drives job matching.</span>
+          <span className={FIELD_HINT}>Where you're based (drives job matching).</span>
         </label>
 
         <label className={FIELD_LABEL}>

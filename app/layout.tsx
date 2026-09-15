@@ -20,7 +20,7 @@ const interTight = Inter_Tight({
 });
 
 export const metadata: Metadata = {
-  title: "Book My Tech — Mobile mechanics, booked in 60 seconds",
+  title: "Book My Tech | Mobile mechanics, booked in 60 seconds",
   description:
     "Vetted mobile mechanics. Transparent pricing. Pay only when the job is done.",
   applicationName: "Book My Tech",

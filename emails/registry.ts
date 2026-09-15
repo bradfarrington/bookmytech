@@ -38,7 +38,7 @@ export const EMAIL_TEMPLATE_DEFS: readonly EmailTemplateDef[] = [
     description: "Sent when an admin invites a mechanic to set their password.",
     category: "mechanic",
     subject: "You've been invited to Book My Tech",
-    preheader: "Your Book My Tech mechanic account is ready — sign in to get started.",
+    preheader: "Your Book My Tech mechanic account is ready. Sign in to get started.",
     variables: [
       { name: "name", description: "Mechanic's name", example: "Sam Rivera" },
       { name: "action_link", description: "Set-password link", example: "https://bookmytech.co.uk/…" },
@@ -48,7 +48,7 @@ export const EMAIL_TEMPLATE_DEFS: readonly EmailTemplateDef[] = [
       {
         id: "intro",
         type: "paragraph",
-        text: "An admin has invited you to join Book My Tech as a vetted professional. Click the button below to set your password — then you'll sign in with your email and password to complete your profile.",
+        text: "An admin has invited you to join Book My Tech as a vetted professional. Click the button below to set your password, then you'll sign in with your email and password to complete your profile.",
       },
       { id: "cta", type: "button", text: "Set your password", hrefVar: "action_link" },
       {
@@ -64,10 +64,10 @@ export const EMAIL_TEMPLATE_DEFS: readonly EmailTemplateDef[] = [
     description: "Sent to a mechanic the moment they submit their application.",
     category: "mechanic",
     subject: "We've received your Book My Tech application",
-    preheader: "We've received your application — we'll review it within 48 hours.",
+    preheader: "We've received your application. We'll review it within 48 hours.",
     variables: [{ name: "name", description: "Applicant's name", example: "Sam Rivera" }],
     blocks: [
-      { id: "heading", type: "heading", text: "Thanks, {{name}} — we've got your application." },
+      { id: "heading", type: "heading", text: "Thanks, {{name}}. We've got your application." },
       {
         id: "intro",
         type: "paragraph",
@@ -86,8 +86,8 @@ export const EMAIL_TEMPLATE_DEFS: readonly EmailTemplateDef[] = [
     label: "Application approved",
     description: "Sent when a mechanic application is approved (optionally with a grace period).",
     category: "mechanic",
-    subject: "You're approved — welcome to Book My Tech",
-    preheader: "You're approved — welcome to Book My Tech.",
+    subject: "You're approved. Welcome to Book My Tech",
+    preheader: "You're approved. Welcome to Book My Tech.",
     variables: [
       { name: "name", description: "Mechanic's name", example: "Sam Rivera" },
       { name: "action_link", description: "Set-password link", example: "https://bookmytech.co.uk/…" },
@@ -99,7 +99,7 @@ export const EMAIL_TEMPLATE_DEFS: readonly EmailTemplateDef[] = [
       {
         id: "intro",
         type: "paragraph",
-        text: "Your application has been approved. Click below to set your password — then you'll sign in with your email and password to start receiving jobs near you.",
+        text: "Your application has been approved. Click below to set your password, then you'll sign in with your email and password to start receiving jobs near you.",
       },
       { id: "cta", type: "button", text: "Set your password", hrefVar: "action_link" },
       { id: "grace", type: "custom", render: "grace_block" },
@@ -153,14 +153,14 @@ export const EMAIL_TEMPLATE_DEFS: readonly EmailTemplateDef[] = [
       {
         id: "intro",
         type: "paragraph",
-        text: "We're almost there with your application — we just need the following before we can finish our review:",
+        text: "We're almost there with your application. We just need the following before we can finish our review:",
       },
       { id: "note", type: "paragraph", text: "{{note}}" },
       { id: "cta", type: "button", text: "Supply what's needed", hrefVar: "resubmit_link" },
       {
         id: "footnote",
         type: "note",
-        text: "This is a secure link unique to your application — don't share it.",
+        text: "This is a secure link unique to your application. Don't share it.",
       },
     ],
   },
@@ -170,7 +170,7 @@ export const EMAIL_TEMPLATE_DEFS: readonly EmailTemplateDef[] = [
     description: "Reminder that a mechanic document is due to expire (30/7/0 days out).",
     category: "mechanic",
     subject: "Your {{doc}} is expiring soon",
-    preheader: "Your {{doc}} is expiring soon — upload a renewed copy.",
+    preheader: "Your {{doc}} is expiring soon. Upload a renewed copy.",
     variables: [
       { name: "doc", description: "Document name", example: "Public liability insurance" },
       { name: "documents_link", description: "Link to documents page", example: "https://bookmytech.co.uk/mechanic/documents" },
@@ -191,7 +191,7 @@ export const EMAIL_TEMPLATE_DEFS: readonly EmailTemplateDef[] = [
     description: "Sent when a mechanic document has expired (may take them offline).",
     category: "mechanic",
     subject: "Your {{doc}} has expired",
-    preheader: "Your {{doc}} has expired — upload a current copy to get back online.",
+    preheader: "Your {{doc}} has expired. Upload a current copy to get back online.",
     variables: [
       { name: "doc", description: "Document name", example: "Public liability insurance" },
       { name: "documents_link", description: "Link to documents page", example: "https://bookmytech.co.uk/mechanic/documents" },
@@ -225,7 +225,7 @@ export const EMAIL_TEMPLATE_DEFS: readonly EmailTemplateDef[] = [
       {
         id: "body",
         type: "paragraph",
-        text: "You were approved with a 28-day window to supply your outstanding documents. Please upload them by **{{ends_on}}** — after that your account is paused and you'll stop receiving new jobs until they're on file.",
+        text: "You were approved with a 28-day window to supply your outstanding documents. Please upload them by **{{ends_on}}**. After that, your account is paused and you'll stop receiving new jobs until they're on file.",
       },
       { id: "still", type: "paragraph", text: "**Still needed:**" },
       { id: "list", type: "custom", render: "outstanding_list" },
@@ -238,7 +238,7 @@ export const EMAIL_TEMPLATE_DEFS: readonly EmailTemplateDef[] = [
     key: "password_reset",
     label: "Password reset",
     description:
-      "Sent when a customer asks for a new password — from /login or the booking funnel's sign-in prompt.",
+      "Sent when a customer asks for a new password, from /login or the booking funnel's sign-in prompt.",
     category: "customer",
     subject: "Set a new Book My Tech password",
     preheader: "Use the link inside to choose a new password.",
@@ -252,13 +252,13 @@ export const EMAIL_TEMPLATE_DEFS: readonly EmailTemplateDef[] = [
       {
         id: "intro",
         type: "paragraph",
-        text: "You asked to reset the password on your Book My Tech account. Click the button below to choose a new one — you'll be signed in straight away.",
+        text: "You asked to reset the password on your Book My Tech account. Click the button below to choose a new one. You'll be signed in straight away.",
       },
       { id: "cta", type: "button", text: "Set a new password", hrefVar: "action_link" },
       {
         id: "footnote",
         type: "note",
-        text: "For your security this link expires soon and can only be used once. If you didn't ask for this, you can safely ignore this email — your password won't change.",
+        text: "For your security this link expires soon and can only be used once. If you didn't ask for this, you can safely ignore this email; your password won't change.",
       },
     ],
   },
@@ -267,18 +267,18 @@ export const EMAIL_TEMPLATE_DEFS: readonly EmailTemplateDef[] = [
     label: "Booking received",
     description: "Sent to the customer when a booking is created, while we find a mechanic.",
     category: "customer",
-    subject: "Booking received — we're finding your mechanic",
-    preheader: "We've received your booking — we're finding your mechanic.",
+    subject: "Booking received: we're finding your mechanic",
+    preheader: "We've received your booking. We're finding your mechanic.",
     variables: [
       { name: "name", description: "Customer's name", example: "Alex" },
       { name: "ref", description: "Short booking reference", example: "A1B2C3D4" },
       { name: "service", description: "Service booked (a summary when several jobs were booked together)", example: "Full service" },
       {
         name: "repairs",
-        description: "Every job in a multi-job booking, '|'-separated — empty for one job",
+        description: "Every job in a multi-job booking, '|'-separated; empty for one job",
         example: "Renew both front brake discs|Renew the front brake pads",
       },
-      { name: "vehicle", description: "Vehicle description", example: "AB12 CDE — Ford Focus" },
+      { name: "vehicle", description: "Vehicle description", example: "AB12 CDE, Ford Focus" },
       { name: "when", description: "Scheduled date/time", example: "Monday 3 August · 8am–10am" },
       { name: "pay_line", description: "Payment summary line", example: "Amount pre-authorised: £120.00" },
     ],
@@ -288,7 +288,7 @@ export const EMAIL_TEMPLATE_DEFS: readonly EmailTemplateDef[] = [
       {
         id: "intro",
         type: "paragraph",
-        text: "We've received your booking and are now matching you with the best available mechanic in your area. You'll hear from us as soon as one accepts — usually within minutes.",
+        text: "We've received your booking and are now matching you with the best available mechanic in your area. You'll hear from us as soon as one accepts, usually within minutes.",
       },
       { id: "summary", type: "custom", render: "booking_summary" },
       { id: "repairs", type: "custom", render: "repair_list" },
@@ -330,11 +330,11 @@ export const EMAIL_TEMPLATE_DEFS: readonly EmailTemplateDef[] = [
   },
   {
     key: "job_complete",
-    label: "Job complete — receipt",
+    label: "Job complete: receipt",
     description: "Sent to the customer when the mechanic marks the job complete.",
     category: "customer",
-    subject: "Your job is complete — receipt",
-    preheader: "All done — here's your receipt.",
+    subject: "Your job is complete: here's your receipt",
+    preheader: "All done. Here's your receipt.",
     variables: [
       { name: "name", description: "Customer's name", example: "Alex" },
       { name: "service", description: "Service completed", example: "Full service" },
@@ -346,7 +346,7 @@ export const EMAIL_TEMPLATE_DEFS: readonly EmailTemplateDef[] = [
       { name: "report_url", description: "Link to the service / inspection report (empty when the job had no checklist)", example: "https://bookmytech.co.uk/dashboard/bookings/…/report" },
     ],
     blocks: [
-      { id: "heading", type: "heading", text: "All done — thanks for using Book My Tech" },
+      { id: "heading", type: "heading", text: "All done. Thanks for using Book My Tech" },
       { id: "greeting", type: "paragraph", text: "Hi {{name}}," },
       { id: "body", type: "paragraph", text: "Your mechanic has marked **{{service}}** complete." },
       { id: "mileage", type: "custom", render: "mileage_line" },
@@ -366,7 +366,7 @@ export const EMAIL_TEMPLATE_DEFS: readonly EmailTemplateDef[] = [
     preheader: "Your booking has been cancelled as requested.",
     variables: [
       { name: "name", description: "Customer's name", example: "Alex" },
-      { name: "fee_line", description: "Cancellation fee / release line", example: "No cancellation fee applied — your full pre-authorisation has been released." },
+      { name: "fee_line", description: "Cancellation fee / release line", example: "No cancellation fee applied. Your full pre-authorisation has been released." },
     ],
     blocks: [
       { id: "heading", type: "heading", text: "Booking cancelled" },
@@ -419,7 +419,7 @@ export const EMAIL_TEMPLATE_DEFS: readonly EmailTemplateDef[] = [
       { id: "heading", type: "heading", text: "New time confirmed" },
       { id: "greeting", type: "paragraph", text: "Hi {{name}}," },
       { id: "body", type: "paragraph", text: "Your booking is now set for **{{slot}}**." },
-      { id: "footnote", type: "note", text: "Your pre-authorisation stays in place — no new charge." },
+      { id: "footnote", type: "note", text: "Your pre-authorisation stays in place. No new charge." },
     ],
   },
   {
@@ -455,7 +455,7 @@ export const EMAIL_TEMPLATE_DEFS: readonly EmailTemplateDef[] = [
     label: "Replacement mechanic confirmed",
     description: "Sent to the customer when a replacement mechanic takes over the job.",
     category: "customer",
-    subject: "Good news — your replacement mechanic is confirmed",
+    subject: "Good news: your replacement mechanic is confirmed",
     preheader: "We've found your replacement mechanic.",
     variables: [
       { name: "name", description: "Customer's name", example: "Alex" },
@@ -474,11 +474,11 @@ export const EMAIL_TEMPLATE_DEFS: readonly EmailTemplateDef[] = [
       {
         id: "intro",
         type: "paragraph",
-        text: "Thanks for your patience — **{{mechanic}}** has accepted your job and will be taking over.",
+        text: "Thanks for your patience. **{{mechanic}}** has accepted your job and will be taking over.",
       },
       { id: "summary", type: "custom", render: "booking_summary" },
       { id: "window_note", type: "custom", render: "optional_note" },
-      { id: "hold", type: "note", text: "Your existing pre-authorisation stays in place — no new charge." },
+      { id: "hold", type: "note", text: "Your existing pre-authorisation stays in place. No new charge." },
       { id: "track", type: "note", text: "Track your booking any time from your account." },
     ],
   },
@@ -510,7 +510,7 @@ export const EMAIL_TEMPLATE_DEFS: readonly EmailTemplateDef[] = [
       {
         id: "hold",
         type: "note",
-        text: "Nothing else about your booking has changed — your pre-authorisation stays in place.",
+        text: "Nothing else about your booking has changed. Your pre-authorisation stays in place.",
       },
       { id: "track", type: "note", text: "Track your booking any time from your account." },
     ],
@@ -520,7 +520,7 @@ export const EMAIL_TEMPLATE_DEFS: readonly EmailTemplateDef[] = [
     label: "Finding a replacement",
     description: "Sent to the customer when their mechanic cancels and we source a replacement.",
     category: "customer",
-    subject: "Update on your booking — finding you a replacement mechanic",
+    subject: "Update on your booking: finding you a replacement mechanic",
     preheader: "We're finding you a replacement mechanic.",
     variables: [{ name: "name", description: "Customer's name", example: "Alex" }],
     blocks: [
@@ -529,7 +529,7 @@ export const EMAIL_TEMPLATE_DEFS: readonly EmailTemplateDef[] = [
       {
         id: "body",
         type: "paragraph",
-        text: "Your original mechanic has had to cancel. We're sorry for the disruption — we're already finding you a suitable replacement and will confirm as soon as one accepts, usually within minutes.",
+        text: "Your original mechanic has had to cancel. We're sorry for the disruption. We're already finding you a suitable replacement and will confirm as soon as one accepts, usually within minutes.",
       },
       {
         id: "hold",
@@ -583,7 +583,7 @@ export const EMAIL_TEMPLATE_DEFS: readonly EmailTemplateDef[] = [
       { name: "prefs_url", description: "Manage-reminders link", example: "https://bookmytech.co.uk/…" },
     ],
     blocks: [
-      { id: "heading", type: "heading", text: "{{label}} — {{reg}}" },
+      { id: "heading", type: "heading", text: "{{label}}: {{reg}}" },
       { id: "greeting", type: "paragraph", text: "Hi {{name}}," },
       { id: "body", type: "paragraph", text: "{{blurb}}" },
       { id: "cta", type: "button", text: "{{cta}}", hrefVar: "cta_url" },
@@ -601,7 +601,7 @@ export const EMAIL_TEMPLATE_DEFS: readonly EmailTemplateDef[] = [
     label: "Admin: new application alert",
     description: "Internal alert to ops when a new mechanic application lands.",
     category: "internal",
-    subject: "New mechanic application — {{applicant_name}}",
+    subject: "New mechanic application: {{applicant_name}}",
     preheader: "New mechanic application from {{applicant_name}} ({{postcode}}).",
     variables: [
       { name: "applicant_name", description: "Applicant's name", example: "Sam Rivera" },
@@ -626,8 +626,8 @@ export const EMAIL_TEMPLATE_DEFS: readonly EmailTemplateDef[] = [
     label: "Admin: low SMS credits",
     description: "Internal alert when the SMS credit balance drops to the low threshold.",
     category: "internal",
-    subject: "Low SMS credits — {{balance}} {{plural}} remaining",
-    preheader: "Only {{balance}} SMS {{plural}} left — top up to keep notifications sending.",
+    subject: "Low SMS credits: {{balance}} {{plural}} remaining",
+    preheader: "Only {{balance}} SMS {{plural}} left. Top up to keep notifications sending.",
     variables: [
       { name: "balance", description: "Credits remaining", example: "8" },
       { name: "plural", description: '"credit" or "credits"', example: "credits" },
@@ -712,7 +712,7 @@ export const EMAIL_TEMPLATE_DEFS: readonly EmailTemplateDef[] = [
     label: "Quote approved (to mechanic)",
     description: "Sent to the mechanic when the customer approves their quote.",
     category: "mechanic",
-    subject: "Your quote was approved — go ahead",
+    subject: "Your quote was approved. Go ahead",
     preheader: "The customer has approved and authorised the extra work.",
     variables: [
       { name: "ref", description: "Job number", example: "00123" },
@@ -720,7 +720,7 @@ export const EMAIL_TEMPLATE_DEFS: readonly EmailTemplateDef[] = [
       { name: "kind_line", description: "What the quote was for", example: "extra work on this visit" },
     ],
     blocks: [
-      { id: "heading", type: "heading", text: "Approved — go ahead" },
+      { id: "heading", type: "heading", text: "Approved, go ahead" },
       { id: "body", type: "paragraph", text: "The customer approved your **{{total}}** quote for {{kind_line}} on job {{ref}} and their card is authorised. It's paid with the job." },
       { id: "footnote", type: "note", text: "View it on your dashboard." },
     ],
@@ -739,7 +739,7 @@ export const EMAIL_TEMPLATE_DEFS: readonly EmailTemplateDef[] = [
     ],
     blocks: [
       { id: "heading", type: "heading", text: "Quote declined" },
-      { id: "body", type: "paragraph", text: "The customer declined your **{{total}}** quote for {{kind_line}} on job {{ref}}. Don't carry out that work — finish the job as booked." },
+      { id: "body", type: "paragraph", text: "The customer declined your **{{total}}** quote for {{kind_line}} on job {{ref}}. Don't carry out that work; finish the job as booked." },
       { id: "footnote", type: "note", text: "View it on your dashboard." },
     ],
   },
@@ -768,16 +768,16 @@ export const EMAIL_TEMPLATE_DEFS: readonly EmailTemplateDef[] = [
     description: "Sent to the customer when their mechanic finds the booked repair isn't what's needed and proposes a different job.",
     category: "customer",
     subject: "Your mechanic has revised the job",
-    preheader: "The repair you booked isn't what your car needs — review the revised job.",
+    preheader: "The repair you booked isn't what your car needs. Review the revised job.",
     variables: [
       { name: "name", description: "Customer's name", example: "Alex" },
       { name: "ref", description: "Job number", example: "00123" },
       { name: "mechanic", description: "Mechanic's name", example: "Sam" },
-      { name: "reason", description: "Why the booked repair isn't right", example: "The pads are fine — the noise is a worn front wheel bearing." },
+      { name: "reason", description: "Why the booked repair isn't right", example: "The pads are fine; the noise is a worn front wheel bearing." },
       { name: "before_total", description: "What was booked", example: "£92.00" },
       { name: "after_total", description: "The revised total", example: "£111.00" },
       { name: "difference", description: "Signed difference", example: "+£19.00" },
-      { name: "difference_line", description: "What the difference means for the card", example: "£19.00 more than you booked — you'll authorise the difference on your card now." },
+      { name: "difference_line", description: "What the difference means for the card", example: "£19.00 more than you booked. You'll authorise the difference on your card now." },
       { name: "removed_lines", description: "Packed list of what was taken off (a|b)", example: "Renew the front brake pads · 1 h|Front brake pads · £32.00" },
       { name: "added_lines", description: "Packed list of what was added (a|b)", example: "Renew the front wheel bearing · 1.1 h|Wheel bearing kit · £45.00" },
       { name: "kept_lines", description: "Packed list of what stays (a|b)", example: "" },
@@ -796,7 +796,7 @@ export const EMAIL_TEMPLATE_DEFS: readonly EmailTemplateDef[] = [
       {
         id: "footnote",
         type: "note",
-        text: "Nothing changes until you approve. If you decline, your mechanic may charge the on-site diagnostic or cancellation fee for the visit — see our cancellation policy. This is open until {{expires}}.",
+        text: "Nothing changes until you approve. If you decline, your mechanic may charge the on-site diagnostic or cancellation fee for the visit (see our cancellation policy). This is open until {{expires}}.",
       },
     ],
   },
@@ -805,7 +805,7 @@ export const EMAIL_TEMPLATE_DEFS: readonly EmailTemplateDef[] = [
     label: "Revised job approved (to mechanic)",
     description: "Sent to the mechanic when the customer approves the revised job.",
     category: "mechanic",
-    subject: "The revised job was approved — go ahead",
+    subject: "The revised job was approved. Go ahead",
     preheader: "The customer has approved the change of work.",
     variables: [
       { name: "ref", description: "Job number", example: "00123" },
@@ -815,7 +815,7 @@ export const EMAIL_TEMPLATE_DEFS: readonly EmailTemplateDef[] = [
     ],
     blocks: [
       { id: "heading", type: "heading", text: "Revised job approved" },
-      { id: "body", type: "paragraph", text: "The customer has approved the revised job on {{ref}}: **{{job}}** at **{{after_total}}** ({{difference}} on what was booked). Go ahead — it's paid with the job when you complete it." },
+      { id: "body", type: "paragraph", text: "The customer has approved the revised job on {{ref}}: **{{job}}** at **{{after_total}}** ({{difference}} on what was booked). Go ahead; it's paid with the job when you complete it." },
       { id: "footnote", type: "note", text: "The job sheet on your dashboard now shows the revised work." },
     ],
   },
@@ -834,7 +834,7 @@ export const EMAIL_TEMPLATE_DEFS: readonly EmailTemplateDef[] = [
     ],
     blocks: [
       { id: "heading", type: "heading", text: "Revised job declined" },
-      { id: "body", type: "paragraph", text: "The customer declined the revised job on {{ref}} ({{job}}, {{after_total}}). Don't carry out that work. From the job page you can end the job — charging the on-site diagnostic, the cancellation fee, or nothing — or carry on with the original job if the customer wants that." },
+      { id: "body", type: "paragraph", text: "The customer declined the revised job on {{ref}} ({{job}}, {{after_total}}). Don't carry out that work. From the job page you can end the job (charging the on-site diagnostic, the cancellation fee, or nothing) or carry on with the original job if the customer wants that." },
       { id: "footnote", type: "note", text: "Open the job on your dashboard to choose." },
     ],
   },
@@ -867,14 +867,14 @@ export const EMAIL_TEMPLATE_DEFS: readonly EmailTemplateDef[] = [
     variables: [
       { name: "name", description: "Customer's name", example: "Alex" },
       { name: "ref", description: "Job number", example: "00123" },
-      { name: "reason", description: "What the mechanic found", example: "The pads are fine — the noise is a worn front wheel bearing." },
+      { name: "reason", description: "What the mechanic found", example: "The pads are fine; the noise is a worn front wheel bearing." },
       { name: "fee_line", description: "What was charged", example: "On-site diagnostic fee: £59.99 has been charged to your card. The rest of your pre-authorisation has been released." },
       { name: "url", description: "Dashboard link", example: "https://bookmytech.co.uk/dashboard" },
     ],
     blocks: [
       { id: "heading", type: "heading", text: "Your booking has ended" },
       { id: "greeting", type: "paragraph", text: "Hi {{name}}," },
-      { id: "body", type: "paragraph", text: "Your mechanic found that the repair you booked on job {{ref}} wasn't what your car needed — \"{{reason}}\" — and the revised job was declined, so the booking has ended." },
+      { id: "body", type: "paragraph", text: "Your mechanic found that the repair you booked on job {{ref}} wasn't what your car needed: \"{{reason}}\". The revised job was declined, so the booking has ended." },
       { id: "fee", type: "paragraph", text: "{{fee_line}}" },
       { id: "cta", type: "button", text: "Your dashboard", hrefVar: "url" },
       { id: "footnote", type: "note", text: "If you'd like the revised work done later, book it from your dashboard and your mechanic will be offered it first. If you think the fee was charged incorrectly, reply to this email." },
@@ -977,7 +977,7 @@ export const EMAIL_TEMPLATE_DEFS: readonly EmailTemplateDef[] = [
     description: "Sent to a mechanic when their suspension is lifted.",
     category: "mechanic",
     subject: "Your Book My Tech account is active again",
-    preheader: "You're back online — your suspension has been lifted.",
+    preheader: "You're back online. Your suspension has been lifted.",
     variables: [
       { name: "dashboard_url", description: "Dashboard link", example: "https://bookmytech.co.uk/mechanic" },
     ],
@@ -986,7 +986,7 @@ export const EMAIL_TEMPLATE_DEFS: readonly EmailTemplateDef[] = [
       {
         id: "body",
         type: "paragraph",
-        text: "Your suspension has been lifted — you'll start receiving job offers again once you go online.",
+        text: "Your suspension has been lifted. You'll start receiving job offers again once you go online.",
       },
       { id: "footnote", type: "note", text: "[Open your dashboard →]({{dashboard_url}})" },
     ],
@@ -997,7 +997,7 @@ export const EMAIL_TEMPLATE_DEFS: readonly EmailTemplateDef[] = [
     label: "Dispute opened (admin alert)",
     description: "Internal alert to ops when either party opens a dispute.",
     category: "dispute",
-    subject: "New dispute opened — booking {{ref}}",
+    subject: "New dispute opened | Booking {{ref}}",
     preheader: "A dispute has been opened.",
     variables: [
       { name: "opener_role", description: "Who opened it", example: "customer" },
@@ -1017,7 +1017,7 @@ export const EMAIL_TEMPLATE_DEFS: readonly EmailTemplateDef[] = [
     label: "Dispute opened (to mechanic)",
     description: "Sent to the mechanic when a customer opens a dispute.",
     category: "dispute",
-    subject: "A customer raised an issue — booking {{ref}}",
+    subject: "A customer raised an issue | Booking {{ref}}",
     preheader: "A customer has opened a dispute on your job.",
     variables: [
       { name: "service", description: "Service name", example: "Full service" },
@@ -1042,7 +1042,7 @@ export const EMAIL_TEMPLATE_DEFS: readonly EmailTemplateDef[] = [
     label: "Dispute opened (to customer)",
     description: "Sent to the customer when their mechanic opens a dispute.",
     category: "dispute",
-    subject: "Your mechanic raised an issue — booking {{ref}}",
+    subject: "Your mechanic raised an issue | Booking {{ref}}",
     preheader: "Your mechanic has opened a dispute.",
     variables: [
       { name: "name", description: "Customer's name", example: "Alex" },
@@ -1066,7 +1066,7 @@ export const EMAIL_TEMPLATE_DEFS: readonly EmailTemplateDef[] = [
     label: "Dispute responded (admin alert)",
     description: "Internal alert when a party responds to a dispute.",
     category: "dispute",
-    subject: "Dispute responded — booking {{ref}}",
+    subject: "Dispute responded | Booking {{ref}}",
     preheader: "A party responded to a dispute.",
     variables: [
       { name: "role", description: "Who responded", example: "mechanic" },
@@ -1083,7 +1083,7 @@ export const EMAIL_TEMPLATE_DEFS: readonly EmailTemplateDef[] = [
     label: "New dispute message (to mechanic)",
     description: "Nudges the mechanic when another party posts on the dispute.",
     category: "dispute",
-    subject: "New message on a dispute — booking {{ref}}",
+    subject: "New message on a dispute | Booking {{ref}}",
     preheader: "There's a new message on your dispute.",
     variables: [
       { name: "role", description: "Who posted", example: "customer" },
@@ -1100,7 +1100,7 @@ export const EMAIL_TEMPLATE_DEFS: readonly EmailTemplateDef[] = [
     label: "Dispute withdrawn (to customer)",
     description: "Sent to the customer when a dispute is withdrawn.",
     category: "dispute",
-    subject: "Dispute closed — booking {{ref}}",
+    subject: "Dispute closed | Booking {{ref}}",
     preheader: "The dispute has been withdrawn and closed.",
     variables: [
       { name: "service", description: "Service name", example: "Full service" },
@@ -1115,7 +1115,7 @@ export const EMAIL_TEMPLATE_DEFS: readonly EmailTemplateDef[] = [
     label: "Dispute withdrawn (to mechanic)",
     description: "Sent to the mechanic when a dispute is withdrawn; their payout is unaffected.",
     category: "dispute",
-    subject: "Dispute closed — booking {{ref}}",
+    subject: "Dispute closed | Booking {{ref}}",
     preheader: "The dispute has been withdrawn; your payout is unaffected.",
     variables: [
       { name: "service", description: "Service name", example: "Full service" },
@@ -1130,7 +1130,7 @@ export const EMAIL_TEMPLATE_DEFS: readonly EmailTemplateDef[] = [
     label: "Dispute escalated (admin alert)",
     description: "Internal alert when a dispute is escalated for arbitration.",
     category: "dispute",
-    subject: "Dispute escalated — booking {{ref}}",
+    subject: "Dispute escalated | Booking {{ref}}",
     preheader: "A dispute needs arbitration.",
     variables: [
       { name: "role", description: "Who escalated", example: "customer" },
@@ -1147,7 +1147,7 @@ export const EMAIL_TEMPLATE_DEFS: readonly EmailTemplateDef[] = [
     label: "Dispute escalated (to mechanic)",
     description: "Sent to the mechanic when the other party escalates the dispute.",
     category: "dispute",
-    subject: "A dispute was escalated — booking {{ref}}",
+    subject: "A dispute was escalated | Booking {{ref}}",
     preheader: "A dispute was escalated to Book My Tech.",
     variables: [
       { name: "role", description: "Who escalated", example: "customer" },
@@ -1164,7 +1164,7 @@ export const EMAIL_TEMPLATE_DEFS: readonly EmailTemplateDef[] = [
     label: "Dispute resolved (to customer)",
     description: "Sent to the customer when an admin resolves their dispute.",
     category: "dispute",
-    subject: "Your dispute has been resolved — booking {{ref}}",
+    subject: "Your dispute has been resolved | Booking {{ref}}",
     preheader: "Your dispute has been resolved.",
     variables: [
       { name: "ref", description: "Booking reference", example: "A1B2C3D4" },
@@ -1183,7 +1183,7 @@ export const EMAIL_TEMPLATE_DEFS: readonly EmailTemplateDef[] = [
     label: "Dispute resolved (to mechanic)",
     description: "Sent to the mechanic when an admin resolves a dispute on their job.",
     category: "dispute",
-    subject: "A dispute has been resolved — booking {{ref}}",
+    subject: "A dispute has been resolved | Booking {{ref}}",
     preheader: "A dispute on your job has been resolved.",
     variables: [
       { name: "ref", description: "Booking reference", example: "A1B2C3D4" },
@@ -1249,7 +1249,7 @@ export const EMAIL_TEMPLATE_DEFS: readonly EmailTemplateDef[] = [
     description:
       "Internal alert to ops when a mechanic (or admin) raises a Resolution Center case about a job.",
     category: "internal",
-    subject: "New resolution case — booking {{ref}}",
+    subject: "New resolution case | Booking {{ref}}",
     preheader: "A resolution case has been opened.",
     variables: [
       { name: "opener_role", description: "Who opened it", example: "mechanic" },
@@ -1273,7 +1273,7 @@ export const EMAIL_TEMPLATE_DEFS: readonly EmailTemplateDef[] = [
     label: "Resolution case opened (to mechanic)",
     description: "Sent to the mechanic when an admin raises a Resolution Center case about their job.",
     category: "mechanic",
-    subject: "We've opened a case on your job — booking {{ref}}",
+    subject: "We've opened a case on your job | Booking {{ref}}",
     preheader: "Book My Tech has opened a resolution case on your job.",
     variables: [
       { name: "service", description: "Service name", example: "Full service" },

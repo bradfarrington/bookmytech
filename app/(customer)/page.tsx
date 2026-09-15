@@ -6,8 +6,8 @@ import { FinalCta } from "./_components/final-cta";
 import { Footer } from "./_components/footer";
 import { Hero } from "./_components/hero";
 import { HowItWorks } from "./_components/how-it-works";
+import { MechanicJoin } from "./_components/mechanic-join";
 import { QuoteShowcase } from "./_components/quote-showcase";
-import { Reviews } from "./_components/reviews";
 import { RepairsPreview } from "./_components/repairs-preview";
 import { StickyBookBar } from "./_components/sticky-book-bar";
 import { TrustTicker } from "./_components/trust-ticker";
@@ -23,7 +23,7 @@ export default function HomePage() {
         <QuoteShowcase />
         <HowItWorks />
         <RepairsPreview />
-        <Reviews />
+        <MechanicJoin />
         <Compare />
         <Coverage />
         <Faq />

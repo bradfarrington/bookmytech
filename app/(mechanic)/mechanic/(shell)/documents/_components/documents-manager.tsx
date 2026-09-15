@@ -85,7 +85,7 @@ export function DocumentsManager({ documents }: { documents: DocItem[] }) {
         toast.error(result.error);
         return;
       }
-      toast.success("Document uploaded — it's now pending review.");
+      toast.success("Document uploaded. It's now pending review.");
       setExpiresAt("");
       setFileName(null);
       if (fileRef.current) fileRef.current.value = "";

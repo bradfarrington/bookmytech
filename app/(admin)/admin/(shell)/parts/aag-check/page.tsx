@@ -32,7 +32,7 @@ export default async function AagCheckPage() {
             Ask Alliance Automotive Group what parts fit a registration in one
             product group, at our trade price, with branch stock and delivery
             estimates. This is a read-only check against{" "}
-            {sandbox ? "their sandbox" : "their live system"} — nothing is
+            {sandbox ? "their sandbox" : "their live system"}. Nothing is
             ordered and nothing is saved.
           </p>
         </div>

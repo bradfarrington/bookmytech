@@ -3,7 +3,7 @@ import Image from "next/image";
 import { SetPasswordForm } from "./_components/set-password-form";
 
 export const metadata: Metadata = {
-  title: "Set your password — Book My Tech for mechanics",
+  title: "Set your password | Book My Tech for mechanics",
 };
 
 export default function MechanicSetPasswordPage() {
@@ -36,7 +36,7 @@ export default function MechanicSetPasswordPage() {
             Welcome aboard
           </p>
           <p className="text-3xl font-bold tracking-tight lg:text-4xl">
-            One last step — choose a password.
+            One last step: choose a password.
           </p>
           <p className="mt-4 leading-relaxed text-white/75">
             Set a password now and you&apos;ll sign in with your email and

@@ -3,7 +3,7 @@ import { AuthShell } from "../_components/auth-shell";
 import { CustomerSignupForm } from "./_components/customer-signup-form";
 
 export const metadata: Metadata = {
-  title: "Create an account — Book My Tech",
+  title: "Create an account | Book My Tech",
 };
 
 interface SignupPageProps {
@@ -19,7 +19,7 @@ export default async function SignupPage({ searchParams }: SignupPageProps) {
       title="Create your account"
       subtitle={
         ref
-          ? "You've been referred — get £10 off your first booking when you sign up."
+          ? "You've been referred. Get £10 off your first booking when you sign up."
           : "Track your booking live, message your mechanic, and rebook in a tap."
       }
     >

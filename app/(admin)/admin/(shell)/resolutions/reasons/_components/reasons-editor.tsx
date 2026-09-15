@@ -22,7 +22,7 @@ export function ReasonsEditor({ initialReasons }: { initialReasons: ReasonRow[] 
     <div className="space-y-4">
       <div className="space-y-2.5">
         {initialReasons.length === 0 && (
-          <p className="text-sm text-text-muted">No reasons yet — add the first one below.</p>
+          <p className="text-sm text-text-muted">No reasons yet. Add the first one below.</p>
         )}
         {initialReasons.map((r) => (
           <ReasonCard key={r.id} reason={r} />

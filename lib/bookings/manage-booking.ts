@@ -234,7 +234,7 @@ export async function cancelBookingFor(
         const message = err instanceof Error ? err.message : "Payment error";
         return {
           ok: false,
-          error: `Couldn't settle your payment hold: ${message}. Nothing was changed — try again.`,
+          error: `Couldn't settle your payment hold: ${message}. Nothing was changed. Try again.`,
         };
       }
     }
@@ -314,7 +314,7 @@ export async function cancelBookingFor(
     const feeLine =
       charged > 0
         ? `A cancellation fee of ${formatPrice(charged)} was charged (${FEE_LABELS[tier].toLowerCase()}). The rest of your pre-authorisation has been released.`
-        : "No cancellation fee applied — your full pre-authorisation has been released.";
+        : "No cancellation fee applied. Your full pre-authorisation has been released.";
     renderTemplateEmail("booking_cancelled", {
       name: booking.customer_name ?? "there",
       fee_line: feeLine,
@@ -472,7 +472,7 @@ export async function respondToRescheduleFor(
   if (booking.reschedule_status !== "proposed" || !booking.reschedule_proposed_at)
     return {
       ok: false,
-      error: "There's no reschedule waiting on a response — refresh the page.",
+      error: "There's no reschedule waiting on a response. Refresh the page.",
     };
 
   const proposed = booking.reschedule_proposed_at;

@@ -145,7 +145,7 @@ export async function respondToQuoteFor(
       currency: "gbp",
       capture_method: "manual",
       payment_method_types: ["card"],
-      description: `Book My Tech — additional work on job ${formatJobNumber(booking.job_number)}`,
+      description: `Book My Tech: additional work on job ${formatJobNumber(booking.job_number)}`,
       metadata: { customer_id: caller.userId, booking_id: booking.id, quote_id: quoteId },
     });
     if (!intent.client_secret) return { ok: false, error: "Couldn't start the payment. Please try again." };
@@ -193,7 +193,7 @@ export async function confirmQuotePaymentFor(
   if (intent.metadata?.quote_id !== quoteId || intent.metadata?.customer_id !== caller.userId)
     return { ok: false, error: "We couldn't find that payment." };
   if (intent.status !== "requires_capture")
-    return { ok: false, error: "Your card hasn't been authorised yet — please try the payment again." };
+    return { ok: false, error: "Your card hasn't been authorised yet. Please try the payment again." };
   if (intent.amount !== quote.totalPence)
     return { ok: false, error: "That payment doesn't match the quote. Please try again." };
 

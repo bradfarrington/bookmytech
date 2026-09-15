@@ -32,7 +32,7 @@ export function CustomerLoginForm({ justCreated }: { justCreated?: boolean }) {
     <form action={formAction} className="flex flex-col gap-4">
       {justCreated && (
         <p className="rounded-button border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">
-          Your account is ready — sign in to view your dashboard.
+          Your account is ready. Sign in to view your dashboard.
         </p>
       )}
 
@@ -74,7 +74,7 @@ export function CustomerLoginForm({ justCreated }: { justCreated?: boolean }) {
 
       {resetSent && (
         <p className="rounded-button border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-brand-blue">
-          Check your inbox — we&apos;ve emailed you a link to set a new password.
+          Check your inbox. We&apos;ve emailed you a link to set a new password.
         </p>
       )}
 

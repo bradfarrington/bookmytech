@@ -3,7 +3,7 @@ import Image from "next/image";
 import { LoginForm } from "./_components/login-form";
 
 export const metadata: Metadata = {
-  title: "Sign in — Book My Tech admin",
+  title: "Sign in | Book My Tech admin",
 };
 
 export default function AdminLoginPage() {

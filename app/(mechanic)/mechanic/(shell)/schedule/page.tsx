@@ -121,7 +121,7 @@ export default async function MechanicSchedulePage() {
       whenLabel: whenLabel(b),
       sortKey: b.scheduled_at ? new Date(b.scheduled_at).getTime() : 0,
       title: `${b.repair_description ?? "Vehicle repair"} · ${[b.vehicle_make, b.vehicle_model].filter(Boolean).join(" ") || "Vehicle"}`,
-      where: b.area ?? b.postcode ?? "—",
+      where: b.area ?? b.postcode ?? "Location not set",
       earnings: formatPrice(
         mechanicSharePence(b.total_pence ?? 0, b.commission_rate ?? 0.15),
       ),

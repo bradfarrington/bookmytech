@@ -55,7 +55,7 @@ describe("the ADS component list", () => {
   it("round-trips a Combobox label back to its number", () => {
     const disc = componentByNumber("000027")!;
     const label = componentOptionLabel(disc);
-    expect(label).toBe("000027 — Brake Disc");
+    expect(label).toBe("000027: Brake Disc");
     expect(componentNumberFromLabel(label)).toBe("000027");
   });
 

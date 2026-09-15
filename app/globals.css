@@ -98,13 +98,6 @@
   background: radial-gradient(700px 400px at 20% 100%, rgba(255, 255, 255, 0.1), transparent 60%);
 }
 
-@utility coverage-blobs {
-  background:
-    radial-gradient(ellipse 40% 25% at 50% 30%, rgba(37, 99, 235, 0.1) 60%, transparent 61%),
-    radial-gradient(ellipse 55% 35% at 50% 65%, rgba(37, 99, 235, 0.08) 60%, transparent 61%),
-    radial-gradient(ellipse 25% 15% at 55% 90%, rgba(37, 99, 235, 0.06) 60%, transparent 61%);
-}
-
 body {
   background-color: var(--color-surface);
   color: var(--color-text-primary);

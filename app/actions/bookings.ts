@@ -235,7 +235,7 @@ export async function refundBooking(
       ok: false,
       error: moved > 0
         ? `Refund failed part-way: ${formatPrice(moved)} was refunded before the error (${r.error}). Check the timeline before trying again.`
-        : `Refund failed: ${r.error}. Nothing was changed — try again.`,
+        : `Refund failed: ${r.error}. Nothing was changed. Try again.`,
     };
   }
 
@@ -331,9 +331,9 @@ export async function reassignMechanic(
       ref,
       when: slotLabel,
       optional_note: isFlexible
-        ? "You offered a choice of days — your mechanic will confirm which day and a 2-hour arrival window."
+        ? "You offered a choice of days. Your mechanic will confirm which day and a 2-hour arrival window."
         : isAllDay
-          ? "You booked an all-day slot — your mechanic will confirm a 2-hour arrival window for the day."
+          ? "You booked an all-day slot. Your mechanic will confirm a 2-hour arrival window for the day."
           : "",
     })
       .then(({ subject, html }) => sendEmail({ to, subject, html }))

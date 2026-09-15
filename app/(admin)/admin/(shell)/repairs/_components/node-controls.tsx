@@ -126,7 +126,7 @@ export function CombineControl({
         onSubmit={(e) => {
           e.preventDefault();
           run(() => createBundle({ name, parentId, optionLabel, nodeId }), {
-            success: "Combined repair created — add its other jobs from its card or from their rows.",
+            success: "Combined repair created. Add its other jobs from its card or from their rows.",
             onSuccess: () => {
               setCreating(false);
               setName("");

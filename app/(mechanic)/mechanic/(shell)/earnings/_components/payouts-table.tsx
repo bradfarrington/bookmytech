@@ -33,7 +33,7 @@ export function PayoutsTable({ rows, live = false }: { rows: PayoutRow[]; live?:
           </Pill>
         ) : (
           <span className="text-[11px] font-medium text-text-muted">
-            Preview — connect Stripe to see real payouts
+            Preview: connect Stripe to see real payouts
           </span>
         )}
       </div>

@@ -120,7 +120,7 @@ async function resolveParts(
       // `existingRows` was loaded for this booking alone, so an unknown id is
       // a stale panel, not another job's part.
       const row = existingById.get(input.id);
-      if (!row) return { ok: false, error: "One of those parts is no longer on this job — refresh the page." };
+      if (!row) return { ok: false, error: "One of those parts is no longer on this job. Refresh the page." };
       parts.push(partFromRow(row));
       continue;
     }
@@ -128,7 +128,7 @@ async function resolveParts(
     if (!Number.isInteger(quantity) || quantity <= 0 || quantity > 99) return { ok: false, error: "Enter a quantity between 1 and 99 for each part." };
     if (input.partId) {
       const cat = catalogue.get(input.partId);
-      if (!cat) return { ok: false, error: "One of those catalogue parts isn't available — pick another or type it in." };
+      if (!cat) return { ok: false, error: "One of those catalogue parts isn't available. Pick another or type it in." };
       parts.push({ id: null, partId: input.partId, name: cat.name, quantity, unitPence: cat.bmt_price_pence, linePence: quantity * cat.bmt_price_pence, sourcing: "self" });
       continue;
     }
@@ -167,7 +167,7 @@ async function buildPreview(
   input: RevisionInput,
 ): Promise<{ ok: true; preview: RevisionPreview; sheet: Awaited<ReturnType<typeof loadJobSheet>> } | { ok: false; error: string }> {
   const repairIds = dedupeRepairIds(input.repairIds ?? []);
-  if (repairIds.length === 0) return { ok: false, error: "Keep or add at least one repair — a job can't be empty. To end the job instead, use the options below once the customer has declined." };
+  if (repairIds.length === 0) return { ok: false, error: "Keep or add at least one repair. A job can't be empty. To end the job instead, use the options below once the customer has declined." };
   if (repairIds.length > MAX_REPAIRS_PER_BOOKING) return { ok: false, error: `A job can carry up to ${MAX_REPAIRS_PER_BOOKING} repairs.` };
 
   const sheet = await loadJobSheet(admin, booking.id);
@@ -181,7 +181,7 @@ async function buildPreview(
     hourlyRatePence: booking.hourly_rate_pence ?? undefined,
     commissionRate: booking.commission_rate == null ? undefined : Number(booking.commission_rate),
   });
-  if (!quote) return { ok: false, error: "One of those repairs can't be priced for this car — remove it and try again." };
+  if (!quote) return { ok: false, error: "One of those repairs can't be priced for this car. Remove it and try again." };
 
   const money = revisionMoney(sheet.revisions);
   const before = snapshotFromBooking(booking, sheet.lineRows, sheet.partRows, approvedExtras(sheet.quotes, money.holdQuoteIds));
@@ -215,7 +215,7 @@ export async function sendRevision(
   input: RevisionInput & { reason: string; note?: string | null },
 ): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   const reason = (input.reason ?? "").trim().replace(/\s+/g, " ");
-  if (!reason) return { ok: false, error: "Tell the customer why the booked repair isn't right — they read it before approving." };
+  if (!reason) return { ok: false, error: "Tell the customer why the booked repair isn't right. They read it before approving." };
   if (reason.length > 500) return { ok: false, error: "Keep the reason under 500 characters." };
   const note = (input.note ?? "").trim().slice(0, 1000) || null;
 
@@ -228,17 +228,17 @@ export async function sendRevision(
   const built = await buildPreview(admin, booking, input);
   if (!built.ok) return built;
   const { preview, sheet } = built;
-  if (!hasChanges(preview.diff)) return { ok: false, error: "Nothing has changed — remove or add a repair or part first." };
+  if (!hasChanges(preview.diff)) return { ok: false, error: "Nothing has changed. Remove or add a repair or part first." };
 
   // One open ask per booking, and one approved revision per booking: a
   // second rewrite on top of an authorised difference has no safe capture
   // arithmetic, and in practice means "complete it and quote the rest".
   const money = revisionMoney(sheet.revisions);
-  if (money.pending) return { ok: false, error: "A revised job is already waiting on the customer — withdraw it before sending another." };
+  if (money.pending) return { ok: false, error: "A revised job is already waiting on the customer. Withdraw it before sending another." };
   if (money.approved)
     return { ok: false, error: "This job has already been revised once and approved. Complete it, then send a follow-on quote for anything else." };
   if (quoteMoney(sheet.quotes).pendingNow)
-    return { ok: false, error: "A quote for extra work is still waiting on the customer — withdraw it before revising the job." };
+    return { ok: false, error: "A quote for extra work is still waiting on the customer. Withdraw it before revising the job." };
 
   const difference = preview.diff.differencePence;
   const now = new Date();
@@ -256,7 +256,7 @@ export async function sendRevision(
         mechanic_id: mechanicId,
         kind: "now",
         status: "draft",
-        title: "Revised job — difference",
+        title: "Revised job: difference",
         note: null,
         hourly_rate_pence: preview.after.hourlyRatePence,
         commission_rate: commissionRate,
@@ -386,11 +386,11 @@ export async function endJobOnSite(
   const owned = await ownedBooking(input.bookingId, mechanicId);
   if (!owned.ok) return owned;
   const { booking, admin } = owned;
-  if (booking.status !== "in_progress") return { ok: false, error: "This job has already moved on — refresh the page." };
+  if (booking.status !== "in_progress") return { ok: false, error: "This job has already moved on. Refresh the page." };
 
   const revisions = await loadRevisionsForBooking(admin, booking.id);
   const money = revisionMoney(revisions);
-  if (money.pending) return { ok: false, error: "The revised job is still waiting on the customer — wait for their answer or withdraw it." };
+  if (money.pending) return { ok: false, error: "The revised job is still waiting on the customer. Wait for their answer or withdraw it." };
   if (!money.declined) return { ok: false, error: "The job can only be ended this way after the customer has declined a revised job." };
   const declined = money.declined;
 
@@ -398,7 +398,7 @@ export async function endJobOnSite(
   const feePence = onSiteFeeFor(input.charge, { diagnosticPence, enRoutePence: tiers.enRoute });
   const feeLabel = ON_SITE_FEE_LABEL[input.charge];
   const note = (input.note ?? "").trim().slice(0, 500);
-  const reason = note ? `${declined.reason} — ${note}` : declined.reason;
+  const reason = note ? `${declined.reason}; ${note}` : declined.reason;
 
   // --- Settle the base hold: capture the fee, release the rest.
   let stripe: typeof import("@/lib/stripe/server").stripe | null = null;
@@ -428,7 +428,7 @@ export async function endJobOnSite(
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : "Payment error";
-      return { ok: false, error: `Couldn't settle the customer's payment hold: ${message}. Nothing was changed — try again.` };
+      return { ok: false, error: `Couldn't settle the customer's payment hold: ${message}. Nothing was changed. Try again.` };
     }
   }
 

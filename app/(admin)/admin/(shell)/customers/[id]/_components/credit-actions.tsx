@@ -85,7 +85,7 @@ export function CreditActions({ customerId }: { customerId: string }) {
           <input
             value={note}
             onChange={(e) => setNote(e.target.value)}
-            placeholder="Why — shown on their credit history"
+            placeholder="Why (shown on their credit history)"
             aria-label="Reason"
             maxLength={200}
             className={INPUT}
@@ -106,20 +106,20 @@ export function CreditActions({ customerId }: { customerId: string }) {
               toast.error(res.error);
               return;
             }
-            toast.success(res.sent > 0 ? "Code sent." : "Nothing sent — they have no email address.");
+            toast.success(res.sent > 0 ? "Code sent." : "Nothing sent. They have no email address.");
             router.refresh();
           });
         }}
       >
         <p className="text-sm font-semibold text-text-primary">Send a discount code</p>
         {codes.length === 0 ? (
-          <p className="text-xs text-text-muted">No live codes — create one under Discounts first.</p>
+          <p className="text-xs text-text-muted">No live codes. Create one under Discounts first.</p>
         ) : (
           <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
             <Select
               value={codeId}
               onChange={setCodeId}
-              options={codes.map((c) => ({ value: c.id, label: `${c.code} — ${c.offer}` }))}
+              options={codes.map((c) => ({ value: c.id, label: `${c.code}: ${c.offer}` }))}
               aria-label="Discount code"
             />
             <Button type="submit" size="sm" variant="secondary" iconLeft={Send} disabled={pending || !codeId}>

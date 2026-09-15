@@ -113,7 +113,7 @@ export default async function MatchPage({ searchParams }: MatchPageProps) {
               : singleProduct?.summary ?? "A set price, done at your door."
             : multiJobs
               ? quote.combineSource === "haynespro"
-                ? "Priced as one visit from the manufacturer's book times for your exact vehicle — work that overlaps isn't charged twice."
+                ? "Priced as one visit from the manufacturer's book times for your exact vehicle. Work that overlaps isn't charged twice."
                 : "Each job priced from the manufacturer's book time for your exact vehicle, done in one visit."
               : "Priced from the manufacturer's book time for your exact vehicle."
         }

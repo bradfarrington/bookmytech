@@ -13,7 +13,7 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div>
       <dt className="text-xs font-medium text-text-muted">{label}</dt>
-      <dd className="text-sm font-medium text-text-primary">{value || "—"}</dd>
+      <dd className="text-sm font-medium text-text-primary">{value || "Not given"}</dd>
     </div>
   );
 }
@@ -22,13 +22,13 @@ function Reference({ n, app }: { n: 1 | 2; app: Application }) {
   return (
     <div className="rounded-lg border border-border bg-surface p-3">
       <p className="text-sm font-semibold text-text-primary">
-        {app[`reference_${n}_name`] || "—"}
+        {app[`reference_${n}_name`] || "Not given"}
         {app[`reference_${n}_relationship`] && (
           <span className="font-normal text-text-muted"> · {app[`reference_${n}_relationship`]}</span>
         )}
       </p>
       <p className="text-xs text-text-secondary">
-        {app[`reference_${n}_email`] || "—"} · {app[`reference_${n}_phone`] || "—"}
+        {app[`reference_${n}_email`] || "No email"} · {app[`reference_${n}_phone`] || "No phone"}
       </p>
     </div>
   );
@@ -50,7 +50,7 @@ export function ApplicationDetail({
       ? "Limited company"
       : app.business_type === "sole_trader"
         ? "Sole trader"
-        : "—";
+        : "Not given";
 
   return (
     <div className="space-y-5">
@@ -68,7 +68,7 @@ export function ApplicationDetail({
 
         {app.status === "approved_with_grace" && app.grace_period_ends_at && (
           <p className="rounded-button bg-warning/10 px-3 py-2 text-xs font-medium text-warning">
-            Approved with grace — outstanding documents due by{" "}
+            Approved with grace: outstanding documents due by{" "}
             {new Date(app.grace_period_ends_at).toLocaleDateString("en-GB", {
               day: "numeric",
               month: "long",
@@ -92,7 +92,7 @@ export function ApplicationDetail({
           <Field label="Postcode" value={app.postcode} />
           <Field
             label="Experience"
-            value={app.years_experience ? `${app.years_experience} yrs` : "—"}
+            value={app.years_experience ? `${app.years_experience} yrs` : "Not given"}
           />
           <Field label="Service radius" value={`${app.service_radius_miles} miles`} />
           <Field label="Business type" value={businessType} />
@@ -107,7 +107,7 @@ export function ApplicationDetail({
             value={
               bank.sortCode && bank.accountNumber
                 ? `${maskTail(bank.sortCode, 2)} / ${maskTail(bank.accountNumber)}`
-                : "—"
+                : "Not given"
             }
           />
         </dl>

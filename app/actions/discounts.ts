@@ -62,7 +62,7 @@ type CleanedPromo = {
 function clean(input: PromoCodeInput): { ok: true; row: CleanedPromo } | { ok: false; error: string } {
   const code = normalisePromoCode(input.code);
   if (!PROMO_CODE_RE.test(code))
-    return { ok: false, error: "A code is 3–24 letters, numbers or hyphens — no spaces." };
+    return { ok: false, error: "A code is 3–24 letters, numbers or hyphens, with no spaces." };
   if (input.kind !== "percent" && input.kind !== "fixed") return { ok: false, error: "Choose percent or fixed." };
 
   const value = Math.round(Number(input.value));
@@ -305,7 +305,7 @@ export async function grantCustomerCredit(input: {
   if (!gate.ok) return gate;
   const amount = Math.round(Number(input.amountPence));
   if (!Number.isFinite(amount) || amount <= 0) return { ok: false, error: "Enter an amount greater than zero." };
-  if (amount > 50_000) return { ok: false, error: "That's over £500 — check the amount." };
+  if (amount > 50_000) return { ok: false, error: "That's over £500. Check the amount." };
   const note = (input.note ?? "").trim().slice(0, 200) || "Goodwill credit";
 
   const admin = createAdminClient();

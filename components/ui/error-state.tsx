@@ -81,8 +81,8 @@ export function ErrorState({
             Reference{" "}
             <code className="rounded bg-border-subtle px-1.5 py-0.5 font-mono text-[11px] text-text-secondary">
               {error.digest}
-            </code>{" "}
-            — quote this and we can find exactly what went wrong.
+            </code>.{" "}
+            Quote this and we can find exactly what went wrong.
           </p>
         )}
       </div>

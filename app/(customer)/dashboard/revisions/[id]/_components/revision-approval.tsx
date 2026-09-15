@@ -63,7 +63,7 @@ export function RevisionApproval({ revision, bookingRef, bookingStatus, mechanic
         toast.error(res.error);
         return;
       }
-      toast.success("Declined — your mechanic has been told.");
+      toast.success("Declined. Your mechanic has been told.");
       setStage({ phase: "done", outcome: "declined" });
       router.refresh();
     });
@@ -152,14 +152,14 @@ export function RevisionApproval({ revision, bookingRef, bookingStatus, mechanic
             ? dearer
               ? `Approved. ${formatPrice(revision.differencePence)} is authorised on your card and the new total of ${formatPrice(revision.after.totalPence)} is charged when the job is complete. Your mechanic has been told to go ahead.`
               : `Approved. Only the new total of ${formatPrice(revision.after.totalPence)} is charged when the job is complete; the rest of your pre-authorisation is released. Your mechanic has been told to go ahead.`
-            : "Declined. Your mechanic won't carry out the revised work — they'll be in touch about how to end the visit."}
+            : "Declined. Your mechanic won't carry out the revised work. They'll be in touch about how to end the visit."}
         </p>
       ) : !open ? (
         <p className="rounded-xl bg-surface px-4 py-3 text-sm text-text-secondary">
           {revision.status === "approved"
             ? "You've approved this revised job."
             : revision.status === "sent"
-              ? "This revised job has expired — ask your mechanic to send it again if you'd still like the work done."
+              ? "This revised job has expired. Ask your mechanic to send it again if you'd still like the work done."
               : `This revised job is ${REVISION_STATUS_LABEL[revision.status].toLowerCase()}.`}
         </p>
       ) : stage.phase === "pay" ? (
@@ -170,7 +170,7 @@ export function RevisionApproval({ revision, bookingRef, bookingStatus, mechanic
           customerName={customerName}
           customerEmail={customerEmail}
           returnUrl={`${window.location.origin}/dashboard/revisions/${revision.id}`}
-          holdNote={`${formatPrice(stage.amountPence)} — the difference — is held now. Your original pre-authorisation still covers the rest, and the new total is charged when the job is complete.`}
+          holdNote={`${formatPrice(stage.amountPence)} (the difference) is held now. Your original pre-authorisation still covers the rest, and the new total is charged when the job is complete.`}
           confirm={confirm}
           onDone={() => {
             setStage({ phase: "done", outcome: "approved" });
@@ -193,7 +193,7 @@ export function RevisionApproval({ revision, bookingRef, bookingStatus, mechanic
             Decline
           </Button>
           <p className="text-xs text-text-muted">
-            If you decline, your mechanic may charge the on-site diagnostic or cancellation fee for the visit — see our cancellation policy. You&apos;re never charged for the revised work itself unless you approve it.
+            If you decline, your mechanic may charge the on-site diagnostic or cancellation fee for the visit. See our cancellation policy. You&apos;re never charged for the revised work itself unless you approve it.
           </p>
         </div>
       )}

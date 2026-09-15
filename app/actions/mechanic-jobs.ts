@@ -70,7 +70,7 @@ export async function cancelOwnJob(
       ok: false,
       error:
         booking.status === "in_progress" || booking.status === "en_route"
-          ? "This job is already under way — manage it from the mobile app."
+          ? "This job is already under way. Manage it from the mobile app."
           : "This job can no longer be cancelled.",
     };
 
@@ -240,7 +240,7 @@ export async function setArrivalWindow(
       ok: false,
       error:
         booking.status === "en_route" || booking.status === "in_progress"
-          ? "This job is already under way — the arrival window can't be changed now."
+          ? "This job is already under way, so the arrival window can't be changed now."
           : "Only confirmed jobs can have an arrival window set.",
     };
   if (booking.slot_window !== ALL_DAY_SLOT.window) {
@@ -255,7 +255,7 @@ export async function setArrivalWindow(
     return {
       ok: false,
       error:
-        "You've proposed a new time for this job — wait for the customer's answer before choosing an arrival window.",
+        "You've proposed a new time for this job. Wait for the customer's answer before choosing an arrival window.",
     };
   if (!booking.scheduled_at) return { ok: false, error: "This job has no date yet." };
 
@@ -272,14 +272,14 @@ export async function setArrivalWindow(
     targetDay = dayKey;
   } else {
     if (dayKey && dayKey !== bookingDay)
-      return { ok: false, error: "This job changed while you were choosing — refresh and try again." };
+      return { ok: false, error: "This job changed while you were choosing. Refresh and try again." };
     targetDay = bookingDay;
   }
 
   const now = new Date();
   const iso = slotIso(targetDay, slot.startHour);
   if (!isSlotBookable(targetDay, slot, now))
-    return { ok: false, error: `${slot.window} has already started or is too close — pick a later window.` };
+    return { ok: false, error: `${slot.window} has already started or is too close. Pick a later window.` };
 
   // Recompute the calendar server-side: a clash with another timed job is a
   // hard refusal whatever the client showed. Off-hours is advisory only.
@@ -316,7 +316,7 @@ export async function setArrivalWindow(
     .maybeSingle();
   if (error) return { ok: false, error: error.message };
   if (!updated)
-    return { ok: false, error: "This job changed while you were choosing — refresh and try again." };
+    return { ok: false, error: "This job changed while you were choosing. Refresh and try again." };
 
   const { error: eventErr } = await admin.from("booking_events").insert({
     booking_id: bookingId,

@@ -180,8 +180,8 @@ export const SECTIONS: LegalSection[] = [
       {
         type: "bullets",
         items: [
-          "Accept all — allows the optional analytics cookie described in section 17 as well as the essential cookies.",
-          "Reject non-essential — only essential cookies are used.",
+          "Accept all: allows the optional analytics cookie described in section 17 as well as the essential cookies.",
+          "Reject non-essential: only essential cookies are used.",
         ],
       },
       { type: "p", text: "We do not currently use marketing cookies. If we introduce them, or any other optional category, we will update this policy and ask for your consent for that category separately." },

@@ -71,7 +71,7 @@ export default async function AdminPricingPage() {
           fees. Every booking is priced from the manufacturer&apos;s book time
           for the exact repair and vehicle: exact book-time hours (1-hour
           minimum) × the hourly rate. All edits are audited and apply to new
-          bookings only — existing bookings keep the price snapshotted at the
+          bookings only; existing bookings keep the price snapshotted at the
           time they were made.
         </p>
       </header>

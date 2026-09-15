@@ -83,7 +83,7 @@ export async function refreshStripeStatus(): Promise<
     .eq("id", guard.userId)
     .single();
   if (!mechanic?.stripe_account_id)
-    return { ok: false, error: "No payout account yet — start onboarding first." };
+    return { ok: false, error: "No payout account yet. Start onboarding first." };
 
   try {
     const account = await connect.retrieveAccount(mechanic.stripe_account_id);

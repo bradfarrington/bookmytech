@@ -23,7 +23,7 @@ export default function AdminError({
   return (
     <ErrorState
       title="This page failed to load"
-      description="Something threw while rendering. The reference below matches the server log entry — that's the fastest way to find the cause."
+      description="Something threw while rendering. The reference below matches the server log entry. That's the fastest way to find the cause."
       error={error}
       retry={unstable_retry}
       homeHref="/admin"

@@ -136,7 +136,7 @@ export default async function AdminOverviewPage() {
     id: b.id,
     jobNumber: b.job_number,
     service: b.repair_description ?? "Vehicle repair",
-    customer: b.customer_name ?? "—",
+    customer: b.customer_name ?? "No name",
     mechanic: b.mechanic_id ? mechanicName.get(b.mechanic_id) ?? "Assigned" : null,
     area: b.area,
     status: b.status,
@@ -204,7 +204,7 @@ export default async function AdminOverviewPage() {
           Welcome back, {firstName}.
         </h1>
         <p className="mt-1.5 text-sm text-text-muted">
-          The marketplace at a glance — live bookings, supply, and demand.
+          The marketplace at a glance: live bookings, supply, and demand.
         </p>
       </header>
 

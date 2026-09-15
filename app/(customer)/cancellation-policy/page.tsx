@@ -5,7 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { formatPrice } from "@/lib/utils";
 
 export const metadata: Metadata = {
-  title: "Cancellation Policy — Book My Tech",
+  title: "Cancellation Policy | Book My Tech",
   description:
     "What it costs to cancel or reschedule a Book My Tech booking, when each fee tier applies, and how refunds and pre-authorisations work.",
 };
@@ -36,15 +36,15 @@ export default async function CancellationPolicyPage() {
         "The fee depends on when you cancel, measured against the start of your booked slot:",
       ],
       bullets: [
-        `More than 24 hours before your slot — ${free ? "no charge" : formatPrice(tiers.before24h)}. The pre-authorisation on your card is released in full.`,
-        `Within 24 hours of your slot — ${formatPrice(tiers.within24h)}. Your mechanic has committed the time and turned down other work for it.`,
-        `Once your mechanic is marked en route — ${formatPrice(tiers.enRoute)}. They are already travelling to you, at their own cost.`,
+        `More than 24 hours before your slot: ${free ? "no charge" : formatPrice(tiers.before24h)}. The pre-authorisation on your card is released in full.`,
+        `Within 24 hours of your slot: ${formatPrice(tiers.within24h)}. Your mechanic has committed the time and turned down other work for it.`,
+        `Once your mechanic is marked en route: ${formatPrice(tiers.enRoute)}. They are already travelling to you, at their own cost.`,
       ],
     },
     {
       heading: "How the fee is taken",
       body: [
-        "When you book, we pre-authorise the quoted amount on your card. A pre-authorisation is not a payment — it reserves the funds and nothing leaves your account.",
+        "When you book, we pre-authorise the quoted amount on your card. A pre-authorisation is not a payment; it reserves the funds and nothing leaves your account.",
         "If a cancellation fee applies, we capture only that fee from the pre-authorisation and release the rest immediately. If no fee applies, the whole pre-authorisation is released and you are charged nothing.",
         "Released funds are available again as soon as your bank processes the release. That is usually immediate, but some banks take a few working days to show it.",
       ],
@@ -53,7 +53,7 @@ export default async function CancellationPolicyPage() {
       heading: "Rescheduling",
       body: [
         "Rescheduling is free and does not count as a cancellation, however close to your slot you do it. You keep the same mechanic wherever possible.",
-        "Your mechanic may also propose a new time — if they do, you will be asked to accept or decline it. Declining a proposed time does not incur a fee.",
+        "Your mechanic may also propose a new time; if they do, you will be asked to accept or decline it. Declining a proposed time does not incur a fee.",
       ],
     },
     {
@@ -66,15 +66,15 @@ export default async function CancellationPolicyPage() {
     {
       heading: "If the job can't go ahead on the day",
       body: [
-        "If a mechanic arrives and the work cannot be carried out for a reason outside your control — the wrong part was supplied, or a fault turns out to need a garage — you are not charged a cancellation fee.",
+        "If a mechanic arrives and the work cannot be carried out for a reason outside your control (the wrong part was supplied, or a fault turns out to need a garage), you are not charged a cancellation fee.",
         "If a mechanic arrives at the booked address and cannot reach the vehicle or nobody is there, that is treated as a late cancellation and the en-route fee applies. Keeping your address and access notes up to date on the booking is the way to avoid this.",
       ],
     },
     {
       heading: "If the booked repair isn't what your car needs",
       body: [
-        "Sometimes a mechanic arrives and finds the repair you booked isn't the right one. They will send you a revised job through Book My Tech — what they found, what they'd do instead, and the new price, higher or lower — and nothing changes until you approve it. If the revised job costs more you authorise only the difference on your card; if it costs less, only the new total is charged when the job is complete and the rest of your pre-authorisation is released.",
-        `If you decline the revised job, the mechanic may charge the on-site diagnostic fee — ${formatPrice(tiers.diagnostic)} — or the en-route cancellation fee of ${formatPrice(tiers.enRoute)}, whichever they apply, for having travelled to you and identified what the car actually needs. That fee is taken from your pre-authorisation and the rest is released. You are never charged for the revised work itself unless you approved it.`,
+        "Sometimes a mechanic arrives and finds the repair you booked isn't the right one. They will send you a revised job through Book My Tech (what they found, what they'd do instead, and the new price, higher or lower), and nothing changes until you approve it. If the revised job costs more you authorise only the difference on your card; if it costs less, only the new total is charged when the job is complete and the rest of your pre-authorisation is released.",
+        `If you decline the revised job, the mechanic may charge the on-site diagnostic fee (${formatPrice(tiers.diagnostic)}) or the en-route cancellation fee of ${formatPrice(tiers.enRoute)}, whichever they apply, for having travelled to you and identified what the car actually needs. That fee is taken from your pre-authorisation and the rest is released. You are never charged for the revised work itself unless you approved it.`,
       ],
     },
     {

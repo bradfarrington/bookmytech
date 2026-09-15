@@ -49,7 +49,7 @@ export default async function AdminDiscountsPage() {
           <Overline>Commercial</Overline>
           <h1 className="mt-1 text-3xl font-bold tracking-tight text-text-primary">Discounts</h1>
           <p className="mt-1.5 max-w-2xl text-sm text-text-muted">
-            Codes you can send to customers — &ldquo;10% off your next booking&rdquo; and the like. A code
+            Codes you can send to customers: &ldquo;10% off your next booking&rdquo; and the like. A code
             comes off the booking total before any account credit. <strong>Book My Tech funds it</strong>:
             the customer pays less and the mechanic is still paid in full, so it comes out of our
             commission.

@@ -60,7 +60,7 @@ export function QuoteApproval({ quote, bookingRef, bookingStatus, mechanicName, 
         toast.error(res.error);
         return;
       }
-      toast.success("Declined — your mechanic has been told.");
+      toast.success("Declined. Your mechanic has been told.");
       setStage({ phase: "done", outcome: "declined" });
       router.refresh();
     });
@@ -154,7 +154,7 @@ export function QuoteApproval({ quote, bookingRef, bookingStatus, mechanicName, 
           {quote.status === "approved"
             ? "You've approved this quote."
             : quote.status === "sent"
-              ? "This quote has expired — ask your mechanic to send it again if you'd still like the work done."
+              ? "This quote has expired. Ask your mechanic to send it again if you'd still like the work done."
               : `This quote is ${QUOTE_STATUS_LABEL[quote.status].toLowerCase()}.`}
         </p>
       ) : stage.phase === "pay" ? (
@@ -179,8 +179,8 @@ export function QuoteApproval({ quote, bookingRef, bookingStatus, mechanicName, 
         <div className="flex flex-col gap-3">
           <p className="rounded-xl bg-blue-50 px-4 py-3 text-[13px] leading-relaxed text-text-secondary">
             {quote.kind === "now"
-              ? `Approving authorises ${formatPrice(quote.totalPence)} on your card now — nothing is charged until the job is complete, and the work only goes ahead once you've approved.`
-              : "Approving doesn't take any payment — you'll pick a date for the return visit next, and your mechanic is offered the job first."}
+              ? `Approving authorises ${formatPrice(quote.totalPence)} on your card now. Nothing is charged until the job is complete, and the work only goes ahead once you've approved.`
+              : "Approving doesn't take any payment. You'll pick a date for the return visit next, and your mechanic is offered the job first."}
             {bookingStatus !== "in_progress" && quote.kind === "now" && " This job is no longer in progress."}
           </p>
           <Button size="lg" fullWidth iconLeft={Check} disabled={pending} onClick={approve}>

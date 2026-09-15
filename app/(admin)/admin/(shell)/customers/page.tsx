@@ -116,7 +116,7 @@ export default async function AdminCustomersListPage({ searchParams }: Customers
         <div className="rounded-button border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           Couldn&apos;t load customers: {error.message}
           {error.message.includes("customer_admin_summary") && (
-            <> — has migration <code>0041</code> been applied?</>
+            <> (has migration <code>0041</code> been applied?)</>
           )}
         </div>
       )}

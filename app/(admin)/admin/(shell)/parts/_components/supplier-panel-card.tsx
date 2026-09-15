@@ -23,16 +23,16 @@ import { cn, formatPrice } from "@/lib/utils";
 //   - Cost and surcharge are separate columns and are NEVER added together.
 //     Whether LKQ's ShowPrice already includes the surcharge is unverified and
 //     worth up to £59.95 on a starter motor (docs/06-lkq-parts-api.md §8 Q1).
-//   - An unpriced variant renders "—", never £0.00.
-//   - A null stock figure renders "—" ("no figure given"), never "0".
+//   - An unpriced variant renders "Not given", never £0.00.
+//   - A null stock figure renders "No stock figure", never "0".
 
 function money(pence: number | null): string {
-  return pence == null ? "—" : formatPrice(pence);
+  return pence == null ? "Not given" : formatPrice(pence);
 }
 
 function StockCell({ offer }: { offer: SupplierOffer }) {
   if (offer.availability.length === 0) {
-    return <span className="text-text-muted">—</span>;
+    return <span className="text-text-muted">No stock figure</span>;
   }
   return (
     <ul className="space-y-0.5">
@@ -41,7 +41,7 @@ function StockCell({ offer }: { offer: SupplierOffer }) {
           <span className={cn(line.emphasis && "font-semibold text-text-primary")}>
             {line.label}
           </span>{" "}
-          <span className="text-text-muted">{line.qty == null ? "—" : line.qty}</span>
+          <span className="text-text-muted">{line.qty == null ? "no figure" : line.qty}</span>
           {line.eta ? <span className="text-text-muted"> · {line.eta}</span> : null}
         </li>
       ))}

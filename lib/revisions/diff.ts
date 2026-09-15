@@ -55,19 +55,19 @@ export function hasChanges(diff: RevisionDiff): boolean {
 /** "£23.40 more — you'll authorise it on your card" / "£18.00 less — released from your hold when the job's done". */
 export function customerDirectionSentence(differencePence: number): string {
   if (differencePence > 0)
-    return `${formatPrice(differencePence)} more than you booked — you'll authorise the difference on your card now, and nothing is charged until the job is complete.`;
+    return `${formatPrice(differencePence)} more than you booked. You'll authorise the difference on your card now, and nothing is charged until the job is complete.`;
   if (differencePence < 0)
-    return `${formatPrice(-differencePence)} less than you booked — only the new total is charged when the job is complete, and the rest of your pre-authorisation is released.`;
+    return `${formatPrice(-differencePence)} less than you booked. Only the new total is charged when the job is complete, and the rest of your pre-authorisation is released.`;
   return "The same price as you booked.";
 }
 
 /** What the mechanic sees under the preview. */
 export function mechanicDirectionSentence(differencePence: number): string {
   if (differencePence > 0)
-    return `Customer pays ${formatPrice(differencePence)} more — they'll authorise it on their card when they approve. Don't start the new work until it shows Approved.`;
+    return `Customer pays ${formatPrice(differencePence)} more. They'll authorise it on their card when they approve. Don't start the new work until it shows Approved.`;
   if (differencePence < 0)
-    return `Customer pays ${formatPrice(-differencePence)} less — the difference is released from their hold when you complete the job. They still need to approve the change.`;
-  return "Same price — the customer still needs to approve the change of work.";
+    return `Customer pays ${formatPrice(-differencePence)} less. The difference is released from their hold when you complete the job. They still need to approve the change.`;
+  return "Same price. The customer still needs to approve the change of work.";
 }
 
 /** Short, signed: "+£23.40" / "−£18.00" / "no change". */

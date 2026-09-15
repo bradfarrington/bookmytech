@@ -242,7 +242,7 @@ export default async function AdminAnalyticsPage({
             Analytics
           </h1>
           <p className="mt-1.5 text-sm text-text-muted">
-            Marketplace performance over time — revenue, demand and conversion.
+            Marketplace performance over time: revenue, demand and conversion.
           </p>
         </div>
         <PeriodSelector current={period} />

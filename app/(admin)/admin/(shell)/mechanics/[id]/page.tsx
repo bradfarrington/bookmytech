@@ -212,7 +212,7 @@ export default async function MechanicDetailPage({
                 {statusLabel(mechanic.status)}
               </Pill>
             ) : (
-              <Pill tone="pending" title="Invite sent — not yet accepted">
+              <Pill tone="pending" title="Invite sent, not yet accepted">
                 Invited
               </Pill>
             )}
@@ -271,8 +271,8 @@ export default async function MechanicDetailPage({
               <h2 className="text-sm font-bold uppercase tracking-wide text-text-muted">
                 Contact
               </h2>
-              <Row icon={Mail} label="Email" value={email ?? "—"} />
-              <Row icon={Phone} label="Phone" value={profile?.phone ?? "—"} />
+              <Row icon={Mail} label="Email" value={email ?? "Not set"} />
+              <Row icon={Phone} label="Phone" value={profile?.phone ?? "Not set"} />
               <Row
                 icon={MapPin}
                 label="Base postcode"
@@ -362,7 +362,7 @@ export default async function MechanicDetailPage({
             )}
             {balance.balancePence > 0 && (
               <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                Book My Tech owes this mechanic — a payout is pending (likely a transfer
+                Book My Tech owes this mechanic: a payout is pending (likely a transfer
                 that needs retrying).
               </p>
             )}
@@ -521,7 +521,7 @@ export default async function MechanicDetailPage({
                             {j.repair_description ?? "Vehicle repair"}
                           </Link>
                           <p className="text-xs text-text-muted">
-                            {j.customer_name ?? "—"}
+                            {j.customer_name ?? "No name"}
                             {j.area ? ` · ${j.area}` : ""}
                           </p>
                         </td>
@@ -531,7 +531,7 @@ export default async function MechanicDetailPage({
                           </Pill>
                         </td>
                         <td className="px-5 py-3 text-text-secondary">
-                          {j.scheduled_at ? formatBookingWhen(j) : "—"}
+                          {j.scheduled_at ? formatBookingWhen(j) : "Not scheduled"}
                         </td>
                         <td className="px-5 py-3 font-semibold text-text-primary">
                           {formatPrice(j.total_pence ?? 0)}

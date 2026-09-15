@@ -32,7 +32,7 @@ interface ReminderMeta {
 export const REMINDER_META: Record<ReminderType, ReminderMeta> = {
   mot_due: {
     label: "MOT due",
-    subject: "Your MOT is due soon — book your pre-check",
+    subject: "Your MOT is due soon: book your pre-check",
     blurb:
       "Your MOT is coming up. Book a pre-check now and we'll catch anything that would fail before the test does.",
     cta: "Book your MOT pre-check",
@@ -48,7 +48,7 @@ export const REMINDER_META: Record<ReminderType, ReminderMeta> = {
   },
   winter_battery: {
     label: "Winter battery check",
-    subject: "Cold weather's coming — get your battery checked",
+    subject: "Cold weather's coming: get your battery checked",
     blurb:
       "Batteries fail most in winter. A quick check now means you won't get caught out on a frosty morning.",
     cta: "Book a battery check",
@@ -56,7 +56,7 @@ export const REMINDER_META: Record<ReminderType, ReminderMeta> = {
   },
   summer_aircon: {
     label: "Summer air-con check",
-    subject: "Warmer days ahead — is your air-con ready?",
+    subject: "Warmer days ahead. Is your air-con ready?",
     blurb:
       "Air-con loses its bite over winter. Get it checked before the heat arrives so you stay cool on the road.",
     cta: "Book a check",

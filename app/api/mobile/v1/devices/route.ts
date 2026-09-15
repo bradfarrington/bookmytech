@@ -55,7 +55,7 @@ export async function POST(request: Request): Promise<Response> {
     );
   if (error) {
     console.error("[devices] upsert failed — has migration 0050 been applied?", error);
-    return apiError("We couldn't save your notification settings — please try again later.", 500);
+    return apiError("We couldn't save your notification settings. Please try again later.", 500);
   }
 
   return apiOk({ ok: true });

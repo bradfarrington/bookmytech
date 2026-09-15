@@ -31,9 +31,9 @@ export default async function SmsTemplatesPage() {
         <p className="max-w-2xl text-sm text-text-muted">
           Customise the SMS copy sent at each point in a booking&apos;s life. Use{" "}
           <code className="rounded bg-surface px-1 py-0.5 text-xs">{"{{token}}"}</code>{" "}
-          merge tags — they&apos;re filled in automatically. Leave a template on
+          merge tags; they&apos;re filled in automatically. Leave a template on
           its default, or reset any time. Use the switch to stop a text going out
-          at all — switched-off texts cost nothing.
+          at all. Switched-off texts cost nothing.
         </p>
       </div>
       <TemplatesEditor templates={templates} />

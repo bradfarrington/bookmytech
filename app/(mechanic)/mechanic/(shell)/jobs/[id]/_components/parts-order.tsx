@@ -98,7 +98,7 @@ export function PartsOrder({
       </ul>
       <p className="text-xs text-text-muted">
         Parts you source yourself are reimbursed in your payout. Order via BMT
-        and we deliver the part — its cost comes off your payout instead.
+        and we deliver the part; its cost comes off your payout instead.
       </p>
     </div>
   );

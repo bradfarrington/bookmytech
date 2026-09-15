@@ -69,7 +69,7 @@ export default async function BookingReportPage({ params }: { params: Promise<{ 
   const when = booking.completed_at ?? booking.scheduled_at;
   const dateLabel = when
     ? new Date(when).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "Europe/London" })
-    : "—";
+    : "Date not set";
   const finished = booking.status === "completed";
 
   return (

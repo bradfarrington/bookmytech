@@ -36,7 +36,7 @@ export function PastJobs({ jobs, mechanics, ratedByBooking, disputes }: PastJobs
                 month: "short",
                 year: "numeric",
               })
-            : "—";
+            : "Date not set";
           const cancelled = job.status === "cancelled";
           const dispute = disputes[job.id];
           const inDisputeWindow =

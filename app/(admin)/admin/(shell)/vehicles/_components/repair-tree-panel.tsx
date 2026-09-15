@@ -280,7 +280,7 @@ export async function RepairTreePanel({
 
       {empty && (
         <p className="rounded-2xl border border-border bg-surface-card px-4 py-8 text-center text-sm text-text-muted shadow-card">
-          Nothing under this group{editing ? " yet — create a category, or move jobs and groups here from elsewhere in the tree." : "."}
+          Nothing under this group{editing ? " yet. Create a category, or move jobs and groups here from elsewhere in the tree." : "."}
         </p>
       )}
 
@@ -427,7 +427,7 @@ export async function RepairTreePanel({
                     )}
                   </div>
                   <span className={cn("shrink-0 font-semibold", visible ? "text-text-primary" : "text-text-muted")}>
-                    {row.hours != null ? fmtHours(row.hours) : "—"}
+                    {row.hours != null ? fmtHours(row.hours) : "No time"}
                   </span>
                   {editing && (
                     <>
@@ -473,12 +473,12 @@ export async function RepairTreePanel({
             Switching a repair or group off hides it for every make and model; a model&apos;s page under
             Vehicles can still switch it back on for that model alone. Rename anything with the pencil,
             move it with &ldquo;Move to…&rdquo;, and combine jobs into one bookable repair with
-            &ldquo;Combine…&rdquo; (or the search box on its card) — the separate jobs stay available
+            &ldquo;Combine…&rdquo; (or the search box on its card); the separate jobs stay available
             too. Times shown are for the reference vehicle; every vehicle gets its own.
             <MoveRight size={10} className="ml-1 inline" />
           </>
         ) : (
-          "Switching a repair or group off hides it from the customer “Repairs for your car” browser for every variant of this model. Hiding a group hides everything inside it. A repair hidden for all vehicles (under Repairs) can be switched back on here — for this model only."
+          "Switching a repair or group off hides it from the customer “Repairs for your car” browser for every variant of this model. Hiding a group hides everything inside it. A repair hidden for all vehicles (under Repairs) can be switched back on here, for this model only."
         )}
       </p>
     </div>

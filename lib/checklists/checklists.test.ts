@@ -78,7 +78,7 @@ describe("checklistProgress + unfinishedMessage", () => {
       { item_id: "zzz", result: "pass", comment: null }, // not in this list
     ]);
     expect(p).toMatchObject({ total: 3, answered: 2, unanswered: 1, pass: 1, fail: 1, advisory: 0 });
-    expect(unfinishedMessage("Gold inspection", p)).toBe("Finish the Gold inspection first — 1 item still needs an answer.");
+    expect(unfinishedMessage("Gold inspection", p)).toBe("Finish the Gold inspection first: 1 item still needs an answer.");
   });
 
   it("is done when every item has an answer", () => {
@@ -86,7 +86,7 @@ describe("checklistProgress + unfinishedMessage", () => {
     expect(p.unanswered).toBe(0);
     expect(p.checked).toBe(3);
     expect(unfinishedMessage("Full service checklist", p)).toBeNull();
-    expect(unfinishedMessage("x", checklistProgress(items, []))).toBe("Finish the x first — 3 items still need an answer.");
+    expect(unfinishedMessage("x", checklistProgress(items, []))).toBe("Finish the x first: 3 items still need an answer.");
   });
 });
 
@@ -97,6 +97,6 @@ describe("results", () => {
     expect(isValidResult("inspection", "advisory")).toBe(true);
     expect(isValidResult("inspection", "na")).toBe(false);
     expect(resultLabel("not_checked")).toBe("Not checked");
-    expect(resultLabel(null)).toBe("—");
+    expect(resultLabel(null)).toBe("Not answered");
   });
 });

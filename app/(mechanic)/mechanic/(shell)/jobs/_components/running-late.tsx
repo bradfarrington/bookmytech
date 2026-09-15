@@ -65,7 +65,7 @@ export function RunningLate({ jobs }: { jobs: LateCandidate[] }) {
   const [pending, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
   const [rows, setRows] = useState<Row[]>(() => jobs.map((j) => ({ ...j, include: true, newLocal: pushed(j.scheduledAt, 60) })));
-  const [note, setNote] = useState("Running behind on an earlier job — sorry. Does this new time work for you?");
+  const [note, setNote] = useState("Running behind on an earlier job, sorry. Does this new time work for you?");
 
   if (jobs.length === 0) return null;
 
@@ -81,7 +81,7 @@ export function RunningLate({ jobs }: { jobs: LateCandidate[] }) {
         toast.error(res.error);
         return;
       }
-      if (res.proposed > 0) toast.success(`Proposed a new time to ${res.proposed} customer${res.proposed === 1 ? "" : "s"} — they'll accept or decline from their booking.`);
+      if (res.proposed > 0) toast.success(`Proposed a new time to ${res.proposed} customer${res.proposed === 1 ? "" : "s"}. They'll accept or decline from their booking.`);
       for (const f of res.failed) {
         const row = rows.find((r) => r.bookingId === f.bookingId);
         toast.error(`${row?.title ?? "One job"}: ${f.error}`);
@@ -99,7 +99,7 @@ export function RunningLate({ jobs }: { jobs: LateCandidate[] }) {
           <span>
             <span className="block text-[15px] font-bold text-text-primary">Running late?</span>
             <span className="block text-[11px] text-text-muted">
-              Move your {jobs.length} later job{jobs.length === 1 ? "" : "s"} today — each customer is asked to accept the new time.
+              Move your {jobs.length} later job{jobs.length === 1 ? "" : "s"} today. Each customer is asked to accept the new time.
             </span>
           </span>
         </span>

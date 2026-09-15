@@ -42,7 +42,6 @@ const COLUMNS: FooterColumn[] = [
       { label: "Book a repair", href: "/book" },
       { label: "How it works", href: "/#how-it-works" },
       { label: "Repairs", href: "/#repairs" },
-      { label: "Reviews", href: "/#reviews" },
       { label: "Pricing", href: "/book" },
       { label: "Your bookings", href: "/dashboard" },
     ],

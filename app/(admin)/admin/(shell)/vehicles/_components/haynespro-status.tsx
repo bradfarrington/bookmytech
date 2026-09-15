@@ -52,7 +52,7 @@ export function HaynesProStatus({
         <AlertTriangle size={18} className="mt-0.5 shrink-0" />
         <div>
           <p className="font-semibold">
-            HaynesPro is refusing our credentials — booking is down.
+            HaynesPro is refusing our credentials. Booking is down.
           </p>
           <p className="mt-0.5 text-red-800">{health.detail}</p>
           <p className="mt-1.5 text-red-800">
@@ -74,7 +74,7 @@ export function HaynesProStatus({
           <p className="font-semibold">We couldn&apos;t reach HaynesPro.</p>
           <p className="mt-0.5 text-amber-800">
             {health.detail} Seen {relative(health.at)}. This is usually a blip
-            and clears itself — if it persists, booking is affected.
+            and clears itself. If it persists, booking is affected.
           </p>
         </div>
       </div>
@@ -86,7 +86,7 @@ export function HaynesProStatus({
       <div className="flex items-center gap-2.5 rounded-button border border-border bg-surface-card px-4 py-2.5 text-sm text-text-secondary">
         <CheckCircle2 size={16} className="shrink-0 text-success" />
         <span>
-          HaynesPro connected — last authenticated {relative(health.at)}.
+          HaynesPro connected. Last authenticated {relative(health.at)}.
         </span>
       </div>
     );
@@ -99,7 +99,7 @@ export function HaynesProStatus({
     <div className="flex items-center gap-2.5 rounded-button border border-border bg-surface-card px-4 py-2.5 text-sm text-text-muted">
       <CheckCircle2 size={16} className="shrink-0 text-text-disabled" />
       <span>
-        HaynesPro is configured. No authentication attempt recorded yet — status
+        HaynesPro is configured. No authentication attempt recorded yet. Status
         will show here after the next lookup.
       </span>
     </div>

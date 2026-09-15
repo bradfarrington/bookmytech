@@ -108,7 +108,7 @@ export async function reportOrphanedHold(
 
     await sendEmail({
       to: ALERT_EMAIL,
-      subject: `Orphaned Stripe hold — ${amount} with no booking (${paymentIntentId})`,
+      subject: `Orphaned Stripe hold: ${amount} with no booking (${paymentIntentId})`,
       html: `
         <p><strong>A pre-authorisation succeeded but no booking row was written.</strong></p>
         <p>The customer has been told we're holding the funds and asked to contact us.</p>

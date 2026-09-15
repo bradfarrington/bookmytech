@@ -46,7 +46,7 @@ function matches(row: AdminDocRow, filter: Filter): boolean {
 }
 
 function expiryText(row: AdminDocRow): string {
-  if (!row.expiresAt) return "—";
+  if (!row.expiresAt) return "No expiry";
   const d = daysUntil(row.expiresAt);
   const date = new Date(row.expiresAt).toLocaleDateString("en-GB", {
     day: "numeric",

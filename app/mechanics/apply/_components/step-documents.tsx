@@ -182,7 +182,7 @@ export function StepDocuments() {
   return (
     <StepShell
       title="Documents & references"
-      intro="Upload whatever paperwork you have to hand. Don't worry if some isn't ready — once you're approved you'll have 28 days to supply anything outstanding. Files are stored securely and only seen by our verification team."
+      intro="Upload whatever paperwork you have to hand. Don't worry if some isn't ready. Once you're approved you'll have 28 days to supply anything outstanding. Files are stored securely and only seen by our verification team."
       backHref="/mechanics/apply/step-3"
       error={error}
       onNext={handleNext}
@@ -191,7 +191,7 @@ export function StepDocuments() {
         <div>
           <p className="text-sm font-semibold text-text-primary">Documents</p>
           <p className={FIELD_HINT}>
-            Optional now — upload what you can. You&apos;ll have 28 days after
+            Optional now. Upload what you can. You&apos;ll have 28 days after
             approval to add anything missing before it affects your jobs.
           </p>
         </div>
@@ -204,7 +204,7 @@ export function StepDocuments() {
         <div>
           <p className="text-sm font-semibold text-text-primary">Bank account</p>
           <p className={FIELD_HINT}>
-            For job payouts. Encrypted at rest — never stored in plain text.
+            For job payouts. Encrypted at rest, never stored in plain text.
           </p>
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
@@ -240,7 +240,7 @@ export function StepDocuments() {
           <p className="text-sm font-semibold text-text-primary">
             Professional references <span className="font-normal text-text-muted">(optional)</span>
           </p>
-          <p className={FIELD_HINT}>Two people who can vouch for your work. Add them if you can — it helps us verify you faster.</p>
+          <p className={FIELD_HINT}>Two people who can vouch for your work. Add them if you can. It helps us verify you faster.</p>
         </div>
         {data.references.map((ref, i) => (
           <ReferenceFields

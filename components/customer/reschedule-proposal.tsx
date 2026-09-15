@@ -72,8 +72,8 @@ export function RescheduleProposal({
       if (res.ok) {
         toast.success(
           decision === "accept"
-            ? "New time confirmed — your mechanic has been notified."
-            : "Original time kept — your mechanic has been notified.",
+            ? "New time confirmed. Your mechanic has been notified."
+            : "Original time kept. Your mechanic has been notified.",
         );
         router.refresh();
       } else {

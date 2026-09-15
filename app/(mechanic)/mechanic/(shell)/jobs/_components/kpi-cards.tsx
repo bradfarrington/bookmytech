@@ -28,13 +28,13 @@ export function KpiCards({ kpis }: { kpis: MechanicKpis }) {
       />
       <KPI
         label="Acceptance rate"
-        value={kpis.acceptanceRate === null ? "—" : `${kpis.acceptanceRate}%`}
+        value={kpis.acceptanceRate === null ? "n/a" : `${kpis.acceptanceRate}%`}
         delta="Last 30 days"
         icon={Zap}
       />
       <KPI
         label="Customer rating"
-        value={kpis.rating === null ? "—" : `${kpis.rating.toFixed(1)} ★`}
+        value={kpis.rating === null ? "n/a" : `${kpis.rating.toFixed(1)} ★`}
         delta="From completed jobs"
         icon={Star}
       />

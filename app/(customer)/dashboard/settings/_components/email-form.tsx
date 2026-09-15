@@ -68,7 +68,7 @@ export function EmailForm({ currentEmail }: { currentEmail: string }) {
       {sentTo ? (
         <p className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-brand-blue">
           Check your inbox. We&apos;ve sent a confirmation link to <strong>{sentTo}</strong> and one to
-          your current address — click both and your email will be updated.
+          your current address. Click both and your email will be updated.
         </p>
       ) : (
         <>

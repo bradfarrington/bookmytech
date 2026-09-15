@@ -88,7 +88,7 @@ export async function createCustomerAccount(
       return {
         ok: false,
         emailTaken: true,
-        error: "An account with that email already exists — try signing in instead.",
+        error: "An account with that email already exists. Try signing in instead.",
       };
     }
     return { ok: false, error: msg };

@@ -60,7 +60,7 @@ export function MechanicLoginForm() {
       </Button>
 
       <p className="mt-1 text-center text-xs text-text-muted">
-        New to Book My Tech? Your account is created by our team — check your
+        New to Book My Tech? Your account is created by our team. Check your
         inbox for an invite link.
       </p>
     </form>

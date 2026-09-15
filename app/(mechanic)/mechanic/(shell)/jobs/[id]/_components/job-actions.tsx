@@ -90,9 +90,9 @@ export function JobActions({
           fullWidth
           iconLeft={Wrench}
           disabled={pending}
-          onClick={() => runLive(beginWork, "Job started — the customer's been updated.")}
+          onClick={() => runLive(beginWork, "Job started. The customer's been updated.")}
         >
-          I&apos;ve arrived — begin work
+          I&apos;ve arrived, begin work
         </Button>
       </div>
     );
@@ -106,7 +106,7 @@ export function JobActions({
       <div className="space-y-3">
         <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-3 text-sm text-amber-700">
           <Wrench size={16} className="mt-0.5 shrink-0 text-amber-600" />
-          Work is <strong>in progress</strong>. When you&apos;re finished, confirm below — that
+          Work is <strong>in progress</strong>. When you&apos;re finished, confirm below. That
           completes the job and captures payment.
         </div>
 
@@ -117,7 +117,7 @@ export function JobActions({
               this job complete?
             </p>
             <p className="text-xs text-text-muted">
-              Check the work is finished and you&apos;ve added any photos — this can&apos;t be undone
+              Check the work is finished and you&apos;ve added any photos. This can&apos;t be undone
               from here.
             </p>
             <Button
@@ -126,7 +126,7 @@ export function JobActions({
               iconLeft={BadgePoundSterling}
               disabled={pending}
               onClick={() =>
-                runLive(completeAndCharge, "Job complete — payment captured.", () =>
+                runLive(completeAndCharge, "Job complete. Payment captured.", () =>
                   setConfirming(false),
                 )
               }
@@ -185,7 +185,7 @@ export function JobActions({
     startTransition(async () => {
       const res = await proposeReschedule(bookingId, iso, note);
       if (res.ok) {
-        toast.success("New time proposed — the customer has been notified.");
+        toast.success("New time proposed. The customer has been notified.");
         setNote("");
         router.refresh();
       } else {
@@ -199,11 +199,11 @@ export function JobActions({
       toast.error("Choose a reason for cancelling.");
       return;
     }
-    const full = reasonDetails.trim() ? `${reason} — ${reasonDetails.trim()}` : reason;
+    const full = reasonDetails.trim() ? `${reason}: ${reasonDetails.trim()}` : reason;
     startTransition(async () => {
       const res = await cancelOwnJob(bookingId, full);
       if (res.ok) {
-        toast.success("Job cancelled — we're sourcing a replacement.");
+        toast.success("Job cancelled. We're sourcing a replacement.");
         router.push("/mechanic/jobs");
       } else {
         toast.error(res.error);
@@ -224,7 +224,7 @@ export function JobActions({
             fullWidth
             iconLeft={Navigation}
             disabled={pending}
-            onClick={() => runLive(startJourney, "You're on the way — the customer's been notified.")}
+            onClick={() => runLive(startJourney, "You're on the way. The customer's been notified.")}
           >
             Start journey
           </Button>
@@ -237,7 +237,7 @@ export function JobActions({
       {pendingProposal && (
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-3">
           <p className="text-xs font-semibold text-amber-800">
-            Reschedule proposed — awaiting customer
+            Reschedule proposed, awaiting customer
           </p>
           <p className="mt-0.5 text-xs text-amber-700">
             You proposed{" "}

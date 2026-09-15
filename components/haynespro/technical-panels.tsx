@@ -230,8 +230,8 @@ function AdjustmentRows({ rows, depth }: { rows: HpAdjustment[]; depth: number }
               <div className="flex items-baseline justify-between gap-4 text-sm">
                 <span className="text-text-secondary">{row.name}</span>
                 <span className="shrink-0 font-medium text-text-primary">
-                  {row.value ?? "—"}
-                  {row.unit ? ` ${row.unit}` : ""}
+                  {row.value ?? "Not given"}
+                  {row.value != null && row.unit ? ` ${row.unit}` : ""}
                 </span>
               </div>
             )}

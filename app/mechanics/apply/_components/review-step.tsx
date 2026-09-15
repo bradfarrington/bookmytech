@@ -19,7 +19,7 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex justify-between gap-4 py-1.5 text-sm">
       <span className="text-text-muted">{label}</span>
-      <span className="text-right font-medium text-text-primary">{value || "—"}</span>
+      <span className="text-right font-medium text-text-primary">{value || "Not provided"}</span>
     </div>
   );
 }
@@ -64,7 +64,7 @@ export function ReviewStep({ services }: { services: ServiceLookup[] }) {
   function handleSubmit() {
     if (!bankReady) {
       setError(
-        "Your bank details aren't filled in — go back to the Documents step and re-enter them, then submit.",
+        "Your bank details aren't filled in. Go back to the Documents step and re-enter them, then submit.",
       );
       return;
     }
@@ -141,7 +141,7 @@ export function ReviewStep({ services }: { services: ServiceLookup[] }) {
       <SectionCard title="Documents & references" editHref="/mechanics/apply/step-4">
         <Row
           label="Documents uploaded"
-          value={uploadedDocLabels.length ? uploadedDocLabels.join(", ") : "None yet — 28-day grace after approval"}
+          value={uploadedDocLabels.length ? uploadedDocLabels.join(", ") : "None yet (28-day grace after approval)"}
         />
         <Row label="Bank details" value={bankReady ? "Provided (encrypted)" : "Missing"} />
         <Row label="Reference 1" value={data.references[0].name} />

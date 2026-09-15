@@ -119,7 +119,7 @@ export async function respondToRevisionFor(
   // revision's hold quote. Reused if the customer started one and didn't
   // finish; created otherwise. Nothing changes until the card is authorised.
   const hold = await loadQuote(admin, revision.holdQuoteId);
-  if (!hold || hold.status !== "draft") return { ok: false, error: "This revised job can't be approved right now — ask your mechanic to send it again." };
+  if (!hold || hold.status !== "draft") return { ok: false, error: "This revised job can't be approved right now. Ask your mechanic to send it again." };
   let stripe;
   try {
     stripe = (await import("@/lib/stripe/server")).stripe;
@@ -142,7 +142,7 @@ export async function respondToRevisionFor(
       currency: "gbp",
       capture_method: "manual",
       payment_method_types: ["card"],
-      description: `Book My Tech — revised job difference on job ${formatJobNumber(booking.job_number)}`,
+      description: `Book My Tech: revised job difference on job ${formatJobNumber(booking.job_number)}`,
       metadata: { customer_id: caller.userId, booking_id: booking.id, quote_id: hold.id, revision_id: revisionId },
     });
     if (!intent.client_secret) return { ok: false, error: "Couldn't start the payment. Please try again." };
@@ -186,7 +186,7 @@ export async function confirmRevisionPaymentFor(
   }
   if (intent.metadata?.revision_id !== revisionId || intent.metadata?.customer_id !== caller.userId)
     return { ok: false, error: "We couldn't find that payment." };
-  if (intent.status !== "requires_capture") return { ok: false, error: "Your card hasn't been authorised yet — please try the payment again." };
+  if (intent.status !== "requires_capture") return { ok: false, error: "Your card hasn't been authorised yet. Please try the payment again." };
   if (intent.amount !== revision.differencePence) return { ok: false, error: "That payment doesn't match the revised job. Please try again." };
 
   const now = new Date().toISOString();

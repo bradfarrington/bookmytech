@@ -37,7 +37,7 @@ const ORDER = STEPS.map((s) => s.key);
 const BANNERS: Record<string, { title: string; body: string; icon: LucideIcon }> = {
   sourcing_mechanic: {
     title: "Finding your mechanic",
-    body: "We're matching you with the best available mechanic in your area. You'll get an email as soon as one accepts — usually within minutes.",
+    body: "We're matching you with the best available mechanic in your area. You'll get an email as soon as one accepts, usually within minutes.",
     icon: Clock,
   },
   confirmed: {
@@ -57,7 +57,7 @@ const BANNERS: Record<string, { title: string; body: string; icon: LucideIcon }>
   },
   completed: {
     title: "Job complete",
-    body: "All done — your payment has been taken and a receipt is on its way to your inbox. Thanks for using Book My Tech.",
+    body: "All done. Your payment has been taken and a receipt is on its way to your inbox. Thanks for using Book My Tech.",
     icon: PartyPopper,
   },
 };
@@ -70,20 +70,20 @@ function sourcingBanner(elapsedSec: number): { title: string; body: string; icon
   if (elapsedSec >= 300) {
     return {
       title: "This is taking a little longer",
-      body: "Sorry this is taking longer than usual. Our team has been alerted and will make sure you're matched shortly — we'll be in touch by email. There's nothing you need to do.",
+      body: "Sorry this is taking longer than usual. Our team has been alerted and will make sure you're matched shortly. We'll be in touch by email. There's nothing you need to do.",
       icon: Clock,
     };
   }
   if (elapsedSec >= 60) {
     return {
       title: "Still finding your mechanic",
-      body: "We're still looking — this should only be a moment longer. Hang tight, there's nothing you need to do.",
+      body: "We're still looking. This should only be a moment longer. Hang tight, there's nothing you need to do.",
       icon: Clock,
     };
   }
   return {
     title: "Finding your mechanic",
-    body: "We're matching you with the best available mechanic in your area — usually within seconds. You'll get an email the moment one accepts.",
+    body: "We're matching you with the best available mechanic in your area, usually within seconds. You'll get an email the moment one accepts.",
     icon: Clock,
   };
 }

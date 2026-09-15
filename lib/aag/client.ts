@@ -177,9 +177,9 @@ export function describeAagError(code: string | null): string {
     case "ISE0035":
       return "AAG's server reported an internal error.";
     case "ISE0047":
-      return "AAG couldn't create the quote — try again.";
+      return "AAG couldn't create the quote. Try again.";
     case "ISE0053":
-      return "AAG couldn't look up product info — try again.";
+      return "AAG couldn't look up product info. Try again.";
     case null:
       return "AAG refused the request without an error code.";
     default:
@@ -257,7 +257,7 @@ export async function aagCall<T>(path: string, body: unknown): Promise<T | null>
         res.status === 401 || res.status === 403 ? "auth_failed" : "unreachable",
         null,
         res.status === 401 || res.status === 403
-          ? `AAG's gateway refused us with HTTP ${res.status} — a wrong API-key header, or our address isn't on their allowlist.`
+          ? `AAG's gateway refused us with HTTP ${res.status}. Either the API-key header is wrong or our address isn't on their allowlist.`
           : `AAG responded HTTP ${res.status}.`,
       );
       return null;
