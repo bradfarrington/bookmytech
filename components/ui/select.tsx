@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Check, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Icon } from "@/components/ui/icon";
+import { useFloatingLayout } from "@/components/ui/floating";
 
 // Custom dropdown that replaces the browser-native `<select>` for parity with
 // the rest of the design system. Generic over the value type so consumers get
@@ -12,6 +14,9 @@ import { Icon } from "@/components/ui/icon";
 //
 // Per project memory: do NOT use native <select> elements in client UI — use
 // this primitive instead.
+//
+// The list renders in a fixed layer outside the page flow (useFloatingLayout),
+// so a card or panel with overflow hidden can never clip it.
 
 export interface SelectOption<T extends string = string> {
   value: T;
@@ -47,6 +52,7 @@ export function Select<T extends string>({
   const listId = `${id ?? autoId}-list`;
 
   const current = options.find((o) => o.value === value);
+  const layout = useFloatingLayout(buttonRef, open, 288);
 
   useEffect(() => {
     if (!open) return;
@@ -72,13 +78,13 @@ export function Select<T extends string>({
     };
   }, [open]);
 
-  // Sync the highlighted option to the current value whenever we open
-  useEffect(() => {
-    if (open) {
-      const idx = options.findIndex((o) => o.value === value);
-      setActiveIndex(idx >= 0 ? idx : 0);
-    }
-  }, [open, options, value]);
+  // Opening highlights the current value. Done at the moment of opening rather
+  // than in an effect watching `open`, which would render twice.
+  const openList = () => {
+    const idx = options.findIndex((o) => o.value === value);
+    setActiveIndex(idx >= 0 ? idx : 0);
+    setOpen(true);
+  };
 
   const commit = (option: SelectOption<T>) => {
     onChange(option.value);
@@ -93,7 +99,11 @@ export function Select<T extends string>({
         type="button"
         id={id}
         disabled={disabled}
-        onClick={() => !disabled && setOpen((o) => !o)}
+        onClick={() => {
+          if (disabled) return;
+          if (open) setOpen(false);
+          else openList();
+        }}
         onKeyDown={(event) => {
           if (
             !open &&
@@ -102,7 +112,7 @@ export function Select<T extends string>({
               event.key === " ")
           ) {
             event.preventDefault();
-            setOpen(true);
+            openList();
             return;
           }
           if (open) {
@@ -145,12 +155,13 @@ export function Select<T extends string>({
         />
       </button>
 
-      {open && (
+      {open && layout && createPortal(
         <div
           ref={listRef}
           id={listId}
           role="listbox"
-          className="absolute left-0 right-0 z-20 mt-1 max-h-72 overflow-y-auto rounded-button border border-border bg-surface-card py-1 shadow-card"
+          style={layout.style}
+          className="z-[70] overflow-y-auto rounded-button border border-border bg-surface-card py-1 shadow-float"
         >
           {options.map((option, index) => {
             const isSelected = option.value === value;
@@ -182,7 +193,8 @@ export function Select<T extends string>({
               </button>
             );
           })}
-        </div>
+        </div>,
+        layout.container,
       )}
     </div>
   );

@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Check, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Icon } from "@/components/ui/icon";
+import { useFloatingLayout } from "@/components/ui/floating";
 
 // Searchable, free-text-capable select (autocomplete/combobox).
 //
@@ -12,6 +14,9 @@ import { Icon } from "@/components/ui/icon";
 // keep your own typed value — `allowCustom` means a make/model we don't carry in
 // the catalogue still goes through as free text, so coverage gaps never block a
 // booking. Keyboard: Arrow keys to move, Enter to commit, Escape to close.
+//
+// The list renders in a fixed layer outside the page flow (useFloatingLayout),
+// so a card or panel with overflow hidden can never clip it.
 
 export interface ComboboxProps {
   value: string;
@@ -40,6 +45,8 @@ export function Combobox({
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
   const wrapRef = useRef<HTMLDivElement>(null);
+  const fieldRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const autoId = useId();
   const listId = `${id ?? autoId}-list`;
@@ -54,10 +61,16 @@ export function Combobox({
     return options.filter((o) => o.toLowerCase().includes(q));
   }, [value, options]);
 
+  const showList = open && !disabled && filtered.length > 0;
+  const showCustom = open && !disabled && allowCustom && filtered.length === 0 && Boolean(value.trim());
+  const layout = useFloatingLayout(fieldRef, showList || showCustom, 256);
+
   useEffect(() => {
     if (!open) return;
     const onDocDown = (e: MouseEvent) => {
-      if (!wrapRef.current?.contains(e.target as Node)) setOpen(false);
+      const target = e.target as Node;
+      // The list lives in a portal, outside wrapRef, so check it separately.
+      if (!wrapRef.current?.contains(target) && !listRef.current?.contains(target)) setOpen(false);
     };
     document.addEventListener("mousedown", onDocDown);
     return () => document.removeEventListener("mousedown", onDocDown);
@@ -72,6 +85,7 @@ export function Combobox({
   return (
     <div ref={wrapRef} className={cn("relative", className)}>
       <div
+        ref={fieldRef}
         className={cn(
           "flex h-12 items-center gap-2 rounded-lg border bg-surface px-3 transition-colors",
           open
@@ -128,11 +142,13 @@ export function Combobox({
         />
       </div>
 
-      {open && !disabled && filtered.length > 0 && (
+      {showList && layout && createPortal(
         <div
+          ref={listRef}
           id={listId}
           role="listbox"
-          className="absolute left-0 right-0 z-30 mt-1 max-h-64 overflow-y-auto rounded-lg border border-border bg-surface-card py-1 shadow-card [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          style={layout.style}
+          className="z-[70] overflow-y-auto rounded-lg border border-border bg-surface-card py-1 shadow-float [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         >
           {filtered.map((option, index) => {
             const isSelected = option.toLowerCase() === value.trim().toLowerCase();
@@ -160,13 +176,19 @@ export function Combobox({
               </button>
             );
           })}
-        </div>
+        </div>,
+        layout.container,
       )}
 
-      {open && !disabled && allowCustom && filtered.length === 0 && value.trim() && (
-        <div className="absolute left-0 right-0 z-30 mt-1 rounded-lg border border-border bg-surface-card px-3 py-2.5 text-sm text-text-muted shadow-card">
+      {showCustom && layout && createPortal(
+        <div
+          ref={listRef}
+          style={layout.style}
+          className="z-[70] rounded-lg border border-border bg-surface-card px-3 py-2.5 text-sm text-text-muted shadow-float"
+        >
           Using “<span className="font-semibold text-text-primary">{value.trim()}</span>”
-        </div>
+        </div>,
+        layout.container,
       )}
     </div>
   );
