@@ -23,10 +23,12 @@ The design language for Book My Tech. Every UI in this codebase — customer, me
 | `warning`          | `#F59E0B` | Pending, surge, attention                          |
 | `danger`           | `#EF4444` | Errors, rejected                                   |
 | `plate-yellow`     | `#FEF3C7` | UK reg-plate background                            |
+| `surface-dark`     | `#0B1220` | Dark marketing sections, footer, plate borders (Task 46) |
 
 ### Typography
 
 - **Font family:** Inter on web (`Inter, system-ui, sans-serif`), SF Pro on iOS
+- **Display family:** Inter Tight (`font-display`), weight 800–900, for marketing headings, big numerals and prices (Task 46). Body copy stays Inter.
 - **Heading scale:** 56 / 40 / 32 / 24 / 20 / 18 (font-weight 700–800, letter-spacing -0.025em on display sizes)
 - **Body:** 16 / 14 / 13 (line-height 1.5–1.55)
 - **Caption / overline:** 11–12 (letter-spacing 0.06em–0.1em, uppercase for overlines)
@@ -47,6 +49,17 @@ Strict scale, no arbitrary values: **4 / 8 / 12 / 16 / 24 / 32 / 48 / 64** pixel
 
 - **Card:** `0 4px 20px rgba(0,0,0,0.05)` → custom shadow class `shadow-card`
 - **Floating hero card:** `0 20px 60px rgba(15,23,42,0.25)` → `shadow-hero`
+- **Floating element (toast, popover):** `0 12px 32px rgba(15,23,42,0.10)` → `shadow-float`
+
+### Gradients
+
+- **Brand:** `135deg, #1E3A8A → #2563EB → #3B82F6` → `bg-brand-gradient` (app surfaces, existing heroes)
+- **Brand deep:** `135deg, #0B1F52 0% → #1E3A8A 45% → #2563EB 100%` → `bg-brand-gradient-deep` (marketing hero and final CTA, Task 46)
+
+### Motion
+
+- `animate-ticker` (34s linear marquee, content duplicated and translated −50%) and `animate-live-pulse` (2.2s green ring). Always pair with `motion-reduce:animate-none`.
+- Scroll entrances use `components/ui/reveal.tsx` (GSAP), which already honours reduced motion.
 - **Focused input:** blue border + soft outer shadow
 
 ### Layout
@@ -123,6 +136,14 @@ The current `app/globals.css` defines:
 }
 ```
 
+Task 46 added, inside the same `@theme` (see the file for the full block):
+`--color-surface-dark`, `--font-display`, `--shadow-float`,
+`--background-image-brand-gradient-deep`, `--animate-ticker` and
+`--animate-live-pulse` with their keyframes. Outside `@theme`, three decorative
+`@utility` classes (`hero-glow`, `final-glow`, `coverage-blobs`) paint the
+marketing sections' light. They are page decoration, not tokens, and the mobile
+app does not mirror them.
+
 Adding a new token? Add a CSS variable inside `@theme`. The corresponding Tailwind utility is generated on next build.
 
 ## Core components
@@ -147,7 +168,7 @@ White surface, `16px` radius, `shadow-card`. Default padding `24px`. Accepts chi
 
 ### `RegPlateInput`
 
-UK number plate styling: yellow (`#FEF3C7`) background, dark border, monospace-ish letter-spacing, GB badge on the left (blue square with white "GB" text). Used in the hero and the booking flow step 1.
+UK number plate styling: yellow (`#FEF3C7`) background, dark border, monospace-ish letter-spacing, GB badge on the left (blue square with white "GB" text). `size="md"` (default) is the compact plate used in the booking flow and admin; `size="lg"` is the 60px marketing plate on the homepage's lookup boxes.
 
 ### `Icon`
 
@@ -171,7 +192,26 @@ Used in the trust strip below the hero. Icon + value + label, horizontal layout.
 
 ### `CustomerNav`
 
-Top navigation for customer pages. Accepts `active` (current page name) and `dark` (boolean — uses light text on dark hero backgrounds).
+Sticky, frosted top bar for customer marketing pages (Task 46). Accepts an optional `active` (the current nav item; omit it on pages that aren't one). Render it **above** the page's hero as a sibling, never inside a `<section>`: a sticky element only sticks within its parent.
+
+### `SectionHeading`
+
+Eyebrow + `font-display` h2 (`clamp(30px, 4vw, 46px)`) + 17px lead above a marketing section. Props: `eyebrow`, `title`, `lead`, `align` (`center` | `left`), `tone` (`light` | `dark`, the surface it sits on). Wraps itself in `Reveal`.
+
+## Marketing page pattern (Task 46)
+
+The layout every customer marketing page follows, taken from `proposal/homepage-redesign.html`. The homepage (`app/(customer)/page.tsx`) is the worked example; reuse its pieces rather than restating classes.
+
+- **Page shell:** `<CustomerNav />`, then `<main>` holding the sections, then `<Footer />`.
+- **Section shell:** full-width band, content in `mx-auto max-w-content px-4 sm:px-6`, vertical rhythm `py-14 sm:py-[88px]`. Sections with an in-page anchor add `scroll-mt-[68px]` so the sticky nav doesn't cover their heading.
+- **Section heading:** `SectionHeading`. Centred by default; left-aligned for content-heavy sections.
+- **Alternating bands:** `bg-surface` (default), white bands with `border-y border-border`, and a dark band (`bg-surface-dark`, `SectionHeading tone="dark"`).
+- **Gradient sections:** hero and final CTA use `bg-brand-gradient-deep`, with a `hero-glow` / `final-glow` overlay (`absolute inset-0 pointer-events-none`).
+- **Cards:** white, `border border-border`, `rounded-[18px]`–`rounded-[20px]`, `p-5`–`p-[26px]`. Interactive cards lift on hover (`hover:-translate-y-0.5 hover:border-brand-blue/35 hover:shadow-card`).
+- **Buttons:** `primary` for the main CTA, `dark` for the nav CTA, `ghost` for secondary links, `secondary` with a white background on gradients. Bold labels (`font-bold`).
+- **Icon tiles:** 44px, `rounded-xl`, `bg-indigo-50 text-brand-blue` (solid `bg-brand-blue text-white` for a featured item).
+- **Grids:** collapse to one column around 900px; a row of cards may become a horizontal scroll-snap carousel below 561px.
+- **Copy rule:** a proposal's stats, prices, places and testimonials are placeholders. Every figure that ships must be real (live catalogue prices, confirmed areas) or already approved on the live site.
 
 ## UX principles (from the brief)
 

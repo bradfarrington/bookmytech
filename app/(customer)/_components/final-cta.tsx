@@ -3,18 +3,22 @@ import { RegLookupForm } from "./reg-lookup-form";
 
 export function FinalCta() {
   return (
-    <section className="bg-brand-gradient text-white">
-      <div className="mx-auto max-w-content px-4 py-14 sm:px-8 lg:py-[72px]">
-        <Reveal className="mx-auto max-w-2xl text-center">
-          <h2 className="mb-3 text-[32px] font-extrabold leading-tight tracking-[-0.025em] sm:text-[40px]">
-            Ready to book? It takes 60 seconds.
+    <section className="relative overflow-hidden bg-brand-gradient-deep text-white">
+      <div aria-hidden className="final-glow pointer-events-none absolute inset-0 opacity-70" />
+      <div className="relative mx-auto max-w-[720px] px-4 py-[72px] text-center sm:px-6 sm:py-[100px]">
+        <Reveal>
+          <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-white/75">
+            Ready to book?
+          </p>
+          <h2 className="mb-4 mt-3 font-display text-[clamp(32px,5vw,54px)] font-extrabold leading-[1.05] tracking-[-0.025em]">
+            It takes 60 seconds.
           </h2>
-          <p className="mb-7 text-base text-white/85 sm:text-lg">
+          <p className="mb-8 text-lg text-white/80">
             Drop in your reg, see your fixed price, pick a slot. We&apos;ll come to
             you.
           </p>
         </Reveal>
-        <RegLookupForm className="mx-auto max-w-[540px]" />
+        <RegLookupForm variant="final" className="mx-auto max-w-[520px]" />
       </div>
     </section>
   );

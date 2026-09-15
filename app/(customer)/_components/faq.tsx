@@ -1,11 +1,5 @@
-"use client";
-
-import { useState } from "react";
-import { ChevronDown } from "lucide-react";
-import { Icon } from "@/components/ui/icon";
-import { Overline } from "@/components/ui/overline";
 import { Reveal } from "@/components/ui/reveal";
-import { cn } from "@/lib/utils";
+import { SectionHeading } from "@/components/ui/section-heading";
 
 type FaqItem = { question: string; answer: string };
 
@@ -28,7 +22,7 @@ const FAQS: FaqItem[] = [
   {
     question: "What areas do you cover?",
     answer:
-      "We're live across Greater London with mechanics expanding through Manchester, Bristol and Birmingham. Drop your postcode into the hero above to see who's covering your area.",
+      "We're live across Greater London, with Manchester, Birmingham and Bristol coming soon. Enter your reg and postcode at the top of the page to get started.",
   },
   {
     question: "What if the mechanic can't fix the problem?",
@@ -42,61 +36,36 @@ const FAQS: FaqItem[] = [
   },
 ];
 
+// Native <details>, so no client JS; the first question starts open.
 export function Faq() {
-  const [openIndex, setOpenIndex] = useState<number | null>(0);
-
   return (
-    <section className="bg-surface">
-      <div className="mx-auto max-w-[820px] px-4 py-14 sm:px-8 lg:py-[56px]">
-        <Reveal className="mb-9 text-center">
-          <Overline className="mb-2 text-brand-blue">FAQ</Overline>
-          <h2 className="text-[32px] font-extrabold leading-tight tracking-[-0.025em] text-text-primary sm:text-[40px]">
-            Questions, answered.
-          </h2>
-        </Reveal>
+    <section id="faq" className="scroll-mt-[68px] border-t border-border bg-white">
+      <div className="mx-auto max-w-content px-4 py-14 sm:px-6 sm:py-[88px]">
+        <SectionHeading eyebrow="FAQ" title="Questions, answered." />
 
-        <ul className="flex flex-col gap-2">
-          {FAQS.map((item, i) => {
-            const isOpen = openIndex === i;
-            return (
-              <li key={item.question}>
-                <button
-                  type="button"
-                  onClick={() => setOpenIndex(isOpen ? null : i)}
-                  aria-expanded={isOpen}
-                  aria-controls={`faq-panel-${i}`}
-                  className={cn(
-                    "flex w-full items-center justify-between gap-4 rounded-2xl border border-border bg-surface-card px-5 py-4 text-left",
-                    "transition-colors hover:border-brand-blue/40",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue focus-visible:ring-offset-2",
-                    isOpen && "border-brand-blue/60",
-                  )}
+        <Reveal stagger className="mx-auto flex max-w-[820px] flex-col gap-2.5">
+          {FAQS.map((item, i) => (
+            <details
+              key={item.question}
+              open={i === 0}
+              className="group overflow-hidden rounded-2xl border border-border bg-white transition-colors open:border-brand-blue/35"
+            >
+              <summary className="flex list-none items-center justify-between gap-5 px-[22px] py-5 text-base font-bold tracking-[-0.01em] text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-blue [&::-webkit-details-marker]:hidden">
+                {item.question}
+                <span
+                  aria-hidden
+                  className="font-display text-2xl font-normal leading-none text-text-muted group-open:text-brand-blue"
                 >
-                  <span className="text-base font-bold tracking-[-0.01em] text-text-primary">
-                    {item.question}
-                  </span>
-                  <Icon
-                    icon={ChevronDown}
-                    size={20}
-                    className={cn(
-                      "shrink-0 text-text-muted transition-transform duration-200",
-                      isOpen && "rotate-180 text-brand-blue",
-                    )}
-                  />
-                </button>
-                {isOpen && (
-                  <div
-                    id={`faq-panel-${i}`}
-                    role="region"
-                    className="px-5 pb-5 pt-3 text-[15px] leading-[1.6] text-text-secondary"
-                  >
-                    {item.answer}
-                  </div>
-                )}
-              </li>
-            );
-          })}
-        </ul>
+                  <span className="group-open:hidden">+</span>
+                  <span className="hidden group-open:inline">−</span>
+                </span>
+              </summary>
+              <div className="px-[22px] pb-[22px] text-[15px] leading-[1.6] text-text-secondary">
+                {item.answer}
+              </div>
+            </details>
+          ))}
+        </Reveal>
       </div>
     </section>
   );

@@ -139,10 +139,10 @@ const FAQS: AccordionItem[] = [
 export default function MechanicsLandingPage() {
   return (
     <>
+      <CustomerNav active="For mechanics" />
       {/* Hero */}
       <section className="bg-brand-gradient text-white">
-        <CustomerNav active="For mechanics" dark />
-        <div className="mx-auto grid max-w-content gap-10 px-4 pb-16 pt-10 sm:px-8 lg:grid-cols-[1.15fr_1fr] lg:items-center lg:gap-14 lg:pb-20 lg:pt-14">
+        <div className="mx-auto grid max-w-content gap-10 px-4 pb-16 pt-14 sm:px-8 lg:grid-cols-[1.15fr_1fr] lg:items-center lg:gap-14 lg:pb-20 lg:pt-20">
           <Reveal stagger trigger="mount" y={18}>
             <Overline className="mb-3 text-white/70">For mechanics</Overline>
             <h1 className="mb-4 text-[34px] font-extrabold leading-[1.05] tracking-[-0.025em] sm:text-[44px] lg:text-[54px]">

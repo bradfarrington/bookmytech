@@ -9,6 +9,8 @@
   /* Surfaces */
   --color-surface: #f8fafc;
   --color-surface-card: #ffffff;
+  /* Dark marketing sections and the footer (Task 46) */
+  --color-surface-dark: #0b1220;
 
   /* Borders */
   --color-border: #e2e8f0;
@@ -30,6 +32,9 @@
 
   /* Typography — Inter is bound to --font-inter in app/layout.tsx */
   --font-sans: var(--font-inter), Inter, ui-sans-serif, system-ui, sans-serif;
+  /* Display — Inter Tight, bound to --font-inter-tight in app/layout.tsx (Task 46) */
+  --font-display: var(--font-inter-tight), "Inter Tight", var(--font-inter), Inter,
+    ui-sans-serif, system-ui, sans-serif;
 
   /* Radii */
   --radius-button: 10px;
@@ -37,6 +42,7 @@
   /* Shadows */
   --shadow-card: 0 4px 20px rgba(15, 23, 42, 0.05);
   --shadow-hero: 0 20px 60px rgba(15, 23, 42, 0.25);
+  --shadow-float: 0 12px 32px rgba(15, 23, 42, 0.1);
 
   /* Gradients */
   --background-image-brand-gradient: linear-gradient(
@@ -45,9 +51,58 @@
     #2563eb 60%,
     #3b82f6 100%
   );
+  /* Deeper navy gradient for the marketing hero and final CTA (Task 46) */
+  --background-image-brand-gradient-deep: linear-gradient(
+    135deg,
+    #0b1f52 0%,
+    #1e3a8a 45%,
+    #2563eb 100%
+  );
 
   /* Layout */
   --container-content: 1200px;
+
+  /* Motion — pair every use with motion-reduce:animate-none */
+  --animate-ticker: ticker 34s linear infinite;
+  --animate-live-pulse: live-pulse 2.2s ease-in-out infinite;
+
+  @keyframes ticker {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(-50%);
+    }
+  }
+
+  @keyframes live-pulse {
+    0%,
+    100% {
+      box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.2);
+    }
+    50% {
+      box-shadow: 0 0 0 12px rgba(34, 197, 94, 0.05);
+    }
+  }
+}
+
+/* Decorative light on the marketing gradient sections and the coverage map.
+   Page decoration, not tokens — see docs/03-design-system.md → Marketing page pattern. */
+@utility hero-glow {
+  background:
+    radial-gradient(1200px 500px at 85% -10%, rgba(59, 130, 246, 0.55), transparent 60%),
+    radial-gradient(600px 400px at 10% 110%, rgba(255, 255, 255, 0.09), transparent 60%);
+}
+
+@utility final-glow {
+  background: radial-gradient(700px 400px at 20% 100%, rgba(255, 255, 255, 0.1), transparent 60%);
+}
+
+@utility coverage-blobs {
+  background:
+    radial-gradient(ellipse 40% 25% at 50% 30%, rgba(37, 99, 235, 0.1) 60%, transparent 61%),
+    radial-gradient(ellipse 55% 35% at 50% 65%, rgba(37, 99, 235, 0.08) 60%, transparent 61%),
+    radial-gradient(ellipse 25% 15% at 55% 90%, rgba(37, 99, 235, 0.06) 60%, transparent 61%);
 }
 
 body {

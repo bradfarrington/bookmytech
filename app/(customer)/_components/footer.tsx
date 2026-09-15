@@ -74,23 +74,30 @@ const SOCIALS: { label: string; Icon: () => React.ReactElement; href: string }[]
   { label: "LinkedIn", Icon: LinkedInSocialIcon, href: "#" },
 ];
 
+const LEGAL_LINKS = [
+  { label: "Terms", href: "/terms" },
+  { label: "Privacy", href: "/privacy" },
+  { label: "Cookies", href: "/cookies" },
+] as const;
+
 export function Footer() {
   return (
-    <footer className="bg-text-primary text-white">
-      {/* Full-bleed like CustomerNav (side padding only, no max width). */}
-      <div className="px-4 py-14 sm:px-8 lg:py-[56px]">
-        <div className="grid gap-10 md:grid-cols-3 lg:grid-cols-[1.4fr_repeat(3,_1fr)]">
-          <div className="md:col-span-3 lg:col-span-1">
+    // data-hide-sticky-bar: the homepage's mobile sticky bar hides while the
+    // footer is on screen so it never covers the legal links.
+    <footer data-hide-sticky-bar className="bg-surface-dark text-white/70">
+      <div className="mx-auto max-w-content px-4 pb-10 pt-16 sm:px-6">
+        <div className="mb-12 grid grid-cols-2 gap-8 md:grid-cols-[2fr_1fr_1fr_1fr] md:gap-10">
+          <div className="col-span-2 md:col-span-1">
             <Link href="/" aria-label="Book My Tech home" className="inline-block">
               <Image
-                src="/logo.png"
+                src="/logo-cropped.png"
                 alt="Book My Tech"
-                width={228}
-                height={76}
-                className="h-16 w-auto brightness-0 invert"
+                width={159}
+                height={40}
+                className="h-10 w-auto brightness-0 invert"
               />
             </Link>
-            <p className="mt-4 max-w-xs text-sm leading-[1.55] text-white/70">
+            <p className="mt-4 max-w-[320px] text-[13px] leading-[1.6]">
               Vetted mobile mechanics. Transparent pricing. Pay only when the job
               is done.
             </p>
@@ -100,7 +107,7 @@ export function Footer() {
                   <a
                     href={s.href}
                     aria-label={s.label}
-                    className="flex size-9 items-center justify-center rounded-full border border-white/15 text-white/80 transition-colors hover:border-white/40 hover:text-white"
+                    className="flex size-9 items-center justify-center rounded-full border border-white/15 text-white/70 transition-colors hover:border-white/40 hover:text-white"
                   >
                     <s.Icon />
                   </a>
@@ -111,15 +118,15 @@ export function Footer() {
 
           {COLUMNS.map((col) => (
             <div key={col.heading}>
-              <h3 className="mb-4 text-[13px] font-bold uppercase tracking-[0.08em] text-white/60">
+              <h3 className="mb-3.5 text-xs font-bold uppercase tracking-[0.1em] text-white">
                 {col.heading}
               </h3>
-              <ul className="flex flex-col gap-2.5">
+              <ul className="flex flex-col gap-2">
                 {col.links.map((l) => (
                   <li key={l.label}>
                     <Link
                       href={l.href}
-                      className="text-sm text-white/85 transition-colors hover:text-white"
+                      className="text-[13px] leading-[1.6] text-white/70 transition-colors hover:text-white"
                     >
                       {l.label}
                     </Link>
@@ -130,29 +137,21 @@ export function Footer() {
           ))}
         </div>
 
-        <div className="mt-12 flex flex-col items-start gap-3 border-t border-white/10 pt-6 text-xs text-white/60 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-6 text-xs text-white/55">
           <p>© 2026 Book My Tech Ltd. All rights reserved.</p>
           <ul className="flex flex-wrap gap-x-5 gap-y-2">
+            {LEGAL_LINKS.map((l) => (
+              <li key={l.href}>
+                <Link href={l.href} className="transition-colors hover:text-white">
+                  {l.label}
+                </Link>
+              </li>
+            ))}
             <li>
-              <Link href="/terms" className="hover:text-white">
-                Terms
-              </Link>
+              <CookieSettingsLink className="transition-colors hover:text-white" />
             </li>
             <li>
-              <Link href="/privacy" className="hover:text-white">
-                Privacy
-              </Link>
-            </li>
-            <li>
-              <Link href="/cookies" className="hover:text-white">
-                Cookies
-              </Link>
-            </li>
-            <li>
-              <CookieSettingsLink className="hover:text-white" />
-            </li>
-            <li>
-              <Link href="/cancellation-policy" className="hover:text-white">
+              <Link href="/cancellation-policy" className="transition-colors hover:text-white">
                 Cancellations
               </Link>
             </li>

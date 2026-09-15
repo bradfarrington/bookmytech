@@ -201,10 +201,10 @@ const TOPICS: Topic[] = [
 export default function HelpPage() {
   return (
     <>
+      <CustomerNav active="Help" />
       {/* Hero */}
       <section className="bg-brand-gradient text-white">
-        <CustomerNav active="Help" dark />
-        <div className="mx-auto max-w-content px-4 pb-16 pt-10 text-center sm:px-8 lg:pb-20 lg:pt-14">
+        <div className="mx-auto max-w-content px-4 pb-16 pt-14 text-center sm:px-8 lg:pb-20 lg:pt-20">
           <Overline className="mb-3 text-white/70">Help centre</Overline>
           <h1 className="mx-auto mb-4 max-w-3xl text-[34px] font-extrabold leading-[1.05] tracking-[-0.025em] sm:text-[44px] lg:text-[52px]">
             How can we help?

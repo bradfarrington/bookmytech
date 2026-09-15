@@ -1,17 +1,11 @@
-import type { BrandIconProps } from "@/components/ui/brand-icons";
-import {
-  CarIcon,
-  WrenchIcon,
-  PoundCoinIcon,
-  CalendarBoltIcon,
-} from "@/components/ui/brand-icons";
-import { Card } from "@/components/ui/card";
-import { Overline } from "@/components/ui/overline";
+import { CalendarDays, Car, Wrench, type LucideIcon } from "lucide-react";
+import { Icon } from "@/components/ui/icon";
 import { Reveal } from "@/components/ui/reveal";
+import { SectionHeading } from "@/components/ui/section-heading";
 
 type Step = {
   number: string;
-  Icon: (p: BrandIconProps) => React.ReactElement;
+  icon: LucideIcon;
   title: string;
   description: string;
 };
@@ -19,70 +13,60 @@ type Step = {
 const STEPS: Step[] = [
   {
     number: "01",
-    Icon: CarIcon,
-    title: "Tell us your car",
+    icon: Car,
+    title: "Reg in.",
     description:
-      "Drop in your reg — we'll pull the make, model and engine automatically.",
+      "We look up your make, model and engine from the DVLA in seconds. No forms.",
   },
   {
     number: "02",
-    Icon: WrenchIcon,
-    title: "Pick what's wrong",
+    icon: Wrench,
+    title: "Pick what's wrong.",
     description:
-      "Choose from a service or describe a fault. We'll match the right specialist for the job.",
+      "A repair, a diagnostic, a service or an inspection — each priced for your exact car before you book.",
   },
   {
     number: "03",
-    Icon: PoundCoinIcon,
-    title: "See your fixed price",
+    icon: CalendarDays,
+    title: "Pick a time.",
     description:
-      "Transparent pricing for your area. No hidden fees. Pay only when the job is done.",
-  },
-  {
-    number: "04",
-    Icon: CalendarBoltIcon,
-    title: "Pick a slot, we come to you",
-    description:
-      "Same-day or scheduled. We'll send a vetted mechanic to your home, work, or roadside.",
+      "Your card is pre-authorised, never charged up front. A vetted mechanic accepts and comes to your home, work or roadside.",
   },
 ];
 
 export function HowItWorks() {
   return (
-    <section id="how-it-works" className="mx-auto max-w-content px-4 py-14 sm:px-8 lg:py-[56px]">
-      <Reveal className="mx-auto mb-9 max-w-[600px] text-center">
-        <Overline className="mb-2 text-brand-blue">How it works</Overline>
-        <h2 className="mb-2 text-[32px] font-extrabold leading-tight tracking-[-0.025em] text-text-primary sm:text-[40px]">
-          From breakdown to fixed in four taps.
-        </h2>
-        <p className="text-base text-text-secondary">
-          No phone calls. No quotes. No waiting around for the AA. Just a fast,
-          transparent booking.
-        </p>
-      </Reveal>
+    <section id="how-it-works" className="scroll-mt-[68px]">
+      <div className="mx-auto max-w-content px-4 py-14 sm:px-6 sm:py-[88px]">
+        <SectionHeading
+          eyebrow="How it works"
+          title="Three steps from broken to booked."
+          lead="No phone calls. No quotes to chase. No half-day at the dealership."
+        />
 
-      <Reveal as="ol" stagger className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {STEPS.map((s) => (
-          <li key={s.number}>
-            <Card className="h-full p-[22px]">
-              <div className="mb-4 flex items-center justify-between">
-                <div className="flex size-12 items-center justify-center rounded-2xl bg-blue-50 ring-1 ring-inset ring-brand-blue/10">
-                  <s.Icon size={26} className="text-text-primary" />
-                </div>
-                <span className="flex size-7 items-center justify-center rounded-full bg-blue-50 text-xs font-extrabold text-brand-blue">
+        <Reveal as="ol" stagger className="grid gap-3 min-[900px]:grid-cols-3 min-[900px]:gap-6">
+          {STEPS.map((s, i) => (
+            <li key={s.number}>
+              <div className="relative h-full rounded-[20px] border border-border bg-white px-[26px] py-8 transition-[translate,box-shadow,border-color] duration-200 hover:-translate-y-0.5 hover:border-brand-blue/25 hover:shadow-card">
+                <span
+                  aria-hidden
+                  className="block bg-[linear-gradient(180deg,#dbeafe_0%,#eef2ff_100%)] bg-clip-text font-display text-[84px] font-black leading-none tracking-[-0.05em] text-transparent"
+                >
                   {s.number}
                 </span>
+                <span className="absolute right-6 top-6 flex size-11 items-center justify-center rounded-xl bg-[linear-gradient(135deg,#eef2ff,#dbeafe)] text-brand-blue">
+                  <Icon icon={s.icon} size={20} strokeWidth={2} />
+                </span>
+                <h3 className="mb-2 mt-1 font-display text-[22px] font-extrabold tracking-[-0.015em] text-text-primary">
+                  <span className="sr-only">Step {i + 1}: </span>
+                  {s.title}
+                </h3>
+                <p className="text-sm leading-[1.55] text-text-secondary">{s.description}</p>
               </div>
-              <h3 className="mb-1.5 text-lg font-bold tracking-[-0.01em] text-text-primary">
-                {s.title}
-              </h3>
-              <p className="text-[13px] leading-[1.5] text-text-muted">
-                {s.description}
-              </p>
-            </Card>
-          </li>
-        ))}
-      </Reveal>
+            </li>
+          ))}
+        </Reveal>
+      </div>
     </section>
   );
 }

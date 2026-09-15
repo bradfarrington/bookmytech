@@ -119,6 +119,23 @@ You are working on **Book My Tech**, a UK mobile-mechanic booking platform. This
 
 ## Current task
 
+### 2026-09-15 — Homepage redesign ✅ (Task 46), branch `task-46-homepage-redesign`
+
+**The homepage now follows `proposal/homepage-redesign.html`**, the structure every customer page will follow one page at a time. Detail in `docs/tasks/46-homepage-redesign.md`.
+
+- **Kept ours:** the nav links, the hero's GSAP live dispatch animation, and the footer content.
+- **New nav everywhere it's shared:** sticky and frosted, on `/`, `/help`, `/mechanics` and the legal pages. It renders **above** each page's hero, never inside it. Only the nav changed on those pages.
+- **Copy rewritten wherever the proposal invented facts:**
+  - live mechanic counts and six cities
+  - repair prices and a free MOT
+  - a picked, named mechanic
+  - a placeholder company number
+- **Additive design tokens:** Inter Tight `font-display`, `surface-dark`, `brand-gradient-deep`, `shadow-float`, and ticker/pulse animations. No existing token changed. The "Marketing page pattern" in `docs/03-design-system.md` and `components/ui/section-heading.tsx` are what the next pages reuse.
+- **Owner:**
+  - confirm the areas: London live; Manchester, Birmingham and Bristol coming soon
+  - confirm the reviews and headline figures, which are carried over unchanged
+- **Mobile app:** mirror the four new tokens in `src/constants/theme.ts`. No API or schema change.
+
 ### 2026-09-15 — Repair → parts linking, merged to `main` 🚧 (Task 45)
 
 **Tasks 40–45 merged to `main` (fast-forward from branch `task-42-live-supplier-catalogue`).** Task 45 is still in progress; detail in `docs/tasks/45-repair-parts-linking.md`.

@@ -21,12 +21,14 @@ const NAV_ITEMS = [
 export type CustomerNavActive = (typeof NAV_ITEMS)[number]["label"];
 
 export interface CustomerNavProps {
+  /** The current section. Omit on pages that aren't a nav item (the homepage, legal pages). */
   active?: CustomerNavActive;
-  /** Renders with transparent background + light text for use over the hero gradient. */
-  dark?: boolean;
 }
 
-export function CustomerNav({ active = "Book", dark = false }: CustomerNavProps) {
+// Sticky, frosted top bar shared by the homepage, /help, /mechanics and the
+// legal pages (Task 46 redesign). Render it as a sibling ABOVE the page's hero,
+// never inside a <section>: a sticky element only sticks within its parent.
+export function CustomerNav({ active }: CustomerNavProps) {
   const [open, setOpen] = useState(false);
   const signedIn = useCustomerSession();
 
@@ -45,113 +47,100 @@ export function CustomerNav({ active = "Book", dark = false }: CustomerNavProps)
   }, [open]);
 
   return (
-    <header
-      className={cn(
-        "flex h-20 items-center gap-4 px-4 sm:px-8 lg:h-24 lg:gap-8",
-        dark
-          ? "border-b border-white/10 bg-transparent text-white"
-          : "border-b border-border bg-surface-card text-text-primary",
-      )}
-    >
-      <Link href="/" className="flex items-center" aria-label="Book My Tech home">
-        <Image
-          src="/logo.png"
-          alt="Book My Tech"
-          width={228}
-          height={76}
-          priority
-          className={cn("h-16 w-auto lg:h-[76px]", dark && "brightness-0 invert")}
-        />
-      </Link>
+    <>
+      <header className="sticky top-0 z-40 border-b border-border bg-white/85 backdrop-blur-[14px] backdrop-saturate-[1.4]">
+        <div className="mx-auto flex h-[68px] max-w-content items-center gap-4 px-4 sm:px-6 lg:gap-8">
+          <Link href="/" className="flex shrink-0 items-center" aria-label="Book My Tech home">
+            {/* The cropped logo: logo.png carries vertical padding that shrinks
+                the mark to nothing in a 68px bar. width/height are the display
+                size (1463×368 scaled to 40px tall) — the intrinsic size makes
+                next/image request a 1920px variant it never needs. */}
+            <Image
+              src="/logo-cropped.png"
+              alt="Book My Tech"
+              width={159}
+              height={40}
+              priority
+              className="h-9 w-auto sm:h-10"
+            />
+          </Link>
 
-      <nav className="ml-6 hidden gap-1 lg:flex">
-        {NAV_ITEMS.map((item) => {
-          const isActive = item.label === active;
-          return (
-            <Link
-              key={item.label}
-              href={item.href}
-              className={cn(
-                "whitespace-nowrap rounded-lg px-3.5 py-2 text-sm transition-colors",
-                isActive
-                  ? dark
-                    ? "bg-white/10 font-semibold text-white"
-                    : "bg-blue-50 font-semibold text-brand-blue"
-                  : dark
-                    ? "font-medium text-white/70 hover:text-white"
-                    : "font-medium text-slate-700 hover:text-text-primary",
+          <nav className="hidden items-center gap-1 lg:flex">
+            {NAV_ITEMS.map((item) => {
+              const isActive = item.label === active;
+              return (
+                <Link
+                  key={item.label}
+                  href={item.href}
+                  aria-current={isActive ? "page" : undefined}
+                  className={cn(
+                    "whitespace-nowrap rounded-lg px-3 py-2 text-sm font-semibold transition-colors",
+                    isActive
+                      ? "text-brand-blue"
+                      : "text-text-secondary hover:text-text-primary",
+                  )}
+                >
+                  {item.label}
+                </Link>
+              );
+            })}
+          </nav>
+
+          <div className="flex-1" />
+
+          <div className="hidden items-center gap-3 lg:flex">
+            {/* Fixed min-width so resolving the session doesn't shift the nav.
+                While `signedIn` is undefined this renders nothing but keeps its
+                space — better than flashing "Sign in" at a signed-in customer. */}
+            <span className="flex min-w-[104px] justify-end">
+              {signedIn !== undefined && (
+                <Link href={signedIn ? "/dashboard" : "/login"}>
+                  <Button
+                    variant="ghost"
+                    className="whitespace-nowrap font-bold text-text-primary hover:border-text-primary hover:bg-transparent"
+                  >
+                    {signedIn ? "My account" : "Sign in"}
+                  </Button>
+                </Link>
               )}
-            >
-              {item.label}
+            </span>
+            <Link href="/book">
+              <Button variant="dark" className="whitespace-nowrap font-bold">
+                Book a mechanic
+              </Button>
             </Link>
-          );
-        })}
-      </nav>
+          </div>
 
-      <div className="flex-1" />
-
-      <div className="hidden items-center gap-2.5 lg:flex">
-        {/* Fixed min-width so resolving the session doesn't shift the nav.
-            While `signedIn` is undefined this renders nothing but keeps its
-            space — better than flashing "Sign in" at a signed-in customer. */}
-        <span className="flex min-w-[76px] justify-end">
-          {signedIn !== undefined && (
-            <Link
-              href={signedIn ? "/dashboard" : "/login"}
-              className={cn(
-                "text-[13px] font-medium",
-                dark ? "text-white/70 hover:text-white" : "text-slate-700 hover:text-text-primary",
-              )}
-            >
-              {signedIn ? "My account" : "Sign in"}
-            </Link>
-          )}
-        </span>
-        <Link href="/book">
-          <Button
-            variant={dark ? "secondary" : "primary"}
-            size="sm"
-            className={cn(
-              "whitespace-nowrap",
-              dark && "border-transparent bg-white text-brand-blue hover:bg-white/90",
-            )}
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            aria-label="Open menu"
+            aria-expanded={open}
+            aria-controls="customer-nav-drawer"
+            className="flex size-10 items-center justify-center rounded-lg text-text-primary transition-colors hover:bg-border-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue focus-visible:ring-offset-2 lg:hidden"
           >
-            Book a mechanic
-          </Button>
-        </Link>
-      </div>
+            <Icon icon={Menu} size={24} />
+          </button>
+        </div>
+      </header>
 
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        aria-label="Open menu"
-        aria-expanded={open}
-        aria-controls="customer-nav-drawer"
-        className={cn(
-          "flex size-10 items-center justify-center rounded-lg transition-colors lg:hidden",
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
-          dark
-            ? "text-white hover:bg-white/10 focus-visible:ring-white"
-            : "text-text-primary hover:bg-border-subtle focus-visible:ring-brand-blue",
-        )}
-      >
-        <Icon icon={Menu} size={24} />
-      </button>
-
+      {/* Outside <header> on purpose: backdrop-filter makes the header the
+          containing block for fixed descendants, which would clip the drawer
+          to the 68px bar. */}
       <NavDrawer
         open={open}
         onClose={() => setOpen(false)}
         active={active}
         signedIn={signedIn}
       />
-    </header>
+    </>
   );
 }
 
 interface NavDrawerProps {
   open: boolean;
   onClose: () => void;
-  active: CustomerNavActive;
+  active: CustomerNavActive | undefined;
   /** undefined while the session is still resolving — see useCustomerSession. */
   signedIn: boolean | undefined;
 }
@@ -185,7 +174,7 @@ function NavDrawer({ open, onClose, active, signedIn }: NavDrawerProps) {
           open ? "translate-x-0" : "translate-x-full",
         )}
       >
-        <div className="flex h-20 items-center justify-between border-b border-border px-5">
+        <div className="flex h-[68px] items-center justify-between border-b border-border px-5">
           <span className="text-[11px] font-bold uppercase tracking-[0.1em] text-text-muted">
             Menu
           </span>
@@ -207,6 +196,7 @@ function NavDrawer({ open, onClose, active, signedIn }: NavDrawerProps) {
                 key={item.label}
                 href={item.href}
                 onClick={onClose}
+                aria-current={isActive ? "page" : undefined}
                 className={cn(
                   "rounded-lg px-3.5 py-3 text-[15px] transition-colors",
                   isActive
@@ -242,7 +232,7 @@ function NavDrawer({ open, onClose, active, signedIn }: NavDrawerProps) {
             </Link>
           )}
           <Link href="/book" onClick={onClose} className="block">
-            <Button variant="primary" size="md" fullWidth>
+            <Button variant="dark" size="md" fullWidth className="font-bold">
               Book a mechanic
             </Button>
           </Link>

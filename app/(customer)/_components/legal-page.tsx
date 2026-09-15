@@ -174,9 +174,9 @@ export function LegalPage({
   const contentsLabel = "On this page";
   return (
     <>
+      <CustomerNav />
       <section className="bg-brand-gradient text-white">
-        <CustomerNav dark />
-        <div className="mx-auto max-w-content px-4 pb-14 pt-8 sm:px-8 lg:pb-16 lg:pt-10">
+        <div className="mx-auto max-w-content px-4 pb-14 pt-12 sm:px-8 lg:pb-16 lg:pt-16">
           <Overline className="mb-3 text-white/70">{eyebrow}</Overline>
           <h1 className="mb-3 max-w-3xl text-[32px] font-extrabold leading-[1.07] tracking-[-0.025em] sm:text-[42px]">
             {title}

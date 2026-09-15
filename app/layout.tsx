@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
+import { Inter, Inter_Tight } from "next/font/google";
 import "./globals.css";
 import { ServiceWorkerRegister } from "@/components/pwa/service-worker-register";
 import { CookieConsent } from "@/components/cookie-consent";
@@ -8,6 +8,14 @@ import { isProductionSite } from "@/lib/site";
 const inter = Inter({
   subsets: ["latin"],
   variable: "--font-inter",
+  display: "swap",
+});
+
+// Display face for marketing headings and prices (Task 46) — the `font-display`
+// utility in globals.css.
+const interTight = Inter_Tight({
+  subsets: ["latin"],
+  variable: "--font-inter-tight",
   display: "swap",
 });
 
@@ -47,7 +55,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${inter.variable} h-full antialiased`}>
+    <html lang="en" className={`${inter.variable} ${interTight.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col font-sans">
         {children}
         <ServiceWorkerRegister />
