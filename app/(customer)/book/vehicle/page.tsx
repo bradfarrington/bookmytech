@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { AlertCircle, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { lookupVehicleAction } from "@/app/actions/lookup-vehicle";
+import { bookingStartNode } from "@/lib/bookings/start-node";
 import { normaliseReg } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ProgressStepper } from "@/components/customer/progress-stepper";
@@ -11,22 +12,29 @@ interface VehiclePageProps {
   searchParams: Promise<{
     reg?: string;
     postcode?: string;
+    /** Where the repair browser opens (a homepage services card). See lib/bookings/start-node.ts. */
+    node?: string;
   }>;
 }
 
 export default async function VehiclePage({ searchParams }: VehiclePageProps) {
   const params = await searchParams;
   const raw = params.reg ?? "";
+  const start = bookingStartNode(params.node);
 
   // Repairs are priced from the reg (DVLA → HaynesPro), so it's required.
   if (!raw.trim()) {
-    redirect("/book");
+    redirect(start ? `/book?node=${encodeURIComponent(start.id)}` : "/book");
   }
 
   const reg = normaliseReg(raw);
   const postcode = (params.postcode ?? "").trim();
   const postcodeSuffix = postcode ? `&postcode=${encodeURIComponent(postcode)}` : "";
-  const nextHref = `/book/repairs?reg=${encodeURIComponent(reg)}${postcodeSuffix}`;
+  const startSuffix = start
+    ? `&node=${encodeURIComponent(start.id)}&crumbs=${encodeURIComponent(start.crumbs)}`
+    : "";
+  const nextHref = `/book/repairs?reg=${encodeURIComponent(reg)}${postcodeSuffix}${startSuffix}`;
+  const retryHref = start ? `/book?node=${encodeURIComponent(start.id)}` : "/book";
 
   const result = await lookupVehicleAction(reg);
 
@@ -48,7 +56,7 @@ export default async function VehiclePage({ searchParams }: VehiclePageProps) {
         </div>
 
         <div className="flex flex-col gap-3">
-          <Link href="/book">
+          <Link href={retryHref}>
             <Button variant="secondary" size="lg" fullWidth iconLeft={ArrowLeft}>
               Try a different reg
             </Button>

@@ -14,7 +14,12 @@ import { normaliseReg } from "@/lib/utils";
 // HaynesPro). There's no manual make/model path any more — without a reg we
 // can't price anything.
 
-export function BookEntry() {
+export interface BookEntryProps {
+  /** Where the repair browser should open once the car is found (already validated by the page). */
+  node?: string | null;
+}
+
+export function BookEntry({ node = null }: BookEntryProps) {
   const router = useRouter();
   const [postcode, setPostcode] = useState("");
   const [reg, setReg] = useState("");
@@ -22,12 +27,13 @@ export function BookEntry() {
   const pcParam = postcode.trim()
     ? `&postcode=${encodeURIComponent(postcode.trim().toUpperCase())}`
     : "";
+  const nodeParam = node ? `&node=${encodeURIComponent(node)}` : "";
 
   function submitPlate(e: React.FormEvent) {
     e.preventDefault();
     const r = normaliseReg(reg);
     if (!r) return;
-    router.push(`/book/vehicle?reg=${encodeURIComponent(r)}${pcParam}`);
+    router.push(`/book/vehicle?reg=${encodeURIComponent(r)}${pcParam}${nodeParam}`);
   }
 
   return (

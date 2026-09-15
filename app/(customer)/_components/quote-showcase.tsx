@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { Reveal } from "@/components/ui/reveal";
 import { SectionHeading } from "@/components/ui/section-heading";
+import { SectionWatermark } from "@/components/ui/section-watermark";
 
 // An illustrative quote, labelled as an example on the card. The figures are
 // internally consistent: each line is its parts plus book hours at £58/hr, and
@@ -31,8 +32,11 @@ const TOTALS = [
 
 export function QuoteShowcase() {
   return (
-    <section className="border-y border-border bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)]">
-      <div className="mx-auto max-w-content px-4 py-14 sm:px-6 sm:py-[88px]">
+    // Pale blue band: sits between the white ticker and the white how-it-works
+    // timeline so the sections read as distinct.
+    <section className="relative overflow-hidden border-y border-blue-100 bg-[linear-gradient(180deg,#eff6ff_0%,#e0ebff_100%)]">
+      <SectionWatermark />
+      <div className="relative mx-auto max-w-content px-4 py-14 sm:px-6 sm:py-[88px]">
         <SectionHeading
           eyebrow="The price you see"
           title="Is the price you pay."

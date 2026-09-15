@@ -133,10 +133,12 @@ You are working on **Book My Tech**, a UK mobile-mechanic booking platform. This
 - **Areas:** all four live (London, Birmingham, Manchester, Bristol), on a real UK map.
 - **Reviews:** the placeholder reviews are gone (fake-review ban, DMCC Act 2024), replaced by a "For mechanics" recruitment section. A public reviews feed with an admin switch is scoped and **parked** in the Task 46 doc.
 - **No em dashes** in any user-visible copy: website, consoles, emails, SMS. Code comments keep theirs.
+- **Section rhythm:** each homepage section now has a distinct treatment (pale blue, timeline, dark, gradient panel), with a faded logo mark (`SectionWatermark`) on some.
+- **Services from the admin:** the services grid reads the active `/admin/services` products with real prices, and admin changes revalidate `/`. A gateway card leads into booking a specific repair. Cards link to `/book?node=…`, which now survives the reg and vehicle steps (`lib/bookings/start-node.ts`).
 - **Additive design tokens:** Inter Tight `font-display`, `surface-dark`, `brand-gradient-deep`, `shadow-float`, and ticker/pulse animations. No existing token changed. The "Marketing page pattern" in `docs/03-design-system.md` and `components/ui/section-heading.tsx` are what the next pages reuse.
 - **Owner:**
+  - **Apply `0068_copy_no_em_dashes.sql`**. It is data only, rewriting the seeded servicing summaries and part names that still contain em dashes. No schema change, so no type regen in the app.
   - Admin-customised email/SMS templates keep any dashes typed into them.
-  - The "Servicing" card advertises products that are still inactive.
 - **Mobile app:** mirror the four new tokens in `src/constants/theme.ts`. Some mobile error sentences changed punctuation only. No API or schema change.
 
 ### 2026-09-15 — Repair → parts linking, merged to `main` 🚧 (Task 45)

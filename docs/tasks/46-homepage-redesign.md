@@ -7,12 +7,14 @@ Brad's review the same day added:
 - facts in place of invented figures, and false claims removed site-wide (including "DBS-checked")
 - the placeholder reviews replaced with a mechanic recruitment section
 - em dashes removed from all user-visible copy
+- a distinct look for each section, with a faded logo mark in some corners
+- the services grid driven by the admin's products, plus a gateway into booking a specific repair
 
-Deviations from the plan: the nav renders from `page.tsx` rather than inside `hero.tsx`, and the mobile drawer renders outside the `<header>`, because `backdrop-filter` would otherwise clip it to the bar. **No migration. No `app/api/mobile/**` shape change** (punctuation in some error sentences only). The mobile app needs to mirror the new tokens (see "Mobile app").
+Deviations from the plan: the nav renders from `page.tsx` rather than inside `hero.tsx`, and the mobile drawer renders outside the `<header>`, because `backdrop-filter` would otherwise clip it to the bar. **One data-only migration, `0068_copy_no_em_dashes.sql`** (rewrites seeded text; no schema change, so no type regen). **No `app/api/mobile/**` shape change** (punctuation in some error sentences only). The mobile app needs to mirror the new tokens (see "Mobile app").
 
 **Still open (Brad):**
+- **Apply `0068`.** Until then, the three servicing summaries on the homepage and in the booking funnel still show the em dashes they were seeded with ("… change — every six months …"). So do nine seeded part names in the mechanic's quote picker. Editing the three summaries in `/admin/services` fixes the homepage immediately, without the migration.
 - **Admin-edited templates.** Any email or SMS template an admin has already customised in `/admin/emails` or `/admin/sms/templates` keeps the em dashes they typed. Code defaults are already dash-free.
-- **Servicing is advertised but not bookable.** The repairs grid shows "Servicing" ("Priced for your car"), but the servicing products are still seeded inactive with placeholder prices. Set their prices or drop the card.
 - **Mechanic app install name.** The installed mechanic app is now "Book My Tech | Mechanic". Say if you'd prefer different wording.
 
 ## Why
@@ -89,9 +91,12 @@ Each has its evidence noted in `trust-ticker.tsx`.
 2. **Trust ticker:** the facts listed above.
 3. **Example quote:** labelled "Example quote", figures that add up, no named mechanic.
 4. **How it works:** three steps.
-5. **Repairs:** "From" prices only where a live product has one.
-6. **For mechanics** (`mechanic-join.tsx`, new): benefits and requirements matching `/mechanics`, with "Apply now" and "How it works for mechanics" buttons. The commission rate is never quoted, because it is admin-editable.
-7. **Comparison:** old way vs Book My Tech.
+5. **Services** (`repairs-preview.tsx`): a dark band, detailed under "Section rhythm and services from the admin" below.
+6. **For mechanics** (`mechanic-join.tsx`, new):
+   - benefits and requirements matching `/mechanics`, with "Apply now" and "How it works for mechanics" buttons
+   - shown as a contained gradient panel
+   - the commission rate is never quoted, because it is admin-editable
+7. **Comparison:** old way vs Book My Tech, on a light band.
 8. **Coverage:**
    - a real UK outline (`uk-outline.ts`: Natural Earth 1:10m, public domain, simplified and projected)
    - four live cities plotted at their real coordinates, with pulsing pins
@@ -111,6 +116,50 @@ Each has its evidence noted in `trust-ticker.tsx`.
   - Page titles use " | ".
   - Placeholders that showed "—" now use words, and never "0": "n/a", "Not set", "Date not set", "Not answered", "No area".
   - Code comments keep their dashes.
+
+## Section rhythm and services from the admin (Brad, 2026-09-15)
+
+Brad's feedback: the quote, how-it-works and services sections blended into one another and felt overwhelming. Each section should look different and keep the reader engaged.
+
+**Section rhythm.** Neighbouring sections never share a treatment:
+
+| # | Section | Treatment |
+|---|---|---|
+| 1 | Hero | Deep gradient |
+| 2 | Ticker | White |
+| 3 | Example quote | Pale blue band, faded mark |
+| 4 | How it works | White. A numbered, connected timeline (gradient number discs, dashed connectors), not cards |
+| 5 | Services | Dark navy, faded mark |
+| 6 | Mechanics | Light band holding a contained gradient panel, faded mark |
+| 7 | Comparison | White (was dark: two dark blocks would have run together) |
+| 8 | Coverage | Default light background |
+| 9 | FAQ | White, faded mark |
+| 10 | Final CTA | Deep gradient |
+
+**Faded mark.** `components/ui/section-watermark.tsx` puts a large, washed-out Book My Tech mark (`/favicon.png`, the logo without the wordmark) in a section's bottom-right corner:
+- 5% opacity on light sections
+- inverted, 7% on dark ones
+
+**Services from the admin.** `repairs-preview.tsx` is an async server component. It reads `catalogue_products` with the service-role client (the table is admin-only under RLS) through `loadCatalogueProducts`, together with the hourly rate. It shows:
+- **A gateway card, "Book a specific repair":** links to `/book?node=root`, the HaynesPro repair catalogue.
+- **One panel per category with active products:** each product is a compact card with its real price (`productBasePence`), and the panel header shows "From £X".
+  - Servicing prices read "+ oil", because oil is priced per vehicle.
+  - Products switched off in `/admin/services` disappear. A load failure shows the gateway on its own.
+
+**Freshness.** The admin product actions now also `revalidatePath("/")`. The homepage exports `revalidate = 3600` as a backstop (supported without Cache Components; see `node_modules/next/dist/docs/01-app/02-guides/incremental-static-regeneration.md`).
+
+**Deep links through the funnel.** A card's choice survives the reg step. `lib/bookings/start-node.ts` (unit-tested) accepts only `root` or a product category id and builds the breadcrumb. The link then carries through:
+- `/book` forwards it to `BookEntry`, and on reg redirects
+- `BookEntry` adds `&node=` to the vehicle URL
+- the vehicle step adds `&node=&crumbs=` to `/book/repairs`, and "Try a different reg" keeps it
+
+Verified with DV12 CGU: `/book?node=c:diagnostics` lands on "Start / Diagnostics" with the three products priced, and `/book?node=root` on "Start / Repairs". No mobile API change; the app's own funnel is unaffected.
+
+**Layout details:**
+- **Phones:** each product is a compact name-and-price row with no summary, so nine products don't stack into a wall of cards.
+- **Desktop:** the gateway card keeps its natural height and sticks under the nav while the category panels scroll past, rather than stretching into an empty block. The section uses `overflow-clip`, not `overflow-hidden`, which would stop the card sticking.
+
+**Seeded data:** product summaries and part names come from the database, and some still carried em dashes from their seed migrations. `0068_copy_no_em_dashes.sql` rewrites them (data only). Internal-only seeded text, such as database comments and duration-rule notes, was left alone.
 
 ## Parked: a public reviews feed
 
@@ -138,11 +187,14 @@ Brad asked for new reviews to appear on the website automatically, with an admin
 - [x] No invented figures or false claims on the homepage, `/help`, `/mechanics` or the booking price page.
 - [x] Coverage shows all four cities live on a real UK outline.
 - [x] Reviews section replaced with mechanic recruitment.
+- [x] Neighbouring sections have distinct treatments; faded mark in the quote, services, mechanics and FAQ sections.
+- [x] Services grid lists the active `/admin/services` products with real prices, plus a gateway card into the repair catalogue; admin changes revalidate the homepage.
+- [x] A services or gateway card's choice survives reg entry and opens the repair browser at that category (or Repairs).
 - [x] Reg lookup from the hero and the final CTA reaches `/book/vehicle?reg=…&postcode=…`. Verified with the real reg DV12 CGU.
 - [x] Sticky bar hidden while a lookup form is on screen, shown mid-page; its button focuses the hero reg input.
 - [x] Reduced motion stops the ticker, the pulses, the dispatch card and the Reveal entrances.
 - [x] H1 renders in Inter Tight (self-hosted by `next/font`).
-- [x] No em dash in user-visible copy. Comments keep theirs; admin-customised DB templates are noted above.
+- [x] No em dash in user-visible copy. Comments keep theirs. Seeded product and part text is rewritten by `0068`, pending apply; admin-customised DB templates are noted above.
 - [x] Existing tokens unchanged; new ones documented in `docs/03-design-system.md`.
 - [x] `tsc`, eslint on changed files, unit tests and the production build pass; no browser console errors.
 

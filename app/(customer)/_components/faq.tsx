@@ -1,5 +1,6 @@
 import { Reveal } from "@/components/ui/reveal";
 import { SectionHeading } from "@/components/ui/section-heading";
+import { SectionWatermark } from "@/components/ui/section-watermark";
 
 type FaqItem = { question: string; answer: string };
 
@@ -41,8 +42,9 @@ const FAQS: FaqItem[] = [
 // Native <details>, so no client JS; the first question starts open.
 export function Faq() {
   return (
-    <section id="faq" className="scroll-mt-[68px] border-t border-border bg-white">
-      <div className="mx-auto max-w-content px-4 py-14 sm:px-6 sm:py-[88px]">
+    <section id="faq" className="relative scroll-mt-[68px] overflow-hidden border-t border-border bg-white">
+      <SectionWatermark />
+      <div className="relative mx-auto max-w-content px-4 py-14 sm:px-6 sm:py-[88px]">
         <SectionHeading eyebrow="FAQ" title="Questions, answered." />
 
         <Reveal stagger className="mx-auto flex max-w-[820px] flex-col gap-2.5">

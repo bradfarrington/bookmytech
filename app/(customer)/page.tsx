@@ -12,6 +12,10 @@ import { RepairsPreview } from "./_components/repairs-preview";
 import { StickyBookBar } from "./_components/sticky-book-bar";
 import { TrustTicker } from "./_components/trust-ticker";
 
+// The services section reads the admin's products. Admin changes revalidate "/"
+// straight away (app/actions/catalogue-products.ts); this is the backstop.
+export const revalidate = 3600;
+
 // Section order and layout follow proposal/homepage-redesign.html (Task 46).
 export default function HomePage() {
   return (

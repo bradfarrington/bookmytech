@@ -205,7 +205,8 @@ The layout every customer marketing page follows, taken from `proposal/homepage-
 - **Page shell:** `<CustomerNav />`, then `<main>` holding the sections, then `<Footer />`.
 - **Section shell:** full-width band, content in `mx-auto max-w-content px-4 sm:px-6`, vertical rhythm `py-14 sm:py-[88px]`. Sections with an in-page anchor add `scroll-mt-[68px]` so the sticky nav doesn't cover their heading.
 - **Section heading:** `SectionHeading`. Centred by default; left-aligned for content-heavy sections.
-- **Alternating bands:** `bg-surface` (default), white bands with `border-y border-border`, and a dark band (`bg-surface-dark`, `SectionHeading tone="dark"`).
+- **Section rhythm:** neighbouring sections never share a treatment. Mix plain white or `bg-surface` bands, a pale blue band, a dark band (`bg-surface-dark`, `SectionHeading tone="dark"`) and a contained gradient panel inside a light band. Vary the layout too: a timeline, a card grid, a split panel. A page of look-alike card grids on light grey reads as one overwhelming block.
+- **Faded mark:** `components/ui/section-watermark.tsx` puts a large washed-out logo mark in a section's bottom-right corner (`tone="dark"` on dark or gradient surfaces). Use it on some sections, not all. The section needs `relative overflow-hidden` and its content `relative`.
 - **Gradient sections:** hero and final CTA use `bg-brand-gradient-deep`, with a `hero-glow` / `final-glow` overlay (`absolute inset-0 pointer-events-none`).
 - **Cards:** white, `border border-border`, `rounded-[18px]`–`rounded-[20px]`, `p-5`–`p-[26px]`. Interactive cards lift on hover (`hover:-translate-y-0.5 hover:border-brand-blue/35 hover:shadow-card`).
 - **Buttons:** `primary` for the main CTA, `dark` for the nav CTA, `ghost` for secondary links, `secondary` with a white background on gradients. Bold labels (`font-bold`).

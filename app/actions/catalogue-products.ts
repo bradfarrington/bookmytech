@@ -8,8 +8,9 @@ import { productId, type ProductCategory } from "@/lib/catalogue/products";
 // The admin's fixed-price products (Task 31): diagnostics, servicing and
 // pre-purchase inspections beside the HaynesPro repair tree. Every write goes
 // through the service-role client after an admin check; the customer
-// catalogue (lib/haynespro/catalogue.ts) reads the table on every request, so
-// a change is live at once.
+// catalogue (lib/haynespro/catalogue.ts) reads the table on every request, and
+// the homepage's services section (Task 46) is revalidated below, so a change
+// is live at once in both.
 
 export type ProductResult = { ok: true } | { ok: false; error: string };
 export type ProductCreateResult = { ok: true; id: string } | { ok: false; error: string };
@@ -113,6 +114,8 @@ function clean(input: ProductInput): { ok: true; row: Cleaned } | { ok: false; e
 function revalidate() {
   revalidatePath("/admin/services");
   revalidatePath("/book/repairs");
+  // The homepage lists the active products (repairs-preview.tsx).
+  revalidatePath("/");
 }
 
 function duplicateMessage(error: { code?: string; message: string }): string {
