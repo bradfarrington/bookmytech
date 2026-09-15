@@ -123,6 +123,14 @@ You are working on **Book My Tech**, a UK mobile-mechanic booking platform. This
 
 **The website's dashboard now uses the app redesign (`mockups/`), with a top header instead of bottom tabs.** The data the redesigned app was waiting on is built too. Detail: `docs/tasks/48-customer-dashboard-rebuild.md` to `54-slots-and-cancellation-policy.md`.
 
+**Pick up here: `docs/tasks/55-dashboard-follow-ups.md`.** Brad's review notes (2026-09-15), none built yet:
+- the review switch should control the public website
+- chat across the website, customer app, mechanic console and mechanic app
+- Book My Tech's own auth screens and emails, with no Supabase pages or redirects
+- fix deep links lost at sign-in
+- fix disputes on guest-era bookings
+- decide whether to add a 2-hour cancellation tier
+
 **Data (Tasks 49 to 54).** Migrations `0072` to `0077`, all additive:
 
 | Task | What | Where |
@@ -161,8 +169,8 @@ You are working on **Book My Tech**, a UK mobile-mechanic booking platform. This
 **Not yet checked:** any dashboard screen in a browser (needs a signed-in customer), `next build`, and the saved-card flow with Stripe test cards.
 
 **Owner:**
-1. Apply `0071` to `0077` in order. `0077` needs `0072`, `0073` and `0075`.
-2. **Customer app:** send the app's Claude `docs/mobile-app-brief-2026-09-15.md` (addresses, garage, profile, inbox, cards, slots, policy, reschedule window). It runs `npm run db:types` once the migrations are in.
+1. ✅ `0071` to `0077` applied by Brad; confirmed against the live schema on 2026-09-15.
+2. **Customer app:** send the app's Claude `docs/mobile-app-brief-2026-09-15.md` (addresses, garage, profile, inbox, cards, slots, policy, reschedule window). It can run `npm run db:types` now.
 3. **AAG:** still needs to allowlist `80.1.6.55` (Task 43 below). Until then, repairs with parts can't be booked.
 
 **Task 43 migration numbers:** unchanged. The dashboard work took `0072` to `0077`.
@@ -190,7 +198,7 @@ You are working on **Book My Tech**, a UK mobile-mechanic booking platform. This
 - **Live state (checked 2026-09-15):** 0069 and 0070 **are applied**, but AAG still blocks `80.1.6.55`. So any repair that needs parts currently can't be booked ("We can't get a price for the parts…").
 - **Owner:**
   1. **Send AAG the dev IP `80.1.6.55`.** UAT only allows `80.6.218.98`. This unblocks bookings.
-  2. Apply **`0071_part_group_set_prices.sql`**. After that, a set price can cover a group AAG doesn't price.
+  2. ✅ **`0071_part_group_set_prices.sql`** applied (confirmed 2026-09-15). A set price can now cover a group AAG doesn't price.
   3. Run `npm run db:types` in the app (0069, 0070, 0071), and delete the `LKQ_*` variables on Vercel.
   4. Book AAG's demo call. Production needs live credentials and `AAG_BASE_URL`; live needs no IP allowlist.
 - **Customer app:**

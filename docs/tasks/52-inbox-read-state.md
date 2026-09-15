@@ -1,6 +1,6 @@
 # Task 52: Inbox (Notifications) and read state
 
-**Status:** ✅ Built (2026-09-15): migration `0075_customer_inbox_reads.sql`, `lib/inbox/`, `/dashboard/inbox` and the header's unread dot. Waiting on `0075` being applied. Until then, "Mark all read" is hidden and read state doesn't persist.
+**Status:** ✅ Built (2026-09-15): migration `0075_customer_inbox_reads.sql`, `lib/inbox/`, `/dashboard/inbox` and the header's unread dot. `0075` applied 2026-09-15.
 
 ## Why
 
@@ -20,7 +20,7 @@ The redesigned app has an Inbox (`mockups/02-dashboard-reminders.html`, "Notific
 
 ## Acceptance criteria
 
-- [ ] `0075` applied (owner)
+- [x] `0075` applied (owner, confirmed 2026-09-15)
 - [x] Reading something on one device marks it read everywhere
 - [x] Two devices marking items read at the same moment both stick
 - [x] Before `0075`, the feed still loads and nothing errors

@@ -45,7 +45,7 @@ Response: `{ day, areaChecked, windows: [{ window, startHour, mechanics, bookabl
 - [x] `GET /cancellation-policy` returns the live fee tiers
 - [x] Website Time step shows the count under each window (Task 48)
 - [x] Website cancel page shows the policy table (Task 48)
-- [ ] `0076` applied (owner). The rate limits work without it, from code defaults
+- [x] `0076` applied (owner, confirmed 2026-09-15)
 
 ## Mobile app
 

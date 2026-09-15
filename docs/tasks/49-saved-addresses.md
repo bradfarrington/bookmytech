@@ -1,6 +1,6 @@
 # Task 49: Saved addresses
 
-**Status:** ✅ Built (2026-09-15): migration `0072_customer_addresses.sql`, `lib/addresses/`, the Addresses screens (`/dashboard/settings/addresses`, `/new`, `/[id]`) and saved addresses on the booking flow's Address step. Waiting on `0072` being applied. On the Address step, only customer sessions are offered addresses, and when a postcode was already given only a saved address at that postcode is pre-filled.
+**Status:** ✅ Built (2026-09-15): migration `0072_customer_addresses.sql`, `lib/addresses/`, the Addresses screens (`/dashboard/settings/addresses`, `/new`, `/[id]`) and saved addresses on the booking flow's Address step. `0072` applied 2026-09-15. On the Address step, only customer sessions are offered addresses, and when a postcode was already given only a saved address at that postcode is pre-filled.
 
 ## Why
 
@@ -32,7 +32,7 @@ The redesigned app has an Addresses screen (`mockups/05-account-settings.html`, 
 
 ## Acceptance criteria
 
-- [ ] `0072` applied (owner)
+- [x] `0072` applied (owner, confirmed 2026-09-15)
 - [x] A customer can list, add, edit, delete and set a default on their own addresses under RLS, and can't read anyone else's
 - [x] A postcode typed without its space is stored with it; a district on its own is refused
 - [x] Exactly one default whenever a customer has any addresses

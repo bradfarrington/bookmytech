@@ -1,6 +1,6 @@
 # Task 48: Customer dashboard rebuild (web)
 
-**Status:** 🚧 Built (2026-09-15), not yet checked in a browser. Every screen in the table exists; `tsc`, eslint and the unit tests pass. Waiting on a signed-in look against the mockups, `next build`, and migrations `0072` to `0077` for the screens that use new tables (until then they show "not available yet").
+**Status:** 🚧 Built (2026-09-15), not yet checked in a browser. Every screen in the table exists; `tsc`, eslint and the unit tests pass. Waiting on a signed-in look against the mockups, `next build`, and Brad's follow-ups in `docs/tasks/55-dashboard-follow-ups.md`. Migrations `0072` to `0077` are applied (confirmed 2026-09-15).
 
 ## Why
 

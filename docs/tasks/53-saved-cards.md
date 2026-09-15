@@ -1,6 +1,6 @@
 # Task 53: Saved cards
 
-**Status:** ✅ Built (2026-09-15): migration `0076_saved_cards_and_account_limits.sql`, `lib/payments/saved-cards.ts`, the payment-methods endpoints, checkout using saved cards (web and app), account deletion removing them, and `/dashboard/settings/payment-methods`. Waiting on `0076` being applied and an end-to-end run with Stripe test cards.
+**Status:** ✅ Built (2026-09-15): migration `0076_saved_cards_and_account_limits.sql`, `lib/payments/saved-cards.ts`, the payment-methods endpoints, checkout using saved cards (web and app), account deletion removing them, and `/dashboard/settings/payment-methods`. `0076` applied 2026-09-15; waiting on an end-to-end run with Stripe test cards.
 
 ## Why
 
@@ -41,7 +41,7 @@ Checkout makes the payment against the stored Stripe Customer **only if they hav
 
 ## Acceptance criteria
 
-- [ ] `0076` applied (owner)
+- [x] `0076` applied (owner, confirmed 2026-09-15)
 - [x] `GET /api/mobile/v1/account/payment-methods` lists the caller's cards, newest first, with one default
 - [x] `POST /api/mobile/v1/account/payment-methods` returns a SetupIntent secret, the customer id and a CustomerSession secret
 - [x] `POST …/:id/remove` and `…/:id/default` only act on the caller's own cards, and return the updated list

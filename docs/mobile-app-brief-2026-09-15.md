@@ -10,12 +10,12 @@ Read the app's own `AGENTS.md` / `CLAUDE.md` first and follow its conventions.
 
 **Status before you start**
 - **Everything is additive.** A build shipped before this keeps working.
-- **Migrations `0072` to `0077` are written but not applied yet.** Build against the contracts below, and test once Brad says they're in.
-- **Tolerate the missing tables.** Until then, the new tables and views don't exist and the new endpoints answer with an empty or "not available yet" result. Keep the screens' empty states for that case.
+- **Migrations `0071` to `0077` are applied** on the live database (confirmed 2026-09-15), so regenerate types straight away. The backend code isn't deployed anywhere yet: the app reaches whichever server its API URL points at.
+- **Keep the screens' empty states.** If a table is missing (another environment), the endpoints answer with an empty or "not available yet" result.
 
 ## Step 0: regenerate types
 
-Once the migrations are applied, run `npm run db:types`. If you haven't regenerated since Task 43, this also picks up `0069` to `0071`.
+The migrations are applied, so run `npm run db:types` now. If you haven't regenerated since Task 43, this also picks up `0069` to `0071`.
 
 | Table or view | What's new | Who can read or write |
 |---|---|---|
@@ -243,9 +243,20 @@ No change. There's still no chat, phone number or opening hours in the backend, 
 
 ---
 
+## Coming later: don't build around these yet
+
+Brad's review of the website (2026-09-15) queued changes that will reach the app. None are built, and each will come with its own brief.
+
+- **Changing email:**
+  - It moves to a Book My Tech endpoint with our own emails and links, with no Supabase confirmation emails or redirects.
+  - Leave the current `updateUser({ email })` flow as it is. Don't invest in Supabase's confirmation screens.
+- **Disputes on older bookings:** bookings made before accounts were required (matched by email) will become disputable.
+- **Chat** is being scoped: support chat and/or better customer and mechanic messaging.
+- **Reviews:** the consent line may change to mention the public website.
+
 ## What to do, in order
 
-1. Regenerate types once Brad confirms `0072` to `0077` are applied.
+1. Regenerate types (`0071` to `0077` are applied).
 2. **Addresses:** the Addresses screen (direct table access), and saved addresses on the booking flow's Address step.
 3. **Garage:** list and add through `/garage`; rename and remove directly; drop the device DVLA cache.
 4. **Mechanic profile:** extras and public reviews, plus the consent line on the review form.

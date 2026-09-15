@@ -1,6 +1,6 @@
 # Task 50: The garage (saved vehicles)
 
-**Status:** ✅ Built (2026-09-15): migration `0073_customer_vehicles.sql`, `lib/garage/`, `GET` and `POST /api/mobile/v1/garage`, bookings adding their vehicle, and the website's Garage (`/dashboard/garage`, history at `/dashboard/garage/[id]`). Waiting on `0073` being applied. The card shows "Last job" (the latest completed booking) rather than "Last service".
+**Status:** ✅ Built (2026-09-15): migration `0073_customer_vehicles.sql`, `lib/garage/`, `GET` and `POST /api/mobile/v1/garage`, bookings adding their vehicle, and the website's Garage (`/dashboard/garage`, history at `/dashboard/garage/[id]`). `0073` applied 2026-09-15. The card shows "Last job" (the latest completed booking) rather than "Last service".
 
 ## Why
 
@@ -29,7 +29,7 @@ The redesigned app's Garage (`mockups/05-account-settings.html`, "Your garage") 
 
 ## Acceptance criteria
 
-- [ ] `0073` applied (owner)
+- [x] `0073` applied (owner, confirmed 2026-09-15)
 - [x] A customer's past bookings appear in their garage after the migration
 - [x] Adding a registration checks it with DVLA and stores MOT and tax dates; adding one that's already there returns it
 - [x] A customer can rename and remove their own vehicles, but can't write DVLA columns or add rows directly
