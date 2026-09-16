@@ -149,7 +149,10 @@ export async function respondToRevisionFor(
     await admin.from("job_quotes").update({ stripe_payment_intent_id: intent.id, updated_at: new Date().toISOString() }).eq("id", hold.id);
     return { ok: true, outcome: "pay", clientSecret: intent.client_secret, paymentIntentId: intent.id, amountPence: revision.differencePence };
   } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : "Payment error" };
+    // NOT err.message: this reaches the customer verbatim, and a thrown Stripe
+    // error would show them "No such customer: cus_…". Detail to the log.
+    console.error("[revisions] starting the payment threw", err);
+    return { ok: false, error: "Couldn't start the payment. Please try again." };
   }
 }
 

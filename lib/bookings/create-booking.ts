@@ -748,6 +748,16 @@ export async function prepareCheckoutFor(
       customerSessionClientSecret: saved?.customerSessionClientSecret ?? null,
     };
   } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : "Payment error" };
+    // NOT err.message. This is returned at HTTP 200 and both clients show
+    // `error` to the customer VERBATIM (see lib/mobile/respond.ts), so a thrown
+    // Stripe or SDK error would put "No such customer: cus_…" or "Invalid API
+    // Key provided" in front of them. Every other refusal in this function is
+    // customer prose; this one was the exception. The detail goes to the log,
+    // where it is useful, instead.
+    console.error("[checkout] prepare threw", err);
+    return {
+      ok: false,
+      error: "We couldn't set up the payment just now. Please try again in a moment.",
+    };
   }
 }

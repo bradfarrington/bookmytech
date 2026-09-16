@@ -155,7 +155,10 @@ export async function respondToQuoteFor(
       .eq("id", quoteId);
     return { ok: true, outcome: "pay", clientSecret: intent.client_secret, paymentIntentId: intent.id, amountPence: quote.totalPence };
   } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : "Payment error" };
+    // NOT err.message: this reaches the customer verbatim, and a thrown Stripe
+    // error would show them "No such customer: cus_…". Detail to the log.
+    console.error("[quotes] starting the payment threw", err);
+    return { ok: false, error: "Couldn't start the payment. Please try again." };
   }
 }
 

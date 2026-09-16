@@ -119,6 +119,30 @@ You are working on **Book My Tech**, a UK mobile-mechanic booking platform. This
 
 ## Current task
 
+### 🔴 2026-09-16 — READ THIS FIRST: a customer can make themselves an admin (Task 62)
+
+**`supabase.from('profiles').update({ role: 'admin' }).eq('id', <own id>)` works.** Reproduced against the live project as the seeded e2e customer: it returned `[{"role":"admin"}]` and the row really changed (restored at once). The `anon` key is **public** — in every browser bundle and every app build — so any customer with an account could do it. `proxy.ts` gates `/admin/*` on `profiles.role` and `public.is_admin()` reads the same column, so every admin page and every admin RLS policy rested on it.
+
+**Cause:** `"Users can update own profile"` (`0010`) restricts which ROW, not which COLUMNS, and `authenticated` held a table-wide UPDATE grant. `0076`'s header had already described this gap as the reason `stripe_customers` is a separate table — the reasoning was right, but it routed around the symptom and left `role` exposed.
+
+**Fix: apply `0079_profiles_column_privileges.sql`.** Revokes the table-wide grant, re-grants only `full_name`, `phone` and the reminder preferences, plus a trigger backstop so a future `grant all` cannot silently reopen it. **Not applicable from here** — there is no `exec_sql` RPC, no `DATABASE_URL`, no psql and no Supabase CLI on this machine, and the Supabase MCP server is unauthenticated. **It needs Brad.**
+
+**Nothing can be done in code.** The attack is a direct PostgREST call with a public key that touches none of our code. Only the grant closes it.
+
+Full detail, including what each privileged column is worth to an attacker and the post-apply checks: `docs/tasks/62-profiles-privilege-escalation.md`.
+
+### 2026-09-16 — Reply to the customer app's status file
+
+The app team sent a status file saying both briefs are built but **nothing has been run against a server**. Answered in **`docs/backend-reply-to-app-2026-09-16.md`** — send them that.
+
+- **All nine new routes confirmed** at the exact method, path, auth mode and field names they listed, including the payment-method sub-routes.
+- **Two of their eight assumptions were wrong.** `customerId` and `customerSessionClientSecret` do NOT always arrive together (the session alone can be null if Stripe's call fails), and `customer_inbox_reads` does not enforce RPC-only writes.
+- **Four first-contact traps flagged:** `/checkout/prepare` returns `customerId` top-level, not nested under a `preauth` object; `/account/email` takes snake_case while the rest of the API is camelCase; that route validates the body before auth, so 400 can precede 401; and `403` does not uniformly mean "staff token" because `mobileActionCaller` has no staff refusal.
+- **`bmt.thedigicraft.co.uk` is serving roughly `main`**, so every endpoint from both briefs **404s there today**. Probed. `bookmytech.co.uk` is not running the app at all — it answers with an Apache directory listing. So the app's first real run must wait for a deploy of this branch, or it will produce a page of 404s that look like app bugs.
+- **A real bug they implied:** `/checkout/prepare` returned `err.message` at HTTP 200, and both clients show that string to the customer verbatim — so a thrown Stripe error would have shown "No such customer: cus_…". Fixed, plus the same pattern on quote confirm and revision confirm. `lib/stripe/refund.ts` keeps `err.message` deliberately: it is admin-facing.
+- **Awaiting Brad:** whether to move the postcode earlier in the app's booking flow so the mechanic counts are ever seen. The website already collects it at step one, so the two funnels simply differ — see the reply's §3.
+
+
 ### 2026-09-16 (later) — Sign in at checkout ✅ (Task 61), branch `task-43-parts-in-customer-prices`
 
 **Brad, from the Confirm screen:** a returning customer was only offered "Create a password", with no way to say they already had an account. Detail in `docs/tasks/61-sign-in-at-checkout.md`.
