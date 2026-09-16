@@ -153,10 +153,12 @@ The app has built both briefs and **has still never run against a server**. It
 needs, in this order:
 
 1. ✅ **`0079` and `0078` applied** (2026-09-16).
-2. ✅ **Branch merged to `main` and pushed** (2026-09-16), so the deploy that
-   serves `bmt.thedigicraft.co.uk` now carries every endpoint from both briefs.
-   Worth re-probing `/api/mobile/v1/cancellation-policy` there once Vercel has
-   finished: it should answer `200` with three tiers instead of `404`.
+2. ✅ **Merged to `main`, pushed, and the deploy confirmed live** (2026-09-16).
+   Probed on `bmt.thedigicraft.co.uk` after Vercel finished:
+   `/api/mobile/v1/cancellation-policy` → `200` with three tiers (was `404`),
+   `/garage` → `401 "Please sign in to continue."`, `/account/email` → `405` for
+   a GET (it is POST-only), `/account/confirm-email` → `200`. The homepage
+   reviews section and the `?next=` deep-link carry-through are live too.
 3. **The four env values** for their `.env`: the API base URL, the Supabase URL
    and anon key, and the Stripe publishable key. All public by design, so send
    them directly rather than committing them. Safe to send now that `0079` is
