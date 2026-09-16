@@ -32,13 +32,19 @@ export default defineConfig({
     // Ordered setup chain (each runs once the dev server is up):
     //   seed → create test users, then auth → log each role in + save session.
     // chromium depends on auth (and transitively seed), so specs always run last.
+    // Signed-OUT pages. No dependencies on purpose, so it can run without
+    // seeding accounts into whatever project .env.local points at:
+    //   npx playwright test --project=public
+    { name: "public", testMatch: /public-pages\.spec\.ts/, use: { ...devices["Desktop Chrome"] } },
     { name: "seed", testMatch: /seed\.setup\.ts/ },
     { name: "auth", testMatch: /auth\.setup\.ts/, dependencies: ["seed"] },
     {
       name: "chromium",
       use: { ...devices["Desktop Chrome"] },
       dependencies: ["auth"],
-      testIgnore: /.*\.setup\.ts/,
+      // public-pages runs in its own project above; excluded here so it isn't
+      // run twice and doesn't drag the seed chain in behind it.
+      testIgnore: [/.*\.setup\.ts/, /public-pages\.spec\.ts/],
     },
   ],
   webServer: {

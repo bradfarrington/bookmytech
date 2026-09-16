@@ -188,12 +188,16 @@ function redirectKeepingCookies(
   const url = request.nextUrl.clone();
   const [pathname, search] = splitTarget(target);
   url.pathname = pathname;
-  // Blank the query first, then add back only what we mean to carry. The
-  // request's own params belong to the page being blocked, not to the login
-  // screen, so forwarding them wholesale would leak them into a different
-  // route. `next` is the one exception and it has been through safeNext().
-  url.search = search;
-  if (next) url.searchParams.set("next", next);
+  // The query is REPLACED, not added to: the request's own params belong to the
+  // page being blocked, not to the login screen, so forwarding them wholesale
+  // would leak them into a different route. `next` is the one exception and it
+  // has been through safeNext().
+  //
+  // Assigning the whole string rather than going via `url.searchParams.set`.
+  // On a NextURL, mutating searchParams after assigning `search` does not
+  // survive into the final URL — the param was silently dropped, which a
+  // browser check caught and no unit test would have.
+  url.search = next ? `?next=${encodeURIComponent(next)}` : search;
   const redirected = NextResponse.redirect(url);
   // Forward any cookies Supabase wrote during session refresh
   for (const cookie of baseResponse.cookies.getAll()) {
