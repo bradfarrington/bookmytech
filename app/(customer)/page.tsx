@@ -9,11 +9,14 @@ import { HowItWorks } from "./_components/how-it-works";
 import { MechanicJoin } from "./_components/mechanic-join";
 import { QuoteShowcase } from "./_components/quote-showcase";
 import { RepairsPreview } from "./_components/repairs-preview";
+import { Reviews } from "./_components/reviews";
 import { StickyBookBar } from "./_components/sticky-book-bar";
 import { TrustTicker } from "./_components/trust-ticker";
 
-// The services section reads the admin's products. Admin changes revalidate "/"
-// straight away (app/actions/catalogue-products.ts); this is the backstop.
+// The services section reads the admin's products and the reviews section reads
+// `reviews.is_public`. Both revalidate "/" on an admin change straight away
+// (app/actions/catalogue-products.ts, app/actions/admin-reviews.ts); this is the
+// backstop.
 export const revalidate = 3600;
 
 // Section order and layout follow proposal/homepage-redesign.html (Task 46).
@@ -27,6 +30,7 @@ export default function HomePage() {
         <QuoteShowcase />
         <HowItWorks />
         <RepairsPreview />
+        <Reviews />
         <MechanicJoin />
         <Compare />
         <Coverage />

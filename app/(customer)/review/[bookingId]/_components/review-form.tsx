@@ -135,7 +135,7 @@ export function ReviewForm({ bookingId, mechanicName, tags, initialRating = 0 }:
       </button>
 
       <p className="-mt-3 text-center text-[13px] text-text-muted">
-        Your first name, rating and comment may be shown on your mechanic&apos;s profile.
+        Your first name, rating and comment may be shown on your mechanic&apos;s profile and on the Book My Tech website. We never show your surname or email.
       </p>
     </div>
   );

@@ -152,7 +152,7 @@ export function ReviewForm({
             {comment.length} of {maxComment} characters
           </Caption>
         )}
-        <Caption className="mt-2">Your first name, rating and comment may be shown on your mechanic&apos;s profile.</Caption>
+        <Caption className="mt-2">Your first name, rating and comment may be shown on your mechanic&apos;s profile and on the Book My Tech website. We never show your surname or email.</Caption>
       </div>
 
       {error && (

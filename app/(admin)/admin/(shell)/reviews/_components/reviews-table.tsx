@@ -58,7 +58,7 @@ export function ReviewsTable({
 }) {
   const [ratingFilter, setRatingFilter] = useState<RatingFilter>("all");
   const [mechanicFilter, setMechanicFilter] = useState<string>("all");
-  // Optimistic "Shown on profile" values by review id, over what the server sent.
+  // Optimistic "Shown publicly" values by review id, over what the server sent.
   const [visibility, setVisibility] = useState<Record<string, boolean>>({});
   const [saving, setSaving] = useState<ReadonlySet<string>>(() => new Set());
 
@@ -125,8 +125,9 @@ export function ReviewsTable({
 
       {canSetVisibility && (
         <p className="max-w-3xl text-xs text-text-muted">
-          Switch a review off to hide it from the mechanic&apos;s profile. Hidden reviews still
-          count towards the mechanic&apos;s rating. Only reviews with a comment appear on a profile.
+          Switch a review off to hide it from the public website and from the mechanic&apos;s
+          profile. Hidden reviews still count towards the mechanic&apos;s rating. Only reviews
+          with a comment are shown anywhere.
         </p>
       )}
 
@@ -145,7 +146,7 @@ export function ReviewsTable({
                   <th className="px-5 py-3">Feedback</th>
                   <th className="px-5 py-3">Customer</th>
                   <th className="px-5 py-3">Date</th>
-                  {canSetVisibility && <th className="whitespace-nowrap px-5 py-3">Shown on profile</th>}
+                  {canSetVisibility && <th className="whitespace-nowrap px-5 py-3">Shown publicly</th>}
                   <th className="px-5 py-3"></th>
                 </tr>
               </thead>
