@@ -124,7 +124,13 @@ Missing = feature silently off. The same six names are read by the CLI probes
 |-----|-----|------|-------|
 | `TWILIO_ACCOUNT_SID` | ⬜ | 🔑 | Twilio console. Needed to actually send SMS (`lib/sms/send-sms.ts`). |
 | `TWILIO_AUTH_TOKEN` | ⬜ | 🔑 | Twilio auth token. |
-| `TWILIO_FROM` | ⬜ | plain | Sender number/name. ⚠️ **Code reads `TWILIO_FROM`, not `TWILIO_FROM_NUMBER`** — the old key in `.env.local` was ignored. Falls back to the `sms_settings` table if unset. |
+| `TWILIO_FROM` | ⬜ | plain | Sender number/name. Set to `BookMyTech` so texts show the brand, not the number. ⚠️ **Code reads `TWILIO_FROM`, not `TWILIO_FROM_NUMBER`** — the old key in `.env.local` was ignored. It also **overrides** the admin panel's Sender Name field (`/admin/sms`), which is inert while this is set; falls back to `sms_settings.sms_sender_name` then `BookMyTech` if unset. |
+
+⚠️ **An alphanumeric sender is one-way** — recipients cannot reply, and UK
+carriers require the sender id to be pre-registered (Twilio Console → Messaging
+→ Sender IDs / the MEF SenderID Protection Registry). An unregistered id can be
+silently dropped or swapped back to a number by the network. The platform
+number is `+447446991186` if we need to switch back.
 
 ## SMS top-ups & invoicing (GoCardless + Xero) — optional, only if using paid SMS
 

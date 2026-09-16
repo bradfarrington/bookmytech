@@ -72,9 +72,10 @@ export async function sendSms({
     return false;
   }
 
-  // Sender: the platform's real Twilio number (backend-only, required on trial
-  // accounts) always wins; else the admin-set alphanumeric sender id; else a
-  // default. The number is never tenant-configurable — SMS is resold centrally.
+  // Sender: TWILIO_FROM (backend-only) always wins; else the admin-set
+  // alphanumeric sender id; else a default. Never tenant-configurable — SMS is
+  // resold centrally. TWILIO_FROM holds the alphanumeric "BookMyTech" id, not a
+  // number, so texts are branded; the trade-off is that they are one-way.
   const { data: settings } = await admin
     .from("sms_settings")
     .select("sms_sender_name")
