@@ -40,7 +40,7 @@ import {
 import { engineOilForVehicle } from "./engine-oil";
 import { isHaynesProConfigured } from "./client";
 import { excludedRepairNodeIdsForVehicle } from "./exclusions";
-import { genartExtra } from "./genarts";
+import { genartExtra, genartIdsOf } from "./genarts";
 import { isCatalogueOutage, readHaynesProHealth } from "./health";
 import {
   combineRepairTimes,
@@ -264,6 +264,26 @@ async function fetchNodes(
   return { hours, raw };
 }
 
+/** `{ genartIds }` for a set of jobs, in the order first seen, or nothing. */
+function genartExtraFor(
+  nodeIds: readonly string[],
+  byNode: ReadonlyMap<string, number[]>,
+): { genartIds?: number[] } {
+  const out: number[] = [];
+  for (const id of nodeIds) for (const g of byNode.get(id) ?? []) if (!out.includes(g)) out.push(g);
+  return out.length ? { genartIds: out } : {};
+}
+
+/** Part-group ids per node, for the nodes composeLevel and the search only know by id. */
+function genartIdsByNode(nodes: ReadonlyMap<string, HpRepairtimeNode>): Map<string, number[]> {
+  const out = new Map<string, number[]>();
+  for (const [id, node] of nodes) {
+    const ids = genartIdsOf(node);
+    if (ids) out.set(id, ids);
+  }
+  return out;
+}
+
 async function loadContext(
   reg: string,
   db: SupabaseClient,
@@ -372,6 +392,11 @@ async function composeLevelFor(
   const rawById = new Map(extra.raw);
   for (const node of raw) if (node.id != null) rawById.set(node.id, node);
 
+  // The part groups of the jobs composeLevel only knows by id. A row that
+  // carries none reads as a job needing no parts, so a moved-in leaf or a
+  // combined repair without these would show labour as if it were the total.
+  const nodeGenarts = genartIdsByNode(extra.raw);
+
   const combined = new Map<string, number | null>();
   for (const { bundle, options } of bundlesAt(levelId, context.overlay)) {
     if (!bundle.is_active) continue;
@@ -394,6 +419,7 @@ async function composeLevelFor(
     excluded: context.excluded,
     hourlyRatePence: context.vehicle.hourlyRatePence,
     nodeHours,
+    nodeGenarts,
     combineHours: (ids) => byIds.get(key(ids)) ?? null,
   });
   return { nodes, rawById };
@@ -757,7 +783,8 @@ async function bundleSearchHits(
   if (candidates.length === 0) return [];
 
   const ids = [...new Set(candidates.flatMap((c) => c.options.flatMap((o) => o.node_ids)))];
-  const { hours: nodeHours } = await fetchNodes(context, ids);
+  const { hours: nodeHours, raw: rawNodes } = await fetchNodes(context, ids);
+  const nodeGenarts = genartIdsByNode(rawNodes);
   const out: CatalogueNode[] = [];
   for (const { bundle, options } of candidates) {
     const optionCount = (context.overlay.optionsByBundle.get(bundle.id) ?? []).length;
@@ -776,6 +803,9 @@ async function bundleSearchHits(
         bundleId: bundle.id,
         bundleName: bundle.name,
         optionLabel: optionCount > 1 ? option.label : null,
+        // The part groups the option's jobs use between them: a search hit must
+        // say "+ parts" for the same rows a browsed one does.
+        ...genartExtraFor(option.node_ids, nodeGenarts),
       });
     }
   }

@@ -48,6 +48,14 @@ const hours = new Map<string, number>([
   ["1M01830000WV0", 1.1],
 ]);
 
+// The part groups HaynesPro puts on these jobs: pads 402, discs 82.
+const genarts = new Map<string, number[]>([
+  ["1M01510000WV0", [402]],
+  ["1M01534000WV0", [402]],
+  ["1M01822000WV0", [82]],
+  ["1M01830000WV0", [82]],
+]);
+
 const compose = (levelId: string, raw: HpRepairtimeNode[], excluded: string[] = []) =>
   composeLevel({
     levelId,
@@ -56,6 +64,7 @@ const compose = (levelId: string, raw: HpRepairtimeNode[], excluded: string[] = 
     excluded: new Set(excluded),
     hourlyRatePence: RATE,
     nodeHours: hours,
+    nodeGenarts: genarts,
     combineHours: (ids) => sum(ids, hours),
   });
 
@@ -153,6 +162,37 @@ describe("extraNodeIdsFor", () => {
       "1M01830000WV0",
     ]);
     expect(extraNodeIdsFor("root", overlay)).toEqual([]); // the root bundle is switched off
+  });
+});
+
+describe("composeLevel part groups", () => {
+  // A row that names no part group reads as a job needing nothing but labour,
+  // so both clients print its price as the whole price. A job that DOES need
+  // parts must carry its groups even when the level only knows it by id, or an
+  // unpriceable row shows labour as though it were the total.
+  it("carries a moved-in leaf's part groups", () => {
+    const nodes = compose(customGroupId("cat-1"), []);
+    const rear = nodes.find((n) => n.id === "1M01534000WV0");
+    expect(rear?.genartIds).toEqual([402]);
+  });
+
+  it("gives a combined repair every part group its jobs use between them", () => {
+    const nodes = compose(customGroupId("cat-1"), []);
+    const front = nodes.find((n) => n.id === bundleOptionId("opt-front"));
+    expect(front?.genartIds).toEqual([82, 402]);
+  });
+
+  it("leaves genartIds off a job that needs no parts", () => {
+    const nodes = composeLevel({
+      levelId: customGroupId("cat-1"),
+      raw: [],
+      overlay,
+      excluded: new Set<string>(),
+      hourlyRatePence: RATE,
+      nodeHours: hours,
+      combineHours: (ids) => sum(ids, hours),
+    });
+    expect(nodes.every((n) => n.genartIds === undefined)).toBe(true);
   });
 });
 

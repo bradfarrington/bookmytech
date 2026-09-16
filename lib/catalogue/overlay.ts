@@ -167,6 +167,15 @@ export interface ComposeInput {
   hourlyRatePence: number;
   /** Book time in hours per HaynesPro node id on THIS vehicle, for moved-in leaves and bundle jobs. */
   nodeHours: ReadonlyMap<string, number>;
+  /**
+   * TecDoc part-group ids per HaynesPro node id, for the same nodes. A leaf's
+   * own listing carries them (`genartExtra` below), but a moved-in leaf and the
+   * jobs inside a combined repair are only known by id here, so they come in
+   * alongside the hours. Without them those rows look like jobs that need no
+   * parts, and a client falls back to showing labour as though it were the
+   * whole price.
+   */
+  nodeGenarts?: ReadonlyMap<string, number[]>;
   /** Hours for a set of jobs booked together — their sum by default. */
   combineHours: (nodeIds: string[]) => number | null;
 }
@@ -197,6 +206,13 @@ function priceLeaf(
  */
 export function composeLevel(input: ComposeInput): CatalogueNode[] {
   const { levelId, raw, overlay, excluded, hourlyRatePence, nodeHours, combineHours } = input;
+  const nodeGenarts = input.nodeGenarts ?? new Map<string, number[]>();
+  /** The part groups a set of jobs uses between them, in the order first seen. */
+  const genartsOf = (ids: readonly string[]): { genartIds?: number[] } => {
+    const out: number[] = [];
+    for (const id of ids) for (const g of nodeGenarts.get(id) ?? []) if (!out.includes(g)) out.push(g);
+    return out.length ? { genartIds: out } : {};
+  };
   const nodes: CatalogueNode[] = [];
   const seen = new Set<string>();
 
@@ -230,7 +246,13 @@ export function composeLevel(input: ComposeInput): CatalogueNode[] {
       continue;
     }
     // A leaf moved in is only shown when this vehicle has a time for it.
-    const node = priceLeaf(override.node_id, description, nodeHours.get(override.node_id), hourlyRatePence);
+    const node = priceLeaf(
+      override.node_id,
+      description,
+      nodeHours.get(override.node_id),
+      hourlyRatePence,
+      genartsOf([override.node_id]),
+    );
     if (node) {
       nodes.push(node);
       seen.add(node.id);
@@ -265,6 +287,9 @@ export function composeLevel(input: ComposeInput): CatalogueNode[] {
           bundleId: bundle.id,
           bundleName: bundle.name,
           optionLabel: options.length > 1 ? option.label : null,
+          // Every part group the option's jobs use between them, so a client
+          // can say "+ parts" when they turn out to be unpriceable.
+          ...genartsOf(ids),
         },
       );
       if (node) nodes.push(node);
