@@ -172,11 +172,13 @@ You are working on **Book My Tech**, a UK mobile-mechanic booking platform. This
 **Owner:**
 1. **Apply `0078_pending_email_changes.sql`.** Unblocks Task 58.
 2. **Send AAG the dev IP `80.1.6.55`.** Still blocking: repairs needing parts can't be booked.
-3. **Send `docs/mobile-app-brief-2026-09-15.md`** to the app session, plus the app items below.
+3. **Send BOTH app briefs** to the app session: `docs/mobile-app-brief-2026-09-15.md` (Tasks 49 to 54, still current) and **`docs/mobile-app-brief-2026-09-16.md`** (Tasks 56 to 60, written for that session — it is the prompt).
 4. Delete the `LKQ_*` variables on Vercel.
 5. **Consider merging to `main`.** This branch is now **26 commits ahead** and nothing from Tasks 43 or 46 to 60 is on `main`.
 
-**Customer app — needs work, tell the app session:**
+**Migrations confirmed against the live database 2026-09-16:** `0069` to `0077` are **all applied** (0069's LKQ tables are gone; 0070, 0071, 0072, 0073, 0074, 0075, 0076 and 0077 all present with their real columns). **Only `0078` is outstanding.**
+
+**Customer app — needs work. `docs/mobile-app-brief-2026-09-16.md` is the brief to send; summary:**
 - **Task 58 (must change):** the app calls `supabase.auth.updateUser({ email })`. Use the new **`POST /api/mobile/v1/account/email`**, body `{ new_email, current_password }` — so the Change Email screen **needs a password field**. Returns `200 { ok: true, sentTo }`, or `200 { ok: false, error, field? }` for a refusal to show verbatim. There is deliberately **no confirm endpoint and no deep link**: the emailed link opens our web page, so `bmtcustomer:///email-changed` is no longer reached. After a confirmed change the stored session still carries the old address, so ask the customer to sign in again.
 - **Task 60 (must mirror):** the app's own `src/lib/booking-events.ts` allow-list will **drop** the new `message_sent` item unless it gains wording — "New message from your mechanic", **only when `payload.from === 'mechanic'`**, tapping it opens the thread.
 - **Task 59 (copy):** the review form's consent line should say the review may appear on the mechanic's profile *and on the Book My Tech website*, and that we never show a surname or email.
