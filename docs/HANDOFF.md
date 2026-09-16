@@ -131,6 +131,32 @@ You are working on **Book My Tech**, a UK mobile-mechanic booking platform. This
 
 Full detail, including what each privileged column is worth to an attacker and the post-apply checks: `docs/tasks/62-profiles-privilege-escalation.md`.
 
+### 2026-09-16 — The app is blocked on two things only Brad can do
+
+The app has built both briefs and **has still never run against a server**. It
+needs, in this order:
+
+1. **`0079` applied** (the escalation above), then `0078`.
+2. **This branch merged and deployed.** `bmt.thedigicraft.co.uk` serves roughly
+   `main` and 404s every endpoint from both briefs — probed 2026-09-16.
+3. **The four env values** for their `.env`: the API base URL, the Supabase URL
+   and anon key, and the Stripe publishable key. All public by design, so send
+   them directly rather than committing them. **Not before `0079` is applied**,
+   because the anon key plus any customer account is the escalation.
+
+**The app answered §5b: it does NOT have the website's checkout sign-in gap.**
+It already offers "Already have one? Sign in" at confirm, and neither trap can
+bite because sign-in is a separate screen with its own validation. Their
+`BookingFlowProvider` sits at the root layout so the draft survives navigating
+away — which is the better design of the two, and the reason they could afford a
+separate screen where the website kept it inline.
+
+**A process lesson worth keeping:** I corrected a wrong Stripe claim in the
+reply document and left it live in the brief. The brief is what gets re-sent, so
+the error circulated twice while the apology sat in a file nobody re-reads. It
+is now fixed at source in `docs/mobile-app-brief-2026-09-16.md`. **Correct the
+document that will be read again, not the reply that notices it.**
+
 ### 2026-09-16 — Reply to the customer app's status file
 
 The app team sent a status file saying both briefs are built but **nothing has been run against a server**. Answered in **`docs/backend-reply-to-app-2026-09-16.md`** — send them that.

@@ -215,7 +215,41 @@ that look like app bugs and are not.
 
 ---
 
-## 4b. One new thing for you: can a returning customer sign in at checkout?
+## 4b. ANSWERED by the app, 2026-09-16 — nothing to do
+
+The app checked and **does not have the website's gap.** Recorded here so this
+is not asked a third time:
+
+- The confirm step already offers "Already have one? Sign in" under "Create
+  account to book" (`confirm.tsx:498-513`), routing to `/login` with
+  `next=/book/confirm`, and both auth screens honour `next` and cross-link
+  carrying it.
+- **Neither trap can bite, for a structural reason worth knowing:** the app has
+  no account block on the confirm form at all. Signing in is a separate screen
+  with its own validation, so it never inherits the booking form's rules.
+  `login.tsx:69` requires only a non-empty email and password — no name, no
+  minimum length — so an older account whose password predates the minimum still
+  signs in.
+- They also checked the thing that would have made the sign-in path useless
+  anyway, and which the website does not have to think about: **the draft
+  survives**, because `BookingFlowProvider` sits at the root layout rather than
+  inside `/book`, so navigating to `/login` does not unmount it.
+
+That last point is the better design of the two. The website keeps sign-in
+inline precisely because leaving the page would lose the draft; the app made the
+draft outlive navigation instead, which is why it could afford a separate
+screen.
+
+**Also confirmed by them:** the logo caveat landed in time. Their test step G10
+had been written to expect "no URL anywhere in the flow is a supabase.co one",
+which a tester would have failed on a text search. Corrected on their side to
+"no clickable link", with the logo `<img>` named as expected and not a failure.
+
+The original question follows, for context.
+
+---
+
+## 4b (original). One new thing for you: can a returning customer sign in at checkout?
 
 Shipped on the website today as Task 61, after Brad hit it himself. Not in
 either brief, because it did not exist when they were written.
@@ -254,6 +288,37 @@ a returning customer's older guest bookings will not appear.
 
 ---
 
+## 4c. "Nothing has run against a server" — what you need to change that
+
+You have flagged this twice and it is the right thing to keep flagging. Two
+things are missing and **both are Brad's to provide**; neither is something you
+can fix from your repo.
+
+**1. A deployment with the endpoints on it.** Covered in §4 above:
+`bmt.thedigicraft.co.uk` is serving roughly `main` and 404s every endpoint from
+both briefs. This branch must be merged and deployed first. Until then a run
+would produce a page of 404s that look like app bugs.
+
+**2. The environment values.** Four, and three of them are public by design:
+
+| Variable | Where it comes from |
+|---|---|
+| `EXPO_PUBLIC_API_BASE_URL` | `https://bmt.thedigicraft.co.uk` after the deploy |
+| `EXPO_PUBLIC_SUPABASE_URL` | The same project URL the website uses. Public. |
+| `EXPO_PUBLIC_SUPABASE_ANON_KEY` | The same anon key the website ships in its bundle. Public by design. |
+| Stripe publishable key | The same `pk_test_…` the website uses. Public. |
+
+Deliberately not written into this file. The anon key is public, but a repo
+document is the wrong place for it, and while **§0 is unapplied** that key is
+more dangerous than it should be — anyone holding it plus any customer account
+can escalate to admin. **Ask Brad for the values directly, and do not start the
+first run until `0079` is applied.**
+
+There is no service-role key in your list and there must never be. Everything
+privileged goes through the endpoints.
+
+---
+
 ## 5. §5 and §6c — agreed, nothing needed
 
 **§5, the contradictions:** both your calls were right, and the later
@@ -266,7 +331,33 @@ checking rather than assuming.
 
 ---
 
-## 6. §6a — the Stripe claim was wrong, and here is why
+## 6. §6a — the Stripe claim was wrong, and the apology was in the wrong place
+
+**Second correction, 2026-09-16.** You flagged this once and it came back at you
+in the re-send, and you were right to say so again. Here is why that happened,
+because the failure is more interesting than the original mistake.
+
+I apologised **here**, in the reply, and left the sentence **live** in
+`docs/mobile-app-brief-2026-09-16.md`. The brief is the document that gets
+re-sent. So the correction sat in a file nobody re-reads while the error kept
+circulating in the one that does.
+
+**Now fixed at source.** That paragraph in the brief is amended in place, says
+what it should have said, and carries a note recording that it was wrong and
+that it was wrong twice. It is scoped explicitly to the backend and to Brad's
+Stripe dashboard, with a sentence stating that it says nothing about whether the
+app's screens are built.
+
+The lesson, which is worth more than the apology: **a correction belongs in the
+document that will be read again, not in the reply that notices it.** Anything
+else leaves a wrong statement in circulation with an apology filed somewhere
+else.
+
+The original explanation follows.
+
+---
+
+
 
 You are right, and the wording was mine. "The only outstanding Stripe work is a
 test-card run … a verification step rather than a change" was true of the
