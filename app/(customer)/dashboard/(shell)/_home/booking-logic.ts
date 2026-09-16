@@ -146,12 +146,12 @@ export function canReview(booking: Pick<CustomerBooking, "status" | "mechanicId"
 }
 
 export function canReportProblem(
-  booking: Pick<CustomerBooking, "status" | "completedAt" | "dispute"> & { ownedByAccount?: boolean },
+  booking: Pick<CustomerBooking, "status" | "completedAt" | "dispute">,
   now: Date,
 ): boolean {
-  // /dashboard/disputes/new only accepts bookings linked to the account, not a
-  // guest-era one matched by email, so don't offer a link it would refuse.
-  if (booking.ownedByAccount === false) return false;
+  // No `ownedByAccount` check: the dispute pages and lib/disputes now use the
+  // shared `ownsBooking`, so a guest-era booking matched by email can raise one
+  // like any other. Offering the link used to mean offering one that was refused.
   if (booking.status !== "completed" || booking.dispute || !booking.completedAt) return false;
   const completedMs = new Date(booking.completedAt).getTime();
   return Number.isFinite(completedMs) && completedMs > 0 && now.getTime() - completedMs <= DISPUTE_WINDOW_MS;

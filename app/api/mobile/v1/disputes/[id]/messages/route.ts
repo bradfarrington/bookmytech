@@ -44,5 +44,5 @@ export async function POST(
 
   const body = typeof parsed.body.body === "string" ? parsed.body.body : "";
 
-  return apiOk(await sendDisputeMessageFor(id, body, auth.caller.userId));
+  return apiOk(await sendDisputeMessageFor(id, body, auth.caller));
 }

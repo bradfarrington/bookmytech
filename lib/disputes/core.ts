@@ -2,6 +2,7 @@ import "server-only";
 
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { ownsBooking, type BookingCaller } from "@/lib/bookings/ownership";
 import { sendEmail } from "@/lib/email/send";
 import { renderTemplateEmail } from "@/emails/resolve";
 import { siteUrl, formatJobNumber } from "@/lib/utils";
@@ -147,8 +148,9 @@ export interface OpenDisputeInput {
 export async function openDisputeFor(
   bookingId: string,
   input: OpenDisputeInput,
-  callerId: string,
+  caller: BookingCaller,
 ): Promise<DisputeResult> {
+  const callerId = caller.userId;
   const admin = createAdminClient();
   const { data: booking } = await admin
     .from("bookings")
@@ -158,7 +160,11 @@ export async function openDisputeFor(
   if (!booking) return { ok: false, error: "That booking no longer exists." };
 
   // Determine the opener's role from their relationship to the booking.
-  const isCustomer = booking.customer_id === callerId;
+  // `ownsBooking` rather than a customer_id comparison, because a booking made
+  // before accounts were required has no customer_id and is linked by email.
+  // Every other customer action already uses it, so a plain `customer_id ===`
+  // here was the one thing standing between those customers and a dispute.
+  const isCustomer = ownsBooking(booking, caller);
   const isMechanic = booking.mechanic_id === callerId;
   if (!isCustomer && !isMechanic)
     return { ok: false, error: "You're not a party to this booking." };
@@ -302,7 +308,8 @@ export interface DisputeRow {
  * (post a message, withdraw, escalate, arbitrate) gates on the role this
  * returns, and a caller who is none of the three is refused here.
  */
-export async function partyForDispute(disputeId: string, callerId: string) {
+export async function partyForDispute(disputeId: string, caller: BookingCaller) {
+  const callerId = caller.userId;
   const admin = createAdminClient();
   const { data: dispute } = await admin
     .from("disputes")
@@ -327,8 +334,10 @@ export async function partyForDispute(disputeId: string, callerId: string) {
   // Booking relationship wins over profile role: an admin who is this
   // booking's mechanic acts on the dispute as its mechanic (and so can't
   // arbitrate their own job).
+  // `ownsBooking` for the customer arm so a guest-era booking (no customer_id,
+  // linked by email) can still reply to, withdraw or escalate its dispute.
   let role: "customer" | "mechanic" | "admin" | null = null;
-  if (booking.customer_id === callerId) role = "customer";
+  if (ownsBooking(booking, caller)) role = "customer";
   else if (booking.mechanic_id === callerId) role = "mechanic";
   else if (profile?.role === "admin") role = "admin";
   if (!role) return { ok: false as const, error: "You're not a party to this dispute." };
@@ -354,12 +363,12 @@ export function revalidateDispute(disputeId: string, bookingId: string) {
 export async function sendDisputeMessageFor(
   disputeId: string,
   body: string,
-  callerId: string,
+  caller: BookingCaller,
 ): Promise<SimpleResult> {
   const trimmed = body.trim();
   if (!trimmed) return { ok: false, error: "Type a message first." };
 
-  const party = await partyForDispute(disputeId, callerId);
+  const party = await partyForDispute(disputeId, caller);
   if (!party.ok) return party;
   const { admin, dispute, booking, userId, role } = party;
   if (["resolved", "withdrawn"].includes(dispute.status))
@@ -422,9 +431,9 @@ export async function sendDisputeMessageFor(
 
 export async function withdrawDisputeFor(
   disputeId: string,
-  callerId: string,
+  caller: BookingCaller,
 ): Promise<SimpleResult> {
-  const party = await partyForDispute(disputeId, callerId);
+  const party = await partyForDispute(disputeId, caller);
   if (!party.ok) return party;
   const { admin, dispute, booking, userId, role } = party;
 

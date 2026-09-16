@@ -82,7 +82,7 @@
 - [x] The mobile quote response change is additive.
 - [x] `tsc` (no new errors), eslint on changed files, `npm test`. No `next build`: Brad's dev server was running on `.next`.
 - [x] Migrations 0069 and 0070 applied. *(Checked live 2026-09-15. 0070 went in before AAG allowlisted this machine, so repairs that need parts can't be booked here until it does.)*
-- [ ] Migration 0071 applied. **Owner.**
+- [x] Migration 0071 applied. **Owner** — confirmed against the live schema 2026-09-15.
 - [ ] AAG allowlists `80.1.6.55`, then the S28BSW air filter is priced with its part end to end (Price, Confirm, hold, booking row, mechanic page). **Owner, then verify.**
 - [ ] AAG production credentials and `AAG_BASE_URL` set on Vercel. **Owner, after the demo call.**
 - [ ] The customer app renders `quote.parts`. **App repo.**

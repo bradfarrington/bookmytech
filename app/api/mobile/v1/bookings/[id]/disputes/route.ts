@@ -73,5 +73,5 @@ export async function POST(
         : null,
   };
 
-  return apiOk(await openDisputeFor(id, input, auth.caller.userId));
+  return apiOk(await openDisputeFor(id, input, auth.caller));
 }

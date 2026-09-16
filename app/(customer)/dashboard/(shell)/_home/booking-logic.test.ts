@@ -157,11 +157,15 @@ describe("canReportProblem", () => {
     expect(canReportProblem(booking({ status: "cancelled", completedAt: hoursAgo(1) }), NOW)).toBe(false);
   });
 
-  it("isn't offered on a guest-era booking the disputes page would refuse", () => {
+  it("is offered on a guest-era booking, which can now be disputed like any other", () => {
+    // Was the opposite assertion: the dispute pages only accepted a booking
+    // whose customer_id matched, so the link was hidden rather than offered and
+    // refused. They use the shared `ownsBooking` now, which also matches a
+    // guest-era booking on its email, so there is nothing left to hide from.
     const hourAgo = new Date(NOW.getTime() - 3_600_000).toISOString();
     expect(
       canReportProblem(booking({ status: "completed", completedAt: hourAgo, ownedByAccount: false }), NOW),
-    ).toBe(false);
+    ).toBe(true);
   });
 });
 

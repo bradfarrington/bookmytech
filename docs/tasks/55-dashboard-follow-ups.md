@@ -1,6 +1,27 @@
 # Task 55: Dashboard follow-ups from Brad's review
 
-**Status:** 📝 Notes only, nothing built (2026-09-15). Written at the end of the session so the work can carry on from another machine.
+**Status:** 🚧 In progress (2026-09-16). Brad's four scope decisions are settled (below). Items **6 and 7 are built** as Tasks 56 and 57; items **3 and 5 need no code** and are closed here. Items 1, 2 and 4 are planned and not started, as Tasks 58 to 60.
+
+## Brad's decisions (2026-09-16)
+
+| Question | Answer |
+|---|---|
+| What "chat" means (item 2) | **Better customer-to-mechanic messaging**, not live support chat |
+| Where public reviews go (item 1) | **Homepage only**, driven by the one existing `is_public` switch |
+| A "within 2 hours" cancellation tier (item 3) | **No.** Keep the three live tiers |
+| Scope | All seven items, **staged** |
+
+## Item status
+
+| Item | State |
+|---|---|
+| 1. Review switch controls the public website | Planned, Task 59. Homepage only, one switch |
+| 2. Chat | Planned, Task 60. Scoped to customer-to-mechanic messaging |
+| 3. "Under 2 hrs" cancellation row | ✅ Closed, no code. Decision: keep as is |
+| 4. Our own auth, no Supabase screens | Planned, Task 58 |
+| 5. Reschedule keeps the 2-hour window | ✅ Closed, already shipped in Task 48 |
+| 6. Deep links lost at sign-in | ✅ Built, Task 56 |
+| 7. Guest-era bookings can't be disputed | ✅ Built, Task 57 |
 
 ## Where things stand
 
@@ -34,9 +55,15 @@
 - Relabel the admin switch and its caption, for example "Shown on website".
 - Change the review forms' consent line to say the review may appear on the website.
 
-**Decide with Brad**
-- whether one switch covers the website and mechanic profiles (the plain reading of his note)
-- where on the site reviews appear (homepage, mechanic pages)
+**✅ Decided 2026-09-16**
+- **One switch** covers both the website and mechanic profiles, the plain reading of Brad's note.
+- **Homepage only.** No public mechanic pages, so nowhere else to place them.
+
+**Also found:** `mechanic_public_reviews` **cannot be reused** for this. It is `revoke all … from anon` and gated on `has_booking_with_mechanic`, so only a signed-in customer who already booked that mechanic sees anything. The public read has to be a service-role read of allow-listed columns, as Task 46 parked it.
+
+Two further things to handle when building it:
+- `setReviewVisibility` only calls `revalidatePath("/admin/reviews")`, and the homepage sets `revalidate = 3600`, so a hidden review would linger up to an hour. It needs `revalidatePath("/")`.
+- `is_public` does **not** change a mechanic's average: `lib/mechanics/aggregates.ts` recomputes `mechanics.rating` from every review. That is intentional and documented on the column.
 
 **App:** the consent line copy changes.
 
@@ -52,10 +79,14 @@
   - it polls rather than using Realtime
 - **There's no chat with Book My Tech support.** The help centre shows email only, and the mockup's Chat and Phone cards are hidden.
 
-**To do: scope it first.** Confirm whether "chat" means:
-- (a) live chat with Book My Tech support
-- (b) better customer and mechanic messaging (Realtime, unread counts, push)
-- (c) both
+**✅ Scoped 2026-09-16: (b), better customer and mechanic messaging.** Not live support chat. So no conversation or message tables, no admin support inbox, no phone line, and the help centre's hidden Chat and Phone cards stay hidden.
+
+**But not Realtime.** `useStayFresh` polling is the project's standing pattern and `messages` is deliberately outside the Realtime publication (`0049`). The work is unread counts and surfaces, not a transport change.
+
+**The actual gaps, found 2026-09-16:**
+- Unread messages never reach the Inbox or the header dot. `lib/inbox/events.ts` is an allow-list with no message entry, while `message_sent` already exists as a `booking_events` type. Adding it needs no schema change.
+- The mechanic console has no Messages nav item and no unread badge, so a thread is reachable only by opening its job.
+- The mechanic app does not exist and `app/api/mobile/v1/` is customer-only. Nothing to build there.
 
 **Then plan it across:**
 - the website dashboard
@@ -90,11 +121,7 @@
 
 **There's no "within 2 hours of the slot" rule.** Cancelling an hour before, with the mechanic not yet on the way, costs £30. So the website and the endpoint label the third row "Once your mechanic is on the way", which is what's actually charged. The mockup's £20 and £40 were placeholders; the table shows the live figures.
 
-**Decision for Brad:** keep it as it is, or add a real "within 2 hours" tier. A new tier touches:
-- a new platform setting and `feeFor` in `lib/bookings/manage-booking.ts`
-- `cancelFeeTiers` and `lib/bookings/cancellation-policy.ts`
-- the public `/cancellation-policy` page and the Terms
-- the app
+**✅ Decided 2026-09-16: keep it as it is.** No "within 2 hours" tier. The three live tiers stand, and the cancel screen's third row already says what is actually charged, "Once your mechanic is on the way". Nothing to build: `cancelFeeTiers`, `feeFor` in `lib/bookings/manage-booking.ts`, `lib/bookings/cancellation-policy.ts`, the public `/cancellation-policy` page, the Terms and the app are all untouched. The mockup's £20 and £40 were placeholders and stay unbuilt.
 
 ## 4. Book My Tech's own auth: no Supabase screens, emails or redirects
 
@@ -126,7 +153,7 @@ Supabase stays the auth backend (users and sessions). Every screen, email and li
 
 ## 5. "Reschedule keeps the 2-hour window"
 
-*Explanation; nothing to decide.*
+**✅ Closed: already shipped in Task 48; nothing to do.** Explanation only, kept for the record.
 
 A booking is made for a 2-hour arrival window, such as "Thu 18 Sep, 2pm–4pm".
 
@@ -135,6 +162,8 @@ A booking is made for a 2-hour arrival window, such as "Thu 18 Sep, 2pm–4pm".
 - **App:** it gets the same result by sending `slotWindow` (brief §8).
 
 ## 6. Fix: deep links lost at sign-in
+
+**✅ Built 2026-09-16 — see `docs/tasks/56-deep-links-through-sign-in.md`.** One helper, `lib/safe-next.ts`, now governs every reader of `next`. There turned out to be **four** loss points, not the two below: proxy, the login page, the sign-in and sign-up actions, and `/auth/callback`'s exact-match allow-list, which collapsed any path carrying an id to `/`. The funnel case was the worst of them, because a lapsed session mid-checkout lost the customer's quote.
 
 **Symptom.** A signed-out customer opens a link from an email, such as `/dashboard/quotes/[id]`, and is sent to `/login`. After signing in they land on the dashboard instead of the quote.
 
@@ -150,6 +179,8 @@ A booking is made for a 2-hour arrival window, such as "Thu 18 Sep, 2pm–4pm".
 - Check `/auth/callback`'s own allow-list at the same time.
 
 ## 7. Fix: guest-era bookings can't be disputed
+
+**✅ Built 2026-09-16 — see `docs/tasks/57-disputes-on-guest-era-bookings.md`.** `ownsBooking` now decides the customer arm everywhere. There were **five** wrong checks, not the three below, and the disputes list's inline guest arm was also slightly looser than the RLS policy it mirrors, so it was collapsed onto the shared rule too.
 
 **Symptom.** A booking made before accounts were required, with no `customer_id` and linked to the customer by email, can't have a dispute raised. "Report a problem" is hidden on those for now, by the `ownedByAccount` check in `canReportProblem` (`app/(customer)/dashboard/(shell)/_home/booking-logic.ts`).
 

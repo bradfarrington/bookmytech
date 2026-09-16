@@ -119,11 +119,53 @@ You are working on **Book My Tech**, a UK mobile-mechanic booking platform. This
 
 ## Current task
 
+### 2026-09-16 — Task 55 follow-ups: deep links and guest-era disputes ✅ (Tasks 56, 57), branch `task-43-parts-in-customer-prices`
+
+**Brad's four scope decisions on Task 55 are settled**, and the two small fixes are built. Details in `docs/tasks/55-dashboard-follow-ups.md`, `56-deep-links-through-sign-in.md` and `57-disputes-on-guest-era-bookings.md`.
+
+**Decisions (2026-09-16)**
+
+| Question | Answer |
+|---|---|
+| What "chat" means | Better customer-to-mechanic messaging, **not** live support chat |
+| Public reviews | **Homepage only**, one switch, driven by the existing `reviews.is_public` |
+| A "within 2 hours" cancellation tier | **No.** Keep free over 24h, £30 within 24h, £50 once `en_route` |
+| Scope | All seven items, staged |
+
+**Task 56 ✅ — deep links survive sign-in.** One helper, `lib/safe-next.ts`, now governs every reader of `?next=`, with 11 unit tests. There were **four** loss points, not the two the notes recorded: `proxy.ts` blanked the query string, the login page never read `next`, the sign-in and sign-up actions hard-coded the destination by role, and `/auth/callback`'s exact-match allow-list collapsed any path carrying an id to `/`. The worst case was the funnel, where a lapsed session mid-checkout lost the customer's quote.
+
+`safeNext` requires a rooted path with no control characters, resolves against a fixed base and demands the origin back unchanged, and refuses `..` raw or encoded. `safeCustomerNext` narrows it to `/dashboard` and `/book` for where the role is known.
+
+**Task 57 ✅ — guest-era bookings can be disputed.** A booking from before accounts were required has no `customer_id` and is linked by `customer_email`. It could be cancelled, rescheduled, reviewed and messaged, because those use `ownsBooking`, but not disputed. RLS was correct all along; **five** service-role code paths compared `customer_id` with no email arm. All now use `ownsBooking`, the `ownedByAccount` guard that hid "Report a problem" is gone, and the disputes list's inline copy of the rule (whose email match was slightly looser than the policy) was collapsed onto the shared one.
+
+**Items 3 and 5 of Task 55 are closed with no code**: no two-hour cancellation tier, and the reschedule window already shipped in Task 48.
+
+**Checked:** `tsc` clean, `next build` passes, **559 unit tests pass** (548 before, plus 11 for `safeNext`).
+
+**Not checked:** neither fix walked in a browser. Task 56 needs a signed-in customer and a real quote id; Task 57 needs a booking with `customer_id IS NULL` and a matching `customer_email`.
+
+⚠️ **`eslint` does not pass on this branch, contrary to what earlier notes here claimed.** 344 problems, all pre-existing: **273 are in `proposal/`**, the reference JSX mockups, which are not app code and are not typechecked. The remaining ~19 are in app code (`setState` in an effect, unescaped apostrophes, `<img>` warnings). None blocks the build. Adding `proposal/` to the eslint ignore list would make the signal readable.
+
+**Next up, in order:**
+1. **Task 58** — our own email change (Task 55 item 4). The last Supabase-owned screen: `change-email-form.tsx` calls `supabase.auth.updateUser({ email })` from the **browser**, so Supabase's own mailer sends both confirmations and their links pass through `<project>.supabase.co/auth/v1/verify`. Password reset, the mechanic invite and approvals are already first-party via `generateLink` plus our Resend templates, so there is a pattern to copy. **Needs a new `POST /api/mobile/v1/account/email` too** — the app calls Supabase directly as well.
+2. **Task 59** — reviews on the homepage (item 1). Note `mechanic_public_reviews` **cannot be reused**: it is revoked from `anon` and gated on `has_booking_with_mechanic`.
+3. **Task 60** — messaging (item 2). Add `message_sent` to the inbox allow-list, and give the mechanic console a Messages screen with unread counts.
+
+**Owner:**
+1. **Send AAG the dev IP `80.1.6.55`.** Still blocking: any repair needing parts can't be booked.
+2. **Send `docs/mobile-app-brief-2026-09-15.md`** to the app session so it can run `npm run db:types`.
+3. Delete the `LKQ_*` variables on Vercel.
+4. **Consider merging to `main`.** This branch is now **20 commits ahead** and nothing from Tasks 43 or 46 to 57 is on `main`.
+
+**Customer app — tell the app session:**
+- **Task 57 is additive, no work needed.** The mobile dispute routes share the core, so `POST /bookings/:id/disputes`, `/disputes/:id/messages` and `/disputes/:id/withdraw` now accept guest-era bookings. No field or shape changed and no migration ran, so older builds keep working. If the app hides its own "Report a problem" on a null `customer_id`, it can stop.
+- **Task 56 has no app impact** — web-only.
+
 ### 2026-09-15 (late) — New customer dashboard and the data behind it 🚧 (Tasks 48 to 54), branch `task-43-parts-in-customer-prices`
 
 **The website's dashboard now uses the app redesign (`mockups/`), with a top header instead of bottom tabs.** The data the redesigned app was waiting on is built too. Detail: `docs/tasks/48-customer-dashboard-rebuild.md` to `54-slots-and-cancellation-policy.md`.
 
-**Pick up here: `docs/tasks/55-dashboard-follow-ups.md`.** Brad's review notes (2026-09-15), none built yet:
+**Superseded by the 2026-09-16 entry above.** Brad's review notes (2026-09-15), now decided and partly built:
 - the review switch should control the public website
 - chat across the website, customer app, mechanic console and mechanic app
 - Book My Tech's own auth screens and emails, with no Supabase pages or redirects

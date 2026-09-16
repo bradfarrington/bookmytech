@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { ownsBooking } from "@/lib/bookings/ownership";
 import { DisputeForm } from "@/components/disputes/dispute-form";
 import { PageHeader, Screen, Stack } from "@/components/dashboard/ui";
 
@@ -35,12 +36,16 @@ export default async function NewDisputePage({
 
   const { data: booking } = await admin
     .from("bookings")
-    .select("id, status, customer_id, completed_at, total_pence, repair_description")
+    .select("id, status, customer_id, customer_email, completed_at, total_pence, repair_description")
     .eq("id", bookingId)
     .single();
 
-  // Must be the customer's own, completed, and inside the 48h window.
-  const owns = booking?.customer_id === user.id;
+  // Must be the customer's own, completed, and inside the 48h window. Ownership
+  // is the shared `ownsBooking`, which also matches a guest-era booking on its
+  // email — those have no customer_id, and a plain comparison refused them.
+  const owns = booking
+    ? ownsBooking(booking, { userId: user.id, email: user.email ?? null })
+    : false;
   const inWindow = inDisputeWindow(booking?.status, booking?.completed_at);
 
   // An existing dispute means they should go to it, not open another.

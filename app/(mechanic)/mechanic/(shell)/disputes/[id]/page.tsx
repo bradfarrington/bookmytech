@@ -19,7 +19,7 @@ export default async function MechanicDisputePage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/mechanic/login");
 
-  const loaded = await loadDispute(id, user.id);
+  const loaded = await loadDispute(id, { userId: user.id, email: user.email ?? null });
   if (!loaded || loaded.viewerRole !== "mechanic") redirect("/mechanic/disputes");
 
   return (

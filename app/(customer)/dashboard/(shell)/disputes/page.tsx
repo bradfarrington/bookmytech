@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { Scale } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { ownsBooking } from "@/lib/bookings/ownership";
 import {
   DISPUTE_STATUS_LABELS,
   REASON_LABELS,
@@ -64,7 +65,7 @@ export default async function CustomerDisputesPage() {
     )
     .order("created_at", { ascending: false });
 
-  const email = (user.email ?? "").toLowerCase();
+  const caller = { userId: user.id, email: user.email ?? null };
 
   const mine: DisputeRowView[] = [];
   for (const d of rows ?? []) {
@@ -77,13 +78,11 @@ export default async function CustomerDisputesPage() {
     if (!b) continue;
 
     // Ownership is filtered here rather than in the query: an `or` across an
-    // embedded table isn't expressible as one PostgREST filter. The rule mirrors
-    // the "Customers can view own bookings" policy — an id match, or a guest
-    // booking on this email.
-    const owns =
-      b.customer_id === user.id ||
-      (b.customer_id == null && !!b.customer_email && b.customer_email.toLowerCase() === email);
-    if (!owns) continue;
+    // embedded table isn't expressible as one PostgREST filter. The rule is the
+    // shared `ownsBooking`, not a local copy of it — this one used to compare
+    // the email case-insensitively, which made it very slightly LOOSER than the
+    // "Customers can view own bookings" policy it is meant to mirror.
+    if (!ownsBooking(b, caller)) continue;
 
     mine.push({
       id: d.id,

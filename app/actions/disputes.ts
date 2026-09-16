@@ -9,6 +9,7 @@ import { grantCredit } from "@/lib/credits/credits";
 import { refundPayment } from "@/lib/stripe/refund";
 import { recordRefundClawback } from "@/lib/mechanics/balance";
 import { applySuspension } from "@/lib/mechanics/suspend";
+import type { BookingCaller } from "@/lib/bookings/ownership";
 import {
   mechanicEmail,
   openDisputeFor,
@@ -70,6 +71,15 @@ async function requireUser() {
   return { ok: true as const, userId: user.id, email: user.email ?? null };
 }
 
+/**
+ * The guard as the shared `BookingCaller`. The email arm matters: a booking made
+ * before accounts were required has no customer_id and is linked by email, so
+ * dropping the email here would lock those customers out of their own disputes.
+ */
+function callerOf(guard: { userId: string; email: string | null }): BookingCaller {
+  return { userId: guard.userId, email: guard.email };
+}
+
 // ---------------------------------------------------------------------------
 // Party actions — thin wrappers over the shared core.
 // ---------------------------------------------------------------------------
@@ -91,19 +101,19 @@ export async function openDispute(
 ): Promise<DisputeResult> {
   const guard = await requireUser();
   if (!guard.ok) return guard;
-  return openDisputeFor(bookingId, input, guard.userId);
+  return openDisputeFor(bookingId, input, callerOf(guard));
 }
 
 export async function sendDisputeMessage(disputeId: string, body: string): Promise<SimpleResult> {
   const guard = await requireUser();
   if (!guard.ok) return guard;
-  return sendDisputeMessageFor(disputeId, body, guard.userId);
+  return sendDisputeMessageFor(disputeId, body, callerOf(guard));
 }
 
 export async function withdrawDispute(disputeId: string): Promise<SimpleResult> {
   const guard = await requireUser();
   if (!guard.ok) return guard;
-  return withdrawDisputeFor(disputeId, guard.userId);
+  return withdrawDisputeFor(disputeId, callerOf(guard));
 }
 
 // ---------------------------------------------------------------------------
@@ -114,7 +124,7 @@ export async function escalateDispute(disputeId: string): Promise<SimpleResult> 
   const guard = await requireUser();
   if (!guard.ok) return guard;
 
-  const party = await partyForDispute(disputeId, guard.userId);
+  const party = await partyForDispute(disputeId, callerOf(guard));
   if (!party.ok) return party;
   const { admin, dispute, booking, userId, role } = party;
   if (role === "admin") return { ok: false, error: "Admins arbitrate escalated disputes directly." };
@@ -170,7 +180,7 @@ export async function resolveDispute(
   const guard = await requireUser();
   if (!guard.ok) return guard;
 
-  const party = await partyForDispute(disputeId, guard.userId);
+  const party = await partyForDispute(disputeId, callerOf(guard));
   if (!party.ok) return party;
   const { admin, dispute, booking, userId, role } = party;
   if (role !== "admin") return { ok: false, error: "Only an admin can arbitrate a dispute." };

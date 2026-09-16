@@ -23,7 +23,7 @@ export default async function CustomerDisputePage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const loaded = await loadDispute(id, user.id);
+  const loaded = await loadDispute(id, { userId: user.id, email: user.email ?? null });
   if (!loaded || loaded.viewerRole !== "customer") redirect("/dashboard");
 
   const talking = loaded.data.status === "opened" || loaded.data.status === "responded";

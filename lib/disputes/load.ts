@@ -1,5 +1,6 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { ownsBooking, type BookingCaller } from "@/lib/bookings/ownership";
 import type { DisputeDetailData } from "@/components/disputes/dispute-detail";
 import type { DisputeStatus, ResolutionKind } from "@/lib/disputes/constants";
 import { formatJobNumber } from "@/lib/utils";
@@ -14,7 +15,11 @@ export interface LoadedDispute {
 // Load a dispute for whoever's viewing it, resolving their role from the booking
 // (admin / customer / mechanic). Returns null if the dispute doesn't exist or
 // the viewer isn't a party — callers redirect on null.
-export async function loadDispute(disputeId: string, userId: string): Promise<LoadedDispute | null> {
+export async function loadDispute(
+  disputeId: string,
+  caller: BookingCaller,
+): Promise<LoadedDispute | null> {
+  const userId = caller.userId;
   const admin = createAdminClient();
   const { data: d } = await admin
     .from("disputes")
@@ -29,7 +34,7 @@ export async function loadDispute(disputeId: string, userId: string): Promise<Lo
 
   const { data: b } = await admin
     .from("bookings")
-    .select("id, job_number, customer_id, mechanic_id, repair_description")
+    .select("id, job_number, customer_id, customer_email, mechanic_id, repair_description")
     .eq("id", d.booking_id)
     .single();
   if (!b) return null;
@@ -37,8 +42,10 @@ export async function loadDispute(disputeId: string, userId: string): Promise<Lo
   // Booking relationship wins over profile role: an admin who is this
   // booking's mechanic views the dispute as its mechanic, not as an admin.
   const { data: profile } = await admin.from("profiles").select("role").eq("id", userId).single();
+  // `ownsBooking` for the customer arm, so a guest-era booking (no customer_id,
+  // linked by email) can still have its dispute opened and read.
   const viewerRole: "customer" | "mechanic" | "admin" | null =
-    b.customer_id === userId
+    ownsBooking(b, caller)
       ? "customer"
       : b.mechanic_id === userId
         ? "mechanic"

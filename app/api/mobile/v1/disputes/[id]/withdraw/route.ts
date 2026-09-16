@@ -38,5 +38,5 @@ export async function POST(
   const auth = await mobileActionCaller(request, "action");
   if (!auth.ok) return auth.response;
 
-  return apiOk(await withdrawDisputeFor(id, auth.caller.userId));
+  return apiOk(await withdrawDisputeFor(id, auth.caller));
 }

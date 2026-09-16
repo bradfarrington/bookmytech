@@ -72,8 +72,13 @@ export interface CustomerBooking {
   rating: number | null;
   dispute: { id: string; status: string } | null;
   /**
-   * False for a guest-era booking matched by email (no customer_id). Some
-   * flows, such as raising a dispute, only accept bookings linked to the account.
+   * False for a guest-era booking matched by email (no customer_id).
+   *
+   * Nothing gates on this. It used to hide "Report a problem", because the
+   * dispute pages accepted only an id match and would have refused the link;
+   * they use the shared `ownsBooking` now, so a guest-era booking behaves like
+   * any other. Kept because it is a true and occasionally useful fact about a
+   * row — don't reintroduce a permission check on it.
    */
   ownedByAccount: boolean;
   /** "Wed 3 Sep · 8am–10am", or "Any of … · All day" while several days are open. */
