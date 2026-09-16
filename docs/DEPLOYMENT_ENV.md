@@ -126,11 +126,16 @@ Missing = feature silently off. The same six names are read by the CLI probes
 | `TWILIO_AUTH_TOKEN` | ⬜ | 🔑 | Twilio auth token. |
 | `TWILIO_FROM` | ⬜ | plain | Sender number/name. Set to `BookMyTech` so texts show the brand, not the number. ⚠️ **Code reads `TWILIO_FROM`, not `TWILIO_FROM_NUMBER`** — the old key in `.env.local` was ignored. It also **overrides** the admin panel's Sender Name field (`/admin/sms`), which is inert while this is set; falls back to `sms_settings.sms_sender_name` then `BookMyTech` if unset. |
 
-⚠️ **An alphanumeric sender is one-way** — recipients cannot reply, and UK
-carriers require the sender id to be pre-registered (Twilio Console → Messaging
-→ Sender IDs / the MEF SenderID Protection Registry). An unregistered id can be
-silently dropped or swapped back to a number by the network. The platform
-number is `+447446991186` if we need to switch back.
+⚠️ **An alphanumeric sender is one-way** — recipients cannot reply. The
+platform number is `+447446991186` if we ever need two-way and have to switch
+back.
+
+No Twilio-side registration is needed to send: this account already delivers
+under several unregistered alphanumeric ids (`BHH`, `BSW`, `Isobex`,
+`GamLEARN`) set by other systems, and UK carriers do not require pre-registration
+to send. The MEF SenderID Protection Registry is opt-in *anti-spoofing* — it
+stops other senders using our id, it is not a prerequisite. Worth doing for
+brand protection at some point; not a blocker.
 
 ## SMS top-ups & invoicing (GoCardless + Xero) — optional, only if using paid SMS
 
