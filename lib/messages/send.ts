@@ -1,6 +1,7 @@
 import "server-only";
 
 import { revalidatePath } from "next/cache";
+import { CLOSED_STATUSES } from "./constants";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendSms } from "@/lib/sms/send-sms";
 import { renderSmsTemplate } from "@/lib/sms/render-template";
@@ -40,7 +41,9 @@ export const MAX_MESSAGE_CHARS = 2000;
  * NOT here — the dispute thread is the place for that conversation, but the
  * booking thread stays open so the parties can still arrange practicalities.
  */
-export const CLOSED_STATUSES = ["completed", "cancelled"] as const;
+// Lives in ./constants so testable modules can read it without pulling in
+// this "server-only" file. Re-exported because callers already import it here.
+export { CLOSED_STATUSES } from "./constants";
 
 type Admin = ReturnType<typeof createAdminClient>;
 
@@ -152,10 +155,41 @@ export async function sendMessageFor(
     }
   }
 
+  // An audit row per message (Task 60). Two reasons it has to exist:
+  //   • the customer's Inbox and its header dot are built from booking_events
+  //     (lib/inbox/feed.ts), so without this a message never shows up as news —
+  //     which was the gap Task 60 set out to close;
+  //   • the admin live activity feed already renders `message_sent`
+  //     (admin/(shell)/live/_components/activity-feed.tsx) and nothing had ever
+  //     written one, so that branch was dead code.
+  //
+  // Written for BOTH directions, because the audit trail and the admin feed want
+  // both. `from` is what lets the customer's Inbox show only the mechanic's
+  // messages and not an echo of their own — see describeEvent in
+  // lib/inbox/events.ts. The body is NOT stored here: `messages` already holds
+  // it, and copying it into an append-only table would put the same words in a
+  // second place with different deletion rules.
+  await admin
+    .from("booking_events")
+    .insert({
+      booking_id: bookingId,
+      event_type: "message_sent",
+      actor_id: caller.userId,
+      payload: { from: role },
+    })
+    // Best-effort: the message is already sent, so a failed audit row must not
+    // report failure back to whoever sent it.
+    .then(({ error: eventError }) => {
+      if (eventError) console.error("[messages] event insert failed", bookingId, eventError.message);
+    });
+
   // Both web surfaces show the thread; they poll for new rows, these just keep
-  // SSR copies fresh.
+  // SSR copies fresh. The mechanic's Messages screen and the customer's Inbox
+  // are SSR too, so they need the same treatment.
   revalidatePath(`/mechanic/jobs/${bookingId}/messages`);
+  revalidatePath("/mechanic/messages");
   revalidatePath("/dashboard");
+  revalidatePath("/dashboard/inbox");
   return { ok: true };
 }
 
@@ -168,11 +202,26 @@ export async function markMessagesReadFor(
   if (!party.ok) return party;
   const { admin, role } = party;
   const counterpart = role === "mechanic" ? "customer" : "mechanic";
-  await admin
+  const { data: cleared } = await admin
     .from("messages")
     .update({ read_at: new Date().toISOString() })
     .eq("booking_id", bookingId)
     .eq("sender_role", counterpart)
-    .is("read_at", null);
+    .is("read_at", null)
+    .select("id");
+
+  // Only when something actually changed: this is called on every poll tick, so
+  // revalidating unconditionally would throw away the shell's cache eight times
+  // a minute for no reason.
+  //
+  // The mechanic's nav badge (Task 60) is computed in the shell layout, which is
+  // SSR, so without this it keeps showing a count for messages already read —
+  // and the thread itself marks them read, so the stale number is exactly what a
+  // mechanic sees right after reading them.
+  if (cleared?.length) {
+    revalidatePath("/mechanic/messages");
+    revalidatePath("/mechanic/jobs");
+    revalidatePath("/dashboard/inbox");
+  }
   return { ok: true };
 }

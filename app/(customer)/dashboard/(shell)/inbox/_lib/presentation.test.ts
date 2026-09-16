@@ -99,13 +99,31 @@ describe("inboxVisual", () => {
     expect(inboxVisual(booking("payment_refunded"))).toEqual({ icon: "card", tone: "brand" });
     expect(inboxVisual({ kind: "reminder", type: "mot_due", status: null })).toEqual({ icon: "bell", tone: "brand" });
   });
+
+  it("gives a message its own icon rather than the fallback calendar", () => {
+    expect(inboxVisual(booking("message_sent"))).toEqual({ icon: "message", tone: "brand" });
+  });
 });
 
 describe("opening an item", () => {
   it("goes to the booking, or books the reminder's vehicle", () => {
-    expect(inboxHref({ kind: "booking", bookingId: "b-1", vehicleReg: null })).toBe("/dashboard/bookings/b-1");
-    expect(inboxHref({ kind: "reminder", bookingId: null, vehicleReg: "ab12 cde" })).toBe("/book/vehicle?reg=AB12CDE");
-    expect(inboxHref({ kind: "reminder", bookingId: null, vehicleReg: null })).toBe("/book");
+    expect(inboxHref({ kind: "booking", type: "status_changed", bookingId: "b-1", vehicleReg: null })).toBe(
+      "/dashboard/bookings/b-1",
+    );
+    expect(inboxHref({ kind: "reminder", type: "mot_due", bookingId: null, vehicleReg: "ab12 cde" })).toBe(
+      "/book/vehicle?reg=AB12CDE",
+    );
+    expect(inboxHref({ kind: "reminder", type: "mot_due", bookingId: null, vehicleReg: null })).toBe("/book");
+  });
+
+  it("opens a message in its thread, not on the booking summary", () => {
+    expect(inboxHref({ kind: "booking", type: "message_sent", bookingId: "b-1", vehicleReg: null })).toBe(
+      "/dashboard/bookings/b-1/messages",
+    );
+    // No booking id is still the dashboard, not a broken /messages URL.
+    expect(inboxHref({ kind: "booking", type: "message_sent", bookingId: null, vehicleReg: null })).toBe(
+      "/dashboard",
+    );
   });
 
   it("shows the job for booking news and the plate for a reminder", () => {

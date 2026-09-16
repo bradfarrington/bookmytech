@@ -59,3 +59,22 @@ describe("read state", () => {
     expect(readStateFromRow({ read_before: null, read_ids: null })).toEqual(EMPTY_READ_STATE);
   });
 });
+
+describe("describeEvent — messages (Task 60)", () => {
+  it("tells the customer about the mechanic's message", () => {
+    expect(describeEvent(event("message_sent", { from: "mechanic" }))).toBe(
+      "New message from your mechanic",
+    );
+  });
+
+  it("does not echo the customer's own message back at them", () => {
+    // The event is written for both directions, for the audit trail and the
+    // admin live feed. Only the mechanic's is news.
+    expect(describeEvent(event("message_sent", { from: "customer" }))).toBeNull();
+  });
+
+  it("stays silent when the payload doesn't say who sent it", () => {
+    expect(describeEvent(event("message_sent", {}))).toBeNull();
+    expect(describeEvent(event("message_sent"))).toBeNull();
+  });
+});

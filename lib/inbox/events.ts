@@ -28,6 +28,7 @@ const EVENT_LABELS: Record<string, string> = {
   reschedule_proposed: "New time proposed",
   reschedule_accepted: "New time agreed",
   arrival_window_set: "Arrival window confirmed",
+  message_sent: "New message from your mechanic",
   fault_added: "Mechanic noted a fault",
   quote_sent: "Quote sent for extra work",
   quote_approved: "Quote approved",
@@ -73,6 +74,13 @@ export function describeEvent(event: CustomerEvent): string | null {
   if (event.event_type === "arrival_window_set") {
     const day = dayFrom(payload?.day) ?? dayFrom(payload?.to);
     return day ? `Arrival confirmed for ${formatBookingDay(day.toISOString())}` : EVENT_LABELS.arrival_window_set;
+  }
+
+  if (event.event_type === "message_sent") {
+    // Only the mechanic's messages are news to the customer. Their own message
+    // is written to booking_events too, for the audit trail and the admin live
+    // feed, and would otherwise come back at them as a notification.
+    return payload?.from === "mechanic" ? EVENT_LABELS.message_sent : null;
   }
 
   if (event.event_type === "cancelled") {

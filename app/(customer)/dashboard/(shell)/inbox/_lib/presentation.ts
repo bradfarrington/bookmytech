@@ -71,7 +71,17 @@ export function groupInboxByDay<T extends Pick<FeedItem, "at">>(
   return groups;
 }
 
-export type InboxIcon = "car" | "quote" | "check" | "cross" | "card" | "dispute" | "bell" | "calendar" | "wrench";
+export type InboxIcon =
+  | "car"
+  | "quote"
+  | "check"
+  | "cross"
+  | "card"
+  | "dispute"
+  | "bell"
+  | "calendar"
+  | "wrench"
+  | "message";
 export type InboxTone = "brand" | "warn" | "success" | "neutral";
 
 /** The tile for an item, by what happened. */
@@ -96,6 +106,7 @@ export function inboxVisual(item: Pick<FeedItem, "kind" | "type" | "status">): {
     }
   }
 
+  if (type === "message_sent") return { icon: "message", tone: "brand" };
   if (type === "disputed" || type.startsWith("dispute_")) return { icon: "dispute", tone: "warn" };
   if (type.startsWith("payment_")) return { icon: "card", tone: "brand" };
   // Outcomes before the quote and revision icon: an approved quote is good news, not a task.
@@ -107,9 +118,13 @@ export function inboxVisual(item: Pick<FeedItem, "kind" | "type" | "status">): {
 }
 
 /** Where opening an item goes: its booking, or the booking flow for a reminder's vehicle. */
-export function inboxHref(item: Pick<FeedItem, "kind" | "bookingId" | "vehicleReg">): string {
+export function inboxHref(item: Pick<FeedItem, "kind" | "type" | "bookingId" | "vehicleReg">): string {
   if (item.kind === "booking") {
-    return item.bookingId ? `/dashboard/bookings/${encodeURIComponent(item.bookingId)}` : "/dashboard";
+    if (!item.bookingId) return "/dashboard";
+    const booking = `/dashboard/bookings/${encodeURIComponent(item.bookingId)}`;
+    // A message belongs in the thread, not on the booking summary: the point of
+    // tapping it is to read what the mechanic said and reply.
+    return item.type === "message_sent" ? `${booking}/messages` : booking;
   }
   const registration = item.vehicleReg ? normaliseRegistration(item.vehicleReg) : "";
   return registration ? `/book/vehicle?reg=${encodeURIComponent(registration)}` : "/book";

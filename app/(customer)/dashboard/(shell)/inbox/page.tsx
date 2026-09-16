@@ -7,6 +7,7 @@ import {
   Check,
   CreditCard,
   FileText,
+  MessageSquare,
   ShieldAlert,
   TriangleAlert,
   Wrench,
@@ -48,6 +49,7 @@ const ICONS: Record<InboxIcon, LucideIcon> = {
   bell: Bell,
   calendar: CalendarClock,
   wrench: Wrench,
+  message: MessageSquare,
 };
 
 const EMPTY: Record<InboxTab, { title: string; body: string }> = {

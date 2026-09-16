@@ -4,6 +4,7 @@ import {
   FileText,
   Inbox,
   LifeBuoy,
+  MessageSquare,
   PoundSterling,
   Scale,
   SlidersHorizontal,
@@ -26,6 +27,9 @@ export type MechanicNavBadges = Record<string, number | undefined>;
 // website, not an app shell.)
 export const MECHANIC_NAV_ITEMS: readonly MechanicNavItem[] = [
   { label: "Jobs", href: "/mechanic/jobs", icon: Inbox },
+  // Threads on current jobs (Task 60). Beside Jobs because that is what they are
+  // about; the badge counts customer messages not yet read.
+  { label: "Messages", href: "/mechanic/messages", icon: MessageSquare },
   { label: "Schedule", href: "/mechanic/schedule", icon: Calendar },
   { label: "Earnings", href: "/mechanic/earnings", icon: PoundSterling },
   { label: "Reviews", href: "/mechanic/reviews", icon: Star },

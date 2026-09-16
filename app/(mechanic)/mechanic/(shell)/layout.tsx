@@ -6,6 +6,7 @@ import { MechanicTopBar } from "@/components/mechanic/top-bar";
 import { ConnectStripeBanner } from "@/components/mechanic/connect-stripe-banner";
 import { InstallPrompt } from "@/components/pwa/install-prompt";
 import { countOpenMechanicDisputes } from "@/lib/disputes/list";
+import { countUnreadMechanicMessages } from "@/lib/messages/threads";
 
 type MechanicStatus = "online" | "offline" | "on_job";
 
@@ -36,12 +37,18 @@ export default async function MechanicShellLayout({
     redirect("/");
   }
 
-  const [{ data: profile }, openDisputes] = await Promise.all([
+  const [{ data: profile }, openDisputes, unreadMessages] = await Promise.all([
     supabase.from("profiles").select("full_name").eq("id", user.id).single(),
-    // Sidebar badge (Task 25) — read under the mechanic's own RLS; 0 on failure.
+    // Sidebar badges (Tasks 25 and 60) — read under the mechanic's own RLS, and
+    // 0 on failure so a broken count can't take out the shell every mechanic
+    // page renders inside.
     countOpenMechanicDisputes(supabase, user.id),
+    countUnreadMechanicMessages(supabase, user.id),
   ]);
-  const badges = { "/mechanic/disputes": openDisputes };
+  const badges = {
+    "/mechanic/disputes": openDisputes,
+    "/mechanic/messages": unreadMessages,
+  };
 
   const displayName =
     profile?.full_name?.trim() || user.email?.split("@")[0] || "Mechanic";
