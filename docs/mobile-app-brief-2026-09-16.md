@@ -128,6 +128,18 @@ So these now accept those bookings, all additive with no shape change:
 
 ---
 
+## 5b. Checkout: can a returning customer sign in?
+
+Added after the rest of this brief. On the **website's** Confirm step a returning customer was only offered "Create a password", with no way to say they already had an account — so they either guessed that typing their existing password would work, or spent a failed submit finding out. Fixed there with an "Already have an account? Sign in" switch.
+
+**Please check whether the app's checkout has the same gap.** If its account block only offers account creation, returning customers hit the same thing.
+
+Two rules bit on the website and may bite in the app if you add a sign-in path: a name and a minimum password length were both required before the form would submit, and neither has anything to do with signing in to an account that already exists — the minimum length especially, since it governs *choosing* a password and an older account may predate it.
+
+**No API change.** The website uses a server action the app does not call; the app signs in through Supabase directly. `POST /checkout/prepare` and the booking endpoints are untouched.
+
+---
+
 ## 5. Deep links through sign-in
 
 Web-only: a signed-out customer opening an emailed dashboard link was landing on the dashboard root instead of the page. **No app impact** — the app has no cookie session, no `/login` and no redirects.

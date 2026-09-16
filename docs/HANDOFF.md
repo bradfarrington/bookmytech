@@ -119,6 +119,18 @@ You are working on **Book My Tech**, a UK mobile-mechanic booking platform. This
 
 ## Current task
 
+### 2026-09-16 (later) — Sign in at checkout ✅ (Task 61), branch `task-43-parts-in-customer-prices`
+
+**Brad, from the Confirm screen:** a returning customer was only offered "Create a password", with no way to say they already had an account. Detail in `docs/tasks/61-sign-in-at-checkout.md`.
+
+It was never broken — typing your existing password into the create field signed you in, and a wrong one flipped the block to sign-in after a failed submit — but nothing signposted either, and the copy told returning customers the wrong thing.
+
+**A link alone would have dead-ended**, which is the part worth remembering. Two signup rules assumed that block was always a signup: the Continue gate required a name and an 8+ character password, and `validateCustomerInput` ran before the sign-in attempt and refused an empty name with "Enter your name." Someone choosing "Sign in" first would have found Continue disabled with no explanation. `ensureCustomerAccount` now takes an `intent` and skips the signup rules when signing in, and the post-sign-in tidy-up (profile gaps, linking guest bookings) is shared so the new path cannot forget it.
+
+Walked in a browser through the real funnel on S28BSW, reaching the same "Renew the air filter · £79.04" screen Brad reported.
+
+**Careful with `localhost:3000`:** it was serving Brad's other project (`Downloads/vision`) while this was being checked, which made every Book My Tech page look like it redirected to `/login`. Confirm which port `next dev` actually bound to before believing a browser result.
+
 ### 2026-09-16 — All seven Task 55 follow-ups done ✅ (Tasks 56 to 60), branch `task-43-parts-in-customer-prices`
 
 **Task 55 is closed.** Brad's four scope decisions are settled, all seven items are dealt with, and the customer dashboard has finally been opened in a browser. Details in `docs/tasks/55-dashboard-follow-ups.md` and `56-` to `60-`.
@@ -189,6 +201,7 @@ You are working on **Book My Tech**, a UK mobile-mechanic booking platform. This
 - **Task 58 (must change):** the app calls `supabase.auth.updateUser({ email })`. Use the new **`POST /api/mobile/v1/account/email`**, body `{ new_email, current_password }` — so the Change Email screen **needs a password field**. Returns `200 { ok: true, sentTo }`, or `200 { ok: false, error, field? }` for a refusal to show verbatim. There is deliberately **no confirm endpoint and no deep link**: the emailed link opens our web page, so `bmtcustomer:///email-changed` is no longer reached. After a confirmed change the stored session still carries the old address, so ask the customer to sign in again.
 - **Task 60 (must mirror):** the app's own `src/lib/booking-events.ts` allow-list will **drop** the new `message_sent` item unless it gains wording — "New message from your mechanic", **only when `payload.from === 'mechanic'`**, tapping it opens the thread.
 - **Task 59 (copy):** the review form's consent line should say the review may appear on the mechanic's profile *and on the Book My Tech website*, and that we never show a surname or email.
+- **Task 61 (worth checking):** the app has its own checkout account block. If it also only offers "create an account", returning customers hit the same problem. No API change — `ensureCustomerAccount` is a website server action and the app signs in through Supabase directly.
 - **Task 57 (nothing to do):** the dispute routes now accept guest-era bookings. Additive, no shape change. If the app hides "Report a problem" on a null `customer_id`, it can stop.
 - **Run `npm run db:types`** once `0078` is applied.
 

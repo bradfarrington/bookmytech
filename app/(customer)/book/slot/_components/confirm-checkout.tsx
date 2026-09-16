@@ -377,10 +377,17 @@ export function ConfirmCheckout({
   }, [savedAddress, returnedIntentSecret, checkout, router, addressHref]);
 
   const hasAccount = signedIn || accountReady;
+  // Per mode, because the two ask for different things. Signing in needs no
+  // name (the field is hidden) and must NOT impose the minimum length: that is
+  // the rule for choosing a NEW password, and an existing account may predate
+  // it. Applying it here would disable Continue for a returning customer with
+  // no way to see why.
   const accountFilled =
-    name.trim().length > 1 &&
-    email.trim().includes("@") &&
-    password.length >= MIN_PASSWORD_LENGTH;
+    accountMode === "signin"
+      ? email.trim().includes("@") && password.length > 0
+      : name.trim().length > 1 &&
+        email.trim().includes("@") &&
+        password.length >= MIN_PASSWORD_LENGTH;
 
   const addressReady = !!address && address.addressLine1.trim().length > 3 && address.postcode.trim().length >= 5;
 
@@ -547,10 +554,18 @@ export function ConfirmCheckout({
           email,
           password,
           phone,
+          // Tells the server not to apply the new-signup rules (a name, and the
+          // minimum password length) to someone signing in to an account they
+          // already have.
+          intent: accountMode,
         });
         if (!account.ok) {
           setAccountError(account.error);
           if (account.needsPassword) {
+            // Move them to sign-in and clear the password: the server has just
+            // told us the one they typed was wrong. Already in sign-in mode
+            // means a wrong password on a second attempt, so leave the mode
+            // alone or they'd be bounced back to "create" and lose the way in.
             setAccountMode("signin");
             setPassword("");
           }
@@ -574,6 +589,23 @@ export function ConfirmCheckout({
       setAppliedPromo(result.promoCode);
       setCheckout(result);
     });
+  }
+
+  // Switch between creating an account and signing in to one.
+  //
+  // Until now this could only happen REACTIVELY: `accountMode` started at
+  // "create" and flipped only after the customer pressed Continue and the
+  // server came back with `needsPassword`. A returning customer was told to
+  // "create a password", and found out otherwise by failing a submit.
+  //
+  // The password is kept deliberately. Someone who typed their real password
+  // into the create field and then noticed the link should not have to type it
+  // again. The reactive flip clears it instead, because there the server has
+  // just told us that password was wrong.
+  function switchAccountMode(next: "create" | "signin") {
+    setAccountMode(next);
+    setAccountError(null);
+    setResetSent(false);
   }
 
   function handleForgotPassword() {
@@ -792,8 +824,8 @@ export function ConfirmCheckout({
             </p>
             <p className="mt-0.5 text-[13px] text-text-muted">
               {accountMode === "signin"
-                ? "You've booked with us before. Enter your password."
-                : "We'll create your account so you can track this job, message your mechanic and rebook in a tap."}
+                ? "Enter the password for your Book My Tech account."
+                : "New here? We'll set up your account so you can track this job, message your mechanic and rebook in a tap."}
             </p>
           </div>
 
@@ -842,16 +874,31 @@ export function ConfirmCheckout({
             className={inputClass}
           />
 
-          {accountMode === "signin" && !resetSent && (
+          {/* The way out of the wrong mode. Without it a returning customer is
+              told to "create a password" and only learns otherwise by failing a
+              submit, which is what this block used to do. */}
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
             <button
               type="button"
-              onClick={handleForgotPassword}
-              disabled={resetPending}
-              className="self-start text-[13px] font-semibold text-brand-blue hover:underline disabled:opacity-50"
+              onClick={() => switchAccountMode(accountMode === "signin" ? "create" : "signin")}
+              className="text-[13px] font-semibold text-brand-blue hover:underline"
             >
-              {resetPending ? "Sending…" : "Forgotten your password?"}
+              {accountMode === "signin"
+                ? "Need an account? Create one"
+                : "Already have an account? Sign in"}
             </button>
-          )}
+
+            {accountMode === "signin" && !resetSent && (
+              <button
+                type="button"
+                onClick={handleForgotPassword}
+                disabled={resetPending}
+                className="text-[13px] font-semibold text-brand-blue hover:underline disabled:opacity-50"
+              >
+                {resetPending ? "Sending…" : "Forgotten your password?"}
+              </button>
+            )}
+          </div>
 
           {resetSent && (
             <Alert tone="info">

@@ -28,6 +28,20 @@ export interface EnsureCustomerAccountInput {
   email: string;
   password: string;
   phone?: string;
+  /**
+   * What the customer is trying to do, from the checkout's account block.
+   *
+   * "create" (the default, and the old behaviour) validates as a new signup and
+   * falls back to signing in when the email turns out to be taken.
+   *
+   * "signin" says they told us they already have an account, so the new-signup
+   * rules must NOT be applied: `validateCustomerInput` refuses an empty name
+   * and a password under the minimum length, and neither has anything to do
+   * with signing in to an account that already exists. Without this a returning
+   * customer who picked "Already have an account?" would be told "Enter your
+   * name."
+   */
+  intent?: "create" | "signin";
 }
 
 export type EnsureCustomerAccountResult =
@@ -51,6 +65,27 @@ export async function ensureCustomerAccount(
     data: { user },
   } = await supabase.auth.getUser();
   if (user) return { ok: true, created: false };
+
+  // They told us they already have an account: sign in, and never validate as
+  // a signup.
+  if (input.intent === "signin") {
+    if (!email.includes("@")) return { ok: false, error: "Enter a valid email address." };
+    if (!input.password) return { ok: false, needsPassword: true, error: "Enter your password." };
+
+    const { data: signIn, error } = await supabase.auth.signInWithPassword({
+      email,
+      password: input.password,
+    });
+    if (error || !signIn.user) {
+      return {
+        ok: false,
+        needsPassword: true,
+        error: "That email and password didn't match. Try again, or create an account.",
+      };
+    }
+    await adoptExistingCustomer(signIn.user.id, email, fullName, phone);
+    return { ok: true, created: false };
+  }
 
   const validationError = validateCustomerInput({ email, password: input.password, fullName });
   if (validationError) return { ok: false, error: validationError };
@@ -95,23 +130,38 @@ export async function ensureCustomerAccount(
     };
   }
 
+  await adoptExistingCustomer(signIn.user.id, email, fullName, phone);
+  return { ok: true, created: false };
+}
+
+/**
+ * Tidy-up after signing in an EXISTING customer mid-funnel. Shared by both
+ * routes into that state: they chose "Already have an account?", or they typed
+ * a taken email in create mode with the right password.
+ */
+async function adoptExistingCustomer(
+  userId: string,
+  email: string,
+  fullName: string,
+  phone: string | null,
+): Promise<void> {
+  const admin = createAdminClient();
+
   // Fill profile gaps from what they typed — never overwrite what's there.
   const { data: profile } = await admin
     .from("profiles")
     .select("full_name, phone")
-    .eq("id", signIn.user.id)
+    .eq("id", userId)
     .maybeSingle();
   const gaps: Record<string, string> = {};
   if (!profile?.full_name && fullName) gaps.full_name = fullName;
   if (!profile?.phone && phone) gaps.phone = phone;
   if (Object.keys(gaps).length) {
-    await admin.from("profiles").update(gaps).eq("id", signIn.user.id);
+    await admin.from("profiles").update(gaps).eq("id", userId);
   }
 
   // Any guest bookings placed on this email since they signed up.
-  await linkGuestBookings(signIn.user.id, email);
-
-  return { ok: true, created: false };
+  await linkGuestBookings(userId, email);
 }
 
 export type PasswordResetResult = { ok: true } | { ok: false; error: string };
