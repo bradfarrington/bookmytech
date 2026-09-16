@@ -132,10 +132,16 @@ total would be worse than an honest gap, and a quote for that job refuses the
 booking anyway. The whole pass is bounded (4.5s) and falls back to the old
 rendering, so a slow or unreachable supplier never costs the level its rows.
 
-**No migration and no mobile response change.** `partsPence` / `totalPence` are
-additive optional fields on `CatalogueNode`, and the mobile tree route doesn't
-ask for them yet — flip `priceParts: true` there alongside an app release. See
-`docs/tasks/63-repair-prices-include-parts.md`, including why search results
+**No migration.** `partsPence` / `totalPence` are additive optional fields on
+`CatalogueNode`, and `GET /api/mobile/v1/repairs/tree` now takes **`parts=1`**
+to get them. A parameter rather than always-on: pricing a level costs a supplier
+lookup per part group, and builds already on phones can't render the number, so
+they shouldn't wait for it. Without the parameter the response is byte-for-byte
+what it was. The app must keep its "£X + parts" rendering for rows that carry
+neither field — those are the jobs whose parts have no price, where a quote
+refuses the booking outright.
+
+See `docs/tasks/63-repair-prices-include-parts.md`, including why search results
 were left on "+ parts".
 
 ### ✅ 2026-09-16 — CLOSED: the profiles privilege escalation (Task 62)

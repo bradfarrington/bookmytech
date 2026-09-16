@@ -67,20 +67,41 @@ asked.
   far bigger fan-out of supplier calls than one level; Brad chose browse-only
   (2026-09-16). The rows share a component, so turning it on later is passing
   the priced nodes through.
-- **The mobile tree endpoint** (`GET /api/mobile/v1/repairs/tree`) does not pass
-  `priceParts`, so its response is byte-for-byte what it was. See below.
+- **Pricing by default on the mobile tree endpoint.** It is opt-in per request
+  instead — see below.
 
 ## The mobile app
 
-- **No schema migration. No response-shape change.** The route is untouched, so
-  a phone on last month's build is unaffected.
-- `partsPence` / `totalPence` are additive optional fields on `CatalogueNode`.
-  When the app is ready to render a total instead of "+ parts", flipping
-  `priceParts: true` in `app/api/mobile/v1/repairs/tree/route.ts` is the whole
-  server-side change — worth doing *with* an app release rather than before
-  one, since it adds supplier latency to that endpoint.
-- Until then the app shows "+ parts" where the website shows a total. That is a
-  difference in **detail, not in price**: both derive from the same quote.
+- **No schema migration.** Nothing to regenerate with `npm run db:types`.
+- **`GET /api/mobile/v1/repairs/tree` takes `parts=1`** (also `parts=true`).
+  With it, bookable rows carry the additive `partsPence` / `totalPence`.
+  Without it the response is byte-for-byte what it was, and costs what it
+  always did.
+
+  A **parameter, not a flag**, on purpose: pricing a level costs a supplier
+  lookup per part group the first time a registration is seen, and a build that
+  cannot render the total should not wait for it. Every build already on a phone
+  is such a build, and they cannot be updated. Opting in per request means only
+  the builds that use the number pay for it.
+
+- **What the app must do:**
+  1. Send `parts=1` on the tree request.
+  2. Render `totalPence` when it is present.
+  3. **Keep the "£X + parts" rendering for when it is absent.** The fields are
+     deliberately absent — not zero — when a part group has no usable price. A
+     quote for that job refuses the booking (`PARTS_UNAVAILABLE_MESSAGE`), so
+     labour alone is not what the customer would pay. `partsPence: 0` is
+     different: the job's part groups are all switched off and labour really is
+     the whole price.
+- An app that hasn't done this shows "+ parts" where the website shows a total.
+  That is a difference in **detail, not in price** — both derive from the same
+  quote, and the app's price step was already correct.
+
+**Verified live (2026-09-16, S28BSW, node `1A00007000G`):** without the
+parameter, "Renew the engine" returns `pricePence: 83400` and no parts fields;
+with `parts=1` it returns `partsPence: 4726, totalPence: 88126`, matching the
+website and the price step. The four rows on that level whose parts AAG can't
+price carry neither field in both responses.
 
 ## Acceptance criteria
 
@@ -91,11 +112,12 @@ asked.
       a total that is short.
 - [x] A supplier that is down, slow or unconfigured leaves the level exactly as
       it read before. *(Bounded by `LEVEL_PARTS_BUDGET_MS`; unit-tested fold.)*
-- [x] The mobile tree response is unchanged.
+- [x] The mobile tree response is unchanged without `parts=1`, and carries the
+      additive fields with it. *(Both arms checked live.)*
 - [x] `tsc`, eslint on changed files, `npm test` (592 passing).
 - [x] Verified end to end against live HaynesPro and AAG.
 
 ## Follow-ups
 
 - Prices in **search results**, once the supplier-call volume is understood.
-- Flip `priceParts` on the mobile tree route when the app renders totals.
+- The app sends `parts=1` and renders `totalPence`. **App repo.**

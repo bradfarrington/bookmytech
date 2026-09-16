@@ -17,6 +17,18 @@ import { createAdminClient } from "@/lib/supabase/admin";
 // with `kind: "group"` are navigation, `kind: "repair"` are bookable and
 // priced.
 //
+// `parts=1` (Task 63) also prices each bookable row's supplier parts, adding
+// `partsPence` and `totalPence` to those nodes — labour plus the parts that job
+// needs on this car, which is what the customer pays if they book it on its
+// own. It is a PARAMETER rather than always-on because pricing a whole level
+// costs a supplier lookup per part group the first time a registration is seen.
+// A build that doesn't render the total shouldn't wait for it, and every build
+// already on a phone is such a build.
+//
+// A row whose parts have no usable price carries NEITHER field — deliberately
+// absent, not zero. Render the old "£X + parts" there: a quote for that job
+// would refuse the booking, so labour alone is not what the customer pays.
+//
 // The admin client is deliberate and safe: nothing here is user data. It reads
 // the public catalogue and writes the shared reg → car-type cache, exactly as
 // the website's RepairBrowser server component does. No mobile request may
@@ -26,6 +38,8 @@ export async function GET(request: Request): Promise<Response> {
   const url = new URL(request.url);
   const reg = url.searchParams.get("reg")?.trim() ?? "";
   const node = url.searchParams.get("node")?.trim() || null;
+  const parts = url.searchParams.get("parts")?.trim();
+  const priceParts = parts === "1" || parts === "true";
 
   if (!reg) {
     return apiError("Enter your registration number.", 400);
@@ -38,6 +52,7 @@ export async function GET(request: Request): Promise<Response> {
     reg,
     node,
     createAdminClient(),
+    { priceParts },
   );
   return apiOk(result);
 }
