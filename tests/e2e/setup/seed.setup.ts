@@ -45,6 +45,23 @@ async function ensureUser(email: string, password: string, role: Role) {
     const { error } = await admin.from("profiles").update({ role }).eq("id", user.id);
     if (error) throw new Error(`set role ${role} for ${email} failed: ${error.message}`);
   }
+
+  // A mechanic needs a `mechanics` ROW, not just role='mechanic'. Both
+  // signInMechanic and proxy's /mechanic gate test for the row, on purpose: an
+  // admin who is also a mechanic keeps role='admin' but holds one. Without it
+  // the mechanic login is rejected with "This account isn't set up as a
+  // mechanic" and auth.setup.ts could never save a mechanic session — so every
+  // mechanic spec was unrunnable.
+  //
+  // Every other column has a default, so id and approved_at are enough.
+  // `approved_at` makes it an APPROVED mechanic, which is what
+  // createMechanicAction sets and what the console expects.
+  if (role === "mechanic") {
+    const { error } = await admin
+      .from("mechanics")
+      .upsert({ id: user.id, approved_at: new Date().toISOString() }, { onConflict: "id" });
+    if (error) throw new Error(`ensure mechanics row for ${email} failed: ${error.message}`);
+  }
 }
 
 setup("seed test users + reset outbox", async () => {

@@ -1,6 +1,6 @@
 # Task 48: Customer dashboard rebuild (web)
 
-**Status:** 🚧 Built (2026-09-15), not yet checked in a browser. Every screen in the table exists; `tsc`, eslint and the unit tests pass. Waiting on a signed-in look against the mockups, `next build`, and Brad's follow-ups in `docs/tasks/55-dashboard-follow-ups.md`. Migrations `0072` to `0077` are applied (confirmed 2026-09-15).
+**Status:** ✅ Built and checked in a browser (2026-09-16). Every screen exists and renders signed in at 375px and 1280px, with no browser errors and no sideways scroll — `tests/e2e/dashboard-walk.spec.ts`, 35 checks, a screenshot attached per screen. `tsc`, eslint, 581 unit tests and `next build` all pass. Migrations `0072` to `0077` applied (confirmed 2026-09-15). **Still open:** judging each screen against its mockup frame (a human's call, screenshots captured), and the booking-detail screens, which need a real booking.
 
 ## Why
 
@@ -112,11 +112,12 @@ The customer app was redesigned (`mockups/01` to `05`, identical to `bmt-custome
 
 ## Acceptance criteria
 
-- [ ] Every screen in the table exists and matches its mockup frame, at phone width and desktop. They exist; the visual check is outstanding.
+- [x] Every screen in the table exists and renders at phone width and desktop. All 13 no-booking screens confirmed 2026-09-16 by `tests/e2e/dashboard-walk.spec.ts`, with a screenshot attached for each.
+- [ ] Each screen judged against its mockup frame. Screenshots are captured for it, but the comparison is a human's call. The booking-detail screens also need a real booking — `dashboard-walk.spec.ts` lists what it does not cover.
 - [x] No bottom tab bar; the header carries the four destinations, Book, and the unread dot
 - [x] Old dashboard components no longer used are deleted
-- [ ] `tsc`, `eslint` and unit tests pass; `next build` passes (run when Brad's dev server is off). `tsc`, eslint and 548 unit tests pass; `next build` not run.
-- [ ] Checked in a browser against the mockups. Needs a signed-in customer; not done.
+- [x] `tsc`, `eslint` and unit tests pass; `next build` passes. All four now pass (2026-09-16): 581 unit tests, and eslint is down to 20 pre-existing problems now that `proposal/` is ignored.
+- [x] Checked in a browser (2026-09-16), signed in as the seeded e2e customer, at 375px and 1280px: no browser errors and no sideways scroll on any screen.
 
 ## Mobile app
 

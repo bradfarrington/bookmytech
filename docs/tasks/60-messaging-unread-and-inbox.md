@@ -55,7 +55,8 @@ Booking messages already existed on both web surfaces. The problem was that **no
 - [x] No Realtime; polling kept
 - [x] 11 new tests (6 on ordering, 5 on the inbox wording and links); suite 570 → 581
 - [x] `tsc` clean, `next build` passes, no new lint problems, live queries verified
-- [ ] Walked in a browser: send a mechanic message, see it in the customer's Inbox and header dot, then read it and watch the badge clear. **Needs a signed-in mechanic and customer.**
+- [x] `/mechanic/messages` renders signed in at 375px and desktop, with its empty state, and **Messages** is in the console nav
+- [ ] The round trip: send a mechanic message, see it in the customer's Inbox and header dot, read it, watch the badge clear. Needs a booking shared by the test mechanic and customer.
 
 ## Mobile app — tell Brad
 

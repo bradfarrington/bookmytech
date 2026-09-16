@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { AtSign, MailPlus } from "lucide-react";
+import { AtSign, Lock, MailPlus } from "lucide-react";
 import { Button, Caption, Notice } from "@/components/dashboard/ui";
 import { requestEmailChange, type EmailChangeState } from "@/app/actions/customer-account";
 import { Field, FormAlert, PasswordInput, TextInput } from "../../_components/field";
@@ -76,6 +76,10 @@ export function ChangeEmailForm({
           <PasswordInput
             id="current-password"
             name="current_password"
+            // `icon` to match Change password's own current-password field: the
+            // email field beside it has one, and a bare box next to it looks
+            // like a different kind of input.
+            icon={Lock}
             autoComplete="current-password"
             aria-describedby="current-password-help"
             required

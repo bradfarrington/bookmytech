@@ -1,6 +1,6 @@
 # Task 55: Dashboard follow-ups from Brad's review
 
-**Status:** 🚧 In progress (2026-09-16). Brad's four scope decisions are settled (below). Items **6 and 7 are built** as Tasks 56 and 57; items **3 and 5 need no code** and are closed here. Items 1, 2 and 4 are planned and not started, as Tasks 58 to 60.
+**Status:** ✅ All seven items done (2026-09-16). Brad's four scope decisions are settled (below). Items 6 and 7 shipped as Tasks 56 and 57; items 4, 1 and 2 as Tasks 58, 59 and 60; items 3 and 5 needed no code and are closed here. **One owner step outstanding:** migration `0078` for Task 58, without which the email change is inert.
 
 ## Brad's decisions (2026-09-16)
 
@@ -15,10 +15,10 @@
 
 | Item | State |
 |---|---|
-| 1. Review switch controls the public website | Planned, Task 59. Homepage only, one switch |
-| 2. Chat | Planned, Task 60. Scoped to customer-to-mechanic messaging |
+| 1. Review switch controls the public website | ✅ Built, Task 59. Homepage only, one switch |
+| 2. Chat | ✅ Built, Task 60. Scoped to customer-to-mechanic messaging |
 | 3. "Under 2 hrs" cancellation row | ✅ Closed, no code. Decision: keep as is |
-| 4. Our own auth, no Supabase screens | Planned, Task 58 |
+| 4. Our own auth, no Supabase screens | ✅ Built, Task 58. **Awaiting migration `0078`** |
 | 5. Reschedule keeps the 2-hour window | ✅ Closed, already shipped in Task 48 |
 | 6. Deep links lost at sign-in | ✅ Built, Task 56 |
 | 7. Guest-era bookings can't be disputed | ✅ Built, Task 57 |
@@ -200,8 +200,8 @@ Every other customer action uses `ownsBooking`, which matches RLS: the customer'
 
 ## Still open from Tasks 48 to 54
 
-- **Browser check:** every dashboard screen against its mockup, signed in as a customer, at 375px and on desktop.
-- **Build:** `next build` with the dev server stopped.
+- ~~**Browser check**~~ **Done 2026-09-16.** `tests/e2e/dashboard-walk.spec.ts` opens all 13 no-booking screens signed in at 375px and 1280px, asserting no browser errors and no sideways scroll, with a screenshot attached for each. Judging them against the mockup frames is still a human's call. The booking-detail screens need a real booking.
+- ~~**Build**~~ **Done 2026-09-16.** `next build` passes.
 - **Saved cards end to end** with Stripe test cards: add, make default, remove, pay with a saved card at checkout, and account deletion removing the Stripe Customer.
 - **App brief:** send `docs/mobile-app-brief-2026-09-15.md` to the customer app session. Items 1, 4 and 7 above will need a follow-up brief when built.
 - **Dispute screens:** the dispute form and detail still use the shared components' old look (Task 48).

@@ -1,6 +1,6 @@
 # Task 56: Deep links survive sign-in
 
-**Status:** ✅ Complete (2026-09-16): `lib/safe-next.ts` plus its 11 unit tests, and `?next=` carried through `proxy.ts`, both customer auth doors, `signInUnified`, `signUp` and `/auth/callback`. Item 6 of Task 55. Exploration found **four** loss points, not the two the Task 55 notes recorded.
+**Status:** ✅ Complete (2026-09-16), verified in a browser: `lib/safe-next.ts` plus its 11 unit tests, and `?next=` carried through `proxy.ts`, both customer auth doors, `signInUnified`, `signUp` and `/auth/callback`. Item 6 of Task 55. Exploration found **four** loss points, not the two the Task 55 notes recorded.
 
 ## Why
 
@@ -53,7 +53,14 @@ Then the path must sit under `/dashboard`, `/book`, `/mechanic` or `/admin`.
 - [x] `signInUnified` and `signUp` honour it, customers only
 - [x] `/auth/callback` keeps a path with an id or query string instead of collapsing it to `/`
 - [x] `tsc` clean, `next build` passes, 559 tests pass
-- [ ] Walked in a browser: signed out → `/dashboard/quotes/<id>` → sign in → land on the quote; and the lapsed-session checkout case. **Needs a signed-in customer and a real quote id.**
+- [x] Walked in a browser (`tests/e2e/public-pages.spec.ts`): a gated URL reaches `/login?next=…`, the form carries it, it survives switching to the sign-up door, and four open-redirect attempts are dropped
+- [ ] The full round trip on a real quote id: signed out → `/dashboard/quotes/<id>` → sign in → land on the quote. Needs a booking with a quote.
+
+## A bug only the browser could find
+
+`proxy.ts` set `url.search = ""` and then `url.searchParams.set("next", …)`. **On a `NextURL` that mutation does not survive into the redirect**, so the `Location` header came back as a bare `/login` and the whole feature did nothing. Every unit test passed, because `safeNext` itself was correct. Fixed by assigning the query string directly.
+
+Worth knowing: **`proxy.ts` changes need the dev server restarted**, not just reloaded. Two of four initial browser failures were a stale proxy, and one looked alarming — `/account/confirm-email` appearing to be gated — but was only the old code still resident.
 
 ## Mobile app
 

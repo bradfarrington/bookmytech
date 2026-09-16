@@ -45,7 +45,8 @@ So this is the service-role read of allow-listed columns that Task 46 parked, in
 - [x] Admin switch and caption relabelled; both consent lines updated
 - [x] Verified against the live database: the query returns the 3 real public reviews, and the `PGRST201` embed ambiguity is fixed
 - [x] `tsc` clean, `next build` passes, 570 tests pass, no new lint problems
-- [ ] Seen in a browser, at 375px and desktop, and a review switched off on `/admin/reviews` confirmed to leave the homepage at once. **Needs the dev server and an admin session.**
+- [x] Seen in a browser at 375px and desktop: the section renders the 3 real public reviews, every card has a comment, and the page does not scroll sideways
+- [ ] A review switched off on `/admin/reviews` confirmed to leave the homepage at once. Not done: it would mean hiding one of Brad's 3 real customer reviews to watch it disappear.
 
 ## Mobile app — tell Brad
 
