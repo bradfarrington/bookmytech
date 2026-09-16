@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { interpolateTokens, isEditableBlock, type MergeVars } from "./blocks";
+import { isEmailTemplateLocked } from "@/lib/notifications/locked";
 import { EMAIL_TEMPLATE_DEFS } from "./registry";
 
 // The two email-change templates (Task 58). They matter more than most: they
@@ -96,5 +97,16 @@ describe("the two templates differ in the way that matters", () => {
       .toLowerCase();
     expect(copy).toContain("wasn't you");
     expect(copy).toContain("{{support_email}}");
+  });
+});
+
+describe("neither template can be switched off", () => {
+  // Both carry the reasoning the locked list already states for
+  // `password_reset` and `account_deleted`. Without this, an admin flipping a
+  // switch on /admin/emails breaks the flow SILENTLY: `requestEmailChangeFor`
+  // still reports success and tells the customer to check their new inbox,
+  // because sendEmail treats an empty body as "switched off" and returns.
+  it.each(["email_change_confirm", "email_change_notice"])("%s is locked", (key) => {
+    expect(isEmailTemplateLocked(key)).toBe(true);
   });
 });

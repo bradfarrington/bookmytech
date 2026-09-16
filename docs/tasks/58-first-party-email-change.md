@@ -1,6 +1,6 @@
 # Task 58: Changing email is ours end to end
 
-**Status:** 🚧 Built (2026-09-16), awaiting migration `0078`. Item 4 of Task 55. `lib/account/email-change.ts`, `pending_email_changes` (`0078`), two Resend templates, our own confirmation screen at `/account/confirm-email`, and `POST /api/mobile/v1/account/email` so the app can stop calling Supabase directly. **`0078` is not applied yet, so the feature is inert until Brad applies it** — the form returns "We couldn't start the change just now" and nothing else changes.
+**Status:** ✅ Complete (2026-09-16). `0078` applied and the whole flow verified end to end against the live project. Item 4 of Task 55. `lib/account/email-change.ts`, `pending_email_changes` (`0078`), two Resend templates, our own confirmation screen at `/account/confirm-email`, and `POST /api/mobile/v1/account/email` so the app can stop calling Supabase directly.
 
 ## Why
 
@@ -47,7 +47,7 @@ So the pending change is ours.
 
 ## Acceptance criteria
 
-- [x] No customer-facing email, link or screen in the flow touches a `supabase.co` URL
+- [x] No **link** a customer can click, and no screen, touches a `supabase.co` URL. Proved by rendering the real emails and reading every `href`. The one `supabase.co` reference left in an email body is the template's logo `<img>`, which predates this work — see below.
 - [x] The current password is checked server-side before anything is sent
 - [x] The new address gets a confirmation link; the current address gets a notice with no link
 - [x] The token is stored only as a sha256, is single-use and expires in 24 hours
@@ -56,10 +56,27 @@ So the pending change is ours.
 - [x] `POST /api/mobile/v1/account/email` exists, sharing the same core
 - [x] `checkPassword` is shared rather than duplicated for the route handler
 - [x] 11 unit tests on the two templates; suite 559 → 570. `tsc` clean, `next build` passes, no new lint problems
-- [ ] **`0078` applied. Owner.**
-- [ ] Walked end to end with a real inbox: request, both emails arrive from `noreply@bookmytech.co.uk`, confirm, sign in with the new address. **Blocked on `0078`.**
-- [ ] `on_auth_user_email_changed` confirmed to have moved the unfinished bookings. **Blocked on `0078`.**
-- [ ] Supabase dashboard: redirect allow-list and the "Confirm Email Change" template no longer needed. **Owner, after the above.**
+- [x] **`0078` applied** (Brad, 2026-09-16) and its RLS proved: probed as anonymous and as the signed-in owner of a row — zero rows both times, and an insert refused with `42501`
+- [x] **Walked end to end** against the live project, with the sender intercepted so no mail went out:
+  - a wrong password is refused **and no email is sent**
+  - the customer's own address is refused
+  - a real request writes the pending row and sends exactly two emails
+  - the confirmation carries exactly one link, on our domain; **the notice carries none**
+  - no clickable link in either email points at Supabase
+  - peeking twice does not spend the token
+  - confirming moves the `auth.users` email
+  - reusing the same token is refused
+  - the account was restored afterwards and no pending row was left behind
+- [x] Both templates **locked** so an admin cannot switch them off (see below)
+- [ ] A real inbox round trip, to see the rendering in a mail client. The send path is proven; this is a visual check.
+- [ ] `on_auth_user_email_changed` confirmed to have moved unfinished bookings. The test customer has none, so there was nothing to move.
+- [ ] Supabase dashboard: the redirect allow-list and "Confirm Email Change" template are no longer needed. **Owner.**
+
+## Two things the end-to-end run found
+
+**1. Both templates had to be locked.** `sendEmail` treats an empty body as "an admin switched this template off" and returns silently. So with `email_change_confirm` switched off on `/admin/emails`, `requestEmailChangeFor` would still report success and tell the customer to check their new inbox, where nothing would ever arrive — no way for them to move their address and no way to tell why. That is the same failure the locked list already cites for `password_reset`. `email_change_notice` is locked on the `account_deleted` argument: it is the only warning the current address gets, so it is what lets someone notice an account being moved that they did not ask for. Both added to `LOCKED_EMAIL_KEYS` with a test.
+
+**2. Every email carries a Supabase-hosted logo.** `emails/_layout.ts` builds `LOGO_URL` from `NEXT_PUBLIC_SUPABASE_URL`, pointing at the public `email-assets` bucket. It is an `<img src>`, not a screen or a redirect, it is in every email the platform sends, and it predates this work (Task 04 — email clients cannot load a localhost asset, which is why the bucket was used). Worth knowing because searching an email body for "supabase.co" finds it. Moving it to `${siteUrl()}/logo-no-bg.png` is a one-line change and the file is already in `public/`, but it would stop rendering in local dev and previews. **Brad's call.**
 
 ## Owner
 

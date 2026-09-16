@@ -16,7 +16,7 @@ Read this alongside `mobile-app-brief-2026-09-15.md`, which is still current.
 
 ## Step 0: types
 
-Run `npm run db:types` **after** the website team applies migration `0078`. It adds one table, `pending_email_changes`, which is **service-role only** — RLS is on with no policies, so the app can neither read nor write it. It only appears in the generated types.
+**`0078` is applied** (confirmed 2026-09-16), so run `npm run db:types` now. It adds one table, `pending_email_changes`, which is **service-role only** — RLS is on with no policies, so the app can neither read nor write it. It only appears in the generated types.
 
 Nothing else changed in the schema. `message_sent` was already an allowed `booking_events.event_type`, so item 2 needed no migration.
 
@@ -73,7 +73,9 @@ Content-Type: application/json
 
 ### Password reset is unchanged
 
-Already first-party and staying that way. For the record, because it is the thing people assume: Supabase hands the backend an `action_link` pointing at `supabase.co/auth/v1/verify`, and **the backend discards it** and emails `https://bookmytech.co.uk/auth/callback?token_hash=…` instead. No customer ever sees a Supabase URL in any flow.
+Already first-party and staying that way. For the record, because it is the thing people assume: Supabase hands the backend an `action_link` pointing at `supabase.co/auth/v1/verify`, and **the backend discards it** and emails `https://bookmytech.co.uk/auth/callback?token_hash=…` instead.
+
+**No link a customer can click, in any flow, goes to Supabase.** Verified by rendering the real emails and reading every `href`. One caveat, so nobody is surprised by it: the email template's **logo is an `<img>` served from Supabase Storage** (`/storage/v1/object/public/email-assets/logo-no-bg.png`). That is an image host, not a screen or a redirect, it is in every email the platform sends and has been since Task 04, and it predates all of this. Mentioned only because a search for "supabase.co" in an email body finds it.
 
 ---
 
@@ -134,13 +136,13 @@ Web-only: a signed-out customer opening an emailed dashboard link was landing on
 
 ## Answering the two questions that came up
 
-**No new fields on saved addresses, the garage or saved cards.** Those all shipped on 2026-09-15 as Tasks 49, 50 and 53, and nothing today touched them. `customer_addresses`, `customer_vehicles` and `stripe_customers` are exactly as `mobile-app-brief-2026-09-15.md` describes. Migrations `0069` to `0077` are confirmed applied to the live database; only `0078` is outstanding and it is one service-role table the app cannot see.
+**No new fields on saved addresses, the garage or saved cards.** Those all shipped on 2026-09-15 as Tasks 49, 50 and 53, and nothing today touched them. `customer_addresses`, `customer_vehicles` and `stripe_customers` are exactly as `mobile-app-brief-2026-09-15.md` describes. Migrations `0069` to `0078` are **all** confirmed applied to the live database. `0078` is one service-role table the app cannot read — its RLS was verified by probing it as both anonymous and as the signed-in owner of a row: zero rows both times, and inserts refused.
 
 **Nothing to configure at Stripe.** Saved cards use SetupIntents, Customers, PaymentMethods and CustomerSessions, all generally available on the pinned API version `2026-04-22.dahlia`. **No webhook is involved** — the Stripe webhook handles only `account.updated` for mechanic Connect onboarding. Stripe attaches a card to the Customer when the SetupIntent succeeds, and cards are listed from Stripe directly, so there is nothing to subscribe to and nothing to reconcile. The only outstanding Stripe work is a test-card run through add / make default / remove / pay at checkout, which is a verification step rather than a change.
 
 ## What to do, in order
 
-1. Wait for `0078`, then `npm run db:types`.
+1. `npm run db:types` — `0078` is already applied.
 2. **Item 2 first** — it is a few lines in `src/lib/booking-events.ts` and until it lands, message notifications are silently missing.
 3. **Item 1** — the new endpoint, a password field on Change Email, the waiting state, and delete the Supabase call and the `email-changed` deep link.
 4. **Item 3** — the consent line.

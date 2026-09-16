@@ -1,6 +1,6 @@
 # Task 55: Dashboard follow-ups from Brad's review
 
-**Status:** ✅ All seven items done (2026-09-16). Brad's four scope decisions are settled (below). Items 6 and 7 shipped as Tasks 56 and 57; items 4, 1 and 2 as Tasks 58, 59 and 60; items 3 and 5 needed no code and are closed here. **One owner step outstanding:** migration `0078` for Task 58, without which the email change is inert.
+**Status:** ✅ All seven items done (2026-09-16). Brad's four scope decisions are settled (below). Items 6 and 7 shipped as Tasks 56 and 57; items 4, 1 and 2 as Tasks 58, 59 and 60; items 3 and 5 needed no code and are closed here. `0078` applied by Brad the same day, and the email change verified end to end. **Nothing outstanding.**
 
 ## Brad's decisions (2026-09-16)
 
@@ -18,7 +18,7 @@
 | 1. Review switch controls the public website | ✅ Built, Task 59. Homepage only, one switch |
 | 2. Chat | ✅ Built, Task 60. Scoped to customer-to-mechanic messaging |
 | 3. "Under 2 hrs" cancellation row | ✅ Closed, no code. Decision: keep as is |
-| 4. Our own auth, no Supabase screens | ✅ Built, Task 58. **Awaiting migration `0078`** |
+| 4. Our own auth, no Supabase screens | ✅ Built and verified, Task 58. `0078` applied |
 | 5. Reschedule keeps the 2-hour window | ✅ Closed, already shipped in Task 48 |
 | 6. Deep links lost at sign-in | ✅ Built, Task 56 |
 | 7. Guest-era bookings can't be disputed | ✅ Built, Task 57 |

@@ -123,7 +123,7 @@ You are working on **Book My Tech**, a UK mobile-mechanic booking platform. This
 
 **Task 55 is closed.** Brad's four scope decisions are settled, all seven items are dealt with, and the customer dashboard has finally been opened in a browser. Details in `docs/tasks/55-dashboard-follow-ups.md` and `56-` to `60-`.
 
-**⚠️ ONE OWNER STEP BLOCKS ONE FEATURE: apply `0078_pending_email_changes.sql`.** Until then the email change (Task 58) is inert — the form answers "We couldn't start the change just now" and nothing else is affected.
+**`0078` was applied by Brad the same day, and the email change is verified end to end** against the live project: wrong password refused with no email sent, two emails on a real request, exactly one link and it is on our domain, the notice correctly linkless, peeking twice does not spend the token, confirming moves the `auth.users` email, and reusing the token is refused. The test account was restored afterwards.
 
 **Decisions (2026-09-16)**
 
@@ -163,20 +163,27 @@ You are working on **Book My Tech**, a UK mobile-mechanic booking platform. This
 
 **Not done**
 
-- **Migration `0078`** (owner) and then the email change walked with a real inbox.
+- **The email change seen in a real mail client.** The send path is proven; this is a rendering check.
 - **Saved cards with Stripe test cards** (Task 53): add, make default, remove, pay at checkout, and account deletion removing the Stripe Customer.
 - **Each dashboard screen judged against its mockup frame.** They all render; the comparison is a human's call and the screenshots are captured.
 - **Booking-detail screens** — `/dashboard/bookings/[id]` and its cancel / messages / reschedule / review / report, plus quotes, revisions, dispute detail, garage detail and mechanic profile. All need a real booking; `customer-booking.spec.ts` drives the funnel but needs `E2E_REG`.
 - **Hiding a review** confirmed to leave the homepage at once. Not done, because it would mean hiding one of Brad's 3 real customer reviews.
 
 **Owner:**
-1. **Apply `0078_pending_email_changes.sql`.** Unblocks Task 58.
+1. ✅ **`0078` applied** (2026-09-16).
 2. **Send AAG the dev IP `80.1.6.55`.** Still blocking: repairs needing parts can't be booked.
 3. **Send BOTH app briefs** to the app session: `docs/mobile-app-brief-2026-09-15.md` (Tasks 49 to 54, still current) and **`docs/mobile-app-brief-2026-09-16.md`** (Tasks 56 to 60, written for that session — it is the prompt).
 4. Delete the `LKQ_*` variables on Vercel.
 5. **Consider merging to `main`.** This branch is now **26 commits ahead** and nothing from Tasks 43 or 46 to 60 is on `main`.
 
-**Migrations confirmed against the live database 2026-09-16:** `0069` to `0077` are **all applied** (0069's LKQ tables are gone; 0070, 0071, 0072, 0073, 0074, 0075, 0076 and 0077 all present with their real columns). **Only `0078` is outstanding.**
+**Migrations: `0069` to `0078` are ALL applied**, confirmed against the live database on 2026-09-16. `0078`'s RLS was proved rather than assumed — probed as anonymous and as the signed-in owner of a row, zero rows both times, and an insert refused with `42501`.
+
+**Two things the Task 58 end-to-end run turned up:**
+
+1. **Both email-change templates are now locked** (`lib/notifications/locked.ts`). `sendEmail` treats an empty body as "an admin switched this off" and returns silently, so with `email_change_confirm` off, the request would still report success and send the customer to an inbox nothing ever arrives in. Same failure the locked list already cites for `password_reset`. The notice is locked on the `account_deleted` argument: it is the only warning the old address gets.
+2. **Every email carries a Supabase-hosted logo** — `emails/_layout.ts` builds `LOGO_URL` from `NEXT_PUBLIC_SUPABASE_URL`, pointing at the public `email-assets` bucket. It is an `<img src>`, not a screen or a redirect, and it predates all of this (Task 04: email clients can't load a localhost asset). **No link a customer can click goes to Supabase**, in any flow. Moving the logo to `${siteUrl()}/logo-no-bg.png` is one line and the file is already in `public/`, but it would stop rendering in local dev and previews. **Brad's call.**
+
+**`vitest` can now import `server-only` modules.** It is aliased to the same empty module Next uses on the server, which had quietly put most of `lib/` out of reach of unit tests.
 
 **Customer app — needs work. `docs/mobile-app-brief-2026-09-16.md` is the brief to send; summary:**
 - **Task 58 (must change):** the app calls `supabase.auth.updateUser({ email })`. Use the new **`POST /api/mobile/v1/account/email`**, body `{ new_email, current_password }` — so the Change Email screen **needs a password field**. Returns `200 { ok: true, sentTo }`, or `200 { ok: false, error, field? }` for a refusal to show verbatim. There is deliberately **no confirm endpoint and no deep link**: the emailed link opens our web page, so `bmtcustomer:///email-changed` is no longer reached. After a confirmed change the stored session still carries the old address, so ask the customer to sign in again.
