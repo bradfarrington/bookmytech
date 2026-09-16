@@ -263,6 +263,75 @@ export const EMAIL_TEMPLATE_DEFS: readonly EmailTemplateDef[] = [
     ],
   },
   {
+    key: "email_change_confirm",
+    label: "Confirm a new email address",
+    description:
+      "Sent to the NEW address when a customer asks to change their email (Task 58). Opening the link is what moves the account, so this replaces Supabase's own confirmation email.",
+    category: "customer",
+    subject: "Confirm your new Book My Tech email",
+    preheader: "Open the link inside to finish changing your email address.",
+    variables: [
+      { name: "name", description: "Customer's first name", example: "Alex" },
+      { name: "new_email", description: "The address being moved to", example: "alex@newmail.com" },
+      { name: "current_email", description: "The address on the account now", example: "alex@oldmail.com" },
+      { name: "action_link", description: "Confirmation link", example: "https://bookmytech.co.uk/…" },
+    ],
+    blocks: [
+      { id: "heading", type: "heading", text: "Confirm your new email" },
+      { id: "greeting", type: "paragraph", text: "Hi {{name}}," },
+      {
+        id: "intro",
+        type: "paragraph",
+        text: "You asked to move your Book My Tech account from **{{current_email}}** to this address. Click below to confirm, and you'll sign in with **{{new_email}}** from then on.",
+      },
+      { id: "cta", type: "button", text: "Confirm this email address", hrefVar: "action_link" },
+      {
+        id: "bookings",
+        type: "paragraph",
+        text: "Bookings that aren't finished yet will move to this address. Finished jobs keep the address they were invoiced to.",
+      },
+      {
+        id: "footnote",
+        type: "note",
+        text: "This link expires in 24 hours and can only be used once. Nothing changes until you open it. If you didn't ask for this, you can safely ignore this email.",
+      },
+    ],
+  },
+  {
+    key: "email_change_notice",
+    label: "Email change requested (notice to the old address)",
+    description:
+      "Sent to the CURRENT address when a customer asks to change their email (Task 58), so a change can't happen quietly. Carries no link: it is a heads-up, not an action.",
+    category: "customer",
+    subject: "Someone asked to change your Book My Tech email",
+    preheader: "If this wasn't you, let us know.",
+    variables: [
+      { name: "name", description: "Customer's first name", example: "Alex" },
+      { name: "new_email", description: "The address being moved to", example: "alex@newmail.com" },
+      { name: "current_email", description: "This address", example: "alex@oldmail.com" },
+      { name: "support_email", description: "Where to report it", example: "support@bookmytech.co.uk" },
+    ],
+    blocks: [
+      { id: "heading", type: "heading", text: "A change to your email was requested" },
+      { id: "greeting", type: "paragraph", text: "Hi {{name}}," },
+      {
+        id: "intro",
+        type: "paragraph",
+        text: "Someone signed in to your Book My Tech account and asked to move it from **{{current_email}}** to **{{new_email}}**. We've sent a confirmation link to the new address.",
+      },
+      {
+        id: "nothing-yet",
+        type: "paragraph",
+        text: "Nothing has changed yet. You still sign in with this address until that link is opened.",
+      },
+      {
+        id: "wasnt-me",
+        type: "note",
+        text: "**If this wasn't you,** your password may no longer be private. Change it now at bookmytech.co.uk, and email {{support_email}} so we can help.",
+      },
+    ],
+  },
+  {
     key: "booking_confirmed",
     label: "Booking received",
     description: "Sent to the customer when a booking is created, while we find a mechanic.",

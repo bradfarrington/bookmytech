@@ -1,92 +1,55 @@
 "use client";
 
-import { useState } from "react";
+import { useActionState } from "react";
 import { AtSign, MailPlus } from "lucide-react";
 import { Button, Caption, Notice } from "@/components/dashboard/ui";
-import { createClient } from "@/lib/supabase/client";
-import { Field, FormAlert, TextInput } from "../../_components/field";
+import { requestEmailChange, type EmailChangeState } from "@/app/actions/customer-account";
+import { Field, FormAlert, PasswordInput, TextInput } from "../../_components/field";
 
-// Change the account email: the same client-side `auth.updateUser({ email })`
-// the mobile app uses (Task 39), on purpose. Supabase confirms the change by
-// link: to the new address and, with Secure Email Change on, to the current
-// one as well, so nothing moves until both inboxes agree. Doing it through the
-// service-role client would skip that check, and the email is the one field
-// that controls password resets. No server code here.
+// Change the account email (Task 58). Ours end to end: our screen, our server
+// action, our Resend template, our confirmation link, our success screen. No
+// supabase.co URL appears anywhere in it.
 //
-// The emailRedirectTo URL is registered in Supabase: keep it exactly as is.
+// This replaced a client-side `auth.updateUser({ email })`, which handed the job
+// to GoTrue's own mailer and its hosted verify endpoint. The logic now lives in
+// lib/account/email-change.ts, shared with the app's
+// POST /api/mobile/v1/account/email.
 //
-// Once the change is confirmed, a trigger on auth.users (0065) carries the new
-// address onto bookings that aren't finished yet and reminders not yet sent.
+// THE PASSWORD FIELD IS BACK, and this time it means something. Under the old
+// flow the request went from the browser straight to Supabase carrying the
+// session, so a password check in front of it protected nothing — anyone could
+// have skipped it. It is now checked server-side before a single email is sent,
+// which is a guard GoTrue's flow never had.
+//
+// Nothing about the account changes until the link in the new inbox is opened.
 
-const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-function messageFor(error: { message: string; status?: number; code?: string }): string {
-  if (error.code === "email_exists" || /already|registered|exists/i.test(error.message)) {
-    return "That email address is already in use.";
-  }
-  if (error.status === 429 || error.code === "over_email_send_rate_limit") {
-    return "We've sent a few emails already. Please wait a minute and try again.";
-  }
-  if (error.code === "email_address_invalid") return "Enter a valid email address.";
-  return "We couldn't send the confirmation just now. Please try again.";
-}
+const initial: EmailChangeState = null;
 
 export function ChangeEmailForm({
   currentEmail,
   pendingEmail,
 }: {
   currentEmail: string;
-  /** A change Supabase is already waiting on, if any. */
+  /** A change already waiting for its link to be opened, if any. */
   pendingEmail: string | null;
 }) {
-  const [email, setEmail] = useState("");
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [sentTo, setSentTo] = useState<string | null>(pendingEmail);
+  const [state, formAction, pending] = useActionState(requestEmailChange, initial);
 
-  async function submit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setError(null);
-    const next = email.trim().toLowerCase();
-    if (!EMAIL_SHAPE.test(next)) {
-      setError("Enter a valid email address.");
-      return;
-    }
-    if (next === currentEmail.toLowerCase()) {
-      setError("That's already your email address.");
-      return;
-    }
-    setPending(true);
-    try {
-      const supabase = createClient();
-      const { error: updateError } = await supabase.auth.updateUser(
-        { email: next },
-        { emailRedirectTo: `${window.location.origin}/dashboard/settings?email=changed` },
-      );
-      if (updateError) {
-        setError(messageFor(updateError));
-        return;
-      }
-      setSentTo(next);
-      setEmail("");
-    } catch {
-      setError("We couldn't send the confirmation just now. Please try again.");
-    } finally {
-      setPending(false);
-    }
-  }
+  // The freshly-requested address wins over the one the page loaded with.
+  const waitingFor = state?.ok ? state.sentTo : pendingEmail;
+  const error = state && !state.ok ? state : null;
 
   return (
     <>
-      {sentTo && (
+      {waitingFor && (
         <Notice icon={MailPlus} title="Confirmation waiting">
-          A change to <span className="break-all font-bold text-text-primary">{sentTo}</span> is waiting.
-          We&apos;ve emailed a link to that address and another to{" "}
-          <span className="break-all">{currentEmail}</span>. Open both to finish the change.
+          A change to <span className="break-all font-bold text-text-primary">{waitingFor}</span> is
+          waiting. Open the link we emailed to that address to finish it. We&apos;ve also let{" "}
+          <span className="break-all">{currentEmail}</span> know.
         </Notice>
       )}
 
-      <form onSubmit={submit} noValidate className="flex flex-col gap-3.5">
+      <form action={formAction} className="flex flex-col gap-3.5">
         <Field
           label="New email"
           htmlFor="new-email"
@@ -97,23 +60,38 @@ export function ChangeEmailForm({
             name="new_email"
             type="email"
             icon={AtSign}
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
             autoComplete="email"
             placeholder="you@example.com"
-            aria-describedby="new-email-help"
-            invalid={!!error}
+            required
+            invalid={error?.field === "new_email"}
             disabled={pending}
           />
         </Field>
 
-        {error && <FormAlert>{error}</FormAlert>}
+        <Field
+          label="Your password"
+          htmlFor="current-password"
+          help="Confirms it's you before we email anything."
+        >
+          <PasswordInput
+            id="current-password"
+            name="current_password"
+            autoComplete="current-password"
+            aria-describedby="current-password-help"
+            required
+            invalid={error?.field === "password"}
+            disabled={pending}
+          />
+        </Field>
 
-        <Button type="submit" size="lg" full disabled={pending || !email.trim()}>
-          {pending ? "Sending…" : "Send confirmation links"}
+        {error && <FormAlert>{error.error}</FormAlert>}
+
+        <Button type="submit" size="lg" full disabled={pending}>
+          {pending ? "Sending…" : "Send confirmation link"}
         </Button>
         <Caption className="text-center">
-          You keep signing in as <span className="break-all">{currentEmail}</span> until the change is confirmed.
+          You keep signing in as <span className="break-all">{currentEmail}</span> until the change
+          is confirmed.
         </Caption>
       </form>
     </>

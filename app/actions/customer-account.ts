@@ -2,9 +2,14 @@
 
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { requestPasswordReset } from "@/app/actions/booking-account";
+import { checkPassword, PASSWORD_CHECK_MESSAGES } from "@/lib/account/check-password";
 import { AccountDeletionError, deleteCustomerAccountFor } from "@/lib/account/delete-account";
+import {
+  confirmEmailChange,
+  requestEmailChangeFor,
+  type EmailChangeResult,
+} from "@/lib/account/email-change";
 import { MIN_PASSWORD_LENGTH } from "@/lib/customers/provision";
 import { createClient } from "@/lib/supabase/server";
 
@@ -13,10 +18,9 @@ import { createClient } from "@/lib/supabase/server";
 // an account. Deletion is a thin wrapper over deleteCustomerAccountFor, the
 // same core the mobile route (app/api/mobile/v1/account/delete) wraps.
 //
-// Both ask for the current password first. It's checked with a STATELESS
-// client: no cookies and nothing persisted, so the check never touches the
-// session this browser is signed in with. The throwaway session a correct
-// check creates is ended straight away.
+// Both ask for the current password first, and so does the email change. That
+// check is lib/account/check-password.ts — shared, because the mobile route
+// handler needs it too and cannot call a "use server" module.
 
 const SUPPORT_EMAIL = "support@bookmytech.co.uk";
 
@@ -28,38 +32,6 @@ export type PasswordChangeState =
 export type AccountDeletionState = { error: string } | null;
 
 export type ResetLinkResult = { ok: true } | { ok: false; error: string };
-
-type PasswordCheck = "ok" | "wrong" | "throttled" | "failed";
-
-async function checkPassword(email: string, password: string): Promise<PasswordCheck> {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !anonKey) return "failed";
-
-  const stateless = createSupabaseClient(url, anonKey, {
-    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
-  });
-
-  try {
-    const { data, error } = await stateless.auth.signInWithPassword({ email, password });
-    if (error) {
-      if (error.status === 429) return "throttled";
-      if (error.code === "invalid_credentials" || /invalid login credentials/i.test(error.message)) {
-        return "wrong";
-      }
-      console.error("[customer-account] password check failed", error.code ?? error.status, error.message);
-      return "failed";
-    }
-    if (data.session) {
-      // "local" ends only the check's own session, never the browser's.
-      await stateless.auth.signOut({ scope: "local" }).catch(() => undefined);
-    }
-    return "ok";
-  } catch (err) {
-    console.error("[customer-account] password check threw", err);
-    return "failed";
-  }
-}
 
 async function callerIp(): Promise<string | null> {
   const forwarded = (await headers()).get("x-forwarded-for");
@@ -96,14 +68,12 @@ export async function changePassword(
   if (!user?.email) return { ok: false, error: "Please sign in again to change your password." };
 
   const check = await checkPassword(user.email, current);
-  if (check === "wrong") {
-    return { ok: false, field: "current", error: "That isn't your current password. Please try again." };
-  }
-  if (check === "throttled") {
-    return { ok: false, error: "Too many attempts. Please wait a few minutes and try again." };
-  }
-  if (check === "failed") {
-    return { ok: false, error: "We couldn't check your password just now. Please try again." };
+  if (check !== "ok") {
+    return {
+      ok: false,
+      field: check === "wrong" ? "current" : undefined,
+      error: PASSWORD_CHECK_MESSAGES[check],
+    };
   }
 
   const { error } = await supabase.auth.updateUser({ password: next });
@@ -126,6 +96,62 @@ export async function changePassword(
   }
 
   return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
+// Change the account email — ours end to end (Task 58)
+// ---------------------------------------------------------------------------
+
+export type EmailChangeState = EmailChangeResult | null;
+
+/**
+ * Ask to move the account to a new address.
+ *
+ * Thin wrapper over `requestEmailChangeFor`, whose only job is to answer "who
+ * is asking?" from the session COOKIE. The caller is deliberately NOT a
+ * parameter: every export of a "use server" file is a public endpoint the
+ * browser can call with arguments of its choosing, so taking a user id here
+ * would let anyone start a change on anyone's account.
+ */
+export async function requestEmailChange(
+  _prev: EmailChangeState,
+  formData: FormData,
+): Promise<EmailChangeState> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Please sign in again to change your email." };
+
+  return requestEmailChangeFor(
+    { userId: user.id, email: user.email ?? null },
+    {
+      newEmail: String(formData.get("new_email") ?? ""),
+      currentPassword: String(formData.get("current_password") ?? ""),
+    },
+    { ip: await callerIp() },
+  );
+}
+
+export type ConfirmEmailState =
+  | { ok: true; newEmail: string }
+  | { ok: false; error: string }
+  | null;
+
+/**
+ * Spend a confirmation token and move the account.
+ *
+ * No session check, on purpose: the link is opened from an email client that
+ * may hold no session, and on a different device from the one that asked. The
+ * TOKEN is the proof — single-use, expiring, and it names exactly one account.
+ * Requiring a session here would mean the customer had to sign in with the
+ * address they are trying to replace.
+ */
+export async function confirmEmailChangeAction(
+  _prev: ConfirmEmailState,
+  formData: FormData,
+): Promise<ConfirmEmailState> {
+  return confirmEmailChange(String(formData.get("token") ?? ""));
 }
 
 /** Email the signed-in customer a password reset link, to their own address. */

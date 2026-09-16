@@ -24,8 +24,13 @@ import { DetailsForm } from "./_components/details-form";
 // Account (Task 48, mockup 05 "Settings"): profile card, the details form, the
 // account rows, support, sign out and delete.
 //
-// Supabase's email-change link returns here as ?email=changed (the redirect
-// URL is registered in Supabase, so it stays this exact path).
+// ?email=changed is LEGACY, kept deliberately. Task 58 moved email changes onto
+// our own link and success screen (/account/confirm-email), so nothing we send
+// points here any more — but confirmation emails GoTrue sent before that deploy
+// are still sitting in inboxes, and their links go through Supabase's verify
+// endpoint to this exact path. Leaving the flag in means an in-flight change
+// still lands somewhere that makes sense. Safe to delete once none can remain
+// (they expire in 24 hours).
 
 interface ProfileRow {
   full_name: string | null;
