@@ -174,7 +174,7 @@ You are working on **Book My Tech**, a UK mobile-mechanic booking platform. This
 2. **Send AAG the dev IP `80.1.6.55`.** Still blocking: repairs needing parts can't be booked.
 3. **Send `docs/mobile-app-brief-2026-09-15.md`** to the app session, plus the app items below.
 4. Delete the `LKQ_*` variables on Vercel.
-5. **Consider merging to `main`.** This branch is now **27 commits ahead** and nothing from Tasks 43 or 46 to 60 is on `main`.
+5. **Consider merging to `main`.** This branch is now **26 commits ahead** and nothing from Tasks 43 or 46 to 60 is on `main`.
 
 **Customer app — needs work, tell the app session:**
 - **Task 58 (must change):** the app calls `supabase.auth.updateUser({ email })`. Use the new **`POST /api/mobile/v1/account/email`**, body `{ new_email, current_password }` — so the Change Email screen **needs a password field**. Returns `200 { ok: true, sentTo }`, or `200 { ok: false, error, field? }` for a refusal to show verbatim. There is deliberately **no confirm endpoint and no deep link**: the emailed link opens our web page, so `bmtcustomer:///email-changed` is no longer reached. After a confirmed change the stored session still carries the old address, so ask the customer to sign in again.
