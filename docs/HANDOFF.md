@@ -119,15 +119,31 @@ You are working on **Book My Tech**, a UK mobile-mechanic booking platform. This
 
 ## Current task
 
-### 🔴 2026-09-16 — READ THIS FIRST: a customer can make themselves an admin (Task 62)
+### ✅ 2026-09-16 — CLOSED: the profiles privilege escalation (Task 62)
+
+**`0079` applied by Brad and verified live.** Five escalation attempts as a
+signed-in customer all refused with `42501` — `role → admin`, `role → mechanic`,
+`referred_by → self`, `deleted_at → null`, and `role` smuggled alongside a
+legitimate `full_name` in one update. A mechanic cannot self-promote either.
+Legitimate writes still work on the user's own session: name, phone and the
+reminder preferences, on both the customer and mechanic profile paths.
+
+`0078` is applied too, so **migrations `0069` to `0079` are all live.**
+
+The account of the vulnerability is kept below because the *class* of bug is
+worth remembering: a self-update policy restricts which ROW, never which
+COLUMNS, so column privileges are the only mechanism. `docs/tasks/62-…md` lists
+the tables worth auditing on the same pattern.
+
+### 2026-09-16 — the vulnerability, for the record (Task 62)
 
 **`supabase.from('profiles').update({ role: 'admin' }).eq('id', <own id>)` works.** Reproduced against the live project as the seeded e2e customer: it returned `[{"role":"admin"}]` and the row really changed (restored at once). The `anon` key is **public** — in every browser bundle and every app build — so any customer with an account could do it. `proxy.ts` gates `/admin/*` on `profiles.role` and `public.is_admin()` reads the same column, so every admin page and every admin RLS policy rested on it.
 
 **Cause:** `"Users can update own profile"` (`0010`) restricts which ROW, not which COLUMNS, and `authenticated` held a table-wide UPDATE grant. `0076`'s header had already described this gap as the reason `stripe_customers` is a separate table — the reasoning was right, but it routed around the symptom and left `role` exposed.
 
-**Fix: apply `0079_profiles_column_privileges.sql`.** Revokes the table-wide grant, re-grants only `full_name`, `phone` and the reminder preferences, plus a trigger backstop so a future `grant all` cannot silently reopen it. **Not applicable from here** — there is no `exec_sql` RPC, no `DATABASE_URL`, no psql and no Supabase CLI on this machine, and the Supabase MCP server is unauthenticated. **It needs Brad.**
+**Fixed by `0079_profiles_column_privileges.sql`**, applied 2026-09-16. Revokes the table-wide grant, re-grants only `full_name`, `phone` and the reminder preferences, plus a trigger backstop so a future `grant all` cannot silently reopen it.
 
-**Nothing can be done in code.** The attack is a direct PostgREST call with a public key that touches none of our code. Only the grant closes it.
+**Note for next time:** this was not applicable from here — no `exec_sql` RPC, no `DATABASE_URL`, no psql, no Supabase CLI, and the Supabase MCP server is unauthenticated. Any future SQL needs the owner, so write it, verify it parses, and hand it over rather than planning to apply it.
 
 Full detail, including what each privileged column is worth to an attacker and the post-apply checks: `docs/tasks/62-profiles-privilege-escalation.md`.
 
@@ -136,13 +152,15 @@ Full detail, including what each privileged column is worth to an attacker and t
 The app has built both briefs and **has still never run against a server**. It
 needs, in this order:
 
-1. **`0079` applied** (the escalation above), then `0078`.
-2. **This branch merged and deployed.** `bmt.thedigicraft.co.uk` serves roughly
-   `main` and 404s every endpoint from both briefs — probed 2026-09-16.
+1. ✅ **`0079` and `0078` applied** (2026-09-16).
+2. ✅ **Branch merged to `main` and pushed** (2026-09-16), so the deploy that
+   serves `bmt.thedigicraft.co.uk` now carries every endpoint from both briefs.
+   Worth re-probing `/api/mobile/v1/cancellation-policy` there once Vercel has
+   finished: it should answer `200` with three tiers instead of `404`.
 3. **The four env values** for their `.env`: the API base URL, the Supabase URL
    and anon key, and the Stripe publishable key. All public by design, so send
-   them directly rather than committing them. **Not before `0079` is applied**,
-   because the anon key plus any customer account is the escalation.
+   them directly rather than committing them. Safe to send now that `0079` is
+   applied.
 
 **The app answered §5b: it does NOT have the website's checkout sign-in gap.**
 It already offers "Already have one? Sign in" at confirm, and neither trap can

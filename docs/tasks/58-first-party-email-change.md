@@ -70,7 +70,7 @@ So the pending change is ours.
 - [x] Both templates **locked** so an admin cannot switch them off (see below)
 - [ ] A real inbox round trip, to see the rendering in a mail client. The send path is proven; this is a visual check.
 - [ ] `on_auth_user_email_changed` confirmed to have moved unfinished bookings. The test customer has none, so there was nothing to move.
-- [ ] Supabase dashboard: the redirect allow-list and "Confirm Email Change" template are no longer needed. **Owner.**
+- [ ] Supabase dashboard: the redirect allow-list and "Confirm Email Change" template are no longer needed. **Owner.** The app has confirmed it deleted its `bmtcustomer:///email-changed` handler, so nothing depends on that redirect any more.
 
 ## Two things the end-to-end run found
 

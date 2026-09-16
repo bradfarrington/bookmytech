@@ -1,6 +1,6 @@
 # Task 62: A customer could make themselves an admin (SECURITY)
 
-**Status:** 🔴 Fix written, **`0079` NOT APPLIED — the hole is open until Brad applies it.** Found 2026-09-16 while answering the customer app's status file.
+**Status:** ✅ **CLOSED (2026-09-16).** `0079` applied by Brad and verified live in both directions. Found while answering the customer app's status file.
 
 ## The vulnerability
 
@@ -74,11 +74,12 @@ The reminder columns are granted anyway: the website writes them with the servic
 - [x] Every client-side profile write enumerated before choosing the grant list
 - [x] `0079` written with both a column grant and a trigger backstop
 - [x] `0079` parses (pglast)
-- [ ] **`0079` applied. OWNER — this is the whole fix.**
-- [ ] Re-run the escalation attempt and confirm `42501`
-- [ ] Confirm a customer can still save their name and phone on `/dashboard/settings`
-- [ ] Confirm a mechanic can still save their name and phone on `/mechanic/profile`
-- [ ] Confirm the app can still write `full_name` and `phone`
+- [x] **`0079` applied** by Brad, 2026-09-16
+- [x] **Escalation refused.** Re-probed live as the signed-in e2e customer, five ways, all `42501`: `role → admin`, `role → mechanic`, `referred_by → self`, `deleted_at → null`, and `role` smuggled alongside a legitimate `full_name` in one update. `role` unchanged afterwards.
+- [x] **A mechanic cannot self-promote either** — same `42501`.
+- [x] **Legitimate writes still work**, under the customer's own session: `full_name` + `phone`, `reminders_enabled`, `reminder_via_email`. Values restored after the probe.
+- [x] **The mechanic profile still saves** `full_name` and `phone` on its own session, which was the write most at risk from the revoke.
+- [ ] The app confirms it can still write `full_name` and `phone`. Same grant and same mechanism as the two verified above, so expected to pass; theirs to confirm on their first real run.
 
 ## Not mitigable in code
 
