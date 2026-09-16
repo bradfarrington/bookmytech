@@ -15,11 +15,14 @@ export function CustomerSignupForm({
   defaultName,
   defaultEmail,
   referralCode,
+  next,
 }: {
   defaultName?: string;
   defaultEmail?: string;
   /** Pre-filled from a share link (?ref=). */
   referralCode?: string;
+  /** Already validated by the page; carried so the action can honour it. */
+  next?: string | null;
 }) {
   const [state, formAction, pending] = useActionState(signUp, initialState);
   // The code field is tucked behind a link unless they arrived with one — most
@@ -30,6 +33,7 @@ export function CustomerSignupForm({
 
   return (
     <form action={formAction} className="flex flex-col gap-4">
+      {next && <input type="hidden" name="next" value={next} />}
       <label className="flex flex-col gap-1.5">
         <span className="text-sm font-semibold text-text-primary">Full name</span>
         <input
@@ -133,7 +137,10 @@ export function CustomerSignupForm({
 
       <p className="text-center text-sm text-text-secondary">
         Already have an account?{" "}
-        <Link href="/login" className="font-semibold text-brand-blue hover:underline">
+        <Link
+          href={next ? `/login?next=${encodeURIComponent(next)}` : "/login"}
+          className="font-semibold text-brand-blue hover:underline"
+        >
           Sign in
         </Link>
       </p>

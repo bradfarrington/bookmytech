@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { safeCustomerNext, safeNext } from "@/lib/safe-next";
 import { isIndexableHost } from "@/lib/site";
 
 export async function proxy(request: NextRequest) {
@@ -112,7 +113,15 @@ async function handleRequest(request: NextRequest) {
   // to their own area rather than the customer dashboard.
   if (isDashboard) {
     if (!user) {
-      return redirectKeepingCookies(request, response, "/login");
+      // Remember where they were heading. Customers arrive on deep dashboard
+      // links from our own emails, and landing them on the dashboard root after
+      // sign-in means they have to go and find the thing we told them about.
+      return redirectKeepingCookies(
+        request,
+        response,
+        "/login",
+        safeNext(`${pathname}${request.nextUrl.search}`),
+      );
     }
     const { data: profile } = await supabase
       .from("profiles")
@@ -133,10 +142,18 @@ async function handleRequest(request: NextRequest) {
       .select("role")
       .eq("id", user.id)
       .single();
+    const elsewhere = areaForRole(profile?.role);
+    // A customer following a deep link they are already signed in for never
+    // reaches the login form, so honour `next` here too or the link still dies.
+    // Admins and mechanics go to their own area regardless: a customer deep
+    // link is not theirs to follow.
+    const wanted = elsewhere
+      ? null
+      : safeCustomerNext(request.nextUrl.searchParams.get("next"));
     return redirectKeepingCookies(
       request,
       response,
-      areaForRole(profile?.role) ?? "/dashboard",
+      wanted ?? elsewhere ?? "/dashboard",
     );
   }
 
@@ -155,20 +172,40 @@ async function handleRequest(request: NextRequest) {
   return response;
 }
 
+/**
+ * Redirect without losing cookies Supabase wrote while refreshing the session.
+ *
+ * `target` is a relative path and may carry its own query string, as a `next`
+ * value resolved by safeNext() does. `next`, when given, is added as a param so
+ * the sign-in screen knows where the person was heading.
+ */
 function redirectKeepingCookies(
   request: NextRequest,
   baseResponse: NextResponse,
-  pathname: string,
+  target: string,
+  next?: string | null,
 ): NextResponse {
   const url = request.nextUrl.clone();
+  const [pathname, search] = splitTarget(target);
   url.pathname = pathname;
-  url.search = "";
+  // Blank the query first, then add back only what we mean to carry. The
+  // request's own params belong to the page being blocked, not to the login
+  // screen, so forwarding them wholesale would leak them into a different
+  // route. `next` is the one exception and it has been through safeNext().
+  url.search = search;
+  if (next) url.searchParams.set("next", next);
   const redirected = NextResponse.redirect(url);
   // Forward any cookies Supabase wrote during session refresh
   for (const cookie of baseResponse.cookies.getAll()) {
     redirected.cookies.set(cookie);
   }
   return redirected;
+}
+
+/** "/book/time?quote=x" → ["/book/time", "?quote=x"]. */
+function splitTarget(target: string): [string, string] {
+  const at = target.indexOf("?");
+  return at === -1 ? [target, ""] : [target.slice(0, at), target.slice(at)];
 }
 
 export const config = {

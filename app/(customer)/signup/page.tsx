@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { safeCustomerNext } from "@/lib/safe-next";
 import { AuthShell } from "../_components/auth-shell";
 import { CustomerSignupForm } from "./_components/customer-signup-form";
 
@@ -8,12 +9,19 @@ export const metadata: Metadata = {
 
 interface SignupPageProps {
   // Pre-filled from the booking confirmation CTA (?name=&email=). ?ref= carries
-  // a referral code when arriving from a share link.
-  searchParams: Promise<{ name?: string; email?: string; ref?: string }>;
+  // a referral code when arriving from a share link. ?next= is where a deep
+  // link wanted them, carried over from /login.
+  searchParams: Promise<{
+    name?: string;
+    email?: string;
+    ref?: string;
+    next?: string;
+  }>;
 }
 
 export default async function SignupPage({ searchParams }: SignupPageProps) {
-  const { name, email, ref } = await searchParams;
+  const { name, email, ref, next } = await searchParams;
+  const nextPath = safeCustomerNext(next);
   return (
     <AuthShell
       title="Create your account"
@@ -23,7 +31,12 @@ export default async function SignupPage({ searchParams }: SignupPageProps) {
           : "Track your booking live, message your mechanic, and rebook in a tap."
       }
     >
-      <CustomerSignupForm defaultName={name} defaultEmail={email} referralCode={ref} />
+      <CustomerSignupForm
+        defaultName={name}
+        defaultEmail={email}
+        referralCode={ref}
+        next={nextPath}
+      />
     </AuthShell>
   );
 }

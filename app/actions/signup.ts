@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createCustomerAccount } from "@/lib/customers/provision";
 import { normaliseReferralCode } from "@/lib/credits/referral-code";
+import { safeCustomerNext } from "@/lib/safe-next";
 
 export type SignUpState = { error: string; field?: "referral_code" } | null;
 
@@ -48,6 +49,11 @@ export async function signUp(
   });
   if (!result.ok) return { error: result.error };
 
+  // Signup only ever makes a customer, so a `next` from the hidden field is
+  // theirs to follow. Someone who signed up *because* a deep link asked them to
+  // should land on that page, not on an empty dashboard.
+  const wanted = safeCustomerNext(formData.get("next"));
+
   // Sign in to set the session cookies on the response.
   const supabase = await createClient();
   const { error: signInErr } = await supabase.auth.signInWithPassword({
@@ -55,9 +61,12 @@ export async function signUp(
     password,
   });
   if (signInErr) {
-    // Account exists but the cookie didn't set — send them to login to retry.
-    redirect("/login?created=1");
+    // Account exists but the cookie didn't set — send them to login to retry,
+    // carrying the destination so the retry doesn't lose it either.
+    const params = new URLSearchParams({ created: "1" });
+    if (wanted) params.set("next", wanted);
+    redirect(`/login?${params}`);
   }
 
-  redirect("/dashboard");
+  redirect(wanted ?? "/dashboard");
 }

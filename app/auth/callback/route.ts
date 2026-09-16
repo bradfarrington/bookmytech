@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import type { EmailOtpType } from "@supabase/supabase-js";
+import { safeNext } from "@/lib/safe-next";
 import { createClient } from "@/lib/supabase/server";
 
 // Auth callback for both server-generated magic links and OAuth.
@@ -17,16 +18,13 @@ import { createClient } from "@/lib/supabase/server";
 //
 // Both then redirect to the `next` query param.
 //
-// Whitelist accepted destinations so an attacker can't craft a callback URL
-// that hands them a session and bounces to an external domain.
-const ALLOWED_NEXT = new Set([
-  "/",
-  "/mechanic",
-  "/mechanic/set-password",
-  "/dashboard",
-  "/dashboard/set-password",
-  "/admin",
-]);
+// Destinations go through safeNext() so an attacker can't craft a callback URL
+// that hands them a session and bounces to an external domain. That replaced an
+// exact-match list of six static paths, which was safe but too blunt: any link
+// carrying an id or a query string — "/dashboard/quotes/<id>", or a funnel step
+// with its quote — silently collapsed to "/", so an emailed deep link could
+// never survive redemption. safeNext() keeps the path when it is same-origin and
+// under /dashboard, /book, /mechanic or /admin.
 const ALLOWED_OTP_TYPES = new Set<EmailOtpType>([
   "magiclink",
   "invite",
@@ -39,8 +37,7 @@ export async function GET(request: NextRequest) {
   const code = searchParams.get("code");
   const tokenHash = searchParams.get("token_hash");
   const typeParam = searchParams.get("type");
-  const nextParam = searchParams.get("next") ?? "/";
-  const next = ALLOWED_NEXT.has(nextParam) ? nextParam : "/";
+  const next = safeNext(searchParams.get("next")) ?? "/";
 
   const supabase = await createClient();
 

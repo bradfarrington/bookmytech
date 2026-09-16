@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { safeCustomerNext } from "@/lib/safe-next";
 import { createClient } from "@/lib/supabase/server";
 
 export type SignInState = { error: string } | null;
@@ -53,13 +54,22 @@ async function authenticate(formData: FormData): Promise<AuthResult> {
 // is read from profiles, so there's no need to ask people which kind of account
 // they have; we just route them to the area they belong to. Middleware re-checks
 // the role on every protected request.
+//
+// A customer who was sent here from a deep link carries it in the form's hidden
+// `next` field, and goes there instead of to the dashboard root. Only customers:
+// `next` describes a page a *customer* wanted, so honouring it for an admin or
+// mechanic would just bounce off that area's gate. safeCustomerNext() rejects
+// anything off-site or outside /dashboard and /book.
 export async function signInUnified(
   _prevState: SignInState,
   formData: FormData,
 ): Promise<SignInState> {
   const result = await authenticate(formData);
   if ("error" in result) return result;
-  redirect(DEST_FOR_ROLE[result.role] ?? "/dashboard");
+  const dest = DEST_FOR_ROLE[result.role] ?? "/dashboard";
+  const wanted =
+    result.role === "customer" ? safeCustomerNext(formData.get("next")) : null;
+  redirect(wanted ?? dest);
 }
 
 // Admin-only sign-in for the dedicated /admin/login page. Rejects non-admins at
