@@ -44,6 +44,15 @@ asked.
     the jobs inside a combined repair could not be priced without them.
   - Rows are expanded through `expandCatalogueItems`, so a **combined repair**
     is priced as the sum of every job it books, exactly as its quote is.
+- **`lib/catalogue/overlay.ts`** — `composeLevel` takes `nodeGenarts` beside
+  `nodeHours`, so a **moved-in leaf** and a **combined repair's option** carry
+  their part groups. They never did: both are known to the level by id only, and
+  the ids were resolved to hours alone. Since both clients decide whether to
+  write "+ parts" from `genartIds`, those rows printed a bare labour figure that
+  looked like a total. It predates this task — the same rows printed the same
+  figure before — but it is the fallback the feature leans on. A combined repair
+  gets every group its jobs use between them; the search path fills them the
+  same way, so a hit says "+ parts" for the same rows a browsed one does.
 - **`_components/repair-rows.tsx`** — the button shows the total; the caption
   reads "· parts included" when there are parts in it. Unchanged where there is
   no total: "+ parts" still follows the labour figure.
@@ -109,12 +118,13 @@ price carry neither field in both responses.
       step charges for that job on its own.
 - [x] A combined repair's option is priced across every job it books.
 - [x] A row whose parts can't be priced keeps "£X + parts" rather than showing
-      a total that is short.
+      a total that is short — including moved-in leaves and combined repairs,
+      which never carried the part groups that rule reads. *(Unit-tested.)*
 - [x] A supplier that is down, slow or unconfigured leaves the level exactly as
       it read before. *(Bounded by `LEVEL_PARTS_BUDGET_MS`; unit-tested fold.)*
 - [x] The mobile tree response is unchanged without `parts=1`, and carries the
       additive fields with it. *(Both arms checked live.)*
-- [x] `tsc`, eslint on changed files, `npm test` (592 passing).
+- [x] `tsc`, eslint on changed files, `npm test` (595 passing).
 - [x] Verified end to end against live HaynesPro and AAG.
 
 ## Follow-ups
