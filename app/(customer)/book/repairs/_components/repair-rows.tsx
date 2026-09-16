@@ -37,6 +37,15 @@ export function toRows(nodes: CatalogueNode[]): Row[] {
   return rows;
 }
 
+/**
+ * True when the price shown for this job has its parts in it, so the caption
+ * can say so (Task 63). `partsPence` of 0 is a real answer — the job needs no
+ * charged parts — and there is nothing to mention.
+ */
+function includesParts(node: CatalogueNode): boolean {
+  return node.totalPence != null && (node.partsPence ?? 0) > 0;
+}
+
 export interface RepairRowsProps {
   nodes: CatalogueNode[];
   /** Items already in the booking. */
@@ -74,14 +83,17 @@ export function RepairRows({
         </span>
       );
     }
-    // `pricePence` is labour only; a repair that uses parts has them priced
-    // for this car on the next step (Task 43).
-    const withParts = (node.genartIds?.length ?? 0) > 0;
+    // What the customer pays for this job on its own: labour plus the parts
+    // it needs, priced for this car (Task 63). When the parts couldn't be
+    // priced there is no honest total to show, so the price stays labour with
+    // "+ parts" after it, as it read before — see `partsPence` on CatalogueNode.
+    const price = formatPrice(node.totalPence ?? node.pricePence ?? 0);
+    const withParts = node.totalPence == null && (node.genartIds?.length ?? 0) > 0;
     if (atCap) {
       return (
         <span className="shrink-0 text-sm font-semibold text-text-muted">
           {label ? `${label} · ` : ""}
-          {formatPrice(node.pricePence ?? 0)}
+          {price}
           {withParts && " + parts"}
         </span>
       );
@@ -92,7 +104,7 @@ export function RepairRows({
         className="flex shrink-0 items-center gap-2 rounded-lg bg-brand-blue px-3.5 py-2 text-sm font-bold text-white transition-colors hover:bg-brand-blue/90"
       >
         {label && <span className="text-xs font-semibold text-blue-100">{label}</span>}
-        {formatPrice(node.pricePence ?? 0)}
+        {price}
         {withParts && <span className="text-xs font-semibold text-blue-100">+ parts</span>}
         {adding ? (
           <>
@@ -146,7 +158,7 @@ export function RepairRows({
                     </p>
                     <p className="mt-0.5 text-xs text-text-muted">
                       {single
-                        ? `Combined repair · estimated ${row.options[0].billedHours} hour${row.options[0].billedHours === 1 ? "" : "s"} on your car`
+                        ? `Combined repair · estimated ${row.options[0].billedHours} hour${row.options[0].billedHours === 1 ? "" : "s"} on your car${includesParts(row.options[0]) ? " · parts included" : ""}`
                         : "Combined repair · choose an option"}
                     </p>
                   </div>
@@ -196,6 +208,7 @@ export function RepairRows({
                 <p className="mt-0.5 text-xs text-text-muted">
                   Estimated {row.node.billedHours} hour
                   {row.node.billedHours === 1 ? "" : "s"} on your car
+                  {includesParts(row.node) && " · parts included"}
                 </p>
               </div>
               {bookButton(row.node)}

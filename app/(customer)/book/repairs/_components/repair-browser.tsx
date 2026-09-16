@@ -59,7 +59,10 @@ export async function RepairBrowser({
 }: RepairBrowserProps) {
   const admin = createAdminClient();
   const [result, trolley] = await Promise.all([
-    getRepairCatalogueLevel(reg, nodeId, admin),
+    // `priceParts`: each row shows labour + the parts that job needs on this
+    // car, not "£60 + parts" (Task 63). Bounded, and falls back to the old
+    // label when the supplier can't price something — lib/catalogue/level-parts.ts.
+    getRepairCatalogueLevel(reg, nodeId, admin, { priceParts: true }),
     // Memo hit — the price page just priced the same set.
     selectedIds.length ? quoteRepairs(reg, selectedIds, admin) : Promise.resolve(null),
   ]);
@@ -171,7 +174,8 @@ export async function RepairBrowser({
 
       <p className="text-xs text-text-muted">
         Repairs are priced on labour from the manufacturer&apos;s book time for your exact
-        vehicle; diagnostics, servicing and inspections are set prices.
+        vehicle, plus the parts that job needs; diagnostics, servicing and inspections are
+        set prices.
         {adding && " Jobs booked together are done in one visit."}
       </p>
 

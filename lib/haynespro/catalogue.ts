@@ -18,12 +18,14 @@ import { loadCatalogueOverlay } from "@/lib/catalogue/load-overlay";
 import {
   bundlesAt,
   composeLevel,
+  expandCatalogueItems,
   extraNodeIdsFor,
   isCustomGroupId,
   optionDisplayName,
   bundleOptionId,
   type CatalogueOverlay,
 } from "@/lib/catalogue/overlay";
+import { priceLevelParts, type PartsRow } from "@/lib/catalogue/level-parts";
 import { loadCatalogueProducts } from "@/lib/catalogue/load-products";
 import {
   composeTopLevel,
@@ -126,6 +128,26 @@ export interface CatalogueNode {
    * how much of the catalogue a supplier could price without a mapping table.
    */
   genartIds?: number[];
+  /**
+   * What this row's supplier parts cost on THIS car, and labour + parts
+   * together — what the customer pays if they book this job on its own
+   * (Task 63). `totalPence` is `pricePence + partsPence` and is exactly the
+   * `breakdown.totalPence` a one-item quote for this id produces, so the
+   * browse figure and the price step agree.
+   *
+   * ADDITIVE AND OPTIONAL, and only present when the parts were actually
+   * priced. They are ABSENT — not zero — when a part group the job needs has
+   * no price we can use right now (see PARTS_UNAVAILABLE_MESSAGE): showing
+   * labour as if it were the whole price would understate what the customer
+   * pays, so the client falls back to "+ parts" instead. `partsPence` is 0
+   * for a job whose part groups are all switched off, where labour genuinely
+   * is the whole price.
+   *
+   * Only filled when the caller asks for it (`priceParts`) — pricing a whole
+   * level costs one supplier lookup per part group on it.
+   */
+  partsPence?: number;
+  totalPence?: number;
 }
 
 /**
@@ -220,21 +242,26 @@ interface CatalogueContext extends HpVehicleRef {
 }
 
 /**
- * Book time per node id on this vehicle for ids HaynesPro's own listing of a
- * level won't supply (moved-in leaves, the jobs inside combined repairs).
- * One batched call; ids the vehicle doesn't have simply don't come back.
+ * The HaynesPro nodes a level's listing won't supply (moved-in leaves, the
+ * jobs inside combined repairs), by id: their book time on this vehicle, and
+ * the nodes themselves — the part groups a job uses live on the node, so
+ * pricing its parts needs more than the hours. One batched call; ids the
+ * vehicle doesn't have simply don't come back.
  */
-async function hoursForNodes(
+async function fetchNodes(
   vehicle: HpVehicleRef,
   nodeIds: string[],
-): Promise<Map<string, number>> {
+): Promise<{ hours: Map<string, number>; raw: Map<string, HpRepairtimeNode> }> {
   const hours = new Map<string, number>();
-  if (nodeIds.length === 0) return hours;
+  const raw = new Map<string, HpRepairtimeNode>();
+  if (nodeIds.length === 0) return { hours, raw };
   const nodes = await getRepairNodesByIds(vehicle, nodeIds);
   for (const n of nodes) {
-    if (n.id != null && typeof n.value === "number" && n.value > 0) hours.set(n.id, n.value / 100);
+    if (n.id == null) continue;
+    raw.set(n.id, n);
+    if (typeof n.value === "number" && n.value > 0) hours.set(n.id, n.value / 100);
   }
-  return hours;
+  return { hours, raw };
 }
 
 async function loadContext(
@@ -334,9 +361,16 @@ async function composeLevelFor(
   context: CatalogueContext,
   levelId: string,
   raw: HpRepairtimeNode[],
-): Promise<CatalogueNode[]> {
+): Promise<{ nodes: CatalogueNode[]; rawById: Map<string, HpRepairtimeNode> }> {
   const extraIds = extraNodeIdsFor(levelId, context.overlay);
-  const nodeHours = await hoursForNodes(context,extraIds);
+  const extra = await fetchNodes(context, extraIds);
+  const nodeHours = extra.hours;
+
+  // Every HaynesPro job this level can book, by id: the level's own leaves and
+  // the ones fetched for moved-in leaves and combined repairs. Pricing a row's
+  // parts reads the part groups off these.
+  const rawById = new Map(extra.raw);
+  for (const node of raw) if (node.id != null) rawById.set(node.id, node);
 
   const combined = new Map<string, number | null>();
   for (const { bundle, options } of bundlesAt(levelId, context.overlay)) {
@@ -353,7 +387,7 @@ async function composeLevelFor(
     for (const option of options) byIds.set(key(option.node_ids), combined.get(option.id) ?? null);
   }
 
-  return composeLevel({
+  const nodes = composeLevel({
     levelId,
     raw,
     overlay: context.overlay,
@@ -361,6 +395,47 @@ async function composeLevelFor(
     hourlyRatePence: context.vehicle.hourlyRatePence,
     nodeHours,
     combineHours: (ids) => byIds.get(key(ids)) ?? null,
+  });
+  return { nodes, rawById };
+}
+
+/**
+ * Fill in `partsPence` / `totalPence` on a level's bookable rows (Task 63).
+ * Returns the same nodes when nothing could be priced, so a supplier that is
+ * down or unconfigured leaves the level exactly as it was.
+ */
+async function withLevelParts(
+  context: CatalogueContext,
+  nodes: CatalogueNode[],
+  rawById: ReadonlyMap<string, HpRepairtimeNode>,
+  reg: string,
+  db: SupabaseClient,
+): Promise<CatalogueNode[]> {
+  // A product already shows its whole price (its own, plus any engine oil);
+  // only HaynesPro-backed repairs have parts on top of labour.
+  const rowIds = nodes
+    .filter((n) => n.kind === "repair" && !n.productId && n.pricePence != null)
+    .map((n) => n.id);
+  if (rowIds.length === 0) return nodes;
+
+  // What each chosen id stands for — a job, or the several a combined repair
+  // books together. The same expansion the quote uses.
+  const items = expandCatalogueItems(rowIds, context.overlay);
+  if (!items) return nodes;
+
+  const rows: PartsRow[] = [];
+  for (const item of items) {
+    const jobs = item.nodeIds.map((id) => rawById.get(id)).filter((n): n is HpRepairtimeNode => n != null);
+    if (jobs.length === item.nodeIds.length) rows.push({ rowId: item.id, nodes: jobs });
+  }
+
+  const parts = await priceLevelParts({ db, reg, carTypeId: context.carTypeId, rows });
+  if (parts.size === 0) return nodes;
+
+  return nodes.map((node) => {
+    const partsPence = parts.get(node.id);
+    if (partsPence == null || node.pricePence == null) return node;
+    return { ...node, partsPence, totalPence: node.pricePence + partsPence };
   });
 }
 
@@ -405,11 +480,17 @@ export function toCatalogueNode(
  * "Repairs" (HaynesPro's root, id "root") beside the product categories
  * (Diagnostics, Servicing, Pre-purchase inspection); pass "root" for
  * HaynesPro's top-level groups exactly as before.
+ *
+ * `priceParts` (Task 63) also prices each bookable row's supplier parts, so a
+ * row can show what the job actually costs rather than "£60 + parts". It is
+ * opt-in because it costs a supplier lookup per part group on the level the
+ * first time a registration is priced — see lib/catalogue/level-parts.ts.
  */
 export async function getRepairCatalogueLevel(
   reg: string,
   nodeId: string | null | undefined,
   db: SupabaseClient,
+  options: { priceParts?: boolean } = {},
 ): Promise<CatalogueLevel> {
   const loaded = await loadContext(reg, db);
   if (!loaded.ok) return loaded;
@@ -438,11 +519,17 @@ export async function getRepairCatalogueLevel(
     return { ok: true, vehicle: context.vehicle, nodes: composeTopLevel(context.products) };
   }
 
-  const nodes = isProductCategoryId(level)
-    ? await composeProductLevel(context, level)
-    : await composeLevelFor(context, level, raw);
+  if (isProductCategoryId(level)) {
+    // A product's price is already its whole price; there is nothing to add.
+    return { ok: true, vehicle: context.vehicle, nodes: await composeProductLevel(context, level) };
+  }
 
-  return { ok: true, vehicle: context.vehicle, nodes };
+  const { nodes, rawById } = await composeLevelFor(context, level, raw);
+  return {
+    ok: true,
+    vehicle: context.vehicle,
+    nodes: options.priceParts ? await withLevelParts(context, nodes, rawById, reg, db) : nodes,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -670,7 +757,7 @@ async function bundleSearchHits(
   if (candidates.length === 0) return [];
 
   const ids = [...new Set(candidates.flatMap((c) => c.options.flatMap((o) => o.node_ids)))];
-  const nodeHours = await hoursForNodes(context,ids);
+  const { hours: nodeHours } = await fetchNodes(context, ids);
   const out: CatalogueNode[] = [];
   for (const { bundle, options } of candidates) {
     const optionCount = (context.overlay.optionsByBundle.get(bundle.id) ?? []).length;

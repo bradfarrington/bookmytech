@@ -119,6 +119,25 @@ You are working on **Book My Tech**, a UK mobile-mechanic booking platform. This
 
 ## Current task
 
+### ✅ 2026-09-16 — DONE: repair prices include their parts (Task 63)
+
+**`/book/repairs` shows what a job costs, not "£1614 + parts".** Each bookable
+row on a level is now priced through the same `quoteJobParts` the quote itself
+uses, so the figure on the button is the figure the price step charges. Verified
+live on S28BSW: "Renew the engine" reads £881.26 in the list and £881.26 (£834
+labour + £47.26 antifreeze) on the price step.
+
+A row whose parts have no usable price keeps the old "£X + parts" — a short
+total would be worse than an honest gap, and a quote for that job refuses the
+booking anyway. The whole pass is bounded (4.5s) and falls back to the old
+rendering, so a slow or unreachable supplier never costs the level its rows.
+
+**No migration and no mobile response change.** `partsPence` / `totalPence` are
+additive optional fields on `CatalogueNode`, and the mobile tree route doesn't
+ask for them yet — flip `priceParts: true` there alongside an app release. See
+`docs/tasks/63-repair-prices-include-parts.md`, including why search results
+were left on "+ parts".
+
 ### ✅ 2026-09-16 — CLOSED: the profiles privilege escalation (Task 62)
 
 **`0079` applied by Brad and verified live.** Five escalation attempts as a
