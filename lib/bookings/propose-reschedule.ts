@@ -90,3 +90,38 @@ export async function proposeRescheduleFor(
   }
   return { ok: true };
 }
+
+/** How many jobs one "Running late?" may move. */
+export const MAX_RESCHEDULES_AT_ONCE = 20;
+
+export type ProposeReschedulesResult =
+  | { ok: true; proposed: number; failed: Array<{ bookingId: string; error: string }> }
+  | MechanicRefusal;
+
+/**
+ * Running late (Task 38): propose a new time for several of today's later
+ * jobs in one go — each customer gets the same email/SMS and the same
+ * accept/decline banner as a single proposal. A job that can't be moved
+ * (already en route, not theirs, in the past) is reported by id with the
+ * sentence `proposeRescheduleFor` refused it with, and the others still go
+ * through. Shared by the website's `proposeReschedules` and the mechanic
+ * app's POST …/mechanic/reschedules (Task 68).
+ */
+export async function proposeReschedulesFor(
+  mechanicId: string,
+  items: unknown,
+  note: string,
+): Promise<ProposeReschedulesResult> {
+  const list = Array.isArray(items) ? items.slice(0, MAX_RESCHEDULES_AT_ONCE) : [];
+  if (list.length === 0) return refuse("invalid", "Pick at least one job to move.");
+  const admin = createAdminClient();
+  let proposed = 0;
+  const failed: Array<{ bookingId: string; error: string }> = [];
+  for (const item of list) {
+    if (typeof item?.bookingId !== "string" || typeof item?.newIso !== "string") continue;
+    const res = await proposeRescheduleFor(mechanicId, item.bookingId, item.newIso, note ?? "", admin);
+    if (res.ok) proposed += 1;
+    else failed.push({ bookingId: item.bookingId, error: res.error });
+  }
+  return { ok: true, proposed, failed };
+}

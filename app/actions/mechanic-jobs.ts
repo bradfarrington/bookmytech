@@ -2,9 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { requireMechanic } from "@/lib/mechanics/require-mechanic";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { cancelOwnJobFor } from "@/lib/mechanics/cancel-job";
-import { proposeRescheduleFor } from "@/lib/bookings/propose-reschedule";
+import { proposeRescheduleFor, proposeReschedulesFor } from "@/lib/bookings/propose-reschedule";
 import { setArrivalWindowFor } from "@/lib/mechanics/set-arrival-window";
 
 export type MechanicJobResult = { ok: true } | { ok: false; error: string };
@@ -65,21 +64,16 @@ export async function proposeReschedules(
 ): Promise<{ ok: true; proposed: number; failed: Array<{ bookingId: string; error: string }> } | { ok: false; error: string }> {
   const guard = await requireMechanic();
   if (!guard.ok) return guard;
-  const list = Array.isArray(items) ? items.slice(0, 20) : [];
-  if (list.length === 0) return { ok: false, error: "Pick at least one job to move." };
-  const admin = createAdminClient();
-  let proposed = 0;
-  const failed: Array<{ bookingId: string; error: string }> = [];
-  for (const item of list) {
-    if (typeof item?.bookingId !== "string" || typeof item?.newIso !== "string") continue;
-    const res = await proposeRescheduleFor(guard.mechanicId, item.bookingId, item.newIso, note ?? "", admin);
-    if (res.ok) {
-      proposed += 1;
-      revalidatePath(`/mechanic/jobs/${item.bookingId}`);
-    } else failed.push({ bookingId: item.bookingId, error: res.error });
+  // The loop lives in lib/bookings/propose-reschedule.ts, shared with the
+  // mechanic app's route handler.
+  const result = await proposeReschedulesFor(guard.mechanicId, items, note);
+  if (!result.ok) return { ok: false, error: result.error };
+  const failedIds = new Set(result.failed.map((f) => f.bookingId));
+  for (const item of Array.isArray(items) ? items : []) {
+    if (typeof item?.bookingId === "string" && !failedIds.has(item.bookingId)) revalidatePath(`/mechanic/jobs/${item.bookingId}`);
   }
   revalidatePath("/mechanic/jobs");
-  return { ok: true, proposed, failed };
+  return result;
 }
 
 /**

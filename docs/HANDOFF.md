@@ -119,6 +119,25 @@ You are working on **Book My Tech**, a UK mobile-mechanic booking platform. This
 
 ## Current task
 
+### 🟡 2026-09-17 — BUILT, not run: the rest of the mechanic app's job page (Task 68)
+
+**Faults, "change what's being done", ending a job on site, part status and
+"Running late?" from the app.** Eleven routes on ten paths; spec, route table
+and the answers the app asked for: `docs/tasks/68-mechanic-job-extras.md`.
+
+The cores mostly existed (`lib/revisions/mechanic.ts`, `lib/quotes/mechanic.ts`)
+and gained refusal codes. New server-side sources the website's panel shares:
+`reviseBlocker()`, `revisionPanelFor()` (so the app never rebuilds a snapshot),
+`chosenItemId()`, `followOnDraftFor()`. `markPartStatus` and the
+`proposeReschedules` loop moved into `lib/`.
+
+`endJobOnSite`'s status change is now a claim, closing the same double-payout
+race Task 67 closed in `complete`. A `faultId` on a quote line must be a fault
+on that job. No migration.
+
+**Not verified beyond typecheck, lint, unit tests and a build** — like Task 67,
+it needs a run-through with real tokens.
+
 ### 🟡 2026-09-17 — BUILT, not run: the mechanic app's active job (Task 67)
 
 **Seventeen routes so a mechanic can work a whole job from the app.** Spec,

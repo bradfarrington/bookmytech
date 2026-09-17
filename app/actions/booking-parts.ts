@@ -1,9 +1,7 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { setPartSourcingFor } from "@/lib/mechanics/part-sourcing";
+import { markPartStatusFor, setPartSourcingFor } from "@/lib/mechanics/part-sourcing";
 
 // Mechanic-facing actions for the parts on one of their jobs (Task 10 Stage 2).
 //
@@ -23,45 +21,25 @@ export type BookingPartResult = { ok: true } | { ok: false; error: string };
 
 type Sourcing = "self" | "bmt";
 
-async function assertAssignedMechanic(
-  bookingPartId: string,
-): Promise<
-  | { ok: true; bookingId: string; userId: string }
-  | { ok: false; error: string }
-> {
+/** The signed-in user's id, or null. Whether they hold the job is the core's question. */
+async function sessionUserId(): Promise<string | null> {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return { ok: false, error: "Not signed in." };
-
-  // Read the line's booking via RLS (mechanic can read assigned booking parts).
-  const { data: line } = await supabase
-    .from("booking_parts")
-    .select("id, booking_id, booking:bookings(mechanic_id)")
-    .eq("id", bookingPartId)
-    .maybeSingle();
-  if (!line) return { ok: false, error: "Part not found." };
-
-  const booking = Array.isArray(line.booking) ? line.booking[0] : line.booking;
-  if (!booking || booking.mechanic_id !== user.id) {
-    return { ok: false, error: "You're not assigned to this job." };
-  }
-  return { ok: true, bookingId: line.booking_id, userId: user.id };
+  return user?.id ?? null;
 }
+
+// The checks, the writes and the payout recompute live in
+// lib/mechanics/part-sourcing.ts, shared with the mechanic app (Tasks 67, 68).
 
 export async function setPartSourcing(
   bookingPartId: string,
   sourcing: Sourcing,
 ): Promise<BookingPartResult> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { ok: false, error: "Not signed in." };
-  // The check, the write and the payout recompute live in
-  // lib/mechanics/part-sourcing.ts, shared with the mechanic app (Task 67).
-  const result = await setPartSourcingFor(user.id, bookingPartId, sourcing);
+  const userId = await sessionUserId();
+  if (!userId) return { ok: false, error: "Not signed in." };
+  const result = await setPartSourcingFor(userId, bookingPartId, sourcing);
   return result.ok ? { ok: true } : { ok: false, error: result.error };
 }
 
@@ -69,17 +47,8 @@ export async function markPartStatus(
   bookingPartId: string,
   status: "ordered" | "delivered" | "used",
 ): Promise<BookingPartResult> {
-  const guard = await assertAssignedMechanic(bookingPartId);
-  if (!guard.ok) return guard;
-
-  const admin = createAdminClient();
-  const patch: Record<string, unknown> = { status };
-  if (status === "ordered") patch.ordered_at = new Date().toISOString();
-  if (status === "delivered") patch.delivered_at = new Date().toISOString();
-
-  const { error } = await admin.from("booking_parts").update(patch).eq("id", bookingPartId);
-  if (error) return { ok: false, error: error.message };
-
-  revalidatePath(`/mechanic/jobs/${guard.bookingId}`);
-  return { ok: true };
+  const userId = await sessionUserId();
+  if (!userId) return { ok: false, error: "Not signed in." };
+  const result = await markPartStatusFor(userId, bookingPartId, status);
+  return result.ok ? { ok: true } : { ok: false, error: result.error };
 }

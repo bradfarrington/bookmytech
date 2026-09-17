@@ -132,3 +132,22 @@ export function followOnLinesFromRevision(diff: RevisionDiff): Array<{
     })),
   ];
 }
+
+/** The title the follow-on quote for that work opens with — the website's panel and the mechanic app alike. */
+export const FOLLOW_ON_TITLE = "The rest of the work from your visit";
+
+/**
+ * One line for a list of revisions: "Removed Front discs · added Rear pads".
+ * Repairs and parts together, removed first — what was taken off is what the
+ * customer was asked about. "No change to the work" when only the price moved.
+ */
+export function revisionSummary(diff: RevisionDiff): string {
+  const names = (lines: readonly RevisionLine[], parts: readonly RevisionPart[]) =>
+    [...lines.map((l) => l.description), ...parts.map((p) => p.name)].join(", ");
+  const removed = names(diff.lines.removed, diff.parts.removed);
+  const added = names(diff.lines.added, diff.parts.added);
+  if (removed && added) return `Removed ${removed} · added ${added}`;
+  if (removed) return `Removed ${removed}`;
+  if (added) return `Added ${added}`;
+  return "No change to the work";
+}

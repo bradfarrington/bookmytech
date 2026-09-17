@@ -7,7 +7,15 @@ import {
   type RevisionPart,
   type RevisionSnapshot,
 } from "./snapshot";
-import { customerDirectionSentence, diffRevision, differenceLabel, followOnLinesFromRevision, hasChanges, packDiff } from "./diff";
+import {
+  customerDirectionSentence,
+  diffRevision,
+  differenceLabel,
+  followOnLinesFromRevision,
+  hasChanges,
+  packDiff,
+  revisionSummary,
+} from "./diff";
 import { feePayout, onSiteFeeFor, onSiteFeeOptions } from "./fees";
 import { REVISION_EXPIRY_HOURS, isRevisionExpired, revisionExpiry, revisionRefusal } from "./status";
 import type { RepairsQuote } from "@/lib/haynespro/repair-booking";
@@ -150,6 +158,16 @@ describe("diffRevision", () => {
     expect(diff.direction).toBe("more");
     expect(hasChanges(diff)).toBe(true);
     expect(differenceLabel(diff.differencePence)).toBe("+£19");
+  });
+
+  it("sums a revision up in one line for the mechanic app's list (Task 68)", () => {
+    expect(revisionSummary(diff)).toBe(
+      "Removed Renew the front brake pads, Front brake pads · added Renew the front wheel bearing, Wheel bearing kit",
+    );
+    expect(revisionSummary(diffRevision(before, before))).toBe("No change to the work");
+    expect(revisionSummary(diffRevision(before, { ...before, lines: [], parts: [] }))).toBe(
+      "Removed Renew the front brake pads, Front brake pads",
+    );
   });
 
   it("the hold-quote invariant: after − difference is exactly before", () => {

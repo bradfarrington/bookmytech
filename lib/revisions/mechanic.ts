@@ -13,7 +13,15 @@ import { chargeIdOf, payoutToMechanic } from "@/lib/payments/payout";
 import { formatJobNumber } from "@/lib/utils";
 import type { BookingRepairRow } from "@/lib/bookings/repair-lines";
 import { loadRevision, loadRevisionsForBooking, revisionMoney, type RevisionView } from "./load";
-import { diffRevision, hasChanges, type RevisionDiff } from "./diff";
+import {
+  diffRevision,
+  FOLLOW_ON_TITLE,
+  followOnLinesFromRevision,
+  hasChanges,
+  revisionSummary,
+  type RevisionDiff,
+  type RevisionDirection,
+} from "./diff";
 import {
   approvedExtras,
   partFromRow,
@@ -23,16 +31,36 @@ import {
   type RevisionPart,
   type RevisionSnapshot,
 } from "./snapshot";
-import { REVISABLE_STATUSES, revisionExpiry, type OnSiteCharge } from "./status";
-import { feePayout, onSiteFeeFor, ON_SITE_FEE_LABEL } from "./fees";
+import { REVISABLE_STATUSES, REVISION_STATUS_LABEL, isRevisionExpired, revisionExpiry, type OnSiteCharge, type RevisionStatus } from "./status";
+import { feePayout, onSiteFeeFor, onSiteFeeOptions, ON_SITE_FEE_LABEL, type OnSiteFeeOption } from "./fees";
+import { chosenItemId, groupRepairLines } from "@/lib/bookings/repair-lines";
+import type { QuoteLineInput } from "@/lib/quotes/pricing";
 import { notifyCustomerJobEndedOnSite, notifyCustomerRevisionSent, type RevisionBookingContact } from "./notify";
+import { refuse, type MechanicRefusal } from "@/lib/mechanics/refusal";
+import type { QuoteView } from "@/lib/quotes/load";
 
-// The mechanic's side of a revision (Task 37). Called only from the mechanic
-// Server Actions (app/actions/job-revisions.ts), which resolve the mechanic
-// from the cookie session and pass their id in. Every write is service-role
+// The mechanic's side of a revision (Task 37). Called from the mechanic Server
+// Actions (app/actions/job-revisions.ts), which resolve the mechanic from the
+// cookie session, and from the mechanic app's route handlers
+// (app/api/mobile/v1/mechanic/…/revision, Task 68), which resolve them from a
+// bearer token. Either way the id is passed in. Every write is service-role
 // after an ownership re-read, as with every other mechanic action.
+//
+// Refusals carry a `code` (lib/mechanics/refusal.ts) for the routes to turn
+// into a status; the website ignores it.
 
-export type RevisionResult = { ok: true } | { ok: false; error: string };
+export type RevisionResult = { ok: true } | MechanicRefusal;
+export type EndOnSiteResult =
+  | {
+      ok: true;
+      /** Always "cancelled" — ending on site adds no status for the apps to learn. */
+      status: "cancelled";
+      /** What the customer's card was charged: the fee, or 0. */
+      chargedPence: number;
+      /** The mechanic's share of it. */
+      payoutPence: number;
+    }
+  | MechanicRefusal;
 
 const BOOKING_COLUMNS =
   "id, job_number, status, mechanic_id, customer_id, customer_email, customer_name, customer_phone, vehicle_reg, repair_node_id, repair_description, service_duration_hours, vehicle_raw_duration_hours, combine_source, engine_oil_litres, engine_oil_price_per_litre_pence, engine_oil_source, hourly_rate_pence, commission_rate, base_price_pence, parts_price_pence, total_pence, platform_fee_pence, mechanic_payout_pence, stripe_payment_intent_id, payment_mode";
@@ -63,10 +91,12 @@ async function ownedBooking(bookingId: string, mechanicId: string) {
   const admin = createAdminClient();
   const { data } = await admin.from("bookings").select(BOOKING_COLUMNS).eq("id", bookingId).single();
   const booking = data as RevisionBooking | null;
-  if (!booking) return { ok: false as const, error: "That job no longer exists." };
-  if (booking.mechanic_id !== mechanicId) return { ok: false as const, error: "This isn't your job." };
+  if (!booking) return refuse("not_found", "That job no longer exists.");
+  if (booking.mechanic_id !== mechanicId) return refuse("forbidden", "This isn't your job.");
   return { ok: true as const, booking, admin };
 }
+
+const MOVED_ON = "This job has already moved on. Refresh the page.";
 
 function revalidate(bookingId: string) {
   revalidatePath(`/mechanic/jobs/${bookingId}`);
@@ -108,8 +138,8 @@ const MAX_PARTS = 20;
 function resolveParts(
   inputs: readonly RevisionPartInput[],
   existingRows: readonly BookingPartRow[],
-): { ok: true; parts: RevisionPart[] } | { ok: false; error: string } {
-  if (inputs.length > MAX_PARTS) return { ok: false, error: `A job can carry up to ${MAX_PARTS} parts.` };
+): { ok: true; parts: RevisionPart[] } | MechanicRefusal {
+  if (inputs.length > MAX_PARTS) return refuse("invalid", `A job can carry up to ${MAX_PARTS} parts.`);
   const existingById = new Map(existingRows.map((r) => [r.id, r]));
   const parts: RevisionPart[] = [];
   for (const input of inputs) {
@@ -117,17 +147,17 @@ function resolveParts(
       // `existingRows` was loaded for this booking alone, so an unknown id is
       // a stale panel, not another job's part.
       const row = existingById.get(input.id);
-      if (!row) return { ok: false, error: "One of those parts is no longer on this job. Refresh the page." };
+      if (!row) return refuse("conflict", "One of those parts is no longer on this job. Refresh the page.");
       parts.push(partFromRow(row));
       continue;
     }
     const quantity = Math.round(Number(input.quantity ?? 1));
-    if (!Number.isInteger(quantity) || quantity <= 0 || quantity > 99) return { ok: false, error: "Enter a quantity between 1 and 99 for each part." };
+    if (!Number.isInteger(quantity) || quantity <= 0 || quantity > 99) return refuse("invalid", "Enter a quantity between 1 and 99 for each part.");
     const name = (input.name ?? "").trim().replace(/\s+/g, " ");
-    if (!name) return { ok: false, error: "Give each part a name." };
-    if (name.length > 200) return { ok: false, error: "Keep each part's name under 200 characters." };
+    if (!name) return refuse("invalid", "Give each part a name.");
+    if (name.length > 200) return refuse("invalid", "Keep each part's name under 200 characters.");
     const unitPence = Math.round(Number(input.unitPence));
-    if (!Number.isFinite(unitPence) || unitPence < 0) return { ok: false, error: `Enter a price for "${name}".` };
+    if (!Number.isFinite(unitPence) || unitPence < 0) return refuse("invalid", `Enter a price for "${name}".`);
     parts.push({ id: null, partId: null, name, quantity, unitPence, linePence: quantity * unitPence, sourcing: "self" });
   }
   return { ok: true, parts };
@@ -156,13 +186,13 @@ async function buildPreview(
   admin: ReturnType<typeof createAdminClient>,
   booking: RevisionBooking,
   input: RevisionInput,
-): Promise<{ ok: true; preview: RevisionPreview; sheet: Awaited<ReturnType<typeof loadJobSheet>> } | { ok: false; error: string }> {
-  const repairIds = dedupeRepairIds(input.repairIds ?? []);
-  if (repairIds.length === 0) return { ok: false, error: "Keep or add at least one repair. A job can't be empty. To end the job instead, use the options below once the customer has declined." };
-  if (repairIds.length > MAX_REPAIRS_PER_BOOKING) return { ok: false, error: `A job can carry up to ${MAX_REPAIRS_PER_BOOKING} repairs.` };
+): Promise<{ ok: true; preview: RevisionPreview; sheet: Awaited<ReturnType<typeof loadJobSheet>> } | MechanicRefusal> {
+  const repairIds = dedupeRepairIds(Array.isArray(input.repairIds) ? input.repairIds.filter((id) => typeof id === "string") : []);
+  if (repairIds.length === 0) return refuse("invalid", "Keep or add at least one repair. A job can't be empty. To end the job instead, use the options below once the customer has declined.");
+  if (repairIds.length > MAX_REPAIRS_PER_BOOKING) return refuse("invalid", `A job can carry up to ${MAX_REPAIRS_PER_BOOKING} repairs.`);
 
   const sheet = await loadJobSheet(admin, booking.id);
-  const parts = resolveParts(input.parts ?? [], sheet.partRows);
+  const parts = resolveParts(Array.isArray(input.parts) ? input.parts : [], sheet.partRows);
   if (!parts.ok) return parts;
 
   // Priced exactly as the checkout prices a basket for this car — at the
@@ -173,10 +203,10 @@ async function buildPreview(
     commissionRate: booking.commission_rate == null ? undefined : Number(booking.commission_rate),
   });
   if (!quote)
-    return {
-      ok: false,
-      error: "One of those repairs can't be priced for this car, or its parts can't be priced right now. Remove it or try again shortly.",
-    };
+    return refuse(
+      "invalid",
+      "One of those repairs can't be priced for this car, or its parts can't be priced right now. Remove it or try again shortly.",
+    );
 
   const money = revisionMoney(sheet.revisions);
   const before = snapshotFromBooking(booking, sheet.lineRows, sheet.partRows, approvedExtras(sheet.quotes, money.holdQuoteIds));
@@ -188,16 +218,38 @@ function revisableRefusal(status: string): string | null {
   return REVISABLE_STATUSES.includes(status) ? null : "The job can only be revised once you've arrived and started it.";
 }
 
+/**
+ * Why a revision can't be SENT right now, or null when it can: the job's
+ * status, then the three "one thing at a time" rules. One function so
+ * `sendRevision` and the mechanic app's panel (`reviseBlocker` on
+ * GET …/revision) give the same sentence.
+ *
+ * One open ask per booking, and one approved revision per booking: a second
+ * rewrite on top of an authorised difference has no safe capture arithmetic,
+ * and in practice means "complete it and quote the rest".
+ */
+export function reviseBlocker(status: string, revisions: readonly RevisionView[], quotes: readonly QuoteView[]): string | null {
+  const refusal = revisableRefusal(status);
+  if (refusal) return refusal;
+  const money = revisionMoney(revisions);
+  if (money.pending) return "A revised job is already waiting on the customer. Withdraw it before sending another.";
+  if (money.approved)
+    return "This job has already been revised once and approved. Complete it, then send a follow-on quote for anything else.";
+  if (quoteMoney(quotes).pendingNow)
+    return "A quote for extra work is still waiting on the customer. Withdraw it before revising the job.";
+  return null;
+}
+
 // --- Preview ------------------------------------------------------------------
 
 export async function previewRevision(
   mechanicId: string,
   input: RevisionInput,
-): Promise<{ ok: true; preview: RevisionPreview } | { ok: false; error: string }> {
+): Promise<{ ok: true; preview: RevisionPreview } | MechanicRefusal> {
   const owned = await ownedBooking(input.bookingId, mechanicId);
   if (!owned.ok) return owned;
   const refusal = revisableRefusal(owned.booking.status);
-  if (refusal) return { ok: false, error: refusal };
+  if (refusal) return refuse("conflict", refusal);
   const built = await buildPreview(owned.admin, owned.booking, input);
   if (!built.ok) return built;
   return { ok: true, preview: built.preview };
@@ -208,32 +260,25 @@ export async function previewRevision(
 export async function sendRevision(
   mechanicId: string,
   input: RevisionInput & { reason: string; note?: string | null },
-): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+): Promise<{ ok: true; id: string } | MechanicRefusal> {
   const reason = (input.reason ?? "").trim().replace(/\s+/g, " ");
-  if (!reason) return { ok: false, error: "Tell the customer why the booked repair isn't right. They read it before approving." };
-  if (reason.length > 500) return { ok: false, error: "Keep the reason under 500 characters." };
+  if (!reason) return refuse("invalid", "Tell the customer why the booked repair isn't right. They read it before approving.");
+  if (reason.length > 500) return refuse("invalid", "Keep the reason under 500 characters.");
   const note = (input.note ?? "").trim().slice(0, 1000) || null;
 
   const owned = await ownedBooking(input.bookingId, mechanicId);
   if (!owned.ok) return owned;
   const { booking, admin } = owned;
   const refusal = revisableRefusal(booking.status);
-  if (refusal) return { ok: false, error: refusal };
+  if (refusal) return refuse("conflict", refusal);
 
   const built = await buildPreview(admin, booking, input);
   if (!built.ok) return built;
   const { preview, sheet } = built;
-  if (!hasChanges(preview.diff)) return { ok: false, error: "Nothing has changed. Remove or add a repair or part first." };
+  if (!hasChanges(preview.diff)) return refuse("invalid", "Nothing has changed. Remove or add a repair or part first.");
 
-  // One open ask per booking, and one approved revision per booking: a
-  // second rewrite on top of an authorised difference has no safe capture
-  // arithmetic, and in practice means "complete it and quote the rest".
-  const money = revisionMoney(sheet.revisions);
-  if (money.pending) return { ok: false, error: "A revised job is already waiting on the customer. Withdraw it before sending another." };
-  if (money.approved)
-    return { ok: false, error: "This job has already been revised once and approved. Complete it, then send a follow-on quote for anything else." };
-  if (quoteMoney(sheet.quotes).pendingNow)
-    return { ok: false, error: "A quote for extra work is still waiting on the customer. Withdraw it before revising the job." };
+  const blocker = reviseBlocker(booking.status, sheet.revisions, sheet.quotes);
+  if (blocker) return refuse("conflict", blocker);
 
   const difference = preview.diff.differencePence;
   const now = new Date();
@@ -263,7 +308,7 @@ export async function sendRevision(
       })
       .select("id")
       .single();
-    if (holdError || !hold) return { ok: false, error: holdError?.message ?? "Couldn't prepare the payment for the difference." };
+    if (holdError || !hold) return refuse("failed", holdError?.message ?? "Couldn't prepare the payment for the difference.");
     holdQuoteId = hold.id;
     await admin.from("job_quote_lines").insert({
       quote_id: hold.id,
@@ -298,7 +343,7 @@ export async function sendRevision(
     .single();
   if (error || !revision) {
     if (holdQuoteId) await admin.from("job_quotes").delete().eq("id", holdQuoteId);
-    return { ok: false, error: error?.message ?? "Couldn't save the revised job." };
+    return refuse("failed", error?.message ?? "Couldn't save the revised job.");
   }
 
   await admin.from("booking_events").insert({
@@ -328,16 +373,16 @@ export async function sendRevision(
 export async function withdrawRevision(mechanicId: string, revisionId: string): Promise<RevisionResult> {
   const admin = createAdminClient();
   const revision = await loadRevision(admin, revisionId);
-  if (!revision) return { ok: false, error: "That revised job no longer exists." };
-  if (revision.mechanicId !== mechanicId) return { ok: false, error: "This isn't your job." };
-  if (revision.status !== "sent") return { ok: false, error: "Only a revised job that's waiting on the customer can be withdrawn." };
+  if (!revision) return refuse("not_found", "That revised job no longer exists.");
+  if (revision.mechanicId !== mechanicId) return refuse("forbidden", "This isn't your job.");
+  if (revision.status !== "sent") return refuse("conflict", "Only a revised job that's waiting on the customer can be withdrawn.");
   const now = new Date().toISOString();
   const { error } = await admin
     .from("job_revisions")
     .update({ status: "withdrawn", responded_at: now, updated_at: now })
     .eq("id", revisionId)
     .eq("status", "sent");
-  if (error) return { ok: false, error: error.message };
+  if (error) return refuse("failed", error.message);
   await withdrawHoldQuote(admin, revision);
   await admin.from("booking_events").insert({
     booking_id: revision.bookingId,
@@ -376,17 +421,17 @@ export async function withdrawHoldQuote(admin: ReturnType<typeof createAdminClie
 export async function endJobOnSite(
   mechanicId: string,
   input: { bookingId: string; charge: OnSiteCharge; note?: string | null },
-): Promise<RevisionResult> {
-  if (!["diagnostic", "cancellation", "none"].includes(input.charge)) return { ok: false, error: "Choose how to end the job." };
+): Promise<EndOnSiteResult> {
+  if (!["diagnostic", "cancellation", "none"].includes(input.charge)) return refuse("invalid", "Choose how to end the job.");
   const owned = await ownedBooking(input.bookingId, mechanicId);
   if (!owned.ok) return owned;
   const { booking, admin } = owned;
-  if (booking.status !== "in_progress") return { ok: false, error: "This job has already moved on. Refresh the page." };
+  if (booking.status !== "in_progress") return refuse("conflict", MOVED_ON);
 
   const revisions = await loadRevisionsForBooking(admin, booking.id);
   const money = revisionMoney(revisions);
-  if (money.pending) return { ok: false, error: "The revised job is still waiting on the customer. Wait for their answer or withdraw it." };
-  if (!money.declined) return { ok: false, error: "The job can only be ended this way after the customer has declined a revised job." };
+  if (money.pending) return refuse("conflict", "The revised job is still waiting on the customer. Wait for their answer or withdraw it.");
+  if (!money.declined) return refuse("conflict", "The job can only be ended this way after the customer has declined a revised job.");
   const declined = money.declined;
 
   const [tiers, diagnosticPence] = await Promise.all([cancelFeeTiers(admin), getOnSiteDiagnosticFeePence(admin)]);
@@ -423,14 +468,19 @@ export async function endJobOnSite(
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : "Payment error";
-      return { ok: false, error: `Couldn't settle the customer's payment hold: ${message}. Nothing was changed. Try again.` };
+      return refuse("conflict", `Couldn't settle the customer's payment hold: ${message}. Nothing was changed. Try again.`);
     }
   }
 
   // Any draft difference hold on the declined revision is released too.
   for (const r of revisions) await withdrawHoldQuote(admin, r);
 
-  const { error } = await admin
+  // The flip is also the CLAIM, as in completeAndChargeFor. Two overlapping
+  // calls — a double tap, or the app retrying after a timeout while the first
+  // is still running — both get this far, because settling the hold above reads
+  // an already-captured intent back rather than capturing twice. Only the one
+  // whose update actually changes the row goes on to pay the mechanic.
+  const { data: flipped, error } = await admin
     .from("bookings")
     .update({
       status: "cancelled",
@@ -441,8 +491,11 @@ export async function endJobOnSite(
     })
     .eq("id", booking.id)
     .eq("mechanic_id", mechanicId)
-    .eq("status", "in_progress");
-  if (error) return { ok: false, error: error.message };
+    .eq("status", "in_progress")
+    .select("id");
+  if (error) return refuse("failed", error.message);
+  if (!flipped?.length) return refuse("conflict", MOVED_ON);
+  let payoutPence = 0;
 
   await admin.from("booking_events").insert({
     booking_id: booking.id,
@@ -474,6 +527,7 @@ export async function endJobOnSite(
     });
     // Paid out like any job: the fee minus the booking's commission.
     const gross = feePayout(charged, Number(booking.commission_rate ?? 0.15)).mechanicPayoutPence;
+    payoutPence = gross;
     await payoutToMechanic({
       admin,
       stripe,
@@ -496,7 +550,170 @@ export async function endJobOnSite(
 
   void notifyCustomerJobEndedOnSite(booking, { feePence: charged, feeLabel, reason: declined.reason });
   revalidate(booking.id);
-  return { ok: true };
+  return { ok: true, status: "cancelled", chargedPence: charged, payoutPence };
+}
+
+// --- The panel, for the mechanic app ------------------------------------------
+//
+// The website's panel is handed whole snapshots and revision rows and works
+// the rest out in the browser. The app is handed the answer instead
+// (GET …/mechanic/bookings/[id]/revision): a snapshot is a lot of shape to
+// mirror, and none of the rules are the app's to own.
+
+export interface RevisionPanelView {
+  /** What is on the job now — the `before` a revision sent this minute would carry. */
+  current: {
+    /** One per CHOSEN catalogue item; `id` is what `repairIds` takes. */
+    repairs: Array<{ id: string; description: string; linePence: number }>;
+    /** The mechanic's own parts; `id` is what a `RevisionPartInput` keeps one by. */
+    parts: Array<{ id: string | null; name: string; quantity: number; unitPence: number; linePence: number; sourcing: "self" | "bmt" }>;
+    totalPence: number;
+    mechanicPayoutPence: number;
+  };
+  /** Newest first. */
+  revisions: Array<{
+    id: string;
+    /** "expired" once a `sent` one has lapsed, even before the cron has said so. */
+    status: RevisionStatus;
+    statusLabel: string;
+    reason: string;
+    note: string | null;
+    summary: string;
+    differencePence: number;
+    sentAt: string | null;
+    expiresAt: string | null;
+    respondedAt: string | null;
+  }>;
+  canRevise: boolean;
+  /** The sentence `sendRevision` would refuse with right now, or null. */
+  reviseBlocker: string | null;
+  /** Only when `endJobOnSite` would be allowed: the customer declined, or never answered. */
+  onSiteOptions?: OnSiteFeeOption[];
+}
+
+export async function revisionPanelFor(
+  mechanicId: string,
+  bookingId: string,
+): Promise<({ ok: true } & RevisionPanelView) | MechanicRefusal> {
+  const owned = await ownedBooking(bookingId, mechanicId);
+  if (!owned.ok) return owned;
+  const { booking, admin } = owned;
+
+  const sheet = await loadJobSheet(admin, booking.id);
+  const money = revisionMoney(sheet.revisions);
+  const before = snapshotFromBooking(booking, sheet.lineRows, sheet.partRows, approvedExtras(sheet.quotes, money.holdQuoteIds));
+  const blocker = reviseBlocker(booking.status, sheet.revisions, sheet.quotes);
+
+  // The same gate as endJobOnSite: in progress, nothing pending, one declined.
+  const canEndOnSite = booking.status === "in_progress" && !money.pending && Boolean(money.declined);
+  let onSiteOptions: OnSiteFeeOption[] | undefined;
+  if (canEndOnSite) {
+    const [tiers, diagnosticPence] = await Promise.all([cancelFeeTiers(admin), getOnSiteDiagnosticFeePence(admin)]);
+    onSiteOptions = onSiteFeeOptions({ diagnosticPence, enRoutePence: tiers.enRoute });
+  }
+
+  return {
+    ok: true,
+    current: {
+      repairs: groupRepairLines(before.lines).map((g) => ({
+        id: chosenItemId(g),
+        description: g.label ?? g.lines[0].description,
+        linePence: g.lines.reduce((sum, l) => sum + l.linePence, 0),
+      })),
+      parts: before.parts.map((p) => ({
+        id: p.id,
+        name: p.name,
+        quantity: p.quantity,
+        unitPence: p.unitPence,
+        linePence: p.linePence,
+        sourcing: p.sourcing,
+      })),
+      totalPence: before.totalPence,
+      mechanicPayoutPence: before.mechanicPayoutPence,
+    },
+    revisions: sheet.revisions.map((r) => {
+      const status: RevisionStatus = isRevisionExpired(r) ? "expired" : r.status;
+      return {
+        id: r.id,
+        status,
+        statusLabel: REVISION_STATUS_LABEL[status] ?? status,
+        reason: r.reason,
+        note: r.note,
+        summary: revisionSummary(diffRevision(r.before, r.after)),
+        differencePence: r.differencePence,
+        sentAt: r.sentAt,
+        expiresAt: r.expiresAt,
+        respondedAt: r.respondedAt,
+      };
+    }),
+    canRevise: blocker === null,
+    reviseBlocker: blocker,
+    ...(onSiteOptions ? { onSiteOptions } : {}),
+  };
+}
+
+/** `RevisionPreview`, trimmed to what the app's preview shows. */
+export interface RevisionPreviewView {
+  before: { totalPence: number; mechanicPayoutPence: number; serviceDurationHours: number };
+  after: { totalPence: number; mechanicPayoutPence: number; serviceDurationHours: number };
+  diff: {
+    differencePence: number;
+    direction: RevisionDirection;
+    durationChange: number;
+    lines: Record<"added" | "removed" | "kept", Array<{ description: string; linePence: number }>>;
+    parts: Record<"added" | "removed" | "kept", Array<{ name: string; quantity: number; linePence: number }>>;
+  };
+}
+
+export function previewView(preview: RevisionPreview): RevisionPreviewView {
+  const figures = (s: RevisionSnapshot) => ({
+    totalPence: s.totalPence,
+    mechanicPayoutPence: s.mechanicPayoutPence,
+    serviceDurationHours: s.serviceDurationHours,
+  });
+  const lines = (list: RevisionDiff["lines"]["added"]) =>
+    list.map((l) => ({ description: l.itemLabel ? `${l.description} · ${l.itemLabel}` : l.description, linePence: l.linePence }));
+  const parts = (list: readonly RevisionPart[]) => list.map((p) => ({ name: p.name, quantity: p.quantity, linePence: p.linePence }));
+  const { diff } = preview;
+  return {
+    before: figures(preview.before),
+    after: figures(preview.after),
+    diff: {
+      differencePence: diff.differencePence,
+      direction: diff.direction,
+      durationChange: diff.durationChange,
+      lines: { added: lines(diff.lines.added), removed: lines(diff.lines.removed), kept: lines(diff.lines.kept) },
+      parts: { added: parts(diff.parts.added), removed: parts(diff.parts.removed), kept: parts(diff.parts.kept) },
+    },
+  };
+}
+
+/**
+ * Task 38, for the app: the work an APPROVED revision took off, ready to send
+ * as a `follow_on` quote once the job is complete. The website's job page
+ * works this out itself and hands it to its panel; this is the same
+ * `followOnLinesFromRevision`, so both offer the same lines. `lines` is empty
+ * when there is nothing to offer — the job isn't complete, or wasn't revised.
+ */
+export async function followOnDraftFor(
+  mechanicId: string,
+  bookingId: string,
+): Promise<{ ok: true; title: string; note: string | null; lines: QuoteLineInput[] } | MechanicRefusal> {
+  const owned = await ownedBooking(bookingId, mechanicId);
+  if (!owned.ok) return owned;
+  const approved = revisionMoney(await loadRevisionsForBooking(owned.admin, bookingId)).approved;
+  const lines: QuoteLineInput[] =
+    owned.booking.status === "completed" && approved
+      ? followOnLinesFromRevision(diffRevision(approved.before, approved.after)).map((l) => ({
+          kind: l.kind,
+          description: l.description.slice(0, 200),
+          hours: l.hours,
+          quantity: l.quantity,
+          unitPence: l.unitPence,
+          nodeId: l.nodeId,
+        }))
+      : [];
+  return { ok: true, title: FOLLOW_ON_TITLE, note: null, lines };
 }
 
 // --- Catalogue search for the panel ------------------------------------------
@@ -516,13 +733,13 @@ export async function searchJobCatalogue(
   mechanicId: string,
   bookingId: string,
   query: string,
-): Promise<{ ok: true; hits: CatalogueHit[]; truncated: boolean } | { ok: false; error: string }> {
+): Promise<{ ok: true; hits: CatalogueHit[]; truncated: boolean } | MechanicRefusal> {
   const owned = await ownedBooking(bookingId, mechanicId);
   if (!owned.ok) return owned;
   const q = query.trim();
   if (q.length < 3) return { ok: true, hits: [], truncated: false };
   const result = await searchRepairCatalogue(owned.booking.vehicle_reg, q, owned.admin);
-  if (!result.ok) return { ok: false, error: result.message };
+  if (!result.ok) return refuse("conflict", result.message);
   return {
     ok: true,
     hits: result.hits

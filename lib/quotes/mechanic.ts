@@ -23,11 +23,10 @@ import { refuse, type MechanicRefusal } from "@/lib/mechanics/refusal";
 // is service-role after an ownership re-read, as with every other mechanic
 // action.
 //
-// The quote functions refuse with a `code` (lib/mechanics/refusal.ts) for the
-// routes to turn into a status; the website ignores it. Faults are web-only
-// and don't carry one.
+// Every function refuses with a `code` (lib/mechanics/refusal.ts) for the
+// routes to turn into a status; the website ignores it. Faults reached the app
+// in Task 68.
 
-export type QuoteResult = { ok: true } | { ok: false; error: string };
 export type QuoteWithdrawResult = { ok: true } | MechanicRefusal;
 export type QuoteCreateResult = { ok: true; id: string } | MechanicRefusal;
 export type QuotePreviewResult =
@@ -73,24 +72,24 @@ function revalidate(bookingId: string) {
 export async function addFault(
   mechanicId: string,
   input: { bookingId: string; description: string; severity?: string },
-): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+): Promise<QuoteCreateResult> {
   const description = (input.description ?? "").trim().replace(/\s+/g, " ");
-  if (!description) return { ok: false, error: "Describe the fault." };
-  if (description.length > 500) return { ok: false, error: "Keep the fault under 500 characters." };
+  if (!description) return refuse("invalid", "Describe the fault.");
+  if (description.length > 500) return refuse("invalid", "Keep the fault under 500 characters.");
   const severity = input.severity === "urgent" ? "urgent" : "advisory";
 
   const owned = await ownedBooking(input.bookingId, mechanicId);
   if (!owned.ok) return owned;
   const { booking, admin } = owned;
   if (!["confirmed", "en_route", "in_progress"].includes(booking.status))
-    return { ok: false, error: "Faults can only be added to an active job." };
+    return refuse("conflict", "Faults can only be added to an active job.");
 
   const { data, error } = await admin
     .from("booking_faults")
     .insert({ booking_id: booking.id, mechanic_id: mechanicId, description, severity })
     .select("id")
     .single();
-  if (error || !data) return { ok: false, error: error?.message ?? "Couldn't save the fault." };
+  if (error || !data) return refuse("failed", error?.message ?? "Couldn't save the fault.");
 
   await admin.from("booking_events").insert({
     booking_id: booking.id,
@@ -105,18 +104,18 @@ export async function addFault(
 }
 
 /** A mechanic can remove their own fault while the job is still active. */
-export async function deleteFault(mechanicId: string, faultId: string): Promise<QuoteResult> {
+export async function deleteFault(mechanicId: string, faultId: string): Promise<QuoteWithdrawResult> {
   const admin = createAdminClient();
   const { data: fault } = await admin
     .from("booking_faults")
     .select("id, booking_id, mechanic_id, quote_id")
     .eq("id", faultId)
     .maybeSingle();
-  if (!fault) return { ok: false, error: "That fault no longer exists." };
-  if (fault.mechanic_id !== mechanicId) return { ok: false, error: "This isn't your fault note." };
-  if (fault.quote_id) return { ok: false, error: "This fault has a quote against it. Withdraw the quote first." };
+  if (!fault) return refuse("not_found", "That fault no longer exists.");
+  if (fault.mechanic_id !== mechanicId) return refuse("forbidden", "This isn't your fault note.");
+  if (fault.quote_id) return refuse("conflict", "This fault has a quote against it. Withdraw the quote first.");
   const { error } = await admin.from("booking_faults").delete().eq("id", faultId);
-  if (error) return { ok: false, error: error.message };
+  if (error) return refuse("failed", error.message);
   revalidate(fault.booking_id);
   return { ok: true };
 }
@@ -142,7 +141,13 @@ async function priceForBooking(
   rawLines: unknown,
 ) {
   if (!Array.isArray(rawLines)) return refuse("invalid", "Add at least one line to the quote.");
-  const lines: QuoteLineInput[] = rawLines.map((l) => ({ ...(l as QuoteLineInput), partId: null }));
+  // A route handler passes JSON straight through, so make each line an object
+  // and its two optional ids strings before the pricer reads them.
+  const text = (v: unknown) => (typeof v === "string" ? v : null);
+  const lines: QuoteLineInput[] = rawLines.map((raw) => {
+    const l = (raw && typeof raw === "object" ? raw : {}) as QuoteLineInput;
+    return { ...l, description: text(l.description) ?? "", nodeId: text(l.nodeId), faultId: text(l.faultId), partId: null };
+  });
   const [hourlyRatePence, defaultRate] = await Promise.all([getHourlyRatePence(admin), getTakeRateBase(admin)]);
   const commissionRate = booking.commission_rate ?? defaultRate;
   const priced = safePriceQuoteLines(lines, { hourlyRatePence, commissionRate });
@@ -204,6 +209,15 @@ export async function createQuote(mechanicId: string, input: CreateQuoteInput): 
   const priced = await priceForBooking(admin, booking, input.lines);
   if (!priced.ok) return priced;
   const { totals, hourlyRatePence, commissionRate } = priced;
+
+  // "Quote for this" on a fault: the line names it (`job_quote_lines.fault_id`)
+  // and the fault points back at the quote. Only a fault noted on THIS job.
+  const quotedFaultIds = [...new Set(totals.lines.map((l) => l.faultId).filter((v): v is string => Boolean(v)))];
+  if (quotedFaultIds.length) {
+    const { data: known } = await admin.from("booking_faults").select("id").eq("booking_id", booking.id).in("id", quotedFaultIds);
+    if ((known ?? []).length !== quotedFaultIds.length)
+      return refuse("conflict", "One of the faults on this quote is no longer on the job. Refresh and try again.");
+  }
 
   const title = (input.title ?? "").trim().slice(0, 120) || null;
   const note = (input.note ?? "").trim().slice(0, 1000) || null;

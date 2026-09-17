@@ -80,6 +80,16 @@ export function groupRepairLines<T extends { itemId?: string | null; itemLabel?:
   return groups;
 }
 
+/**
+ * The catalogue id a group was CHOSEN by — what a revision's `repairIds` takes
+ * and "Book again" carries: a combined repair once, by its option id; a plain
+ * job by its node. The same rule as `repairIdsFromLines` (lib/revisions/snapshot.ts).
+ */
+export function chosenItemId<T extends { itemId?: string | null; nodeId: string | null }>(group: RepairLineGroup<T>): string {
+  const first = group.lines[0];
+  return group.label ? (first.itemId ?? first.nodeId ?? group.key) : (first.nodeId ?? group.key);
+}
+
 const FALLBACK_DESCRIPTION = "Vehicle repair";
 
 function toNumber(value: number | string | null | undefined): number | null {

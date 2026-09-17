@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { ArrowRightLeft, ChevronDown, Loader2, Plus, Search, Send, Trash2, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn, formatPrice } from "@/lib/utils";
-import { groupRepairLines } from "@/lib/bookings/repair-lines";
+import { chosenItemId, groupRepairLines } from "@/lib/bookings/repair-lines";
 import { REVISABLE_STATUSES, REVISION_STATUS_LABEL, isRevisionExpired, type OnSiteCharge } from "@/lib/revisions/status";
 import { differenceLabel, diffRevision, hasChanges, mechanicDirectionSentence } from "@/lib/revisions/diff";
 import { onSiteFeeOptions } from "@/lib/revisions/fees";
@@ -90,7 +90,7 @@ interface ChosenItem {
 function chosenFromLines(lines: ReviseJobLine[]): ChosenItem[] {
   return groupRepairLines(lines).map((g) => {
     const first = g.lines[0];
-    const id = g.label ? (first.itemId ?? first.nodeId ?? g.key) : (first.nodeId ?? g.key);
+    const id = chosenItemId(g);
     const hours = g.lines.reduce((s, l) => s + (l.chargedHours ?? 0), 0);
     const pence = g.lines.reduce((s, l) => s + (l.linePence ?? 0), 0);
     return {

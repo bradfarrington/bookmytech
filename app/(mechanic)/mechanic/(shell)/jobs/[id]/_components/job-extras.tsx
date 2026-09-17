@@ -19,6 +19,7 @@ import { cn, formatPrice } from "@/lib/utils";
 import { safePriceQuoteLines, type QuoteLineInput, type QuoteLineKind } from "@/lib/quotes/pricing";
 import { QUOTABLE_STATUSES, QUOTE_KIND_LABEL, QUOTE_STATUS_LABEL } from "@/lib/quotes/status";
 import type { FaultView, QuoteView } from "@/lib/quotes/load";
+import { FOLLOW_ON_TITLE } from "@/lib/revisions/diff";
 import { addFaultAction, deleteFaultAction } from "@/app/actions/booking-faults";
 import {
   createQuoteAction,
@@ -143,7 +144,7 @@ export function JobExtras({ bookingId, status, faults, quotes, hourlyRatePence, 
   function openBuilderForTheRest() {
     setKind("follow_on");
     setBuilderOpen(true);
-    if (!title) setTitle("The rest of the work from your visit");
+    if (!title) setTitle(FOLLOW_ON_TITLE);
     setLines(
       followOnPrefill.map((p) => ({
         key: newKey(),

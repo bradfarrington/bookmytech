@@ -53,7 +53,7 @@ Cores refuse with a `code` (`lib/mechanics/refusal.ts`); the website ignores it.
 - **Message routes check assignment first** (`ownedBooking`), because the core accepts either party and this route is for the mechanic.
 - **New push: a customer's message → the mechanic.** `sendPushToMechanic`, channel `updates`, title `New message from <short name>`, body the first 120 characters, `data: { type: "message", bookingId }`. The unread-message sweep still texts a mechanic who hasn't read it after ~5 minutes.
 - **No customer signature**, as instructed. The completion event still records `mechanic_confirmed: true`.
-- **Left web-only:** faults, job revisions, end-on-site, `markPartStatus`, bulk reschedule.
+- **Left web-only by this task:** faults, job revisions, end-on-site, `markPartStatus`, bulk reschedule — all since added in Task 68.
 
 ## Migration `0084`
 
