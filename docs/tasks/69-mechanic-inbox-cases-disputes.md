@@ -89,8 +89,8 @@ A private note for the customer alone does not push, email or nudge the mechanic
 ## Acceptance criteria
 
 - [ ] `GET /inbox` returns every source for a mechanic who has one of each, with `unread` following the read routes; 403 for a customer. *(Wording and read rules unit-tested; not run against data.)*
-- [ ] A mechanic's token can raise a case with a photo, reply in it and close it; open a dispute, reply with a photo, escalate and withdraw. *(Not run. Needs `0085`.)*
-- [ ] A private note is unreadable with the other party's token under RLS. *(In the policy; not exercised. Needs `0085`.)*
+- [ ] A mechanic's token can raise a case with a photo, reply in it and close it; open a dispute, reply with a photo, escalate and withdraw. *(Not run. `0085` is applied.)*
+- [ ] A private note is unreadable with the other party's token under RLS. *(In the policy; not exercised. `0085` is applied.)*
 - [x] No mechanic route can resolve a dispute or move money on one. *(By inspection: the six dispute routes are open, photo, read, reply, escalate, withdraw-own.)*
 - [ ] Each push arrives once, on `updates`, with its `data`. *(Not sent.)*
 - [x] The customer app and the web dispute, case and inbox pages behave as before. *(Same cores and return shapes; typecheck, lint, 631 tests, production build. Not clicked through.)*

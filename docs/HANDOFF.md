@@ -119,6 +119,29 @@ You are working on **Book My Tech**, a UK mobile-mechanic booking platform. This
 
 ## Current task
 
+### 📌 2026-09-17 — Where the mechanic-app backend stands (Tasks 64–69)
+
+All six tasks are built, pushed to `main`, and **every migration is applied**:
+`0081`–`0085`, by Brad (`0083`, `0084`, `0085` on 2026-09-17). Nothing is
+waiting on the database. **Never run `0032`** — see Task 69.
+
+**What is left is verification, not building.** Tasks 66–69 have only been
+checked by typecheck, lint, unit tests and a production build. Each task md
+lists its unticked boxes; in short, with real tokens on a test job:
+
+- Task 66 — the summary for a real mechanic; `daily_goal_pence` writable and
+  `resume_online_at` not; a timed offline brought back by the cron; both pushes.
+- Task 67 — a job confirmed → completed through the routes; a customer's token
+  refused; a failed capture retried.
+- Task 68 — faults, a revision previewed / sent / withdrawn, end-on-site with
+  each charge (and two overlapping calls paying once), part status, two jobs
+  moved in one call.
+- Task 69 — the inbox with one of each source; a case and a dispute with a
+  photo; a private note unreadable with the other party's token; each push.
+
+And on a phone: a real push received, which needs the app build and its Expo
+push credentials.
+
 ### 🟡 2026-09-17 — BUILT, `0085` applied: the mechanic app's Inbox, cases and disputes (Task 69)
 
 **One feed, Get-help cases with evidence, and disputes a mechanic can answer

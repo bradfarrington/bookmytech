@@ -65,7 +65,7 @@ Eight `platform_settings` rows for the two new rate-limit families. **No schema 
 - [ ] A customer's token gets 403 everywhere; another mechanic's gets 403/404. *(By construction — `requireMobileMechanic`, then each core's ownership check — not exercised.)*
 - [ ] A failed capture leaves the job `in_progress` and a retry succeeds. *(The capture path is unchanged; not exercised.)*
 - [x] The web job page behaves exactly as before. *(Actions return the same shapes; the page's money figures come from `jobMoney`, unit-tested against the old sums. Typecheck, lint, 616 tests, production build. Not clicked through.)*
-- [ ] **`0084` applied** — Brad. Optional: the limits apply from code without it.
+- [x] **`0084` applied** — Brad, 2026-09-17.
 
 ## For the app repos
 

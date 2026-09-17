@@ -41,8 +41,8 @@ Safe to deploy before it is applied: going offline still works (the failed clear
 ## Acceptance criteria
 
 - [ ] `GET /mechanic/summary` returns the shape for a mechanic; 403 for a customer. *(Built; 403 comes from `requireMobileMechanic` as on every mechanic route. Not called against real data.)*
-- [ ] A mechanic can update their own `daily_goal_pence` with the anon-key client, and cannot update `resume_online_at`. *(Needs `0083`.)*
-- [ ] Offline with `{ "minutes": 30 }` sets `resume_online_at`; the cron brings them back online and re-dispatches; going online by hand clears it. *(Needs `0083`.)*
+- [ ] A mechanic can update their own `daily_goal_pence` with the anon-key client, and cannot update `resume_online_at`. *(`0083` is applied; not exercised.)*
+- [ ] Offline with `{ "minutes": 30 }` sets `resume_online_at`; the cron brings them back online and re-dispatches; going online by hand clears it. *(`0083` is applied; not exercised.)*
 - [ ] Both pushes arrive once, on the `updates` channel, with the right `data`. *(Copy and once-only logic unit-tested; not sent.)*
 - [x] The web mechanic surface behaves exactly as before. *(`setOwnAvailability` returns the same two fields; `completeAndCharge` gains one best-effort call. Typecheck, lint, 612 tests. Not clicked through.)*
 - [x] **`0083` applied** — Brad, 2026-09-17.
