@@ -14,6 +14,12 @@ integrations. **This repo is its backend.** It reaches us two ways:
   <supabase access token>`, JSON in, JSON out, no cookies, no redirects.
 - **Direct Supabase reads** under the existing customer RLS policies.
 
+There is also a **mechanic mobile app**, `bmt-mechanic-app` (Task 64). It uses
+the same two ways in — its handlers live under `app/api/mobile/v1/mechanic/`,
+guarded by `requireMobileMechanic` — and it reads and writes its own `mechanics`
+row directly under RLS. Everything below applies to it equally; read "the app"
+as "either app".
+
 ## The governing principle — apply it to anything, not just the list below
 
 A mobile app **cannot be force-updated**. Unlike the website, where a deploy

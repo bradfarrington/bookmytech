@@ -272,7 +272,8 @@ A `public.is_admin()` `SECURITY DEFINER` function is the single source of truth 
 - `SELECT`: `Admins can view all mechanics` — `using (public.is_admin())`
 - `INSERT`: `Admins can insert mechanics` — `with check (public.is_admin())` (manual creation only until proper onboarding lands in task 07)
 - `UPDATE`: `Admins can update mechanics` — `using (public.is_admin()) with check (public.is_admin())`
-- `UPDATE`: `Mechanics can update own status` — `using (auth.uid() = id) with check (auth.uid() = id)` (lets the mechanic toggle online/offline/on_job from their dashboard without admin involvement)
+- `UPDATE`: `Mechanics can update own status` — `using (auth.uid() = id) with check (auth.uid() = id)` (lets the mechanic toggle online/offline from their dashboard without admin involvement)
+- **Column privileges + trigger (`0081`, Task 64).** The policy above restricts the row, not the columns, so `authenticated` holds UPDATE only on `status`, `online_at`, `last_seen_at`, `bio`, `service_radius_miles`, `specialisms` and `base_postcode`. `rating`, `job_count`, `is_pro`, `approved_at`, `is_suspended`, `suspended_until` and the four `stripe_*` columns are service-role only. The `mechanics_protect_privileged_columns` trigger backs that up and adds the value rules a grant can't express, for a non-admin session: no `online` without payouts or while suspended, no setting `on_job`, and `base_postcode` can be filled in but not moved. Admins and the service role are exempt.
 - `DELETE`: `Admins can delete mechanics` — `using (public.is_admin())`
 
 **`booking_events`** — defined in `0005_booking_events.sql`. Append-only — there's no UPDATE or DELETE policy.

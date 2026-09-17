@@ -1,8 +1,7 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { redispatchPending } from "@/lib/dispatch/dispatch";
+import { setAvailabilityFor } from "@/lib/mechanics/availability";
 
 export type MechanicStatusResult =
   | { ok: true; status: "online" | "offline" }
@@ -12,9 +11,10 @@ export type MechanicStatusResult =
 // under their session so RLS ("Mechanics can update own status", 0004) applies
 // — we never need the service-role client here.
 //
-// We deliberately only expose 'online' / 'offline' to the toggle. 'on_job' is
-// set by the lifecycle actions when a job is in progress, not by the mechanic
-// manually.
+// The rules (payouts gate, online_at, redispatch) live in
+// lib/mechanics/availability.ts, shared with the mechanic app's
+// POST /api/mobile/v1/mechanic/status. This action only resolves the mechanic
+// from the cookie session.
 export async function setOwnAvailability(
   status: "online" | "offline",
 ): Promise<MechanicStatusResult> {
@@ -24,45 +24,12 @@ export async function setOwnAvailability(
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Not signed in." };
 
-  // Gate: a mechanic can't go online until Stripe payouts are enabled —
-  // otherwise we'd dispatch jobs we can't pay them for (Task 08 Stage 3).
-  if (status === "online") {
-    const { data: mechanic } = await supabase
-      .from("mechanics")
-      .select("stripe_payouts_enabled")
-      .eq("id", user.id)
-      .single();
-    if (!mechanic?.stripe_payouts_enabled) {
-      return {
-        ok: false,
-        error: "Connect your bank account before going online: Settings → Get paid.",
-      };
-    }
+  const result = await setAvailabilityFor(supabase, user.id, status);
+  if (result.ok) return result;
+
+  // The website can point at where to fix it; the app has its own screen.
+  if (result.refused === "no_payouts") {
+    return { ok: false, error: `${result.error.replace(/\.$/, "")}: Settings → Get paid.` };
   }
-
-  const now = new Date().toISOString();
-  const patch: Record<string, string> = { status, last_seen_at: now };
-  // Stamp online_at only on the offline→online transition so it reflects the
-  // start of the current session, not every heartbeat.
-  if (status === "online") patch.online_at = now;
-
-  const { error } = await supabase
-    .from("mechanics")
-    .update(patch)
-    .eq("id", user.id);
-
-  if (error) return { ok: false, error: error.message };
-
-  // Coming online rescues any job booked while nobody was available — re-offer
-  // every still-unassigned booking so it reaches this mechanic if in range.
-  if (status === "online") {
-    try {
-      await redispatchPending();
-    } catch (err) {
-      console.error("redispatch on go-online failed", err);
-    }
-  }
-
-  revalidatePath("/mechanic/jobs");
-  return { ok: true, status };
+  return { ok: false, error: result.error };
 }

@@ -50,13 +50,20 @@ export async function createConnectedAccount(email?: string | null): Promise<str
  * A fresh Stripe-hosted onboarding link. These are single-use and short-lived,
  * so we mint a new one each time the mechanic starts/continues onboarding.
  * `refresh_url` is hit when the link expires; `return_url` when they finish.
+ *
+ * Both default to the web onboarding page. The mechanic app passes its own
+ * (lib/mechanics/mobile-return.ts) — Stripe only accepts https here, so that is
+ * a page of ours which bounces to the app's scheme.
  */
-export async function createOnboardingLink(accountId: string): Promise<string> {
+export async function createOnboardingLink(
+  accountId: string,
+  urls?: { returnUrl: string; refreshUrl: string },
+): Promise<string> {
   const base = `${siteUrl()}/mechanic/onboarding/stripe`;
   const link = await stripe.accountLinks.create({
     account: accountId,
-    refresh_url: `${base}?refresh=1`,
-    return_url: `${base}?return=1`,
+    refresh_url: urls?.refreshUrl ?? `${base}?refresh=1`,
+    return_url: urls?.returnUrl ?? `${base}?return=1`,
     type: "account_onboarding",
   });
   return link.url;

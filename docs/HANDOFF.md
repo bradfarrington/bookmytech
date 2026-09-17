@@ -119,6 +119,44 @@ You are working on **Book My Tech**, a UK mobile-mechanic booking platform. This
 
 ## Current task
 
+### 🟡 2026-09-17 — BUILT, migration pending: the mechanic app's first endpoints (Task 64)
+
+**The mechanic app (`bmt-mechanic-app`, a second Expo repo) now has a backend.**
+Three routes under `app/api/mobile/v1/mechanic/`, behind a new
+`requireMobileMechanic` guard (has a `mechanics` row — not `role`):
+
+- `POST …/mechanic/stripe/onboarding` `{ returnUrl }` → `{ url }`
+- `POST …/mechanic/stripe/refresh` → `{ payoutsEnabled }`
+- `POST …/mechanic/status` `{ status }` → `{ status }`, refusals are **409**
+
+Each is a thin wrapper. The website's `startStripeOnboarding`,
+`refreshStripeStatus` and `setOwnAvailability` were hollowed out into
+`lib/mechanics/stripe-onboarding.ts` and `lib/mechanics/availability.ts`, and
+both clients call those. Stripe returns the app user to
+`/mobile-return/mechanic-stripe?to=…`, which 302s to the app's scheme — outside
+`/mechanic/*` on purpose, because proxy gates that on a cookie the in-app
+browser doesn't have. `to` is pinned to `bmtmechanic://` and
+`exp+bmt-mechanic-app://`.
+
+Verified live against the e2e accounts: mechanic 200 on all three, customer 403,
+`https://evil.example` 400, online without payouts 409, and a real test-mode
+onboarding link minted (account deleted and the row reset afterwards).
+
+**⚠️ `0081` is NOT applied yet — Brad to run it.** It seeds the `mechanic`
+rate-limit family (code defaults already apply) and closes the `mechanics`
+version of the Task 62 hole: a mechanic could write their own `rating`, `is_pro`,
+`is_suspended` and `stripe_*` flags, or `status = 'online'` past the payouts
+gate. After applying, verify as a mechanic that `update({ is_pro: true })` is
+refused with `42501` and the web online toggle still works. Both apps then
+regenerate types.
+
+Two small website behaviour changes ride along, both from sharing the core: a
+suspended mechanic is now refused when going online (dispatch already ignored
+them), and `online_at` is stamped only on the offline→online transition, as its
+comment always said.
+
+See `docs/tasks/64-mechanic-mobile-api.md`.
+
 ### ✅ 2026-09-16 — DONE: repair prices include their parts (Task 63)
 
 **`/book/repairs` shows what a job costs, not "£1614 + parts".** Each bookable

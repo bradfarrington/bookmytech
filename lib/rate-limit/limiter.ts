@@ -102,6 +102,14 @@ export const RATE_LIMIT_DEFAULTS = {
   mobile_slots_user_daily: 400,
   mobile_slots_ip_burst: 40,
   mobile_slots_ip_daily: 800,
+  // The mechanic app (/mechanic/**): starting payouts onboarding and re-reading
+  // its status are a Stripe call each, and going online re-offers every waiting
+  // booking. A mechanic toggles availability a few times a day and onboards
+  // once; the burst allows for an expired Stripe link and a few impatient taps.
+  mobile_mechanic_user_burst: 10,
+  mobile_mechanic_user_daily: 150,
+  mobile_mechanic_ip_burst: 20,
+  mobile_mechanic_ip_daily: 400,
 } as const;
 
 export type RateLimitKey = keyof typeof RATE_LIMIT_DEFAULTS;

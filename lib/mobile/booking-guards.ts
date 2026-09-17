@@ -71,6 +71,9 @@ export async function requireMobileCustomer(request: Request): Promise<MobileCus
  *   account  — garage adds and saved cards (a DVLA lookup or a Stripe call each)
  *   slots    — mechanics per arrival window (also callable by guests; see
  *              app/api/mobile/v1/slots/route.ts for the guest rules)
+ *   mechanic — the MECHANIC app: payouts onboarding (Stripe calls) and the
+ *              online/offline toggle (a redispatch). Callers are mechanics, not
+ *              customers — see lib/mobile/mechanic-guards.ts
  */
 export type MobileLimitFamily =
   | "checkout"
@@ -80,7 +83,8 @@ export type MobileLimitFamily =
   | "upload"
   | "vehicle"
   | "account"
-  | "slots";
+  | "slots"
+  | "mechanic";
 
 /**
  * Count this request against its bucket family. Returns a ready-to-return 429
