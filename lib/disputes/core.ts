@@ -12,6 +12,8 @@ import {
   MAX_DISPUTE_PHOTOS,
   REASON_LABELS,
 } from "@/lib/disputes/constants";
+import { pushMechanicUpdate } from "@/lib/push/mechanic-updates";
+import type { MechanicRefusalCode } from "@/lib/mechanics/refusal";
 
 // The one implementation of the dispute lifecycle.
 //
@@ -43,8 +45,21 @@ import {
 // Reads are the other way round: parties get scoped SELECT policies, so the
 // mobile app reads a dispute and its thread straight from Supabase.
 
-export type DisputeResult = { ok: true; disputeId: string } | { ok: false; error: string };
-export type SimpleResult = { ok: true } | { ok: false; error: string };
+/**
+ * A refusal. `code` is for the MECHANIC app's routes, which answer a refusal
+ * with a status (lib/mobile/mechanic-actions.ts): absent means "right caller,
+ * wrong moment" (409). The website and the customer app show `error` and
+ * ignore it.
+ */
+export interface DisputeRefusal {
+  ok: false;
+  error: string;
+  code?: MechanicRefusalCode;
+}
+export type DisputeResult = { ok: true; disputeId: string } | DisputeRefusal;
+export type SimpleResult = { ok: true } | DisputeRefusal;
+/** `sendDisputeMessageFor`: the new message's id comes back for the apps. */
+export type DisputeMessageResult = { ok: true; id?: string } | DisputeRefusal;
 
 type Admin = ReturnType<typeof createAdminClient>;
 
@@ -103,25 +118,64 @@ export const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
 export async function uploadDisputePhotoFor(
   file: File,
   callerId: string,
-): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
-  if (!(file instanceof File) || file.size === 0) return { ok: false, error: "No photo selected." };
-  if (file.size > MAX_PHOTO_BYTES) return { ok: false, error: "Photo must be 10 MB or smaller." };
+): Promise<{ ok: true; url: string } | DisputeRefusal> {
+  return uploadEvidencePhoto(file, callerId, "disputes");
+}
+
+/** Where evidence lives in `job-media`: dispute photos, and Get-help case photos (Task 69). */
+export type EvidenceFolder = "disputes" | "cases";
+
+/** One photo into `job-media/<folder>/<callerId>/…` — the same checks whichever folder. */
+export async function uploadEvidencePhoto(
+  file: File,
+  callerId: string,
+  folder: EvidenceFolder,
+): Promise<{ ok: true; url: string } | DisputeRefusal> {
+  if (!(file instanceof File) || file.size === 0) return { ok: false, code: "invalid", error: "No photo selected." };
+  if (file.size > MAX_PHOTO_BYTES) return { ok: false, code: "invalid", error: "Photo must be 10 MB or smaller." };
   const ext = ALLOWED_PHOTO_TYPES[file.type];
-  if (!ext) return { ok: false, error: "Use a JPG, PNG or WebP image." };
+  if (!ext) return { ok: false, code: "invalid", error: "Use a JPG, PNG or WebP image." };
 
   const admin = createAdminClient();
   // Keyed by the uploader, so an object's path always records who put it there.
-  const path = `disputes/${callerId}/${Date.now()}-${Math.round(file.size)}.${ext}`;
+  const path = `${folder}/${callerId}/${Date.now()}-${Math.round(file.size)}.${ext}`;
   const bytes = new Uint8Array(await file.arrayBuffer());
   const { error: upErr } = await admin.storage
     .from("job-media")
     .upload(path, bytes, { contentType: file.type, upsert: false });
-  if (upErr) return { ok: false, error: upErr.message };
+  if (upErr) return { ok: false, code: "failed", error: upErr.message };
 
   const {
     data: { publicUrl },
   } = admin.storage.from("job-media").getPublicUrl(path);
   return { ok: true, url: publicUrl };
+}
+
+/**
+ * Keep only the URLs this caller got back from `uploadEvidencePhoto` for this
+ * folder — the path records who put each object there, so a URL under anyone
+ * else's prefix (or anywhere else on the internet) is dropped rather than
+ * shown to an admin as "the mechanic's evidence". Capped at `max`.
+ */
+export function ownEvidencePhotos(
+  admin: Admin,
+  urls: unknown,
+  callerId: string,
+  folder: EvidenceFolder,
+  max: number = MAX_DISPUTE_PHOTOS,
+): string[] {
+  if (!Array.isArray(urls)) return [];
+  // Asked for a file and trimmed back to its folder: the client tidies a path
+  // that ends in a slash, and the slash is the point.
+  const {
+    data: { publicUrl: probe },
+  } = admin.storage.from("job-media").getPublicUrl(`${folder}/${callerId}/x`);
+  const prefix = probe.slice(0, -1);
+  const own = urls.filter(
+    (url): url is string =>
+      typeof url === "string" && url.startsWith(prefix) && /^[A-Za-z0-9._-]+$/.test(url.slice(prefix.length)),
+  );
+  return [...new Set(own)].slice(0, max);
 }
 
 // ---------------------------------------------------------------------------
@@ -157,7 +211,7 @@ export async function openDisputeFor(
     .select(DISPUTE_BOOKING_SELECT)
     .eq("id", bookingId)
     .single<DisputeBooking>();
-  if (!booking) return { ok: false, error: "That booking no longer exists." };
+  if (!booking) return { ok: false, code: "not_found", error: "That booking no longer exists." };
 
   // Determine the opener's role from their relationship to the booking.
   // `ownsBooking` rather than a customer_id comparison, because a booking made
@@ -167,7 +221,7 @@ export async function openDisputeFor(
   const isCustomer = ownsBooking(booking, caller);
   const isMechanic = booking.mechanic_id === callerId;
   if (!isCustomer && !isMechanic)
-    return { ok: false, error: "You're not a party to this booking." };
+    return { ok: false, code: "forbidden", error: "You're not a party to this booking." };
   const role: "customer" | "mechanic" = isCustomer ? "customer" : "mechanic";
 
   // Eligibility by role.
@@ -183,10 +237,10 @@ export async function openDisputeFor(
 
   // Validate the input.
   if (!isValidReason(role, input.reasonCategory))
-    return { ok: false, error: "Pick a reason for the dispute." };
+    return { ok: false, code: "invalid", error: "Pick a reason for the dispute." };
   const description = input.description.trim();
   if (description.length < MIN_DESCRIPTION_CHARS)
-    return { ok: false, error: `Please add at least ${MIN_DESCRIPTION_CHARS} characters describing the issue.` };
+    return { ok: false, code: "invalid", error: `Please add at least ${MIN_DESCRIPTION_CHARS} characters describing the issue.` };
   const photos = (input.photos ?? []).slice(0, MAX_DISPUTE_PHOTOS);
   const refundRequested =
     role === "customer" && input.refundRequestedPence != null && input.refundRequestedPence > 0
@@ -211,7 +265,7 @@ export async function openDisputeFor(
   if (error || !dispute) {
     if (error?.code === "23505")
       return { ok: false, error: "There's already an open dispute for this booking." };
-    return { ok: false, error: error?.message ?? "Couldn't open the dispute." };
+    return { ok: false, code: "failed", error: error?.message ?? "Couldn't open the dispute." };
   }
 
   // Booking → disputed, with an audit event.
@@ -267,16 +321,7 @@ async function notifyDisputeOpened(
 
   // The other party.
   if (openerRole === "customer") {
-    const to = await mechanicEmail(admin, booking.mechanic_id);
-    if (to) {
-      renderTemplateEmail("dispute_opened_mechanic", {
-        service: svc,
-        ref,
-        link: `${siteUrl()}/mechanic/disputes/${disputeId}`,
-      })
-        .then(({ subject, html }) => sendEmail({ to, subject, html }))
-        .catch((e) => console.error("dispute mechanic email failed", e));
-    }
+    await notifyMechanicOfDispute(admin, booking, disputeId, "dispute_opened_mechanic", { service: svc, ref }, `${svc} · job ${ref}`);
   } else if (booking.customer_email) {
     const to = booking.customer_email;
     renderTemplateEmail("dispute_opened_customer", {
@@ -287,6 +332,34 @@ async function notifyDisputeOpened(
     })
       .then(({ subject, html }) => sendEmail({ to, subject, html }))
       .catch((e) => console.error("dispute customer email failed", e));
+  }
+}
+
+/**
+ * Tell the MECHANIC something about a dispute: the email they have always had,
+ * and (Task 69) the same news to the mechanic app — the email's own subject as
+ * the push title, so the two can't say different things. The push doesn't wait
+ * on there being an email address.
+ */
+export async function notifyMechanicOfDispute(
+  admin: Admin,
+  booking: Pick<DisputeBooking, "mechanic_id">,
+  disputeId: string,
+  template: string,
+  vars: Record<string, string>,
+  pushBody: string,
+): Promise<void> {
+  if (!booking.mechanic_id) return;
+  try {
+    const to = await mechanicEmail(admin, booking.mechanic_id);
+    const { subject, html } = await renderTemplateEmail(template, {
+      ...vars,
+      link: `${siteUrl()}/mechanic/disputes/${disputeId}`,
+    });
+    pushMechanicUpdate(booking.mechanic_id, { title: subject, body: pushBody }, { type: "dispute", disputeId });
+    if (to) sendEmail({ to, subject, html }).catch((e) => console.error(`${template} email failed`, e));
+  } catch (e) {
+    console.error(`${template} notification failed`, e);
   }
 }
 
@@ -316,14 +389,14 @@ export async function partyForDispute(disputeId: string, caller: BookingCaller) 
     .select("id, booking_id, opened_by, opened_by_role, status, payout_held")
     .eq("id", disputeId)
     .single<DisputeRow>();
-  if (!dispute) return { ok: false as const, error: "That dispute no longer exists." };
+  if (!dispute) return { ok: false as const, code: "not_found" as const, error: "That dispute no longer exists." };
 
   const { data: booking } = await admin
     .from("bookings")
     .select(DISPUTE_BOOKING_SELECT)
     .eq("id", dispute.booking_id)
     .single<DisputeBooking>();
-  if (!booking) return { ok: false as const, error: "That booking no longer exists." };
+  if (!booking) return { ok: false as const, code: "not_found" as const, error: "That booking no longer exists." };
 
   const { data: profile } = await admin
     .from("profiles")
@@ -340,7 +413,7 @@ export async function partyForDispute(disputeId: string, caller: BookingCaller) 
   if (ownsBooking(booking, caller)) role = "customer";
   else if (booking.mechanic_id === callerId) role = "mechanic";
   else if (profile?.role === "admin") role = "admin";
-  if (!role) return { ok: false as const, error: "You're not a party to this dispute." };
+  if (!role) return { ok: false as const, code: "forbidden" as const, error: "You're not a party to this dispute." };
 
   return { ok: true as const, admin, dispute, booking, userId: callerId, role };
 }
@@ -360,27 +433,56 @@ export function revalidateDispute(disputeId: string, bookingId: string) {
 // the dispute opened → responded.
 // ---------------------------------------------------------------------------
 
+/** Who a message is for. null = every party; the other two are Book My Tech's private notes. */
+export type DisputeMessageAudience = "mechanic" | "customer" | null;
+
+export interface DisputeMessageOptions {
+  /** URLs from `uploadDisputePhotoFor`. Anything that isn't the caller's own upload is dropped. */
+  photos?: unknown;
+  /**
+   * ADMIN ONLY (ignored from anyone else): a note only one party can read. The
+   * "Parties read dispute thread" policy (0085) is what keeps it from the
+   * other — their client never receives the row.
+   */
+  visibleTo?: DisputeMessageAudience;
+}
+
 export async function sendDisputeMessageFor(
   disputeId: string,
   body: string,
   caller: BookingCaller,
-): Promise<SimpleResult> {
-  const trimmed = body.trim();
-  if (!trimmed) return { ok: false, error: "Type a message first." };
-
+  options: DisputeMessageOptions = {},
+): Promise<DisputeMessageResult> {
   const party = await partyForDispute(disputeId, caller);
   if (!party.ok) return party;
   const { admin, dispute, booking, userId, role } = party;
+
+  const photos = ownEvidencePhotos(admin, options.photos, userId, "disputes");
+  // Photos can stand alone — "here is the receipt" needs no sentence — but the
+  // column is never empty, so the thread still reads sensibly without images.
+  const trimmed = body.trim() || (photos.length ? `Sent ${photos.length === 1 ? "a photo" : `${photos.length} photos`}.` : "");
+  if (!trimmed) return { ok: false, code: "invalid", error: "Type a message first." };
   if (["resolved", "withdrawn"].includes(dispute.status))
     return { ok: false, error: "This dispute is closed." };
 
-  const { error } = await admin.from("dispute_messages").insert({
-    dispute_id: disputeId,
-    sender_id: userId,
-    sender_role: role,
-    body: trimmed,
-  });
-  if (error) return { ok: false, error: error.message };
+  const visibleTo: DisputeMessageAudience =
+    role === "admin" && (options.visibleTo === "mechanic" || options.visibleTo === "customer") ? options.visibleTo : null;
+
+  // Only name the new columns when they are used, so a plain message still
+  // sends on a database that hasn't had 0085 yet.
+  const { data: inserted, error } = await admin
+    .from("dispute_messages")
+    .insert({
+      dispute_id: disputeId,
+      sender_id: userId,
+      sender_role: role,
+      body: trimmed,
+      ...(photos.length ? { photos } : {}),
+      ...(visibleTo ? { visible_to: visibleTo } : {}),
+    })
+    .select("id")
+    .single();
+  if (error) return { ok: false, code: "failed", error: error.message };
 
   // The non-opener's first message moves the case to 'responded'.
   if (role !== "admin" && role !== dispute.opened_by_role && dispute.status === "opened") {
@@ -407,17 +509,66 @@ export async function sendDisputeMessageFor(
 
   // Nudge the mechanic on every new reply from another party so they don't have
   // to be watching the thread (the admin gets the 'responded' email above).
+  // Not for a note meant only for the customer — they can't read it.
+  if (role !== "mechanic" && visibleTo !== "customer") {
+    await notifyMechanicOfDispute(
+      admin,
+      booking,
+      disputeId,
+      "dispute_new_message_mechanic",
+      { role, service: serviceName(booking), ref: formatJobNumber(booking.job_number) },
+      trimmed.slice(0, 120),
+    );
+  }
+
+  revalidateDispute(disputeId, dispute.booking_id);
+  return { ok: true, id: inserted?.id as string | undefined };
+}
+
+// ---------------------------------------------------------------------------
+// Escalate to the admin mediator (manual; the cron does it automatically at
+// ESCALATION_HOURS). "Ask Book My Tech to step in": it hands the DECISION over,
+// it doesn't make one — no money moves and nothing is resolved here.
+// ---------------------------------------------------------------------------
+
+export async function escalateDisputeFor(disputeId: string, caller: BookingCaller): Promise<SimpleResult> {
+  const party = await partyForDispute(disputeId, caller);
+  if (!party.ok) return party;
+  const { admin, dispute, booking, userId, role } = party;
+  if (role === "admin") return { ok: false, error: "Admins arbitrate escalated disputes directly." };
+  if (!["opened", "responded"].includes(dispute.status))
+    return { ok: false, error: "This dispute can't be escalated from its current state." };
+
+  await admin
+    .from("disputes")
+    .update({ status: "escalated", escalated_at: new Date().toISOString() })
+    .eq("id", disputeId);
+  await admin.from("booking_events").insert({
+    booking_id: dispute.booking_id,
+    event_type: "dispute_escalated",
+    actor_id: userId,
+    actor_role: role,
+    payload: { dispute_id: disputeId, escalated_by: role },
+  });
+  renderTemplateEmail("dispute_escalated_admin", {
+    role,
+    service: serviceName(booking),
+    ref: formatJobNumber(booking.job_number),
+    link: `${siteUrl()}/admin/disputes/${disputeId}`,
+  })
+    .then(({ subject, html }) => sendEmail({ to: ADMIN_EMAIL, subject, html }))
+    .catch(() => {});
+
+  // Let the mechanic know when the other party escalates (admins can't escalate).
   if (role !== "mechanic") {
-    const mechTo = await mechanicEmail(admin, booking.mechanic_id);
-    if (mechTo)
-      renderTemplateEmail("dispute_new_message_mechanic", {
-        role,
-        service: serviceName(booking),
-        ref: formatJobNumber(booking.job_number),
-        link: `${siteUrl()}/mechanic/disputes/${disputeId}`,
-      })
-        .then(({ subject, html }) => sendEmail({ to: mechTo, subject, html }))
-        .catch(() => {});
+    await notifyMechanicOfDispute(
+      admin,
+      booking,
+      disputeId,
+      "dispute_escalated_mechanic",
+      { role, service: serviceName(booking), ref: formatJobNumber(booking.job_number) },
+      "Book My Tech will review it and decide.",
+    );
   }
 
   revalidateDispute(disputeId, dispute.booking_id);
@@ -438,7 +589,7 @@ export async function withdrawDisputeFor(
   const { admin, dispute, booking, userId, role } = party;
 
   if (userId !== dispute.opened_by)
-    return { ok: false, error: "Only the person who opened the dispute can withdraw it." };
+    return { ok: false, code: "forbidden", error: "Only the person who opened the dispute can withdraw it." };
   if (["resolved", "withdrawn"].includes(dispute.status))
     return { ok: false, error: "This dispute is already closed." };
 
@@ -454,8 +605,23 @@ export async function withdrawDisputeFor(
     })
     .eq("id", disputeId);
 
-  // Job goes back to its completed state.
-  await admin.from("bookings").update({ status: "completed" }).eq("id", dispute.booking_id);
+  // The job goes back to where it was when the dispute was opened. For a
+  // customer's dispute that is always `completed`. A MECHANIC can raise one on
+  // a job that is still en route or in progress, and marking that `completed`
+  // would finish it without the customer ever being charged or the mechanic
+  // paid — so put it back where `dispute_opened` recorded it was.
+  const { data: opened } = await admin
+    .from("booking_events")
+    .select("payload")
+    .eq("booking_id", dispute.booking_id)
+    .eq("event_type", "dispute_opened")
+    .eq("payload->>dispute_id", disputeId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const before = (opened?.payload as { status_from?: unknown } | null)?.status_from;
+  const restoreTo = before === "en_route" || before === "in_progress" ? before : "completed";
+  await admin.from("bookings").update({ status: restoreTo }).eq("id", dispute.booking_id);
   await admin.from("booking_events").insert({
     booking_id: dispute.booking_id,
     event_type: "dispute_resolved",
@@ -473,11 +639,24 @@ export async function withdrawDisputeFor(
       .then(({ subject, html }) => sendEmail({ to, subject, html }))
       .catch(() => {});
   }
-  const mechTo = await mechanicEmail(admin, booking.mechanic_id);
-  if (mechTo)
-    renderTemplateEmail("dispute_withdrawn_mechanic", { service: serviceName(booking), ref })
-      .then(({ subject, html }) => sendEmail({ to: mechTo, subject, html }))
-      .catch(() => {});
+  // The mechanic hears either way by email; the app is only told when it was
+  // the CUSTOMER who withdrew — their own withdrawal isn't news to them.
+  if (role === "mechanic") {
+    const mechTo = await mechanicEmail(admin, booking.mechanic_id);
+    if (mechTo)
+      renderTemplateEmail("dispute_withdrawn_mechanic", { service: serviceName(booking), ref })
+        .then(({ subject, html }) => sendEmail({ to: mechTo, subject, html }))
+        .catch(() => {});
+  } else {
+    await notifyMechanicOfDispute(
+      admin,
+      booking,
+      disputeId,
+      "dispute_withdrawn_mechanic",
+      { service: serviceName(booking), ref },
+      "The customer has withdrawn it. Nothing changes for your payout.",
+    );
+  }
 
   revalidateDispute(disputeId, dispute.booking_id);
   return { ok: true };

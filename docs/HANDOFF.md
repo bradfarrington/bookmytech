@@ -119,6 +119,31 @@ You are working on **Book My Tech**, a UK mobile-mechanic booking platform. This
 
 ## Current task
 
+### 🟡 2026-09-17 — BUILT, `0085` NOT applied: the mechanic app's Inbox, cases and disputes (Task 69)
+
+**One feed, Get-help cases with evidence, and disputes a mechanic can answer
+with photos — and nothing more than answer.** Fourteen routes; spec, tables and
+status: `docs/tasks/69-mechanic-inbox-cases-disputes.md`.
+
+**Only Book My Tech decides a dispute** (owner decision 2026-09-17). A mechanic
+can open, reply with their own words and photos, ask BMT to step in, and
+withdraw an issue they raised. No route resolves one or moves money on one, and
+none may be added.
+
+⚠️ **Apply `0085`. Do NOT run `0032`** — it looks never to have reached
+production, and its `booking_events` CHECK is now out of date; `0085` creates
+the Resolution Center's tables itself.
+
+New cores: `lib/resolutions/core.ts` (out of the cookie-bound action),
+`escalateDisputeFor`, `lib/inbox/mechanic-feed.ts` + `mechanic-events.ts`,
+`lib/disputes/mechanic-view.ts`, `lib/push/mechanic-updates.ts`. BMT can now
+write a private note to one party in a dispute thread, enforced by RLS.
+Mechanics are pushed dispute, case, job, review, payout and document news.
+Fixed: withdrawing a mechanic-raised dispute marked an unfinished job
+`completed`.
+
+**Not verified beyond typecheck, lint, unit tests and a build.**
+
 ### 🟡 2026-09-17 — BUILT, not run: the rest of the mechanic app's job page (Task 68)
 
 **Faults, "change what's being done", ending a job on site, part status and

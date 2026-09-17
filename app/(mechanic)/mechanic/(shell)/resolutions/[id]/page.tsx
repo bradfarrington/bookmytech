@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { CasePhotos } from "@/components/resolutions/case-photos";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
@@ -54,6 +55,7 @@ export default async function MechanicCasePage({
       <div className="rounded-xl border border-border bg-surface p-4">
         <p className="text-[10px] font-semibold uppercase tracking-wide text-text-muted">What happened</p>
         <p className="mt-1 whitespace-pre-wrap text-sm text-text-primary">{kase.description}</p>
+        <CasePhotos photos={kase.photos} />
       </div>
 
       {kase.resolutionNote && (

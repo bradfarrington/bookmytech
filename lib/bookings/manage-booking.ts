@@ -1,5 +1,6 @@
 import "server-only";
 
+import { pushMechanicUpdate } from "@/lib/push/mechanic-updates";
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendEmail } from "@/lib/email/send";
@@ -112,6 +113,26 @@ async function requireBookingCustomer(bookingId: string, caller: BookingCaller) 
 // Exported because the public /cancellation-policy page reads the SAME figures.
 // A published policy that disagrees with what the code actually charges is worse
 // than having no policy page at all, so there is exactly one source for them.
+/**
+ * The mechanic's text, and the same words to the mechanic app (Task 69) — so a
+ * mechanic with the app hears at once, and one without it hears exactly what
+ * they always did. The push doesn't wait on there being a phone number.
+ */
+function textAndPushMechanic(
+  mechanicId: string | null,
+  bookingId: string,
+  phone: string | null,
+  title: string,
+  sms: Promise<string>,
+): void {
+  sms
+    .then((body) => {
+      pushMechanicUpdate(mechanicId, { title, body }, { type: "job", bookingId });
+      return phone ? sendSms({ to: phone, body }) : undefined;
+    })
+    .catch(() => {});
+}
+
 export async function cancelFeeTiers(admin: ReturnType<typeof createAdminClient>) {
   const { data } = await admin
     .from("platform_settings")
@@ -303,11 +324,8 @@ export async function cancelBookingFor(
       .catch(console.error);
   }
   const cancelMechPhone = await mechanicPhone(admin, booking.mechanic_id);
-  if (cancelMechPhone) {
-    renderSmsTemplate("mech_job_cancelled", { ref: formatJobNumber(booking.job_number) })
-      .then((body) => sendSms({ to: cancelMechPhone, body }))
-      .catch(() => {});
-  }
+  textAndPushMechanic(booking.mechanic_id, bookingId, cancelMechPhone, "The customer cancelled",
+    renderSmsTemplate("mech_job_cancelled", { ref: formatJobNumber(booking.job_number) }));
 
   // Confirm to the customer.
   const cancelEmail = booking.customer_email;
@@ -419,11 +437,8 @@ export async function rescheduleBookingFor(
       .catch(console.error);
   }
   const moveMechPhone = await mechanicPhone(admin, booking.mechanic_id);
-  if (moveMechPhone) {
-    renderSmsTemplate("mech_booking_rescheduled", { ref, slot: slotLabel })
-      .then((body) => sendSms({ to: moveMechPhone, body }))
-      .catch(() => {});
-  }
+  textAndPushMechanic(booking.mechanic_id, bookingId, moveMechPhone, "The customer moved the job",
+    renderSmsTemplate("mech_booking_rescheduled", { ref, slot: slotLabel }));
 
   const rescheduleEmail = booking.customer_email;
   if (rescheduleEmail) {
@@ -545,12 +560,15 @@ export async function respondToRescheduleFor(
       .catch(console.error);
   }
   const outcomePhone = await mechanicPhone(admin, booking.mechanic_id);
-  if (outcomePhone) {
-    const sms = accepted
+  textAndPushMechanic(
+    booking.mechanic_id,
+    bookingId,
+    outcomePhone,
+    accepted ? "New time agreed" : "New time declined",
+    accepted
       ? renderSmsTemplate("mech_reschedule_accepted", { ref, slot: proposedLabel })
-      : renderSmsTemplate("mech_reschedule_declined", { ref, original: originalLabel });
-    sms.then((body) => sendSms({ to: outcomePhone, body })).catch(() => {});
-  }
+      : renderSmsTemplate("mech_reschedule_declined", { ref, original: originalLabel }),
+  );
 
   revalidatePath(`/book/confirmed/${bookingId}`);
   revalidatePath("/dashboard");

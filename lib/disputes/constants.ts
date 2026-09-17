@@ -1,5 +1,7 @@
 // Dispute domain constants — plain module (no I/O), importable by client + server.
 
+import { formatPrice } from "@/lib/utils";
+
 export type DisputeStatus = "opened" | "responded" | "escalated" | "resolved" | "withdrawn";
 export type DisputeRole = "customer" | "mechanic" | "admin";
 
@@ -76,3 +78,14 @@ export const MAX_DISPUTE_PHOTOS = 6;
 
 // Hours after the other party responds before the dispute auto-escalates to admin.
 export const ESCALATION_HOURS = 48;
+
+/**
+ * What a resolved dispute means for the mechanic's money, in one sentence — the
+ * line in their "dispute resolved" email, and `payoutLine` on the mechanic app's
+ * dispute screen, so the two can't disagree.
+ */
+export function mechanicPayoutLine(refundPence: number): string {
+  return refundPence > 0
+    ? `A refund of ${formatPrice(refundPence)} was issued to the customer. It's been deducted from your balance and will come off your next payout.`
+    : "Your payout for this job is unaffected.";
+}

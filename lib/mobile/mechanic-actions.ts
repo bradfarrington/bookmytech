@@ -49,11 +49,14 @@ const STATUS = { invalid: 400, forbidden: 403, not_found: 404, conflict: 409 } a
  */
 export function refusalResponse(
   tag: string,
-  refusal: { code: keyof typeof STATUS | "failed"; error: string },
+  // `code` is optional for the cores shared with the customer side (disputes,
+  // resolution cases), which only name the refusals that AREN'T "right caller,
+  // wrong moment".
+  refusal: { code?: keyof typeof STATUS | "failed"; error: string },
 ): Response {
   if (refusal.code === "failed") {
     console.error(`[${tag}] failed`, refusal.error);
     return apiError("Something went wrong on our side. Please try again in a moment.", 500);
   }
-  return apiError(refusal.error, STATUS[refusal.code]);
+  return apiError(refusal.error, STATUS[refusal.code ?? "conflict"]);
 }

@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { CasePhotos } from "@/components/resolutions/case-photos";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
@@ -96,6 +97,7 @@ export default async function AdminCasePage({ params }: { params: Promise<{ id: 
           What happened
         </p>
         <p className="mt-1 whitespace-pre-wrap text-sm text-text-primary">{kase.description}</p>
+        <CasePhotos photos={kase.photos} />
       </div>
 
       <AdminCaseActions

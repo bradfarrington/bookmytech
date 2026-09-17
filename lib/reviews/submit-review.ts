@@ -5,6 +5,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { REVIEW_TAGS } from "@/lib/reviews/tags";
 import { ownsBooking, type BookingCaller } from "@/lib/bookings/ownership";
 import { recomputeMechanicAggregates } from "@/lib/mechanics/aggregates";
+import { reviewTitle } from "@/lib/inbox/mechanic-events";
+import { pushMechanicUpdate } from "@/lib/push/mechanic-updates";
 
 // The one implementation of "review this job".
 //
@@ -81,7 +83,7 @@ export async function submitReviewFor(
 
   const { data: booking } = await admin
     .from("bookings")
-    .select("id, status, mechanic_id, customer_id, customer_email")
+    .select("id, status, mechanic_id, customer_id, customer_email, customer_name")
     .eq("id", bookingId)
     .single();
 
@@ -120,6 +122,14 @@ export async function submitReviewFor(
   }
 
   await recomputeMechanicAggregates(admin, booking.mechanic_id);
+
+  // A mechanic has never been told about a review; now the app is (Task 69).
+  // The same title their Inbox will show.
+  pushMechanicUpdate(
+    booking.mechanic_id,
+    { title: reviewTitle(booking.customer_name, rating), body: comment?.trim() || "Tap to see it." },
+    { type: "reviews" },
+  );
 
   revalidatePath("/mechanic/reviews");
   revalidatePath(`/review/${bookingId}`);

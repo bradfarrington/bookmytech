@@ -3,15 +3,16 @@
 import { createClient } from "@/lib/supabase/server";
 import { sendEmail } from "@/lib/email/send";
 import { renderTemplateEmail } from "@/emails/resolve";
-import { siteUrl, formatPrice, formatJobNumber } from "@/lib/utils";
-import { RESOLUTION_LABELS, type ResolutionKind } from "@/lib/disputes/constants";
+import { formatPrice, formatJobNumber } from "@/lib/utils";
+import { RESOLUTION_LABELS, mechanicPayoutLine, type ResolutionKind } from "@/lib/disputes/constants";
 import { grantCredit } from "@/lib/credits/credits";
 import { refundPayment } from "@/lib/stripe/refund";
 import { recordRefundClawback } from "@/lib/mechanics/balance";
 import { applySuspension } from "@/lib/mechanics/suspend";
 import type { BookingCaller } from "@/lib/bookings/ownership";
 import {
-  mechanicEmail,
+  escalateDisputeFor,
+  notifyMechanicOfDispute,
   openDisputeFor,
   partyForDispute,
   revalidateDispute,
@@ -22,6 +23,7 @@ import {
   type OpenDisputeInput,
   type DisputeResult,
   type SimpleResult,
+  type DisputeMessageAudience,
 } from "@/lib/disputes/core";
 
 // The WEBSITE's entry points into the dispute lifecycle. The party-facing four
@@ -37,9 +39,11 @@ import {
 // caller through explicitly because it resolves that caller from a verified
 // Bearer token in a route handler, where nothing is client-supplied either.
 //
-// `escalateDispute` and `resolveDispute` stay here whole: escalation is a party
-// action the website and the 48-hour cron drive, and arbitration is admin-only.
-// The customer app is deliberately not given either.
+// `resolveDispute` stays here whole: arbitration is admin-only, and ONLY Book My
+// Tech decides a dispute (owner decision 2026-09-17) — neither app has, or may
+// be given, a route that resolves one or moves money on one. Escalation ("ask
+// Book My Tech to step in") hands the decision over without making it, so it
+// lives in the core and the mechanic app has it too.
 
 export type { OpenDisputeInput, DisputeResult, SimpleResult } from "@/lib/disputes/core";
 
@@ -54,8 +58,6 @@ export interface ResolveDisputeInput {
   /** Flag the mechanic's account (a dispute_loss performance flag). */
   flagMechanic?: boolean;
 }
-
-const ADMIN_EMAIL = process.env.ADMIN_NOTIFY_EMAIL || "support@bookmytech.co.uk";
 
 /**
  * `getUser()` rather than `getSession()`: it verifies the JWT with Supabase
@@ -104,10 +106,19 @@ export async function openDispute(
   return openDisputeFor(bookingId, input, callerOf(guard));
 }
 
-export async function sendDisputeMessage(disputeId: string, body: string): Promise<SimpleResult> {
+/**
+ * `visibleTo` makes it a private note for one party. The core honours it only
+ * from an admin, so it is safe as an argument: from anyone else it is ignored.
+ */
+export async function sendDisputeMessage(
+  disputeId: string,
+  body: string,
+  visibleTo: DisputeMessageAudience = null,
+): Promise<SimpleResult> {
   const guard = await requireUser();
   if (!guard.ok) return guard;
-  return sendDisputeMessageFor(disputeId, body, callerOf(guard));
+  const result = await sendDisputeMessageFor(disputeId, body, callerOf(guard), { visibleTo });
+  return result.ok ? { ok: true } : result;
 }
 
 export async function withdrawDispute(disputeId: string): Promise<SimpleResult> {
@@ -123,50 +134,7 @@ export async function withdrawDispute(disputeId: string): Promise<SimpleResult> 
 export async function escalateDispute(disputeId: string): Promise<SimpleResult> {
   const guard = await requireUser();
   if (!guard.ok) return guard;
-
-  const party = await partyForDispute(disputeId, callerOf(guard));
-  if (!party.ok) return party;
-  const { admin, dispute, booking, userId, role } = party;
-  if (role === "admin") return { ok: false, error: "Admins arbitrate escalated disputes directly." };
-  if (!["opened", "responded"].includes(dispute.status))
-    return { ok: false, error: "This dispute can't be escalated from its current state." };
-
-  await admin
-    .from("disputes")
-    .update({ status: "escalated", escalated_at: new Date().toISOString() })
-    .eq("id", disputeId);
-  await admin.from("booking_events").insert({
-    booking_id: dispute.booking_id,
-    event_type: "dispute_escalated",
-    actor_id: userId,
-    actor_role: role,
-    payload: { dispute_id: disputeId, escalated_by: role },
-  });
-  renderTemplateEmail("dispute_escalated_admin", {
-    role,
-    service: serviceName(booking),
-    ref: formatJobNumber(booking.job_number),
-    link: `${siteUrl()}/admin/disputes/${disputeId}`,
-  })
-    .then(({ subject, html }) => sendEmail({ to: ADMIN_EMAIL, subject, html }))
-    .catch(() => {});
-
-  // Let the mechanic know when the other party escalates (admins can't escalate).
-  if (role !== "mechanic") {
-    const mechTo = await mechanicEmail(admin, booking.mechanic_id);
-    if (mechTo)
-      renderTemplateEmail("dispute_escalated_mechanic", {
-        role,
-        service: serviceName(booking),
-        ref: formatJobNumber(booking.job_number),
-        link: `${siteUrl()}/mechanic/disputes/${disputeId}`,
-      })
-        .then(({ subject, html }) => sendEmail({ to: mechTo, subject, html }))
-        .catch(() => {});
-  }
-
-  revalidateDispute(disputeId, dispute.booking_id);
-  return { ok: true };
+  return escalateDisputeFor(disputeId, callerOf(guard));
 }
 
 // ---------------------------------------------------------------------------
@@ -323,19 +291,15 @@ export async function resolveDispute(
       .then(({ subject, html }) => sendEmail({ to, subject, html }))
       .catch(() => {});
   }
-  const mechTo = await mechanicEmail(admin, booking.mechanic_id);
-  if (mechTo)
-    renderTemplateEmail("dispute_resolved_mechanic", {
-      ref,
-      service: serviceName(booking),
-      decision: RESOLUTION_LABELS[input.resolution],
-      payout_line:
-        refundPence > 0
-          ? `A refund of ${formatPrice(refundPence)} was issued to the customer. It's been deducted from your balance and will come off your next payout.`
-          : "Your payout for this job is unaffected.",
-    })
-      .then(({ subject, html }) => sendEmail({ to: mechTo, subject, html }))
-      .catch(() => {});
+  const payoutLine = mechanicPayoutLine(refundPence);
+  await notifyMechanicOfDispute(
+    admin,
+    booking,
+    disputeId,
+    "dispute_resolved_mechanic",
+    { ref, service: serviceName(booking), decision: RESOLUTION_LABELS[input.resolution], payout_line: payoutLine },
+    `${RESOLUTION_LABELS[input.resolution]}. ${payoutLine}`,
+  );
 
   revalidateDispute(disputeId, dispute.booking_id);
   return { ok: true };

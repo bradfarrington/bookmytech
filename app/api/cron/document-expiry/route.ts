@@ -9,6 +9,7 @@ import {
   type MechanicDocType,
 } from "@/lib/onboarding/docs";
 import { daysUntil, REMINDER_DAYS } from "@/lib/onboarding/expiry";
+import { pushMechanicUpdate } from "@/lib/push/mechanic-updates";
 
 // Daily document-expiry sweep (Task 07 Stage 3). For every verified mechanic
 // document with an expiry date:
@@ -89,6 +90,11 @@ async function runSweep() {
           console.error("expiry email (expired) failed", err);
         }
       }
+      pushMechanicUpdate(
+        doc.mechanic_id,
+        { title: `${label} has expired`, body: "Upload a new copy to get back online." },
+        { type: "documents" },
+      );
     } else if ((REMINDER_DAYS as readonly number[]).includes(remaining)) {
       if (email) {
         try {
@@ -104,6 +110,15 @@ async function runSweep() {
           console.error("expiry reminder failed", err);
         }
       }
+      // The same milestones as the email (REMINDER_DAYS), to the mechanic app.
+      pushMechanicUpdate(
+        doc.mechanic_id,
+        {
+          title: remaining === 0 ? `${label} expires today` : `${label} expires in ${remaining} days`,
+          body: "Upload the renewed copy before it runs out.",
+        },
+        { type: "documents" },
+      );
     }
   }
 

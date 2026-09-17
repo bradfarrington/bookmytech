@@ -65,6 +65,8 @@ export interface CaseDetail {
   resolutionNote: string | null;
   createdAt: string;
   openedByRole: "mechanic" | "admin";
+  /** Evidence attached when it was raised (0085). Empty before that migration. */
+  photos: string[];
 }
 
 export async function loadCase(client: Queryable, id: string): Promise<CaseDetail | null> {
@@ -83,7 +85,11 @@ export async function loadCase(client: Queryable, id: string): Promise<CaseDetai
       })
     | null;
   if (!c) return null;
+  // Read apart from the rest so the page still loads before 0085 adds the column.
+  const { data: evidence } = await client.from("resolution_cases").select("photos").eq("id", id).maybeSingle();
+  const photos = (evidence as { photos?: unknown } | null)?.photos;
   return {
+    photos: Array.isArray(photos) ? photos.filter((p): p is string => typeof p === "string") : [],
     id: c.id,
     bookingId: c.booking_id,
     shortRef: formatJobNumber(one(c.booking)?.job_number),

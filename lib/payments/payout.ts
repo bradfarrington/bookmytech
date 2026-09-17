@@ -1,5 +1,7 @@
 import "server-only";
 
+import { payoutTitle } from "@/lib/inbox/mechanic-events";
+import { pushMechanicUpdate } from "@/lib/push/mechanic-updates";
 import type Stripe from "stripe";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { allocateTransfers, nettedPayout } from "@/lib/earnings";
@@ -120,6 +122,12 @@ export async function payoutToMechanic(args: PayoutArgs): Promise<{ transferredP
       payload: { recovered_pence: recoveredPence, gross_payout_pence: grossPence, transferred_pence: transferPence },
     });
   }
+  // One push per payout, for what actually reached them (Task 69) — the same
+  // words their Inbox shows for the ledger row.
+  if (transferred > 0) {
+    pushMechanicUpdate(mechanicId, { title: payoutTitle(transferred), body: description }, { type: "earnings" });
+  }
+
   return { transferredPence: transferred };
 }
 

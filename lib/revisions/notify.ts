@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { pushMechanicUpdate } from "@/lib/push/mechanic-updates";
 import { sendEmail } from "@/lib/email/send";
 import { renderTemplateEmail } from "@/emails/resolve";
 import { sendSms } from "@/lib/sms/send-sms";
@@ -98,11 +99,24 @@ export async function notifyMechanicRevisionOutcome(
   }
   if (outcome !== "expired") {
     const phone = await mechanicPhone(admin, booking.mechanic_id);
-    if (phone) {
-      renderSmsTemplate(outcome === "approved" ? "mech_revision_approved" : "mech_revision_declined", vars)
-        .then((body) => sendSms({ to: phone, body }))
-        .catch(() => {});
-    }
+    // The text and the mechanic app's push say the same thing (Task 69); the
+    // push doesn't wait on there being a phone number.
+    renderSmsTemplate(outcome === "approved" ? "mech_revision_approved" : "mech_revision_declined", vars)
+      .then((body) => {
+        pushMechanicUpdate(
+          booking.mechanic_id,
+          { title: outcome === "approved" ? "Revised job approved" : "Revised job declined", body },
+          { type: "job", bookingId: booking.id },
+        );
+        return phone ? sendSms({ to: phone, body }) : undefined;
+      })
+      .catch(() => {});
+  } else {
+    pushMechanicUpdate(
+      booking.mechanic_id,
+      { title: "Revised job expired", body: `The customer didn't answer the revised job ${ref}.` },
+      { type: "job", bookingId: booking.id },
+    );
   }
 }
 

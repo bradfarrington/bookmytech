@@ -4,6 +4,7 @@ import { sendEmail } from "@/lib/email/send";
 import { renderTemplateEmail } from "@/emails/resolve";
 import { siteUrl } from "@/lib/utils";
 import { ESCALATION_HOURS } from "@/lib/disputes/constants";
+import { pushMechanicUpdate } from "@/lib/push/mechanic-updates";
 
 // Hourly dispute escalation (Task 12 Stage 1).
 //
@@ -42,6 +43,22 @@ async function runEscalation() {
       reason: `Auto-escalated after ${ESCALATION_HOURS}h without resolution.`,
       payload: { dispute_id: d.id, escalated_by: "system" },
     });
+  }
+
+  // Tell each mechanic's phone that the decision has passed to us (Task 69).
+  // There has never been an email for an automatic escalation, so this is the
+  // push alone.
+  const { data: jobs } = await admin
+    .from("bookings")
+    .select("id, mechanic_id")
+    .in("id", due.map((d) => d.booking_id));
+  const mechanicByBooking = new Map((jobs ?? []).map((b) => [b.id as string, b.mechanic_id as string | null]));
+  for (const d of due) {
+    pushMechanicUpdate(
+      mechanicByBooking.get(d.booking_id),
+      { title: "Book My Tech is stepping in", body: `It wasn't settled within ${ESCALATION_HOURS} hours, so we'll review it and decide.` },
+      { type: "dispute", disputeId: d.id },
+    );
   }
 
   const { subject, html } = await renderTemplateEmail("disputes_escalated_alert", {

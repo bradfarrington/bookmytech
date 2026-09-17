@@ -5,6 +5,7 @@ import { Send } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useStayFresh } from "@/lib/use-stay-fresh";
 import { sendDisputeMessage } from "@/app/actions/disputes";
+import { Select } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
 interface Msg {
@@ -12,7 +13,19 @@ interface Msg {
   sender_role: "customer" | "mechanic" | "admin";
   body: string;
   created_at: string;
+  /** Evidence sent with the message (0085). */
+  photos?: string[] | null;
+  /** A private note from Book My Tech to one party (0085). Only an admin ever receives one not meant for them. */
+  visible_to?: "mechanic" | "customer" | null;
 }
+
+type Audience = "everyone" | "mechanic" | "customer";
+
+const AUDIENCE_OPTIONS: { value: Audience; label: string }[] = [
+  { value: "everyone", label: "Everyone sees this" },
+  { value: "mechanic", label: "Only the mechanic sees this" },
+  { value: "customer", label: "Only the customer sees this" },
+];
 
 const ROLE_LABEL: Record<Msg["sender_role"], string> = {
   customer: "Customer",
@@ -23,6 +36,12 @@ const ROLE_LABEL: Record<Msg["sender_role"], string> = {
 // A dispute's 3-party thread (customer / mechanic / admin mediator). Reads run
 // client-side under RLS; sends go through sendDisputeMessage. Kept live by
 // polling (no Realtime). `closed` hides the composer once the case is resolved.
+//
+// Two things arrived with the mechanic app (Task 69, migration 0085): photos on
+// a message, and a PRIVATE note from Book My Tech to one party. Privacy is the
+// RLS policy's job, not this component's — a customer's browser never receives
+// a note meant for the mechanic, so there is nothing here to hide. An admin
+// receives everything, and sees who each note was for.
 export function DisputeThread({
   disputeId,
   viewerRole,
@@ -34,17 +53,18 @@ export function DisputeThread({
 }) {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [draft, setDraft] = useState("");
+  const [audience, setAudience] = useState<Audience>("everyone");
   const [pending, startTransition] = useTransition();
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
     const supabase = createClient();
-    const { data } = await supabase
-      .from("dispute_messages")
-      .select("id, sender_role, body, created_at")
-      .eq("dispute_id", disputeId)
-      .order("created_at", { ascending: true });
-    setMessages((data as Msg[]) ?? []);
+    const read = (columns: string) =>
+      supabase.from("dispute_messages").select(columns).eq("dispute_id", disputeId).order("created_at", { ascending: true });
+    let { data, error } = await read("id, sender_role, body, created_at, photos, visible_to");
+    // Before 0085 the two new columns don't exist; the thread must still load.
+    if (error) ({ data, error } = await read("id, sender_role, body, created_at"));
+    setMessages((data as unknown as Msg[]) ?? []);
   }, [disputeId]);
 
   useEffect(() => {
@@ -64,7 +84,7 @@ export function DisputeThread({
     if (!body || pending) return;
     setDraft("");
     startTransition(async () => {
-      const res = await sendDisputeMessage(disputeId, body);
+      const res = await sendDisputeMessage(disputeId, body, audience === "everyone" ? null : audience);
       if (!res.ok) {
         setDraft(body);
         return;
@@ -98,7 +118,22 @@ export function DisputeThread({
                         : "bg-surface text-text-primary",
                   )}
                 >
+                  {m.visible_to && (
+                    <p className="mb-1 text-[10px] font-bold uppercase tracking-wide">
+                      Private · only the {m.visible_to} sees this
+                    </p>
+                  )}
                   <p className="whitespace-pre-wrap break-words">{m.body}</p>
+                  {(m.photos ?? []).length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {(m.photos ?? []).map((url) => (
+                        <a key={url} href={url} target="_blank" rel="noreferrer">
+                          {/* eslint-disable-next-line @next/next/no-img-element -- evidence in the public job-media bucket, shown at thumbnail size */}
+                          <img src={url} alt="Photo sent with this message" className="size-20 rounded-lg object-cover" />
+                        </a>
+                      ))}
+                    </div>
+                  )}
                   <p className={cn("mt-0.5 text-[10px]", mine && m.sender_role !== "admin" ? "text-white/70" : "text-text-muted")}>
                     {new Date(m.created_at).toLocaleString("en-GB", {
                       day: "numeric",
@@ -119,7 +154,18 @@ export function DisputeThread({
           This dispute is closed.
         </p>
       ) : (
-        <div className="flex items-end gap-2 border-t border-border p-3">
+        <div className="border-t border-border p-3">
+          {viewerRole === "admin" && (
+            <div className="mb-2 max-w-xs">
+              <Select
+                value={audience}
+                onChange={setAudience}
+                options={AUDIENCE_OPTIONS}
+                aria-label="Who sees this message"
+              />
+            </div>
+          )}
+          <div className="flex items-end gap-2">
           <textarea
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
@@ -141,6 +187,7 @@ export function DisputeThread({
           >
             <Send size={16} />
           </button>
+          </div>
         </div>
       )}
     </div>
