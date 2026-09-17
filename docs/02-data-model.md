@@ -276,6 +276,10 @@ A `public.is_admin()` `SECURITY DEFINER` function is the single source of truth 
 - **Column privileges + trigger (`0081`, Task 64).** The policy above restricts the row, not the columns, so `authenticated` holds UPDATE only on `status`, `online_at`, `last_seen_at`, `bio`, `service_radius_miles`, `specialisms` and `base_postcode`. `rating`, `job_count`, `is_pro`, `approved_at`, `is_suspended`, `suspended_until` and the four `stripe_*` columns are service-role only. The `mechanics_protect_privileged_columns` trigger backs that up and adds the value rules a grant can't express, for a non-admin session: no `online` without payouts or while suspended, no setting `on_job`, and `base_postcode` can be filled in but not moved. Admins and the service role are exempt.
 - `DELETE`: `Admins can delete mechanics` — `using (public.is_admin())`
 
+**`mechanic_push_tokens`** — `0082` (Task 65). The mechanic app's Expo push tokens: `token` PK, `mechanic_id` → `mechanics`, `platform`, `created_at`, `last_seen_at`. A mirror of `customer_push_tokens` and deliberately separate from it. RLS on, **no policies** — service-role only, via `POST /api/mobile/v1/mechanic/devices`. `push_receipts` is shared by both.
+
+**Offered-booking reads (`0082`, Task 65).** `Mechanics can view offered bookings` (`bookings`) and `Mechanics read offered booking repairs` (`booking_repairs`) now require the offer to be **live** (`response is null`). Before, a declined or superseded offer kept the customer's row readable for good.
+
 **`booking_events`** — defined in `0005_booking_events.sql`. Append-only — there's no UPDATE or DELETE policy.
 - `SELECT`: `Admins can view all booking events` — `using (public.is_admin())`
 - `INSERT`: `Admins can insert booking events` — `with check (public.is_admin())` (server actions run under the admin's session; system-generated events are written via the service-role client)

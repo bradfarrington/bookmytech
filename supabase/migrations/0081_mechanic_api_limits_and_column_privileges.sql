@@ -76,10 +76,10 @@
 -- 1. Rate limits ------------------------------------------------------------
 
 insert into public.platform_settings (key, value) values
-  ('mobile_mechanic_user_burst', '10'::jsonb),   -- per user, per 60s
-  ('mobile_mechanic_user_daily', '150'::jsonb),  -- per user, per 24h
-  ('mobile_mechanic_ip_burst',   '20'::jsonb),   -- per IP,   per 60s
-  ('mobile_mechanic_ip_daily',   '400'::jsonb)   -- per IP,   per 24h
+  ('mobile_mechanic_user_burst', '15'::jsonb),   -- per user, per 60s
+  ('mobile_mechanic_user_daily', '300'::jsonb),  -- per user, per 24h
+  ('mobile_mechanic_ip_burst',   '30'::jsonb),   -- per IP,   per 60s
+  ('mobile_mechanic_ip_daily',   '800'::jsonb)   -- per IP,   per 24h
 on conflict (key) do nothing;
 
 -- 2a. Column privileges -----------------------------------------------------

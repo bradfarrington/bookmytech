@@ -4,8 +4,8 @@ import { buildPushMessage, triageTickets, type PushNotification } from "@/lib/pu
 import { createAdminClient } from "@/lib/supabase/admin";
 import { recordTestOutbox } from "@/lib/test-outbox";
 
-// Push notifications to the customer mobile app, through Expo's push service
-// (Task 19 / P1).
+// Push notifications to the mobile apps, through Expo's push service (Task 19
+// / P1 for customers; Task 65 added mechanics — see sendPushToMechanic).
 //
 // Called from the same places SMS goes out today — ALONGSIDE it, not instead
 // (app plan, decision 2): a mechanic taking the job, the mechanic setting off,
@@ -47,10 +47,25 @@ function expo(): Expo {
   return client;
 }
 
+// One table per app (0050 customers, 0082 mechanics). They are separate Expo
+// projects, so a token only ever lives in one of them — and a phone with both
+// apps installed has two tokens, one in each.
+const TOKEN_TABLES = {
+  customer: { table: "customer_push_tokens", owner: "customer_id", migration: "0050" },
+  mechanic: { table: "mechanic_push_tokens", owner: "mechanic_id", migration: "0082" },
+} as const;
+type Audience = keyof typeof TOKEN_TABLES;
+
+// A receipt doesn't record which app its token belonged to, so a dead token is
+// deleted from both tables. Tokens are globally unique; the other delete is a
+// no-op.
 async function deleteTokens(admin: Admin, tokens: string[]): Promise<void> {
   if (tokens.length === 0) return;
-  const { error } = await admin.from("customer_push_tokens").delete().in("token", tokens);
-  if (error) console.error("[push] failed to delete dead tokens", error);
+  for (const { table } of Object.values(TOKEN_TABLES)) {
+    const { error } = await admin.from(table).delete().in("token", tokens);
+    // 42P01: the mechanic table doesn't exist until 0082 is applied.
+    if (error && error.code !== "42P01") console.error(`[push] failed to delete dead tokens from ${table}`, error);
+  }
 }
 
 /**
@@ -67,15 +82,40 @@ export async function sendPushToCustomer(
   // Test mode: capture the push and skip Expo (lib/test-outbox.ts).
   if (recordTestOutbox("push", { customerId, ...notification })) return 1;
 
+  return sendToDevices("customer", customerId, notification);
+}
+
+/**
+ * The same, to a MECHANIC's devices — the mechanic app (bmt-mechanic-app),
+ * tokens from `mechanic_push_tokens` via POST /mechanic/devices. Today that is
+ * one notification: a new job offer (lib/dispatch/dispatch.ts). Never throws.
+ */
+export async function sendPushToMechanic(
+  mechanicId: string | null | undefined,
+  notification: PushNotification,
+): Promise<number> {
+  if (!mechanicId) return 0;
+
+  if (recordTestOutbox("push", { mechanicId, ...notification })) return 1;
+
+  return sendToDevices("mechanic", mechanicId, notification);
+}
+
+async function sendToDevices(
+  audience: Audience,
+  ownerId: string,
+  notification: PushNotification,
+): Promise<number> {
+  const { table, owner, migration } = TOKEN_TABLES[audience];
   try {
     const admin = createAdminClient();
     const { data: rows, error } = await admin
-      .from("customer_push_tokens")
+      .from(table)
       .select("token")
-      .eq("customer_id", customerId);
+      .eq(owner, ownerId);
     if (error) {
       console.error(
-        "[push] couldn't read customer_push_tokens — has migration 0050 been applied?",
+        `[push] couldn't read ${table} — has migration ${migration} been applied?`,
         error,
       );
       return 0;

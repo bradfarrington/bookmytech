@@ -30,7 +30,7 @@ Errors are `{ error }`: 401, 403 (not a mechanic), 400/415, 429, 500. `status` a
 
 Stripe's own error text never reaches the app — the routes log it and return customer-grade copy.
 
-Rate limited by a new **`mechanic`** bucket family (`mobile_mechanic_*`, 10/min and 150/day per user).
+Rate limited by a new **`mechanic`** bucket family (`mobile_mechanic_*`, 15/min and 300/day per user).
 
 ### Delegate, never reimplement
 

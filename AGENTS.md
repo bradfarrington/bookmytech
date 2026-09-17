@@ -17,7 +17,8 @@ integrations. **This repo is its backend.** It reaches us two ways:
 There is also a **mechanic mobile app**, `bmt-mechanic-app` (Task 64). It uses
 the same two ways in — its handlers live under `app/api/mobile/v1/mechanic/`,
 guarded by `requireMobileMechanic` — and it reads and writes its own `mechanics`
-row directly under RLS. Everything below applies to it equally; read "the app"
+row directly under RLS. Its push tokens live in `mechanic_push_tokens`, never in
+the customer table (Task 65). Everything below applies to it equally; read "the app"
 as "either app".
 
 ## The governing principle — apply it to anything, not just the list below

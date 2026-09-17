@@ -54,6 +54,36 @@ export default async function OfferPage({ params }: PageProps) {
 
   if (!offer || offer.mechanic_id !== user.id) notFound();
 
+  // Offer already resolved (this mechanic responded, or someone else accepted
+  // and it was superseded) → the job's no longer up for grabs. Checked BEFORE
+  // the booking: once an offer is answered, 0082 stops its booking being
+  // readable through it, so the join above comes back empty.
+  if (offer.response !== null) {
+    return (
+      <Shell>
+        <div className="flex flex-1 flex-col items-center justify-center gap-4 p-6 text-center">
+          <div className="flex size-16 items-center justify-center rounded-full bg-border-subtle">
+            <CheckCircle2 size={30} className="text-text-muted" />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold text-text-primary">This job&apos;s no longer available</h1>
+            <p className="mt-1 text-sm text-text-secondary">
+              {offer.response === "accepted"
+                ? "You accepted this job."
+                : "Another mechanic accepted it first, or it was withdrawn."}
+            </p>
+          </div>
+          <Link
+            href="/mechanic/jobs"
+            className="inline-flex h-11 items-center rounded-button bg-brand-blue px-5 text-sm font-semibold text-white transition-colors hover:bg-brand-blue-dark"
+          >
+            Back to jobs
+          </Link>
+        </div>
+      </Shell>
+    );
+  }
+
   const booking = one(offer.booking as never) as
     | {
         id: string;
@@ -83,34 +113,6 @@ export default async function OfferPage({ params }: PageProps) {
     .eq("booking_id", booking.id)
     .order("position");
   const repairLines = repairLinesFor(booking, (lineRows ?? null) as BookingRepairRow[] | null);
-
-  // Offer already resolved (this mechanic responded, or someone else accepted
-  // and it was superseded) → the job's no longer up for grabs.
-  if (offer.response !== null) {
-    return (
-      <Shell>
-        <div className="flex flex-1 flex-col items-center justify-center gap-4 p-6 text-center">
-          <div className="flex size-16 items-center justify-center rounded-full bg-border-subtle">
-            <CheckCircle2 size={30} className="text-text-muted" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-text-primary">This job&apos;s no longer available</h1>
-            <p className="mt-1 text-sm text-text-secondary">
-              {offer.response === "accepted"
-                ? "You accepted this job."
-                : "Another mechanic accepted it first, or it was withdrawn."}
-            </p>
-          </div>
-          <Link
-            href="/mechanic/jobs"
-            className="inline-flex h-11 items-center rounded-button bg-brand-blue px-5 text-sm font-semibold text-white transition-colors hover:bg-brand-blue-dark"
-          >
-            Back to jobs
-          </Link>
-        </div>
-      </Shell>
-    );
-  }
 
   // Distance from the mechanic's base to the job.
   const { data: mechanic } = await supabase

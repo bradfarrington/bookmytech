@@ -15,10 +15,18 @@ export interface PushNotification {
   bookingId?: string;
   /** Extra payload for future app builds (e.g. a reminder's tracked CTA link). */
   data?: Record<string, string>;
+  /** Android channel. Defaults to the customer app's `bookings`. */
+  channelId?: string;
 }
 
-/** The Android channel the app creates before requesting a token. */
+/** The Android channel the customer app creates before requesting a token. */
 export const ANDROID_CHANNEL = "bookings";
+/**
+ * The MECHANIC app's channel for job offers — max importance there, because an
+ * offer is first-to-accept. Separate from `bookings` so neither app's users can
+ * mute one kind of news by muting the other.
+ */
+export const ANDROID_OFFERS_CHANNEL = "offers";
 
 export function isExpoPushToken(token: unknown): token is string {
   return typeof token === "string" && Expo.isExpoPushToken(token);
@@ -33,7 +41,7 @@ export function buildPushMessage(token: string, n: PushNotification): ExpoPushMe
     data: { ...(n.data ?? {}), ...(n.bookingId ? { bookingId: n.bookingId } : {}) },
     sound: "default",
     priority: "high",
-    channelId: ANDROID_CHANNEL,
+    channelId: n.channelId ?? ANDROID_CHANNEL,
   };
 }
 

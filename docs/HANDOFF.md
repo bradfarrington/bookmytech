@@ -119,6 +119,38 @@ You are working on **Book My Tech**, a UK mobile-mechanic booking platform. This
 
 ## Current task
 
+### 🟡 2026-09-17 — BUILT, migration pending: offers and push for the mechanic app (Task 65)
+
+**A mechanic can now take a job from the app, and hears about it with the app
+closed.** Seven more routes under `app/api/mobile/v1/mechanic/`:
+
+- `GET  …/offers` — live offers as a summary, **without** the customer's details
+- `POST …/offers/[id]/accept` → `{ bookingId, needsArrivalWindow }`
+- `POST …/offers/[id]/decline` → `{}`
+- `GET  …/bookings/[id]/arrival-windows` — the picker, per day, with clashes
+- `POST …/bookings/[id]/arrival-window` `{ window, dayKey? }` → `{}`
+- `POST …/devices`, `POST …/devices/remove`
+
+`acceptOffer`, `declineOffer` and `setArrivalWindow` were hollowed out into
+`lib/mechanics/offers.ts` and `lib/mechanics/set-arrival-window.ts`; the cores
+return a refusal `code` that the routes map to 403/404/409 and the website
+ignores. `sendPushToMechanic` sits beside `sendPushToCustomer` on a shared send
+path, and `dispatchBooking` pushes every mechanic it creates a NEW offer for —
+not the ones who already held it, so coming online doesn't re-buzz everybody.
+
+Verified live with a temporary second mechanic (all cleaned up): two tokens
+racing `accept` → one 200, one 409, booking assigned once, sibling superseded;
+customer token 403 on all seven; offer push recorded with
+`data: { type: "offer", offerId }` on the `offers` channel and not repeated on
+re-dispatch; arrival window set, and refused the second time.
+
+**⚠️ `0082` is NOT applied yet — Brad to run it (after `0081`).** Until it is,
+`/mechanic/devices` answers 500 and no mechanic push goes out — everything else
+works. It also fixes a privacy leak: a mechanic who declined or lost an offer
+kept a permanent read of that booking row, customer address and phone included.
+
+See `docs/tasks/65-mechanic-offers-and-push.md`.
+
 ### 🟡 2026-09-17 — BUILT, migration pending: the mechanic app's first endpoints (Task 64)
 
 **The mechanic app (`bmt-mechanic-app`, a second Expo repo) now has a backend.**

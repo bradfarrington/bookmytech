@@ -104,12 +104,21 @@ export const RATE_LIMIT_DEFAULTS = {
   mobile_slots_ip_daily: 800,
   // The mechanic app (/mechanic/**): starting payouts onboarding and re-reading
   // its status are a Stripe call each, and going online re-offers every waiting
-  // booking. A mechanic toggles availability a few times a day and onboards
-  // once; the burst allows for an expired Stripe link and a few impatient taps.
-  mobile_mechanic_user_burst: 10,
-  mobile_mechanic_user_daily: 150,
-  mobile_mechanic_ip_burst: 20,
-  mobile_mechanic_ip_daily: 400,
+  // booking. Answering offers, setting arrival windows and registering the device
+  // count here too (Task 65). A mechanic does a few dozen of these on a busy
+  // day; the burst allows for an expired Stripe link and a few impatient taps.
+  mobile_mechanic_user_burst: 15,
+  mobile_mechanic_user_daily: 300,
+  mobile_mechanic_ip_burst: 30,
+  mobile_mechanic_ip_daily: 800,
+  // The mechanic app's polled reads (GET /mechanic/offers, the arrival-window
+  // picker). This repo polls rather than using Supabase Realtime, so an open
+  // Today screen asks every ~10s: 6 a minute, ~4,300 across a 12-hour day. The
+  // limits sit well clear of that, and well short of a loop.
+  mobile_mechanicfeed_user_burst: 40,
+  mobile_mechanicfeed_user_daily: 8000,
+  mobile_mechanicfeed_ip_burst: 80,
+  mobile_mechanicfeed_ip_daily: 24000,
 } as const;
 
 export type RateLimitKey = keyof typeof RATE_LIMIT_DEFAULTS;

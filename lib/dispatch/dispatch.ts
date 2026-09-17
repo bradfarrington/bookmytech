@@ -2,6 +2,9 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { geocodePostcode, outwardCode } from "@/lib/geo/postcodes";
 import { coversJob, isSuspendedNow } from "@/lib/dispatch/eligibility";
+import { ANDROID_OFFERS_CHANNEL } from "@/lib/push/format";
+import { sendPushToMechanic } from "@/lib/push/send";
+import { formatBookingWhen } from "@/lib/slots";
 
 // Broadcast dispatch (Task 05 Stage 2). Offers a booking to EVERY eligible
 // online mechanic at once — first to accept wins (see app/actions/job-offers.ts).
@@ -62,6 +65,56 @@ async function noteNoMatch(
     reason,
     payload: { kind: "dispatch_no_match" },
   });
+}
+
+interface NewOffer {
+  id: string;
+  mechanic_id: string;
+}
+
+// Push each newly offered mechanic (the mechanic app; the website's feed polls).
+// First-to-accept makes this time-critical, and it is the only way a mechanic
+// hears about a job with the app closed. Awaited, so a serverless function
+// can't be frozen mid-send, but best-effort: sendPushToMechanic never throws and
+// a mechanic with no registered device is a no-op.
+//
+// The lock screen gets the repair, the district and the day — never the
+// customer's name, street or phone.
+async function notifyNewOffers(
+  admin: ReturnType<typeof createAdminClient>,
+  bookingId: string,
+  offers: NewOffer[],
+): Promise<void> {
+  if (offers.length === 0) return;
+  try {
+    const { data: job } = await admin
+      .from("bookings")
+      .select("repair_description, postcode, area, scheduled_at, slot_window, candidate_days")
+      .eq("id", bookingId)
+      .maybeSingle();
+    const where = outwardCode(job?.postcode ?? "") || job?.area || "";
+    const body = [
+      job?.repair_description ?? "Vehicle repair",
+      where,
+      job ? formatBookingWhen(job) : "",
+    ]
+      .filter(Boolean)
+      .join(" · ");
+
+    await Promise.all(
+      offers.map((offer) =>
+        sendPushToMechanic(offer.mechanic_id, {
+          title: "New job offer",
+          body,
+          channelId: ANDROID_OFFERS_CHANNEL,
+          // `offerId` is what the app deep-links on: bmtmechanic://offer/<offerId>.
+          data: { type: "offer", offerId: offer.id },
+        }),
+      ),
+    );
+  } catch (err) {
+    console.error("[dispatch] offer push failed", err);
+  }
 }
 
 export async function dispatchBooking(bookingId: string): Promise<DispatchResult> {
@@ -147,9 +200,17 @@ export async function dispatchBooking(bookingId: string): Promise<DispatchResult
     booking_id: bookingId,
     mechanic_id,
   }));
-  await admin
+  //
+  // `ignoreDuplicates` + `select` hands back ONLY the rows this call created.
+  // That is who gets a push: redispatchPending re-runs this for every waiting
+  // booking each time any mechanic comes online, and a mechanic who already
+  // holds the offer must not be buzzed again for it.
+  const { data: created } = await admin
     .from("job_offers")
-    .upsert(rows, { onConflict: "booking_id,mechanic_id", ignoreDuplicates: true });
+    .upsert(rows, { onConflict: "booking_id,mechanic_id", ignoreDuplicates: true })
+    .select("id, mechanic_id");
+
+  await notifyNewOffers(admin, booking.id, (created ?? []) as NewOffer[]);
 
   return { offered: recipients.length, usedFallback };
 }
