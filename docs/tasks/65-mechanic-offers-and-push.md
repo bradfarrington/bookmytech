@@ -1,6 +1,6 @@
 # Task 65: The mechanic app — offers, arrival windows and push
 
-**Status:** 🟡 **Built and verified 2026-09-17; migration `0082` awaiting Brad (after `0081`).** Everything in the prompt shipped. Additions beyond it: a `GET …/offers` summary route (the answer to its "can the app read the booking before accepting?" question), a per-job `GET …/arrival-windows` rather than a static list, a second rate-limit family for polled reads, and a privacy fix to two RLS policies.
+**Status:** ✅ **Complete (2026-09-17).** Built and verified; migrations `0081` and `0082` applied by Brad the same day. A real push on a phone is still to be seen (needs the app build). Everything in the prompt shipped. Additions beyond it: a `GET …/offers` summary route (the answer to its "can the app read the booking before accepting?" question), a per-job `GET …/arrival-windows` rather than a static list, a second rate-limit family for polled reads, and a privacy fix to two RLS policies.
 
 Source: `bmt-mechanic-app/docs/offers-crm-prompt.md`. Builds on Task 64 (`requireMobileMechanic`).
 
@@ -59,7 +59,7 @@ The cores take the mechanic id and return a refusal `code`; the server actions d
 - [x] Creating an offer sends a push to a registered mechanic. *(Verified to the point of the send: the push was captured by the test outbox with the right payload and channel, and was not repeated on re-dispatch. **Not** verified on a real device — that needs `0082` and a build of the app.)*
 - [x] The web offer page behaves as before. *(Same code, now in `lib/`; typecheck, lint on touched files and 598 unit tests pass. Not clicked through in a browser.)*
 - [x] Customer email, SMS and push still go out on accept and on arrival-window set. *(All six captured.)*
-- [ ] **`0082` applied** — Brad. Until then `/mechanic/devices` answers 500 and mechanic push is a no-op; everything else works.
+- [x] **`0082` applied** — Brad, 2026-09-17. `/mechanic/devices` and mechanic push work from the next deploy.
 - [ ] A real push received on a phone — needs the app build, its Expo push credentials, and `0082`.
 
 ## For the app repos

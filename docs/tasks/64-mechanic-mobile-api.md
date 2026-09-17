@@ -1,6 +1,6 @@
 # Task 64: The mechanic app's first endpoints — auth and onboarding
 
-**Status:** 🟡 **Built and verified 2026-09-17; migration `0081` awaiting Brad.** All three routes, the guard and the Stripe return page shipped as specified, with one deviation: the return page is at `/mobile-return/mechanic-stripe`, not under `/mechanic/onboarding/stripe/` (see below). Item 5 of the prompt (first password from the approval email) deliberately left as is.
+**Status:** ✅ **Complete (2026-09-17).** Built and verified; migration `0081` applied by Brad the same day. All three routes, the guard and the Stripe return page shipped as specified, with one deviation: the return page is at `/mobile-return/mechanic-stripe`, not under `/mechanic/onboarding/stripe/` (see below). Item 5 of the prompt (first password from the approval email) deliberately left as is.
 
 Source: `bmt-mechanic-app/docs/auth-crm-prompt.md`.
 
@@ -70,7 +70,7 @@ The payouts refusal on the web still reads "…: Settings → Get paid." — the
 - [x] Going online without payouts gets 409 with `"Connect your bank account before going online."`
 - [x] Web onboarding and the web online toggle behave as before. *(Same code path, now in `lib/`; typecheck, lint and 598 unit tests pass. Not clicked through in a browser.)*
 - [x] A real onboarding link is minted. *(Stripe test mode; the account was deleted and the e2e mechanic's row reset afterwards.)*
-- [ ] **`0081` applied and verified** — Brad. As a mechanic, `update({ is_pro: true })` should be refused with `42501`, and the web online toggle should still work.
+- [x] **`0081` applied** — Brad, 2026-09-17. Still worth a check from a mechanic session: as a mechanic, `update({ is_pro: true })` should be refused with `42501`, and the web online toggle should still work.
 - [ ] First password from the approval email (prompt item 5) — deliberately not done; the web link works today. Revisit if asked.
 
 ## For the app repos

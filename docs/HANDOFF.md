@@ -119,7 +119,7 @@ You are working on **Book My Tech**, a UK mobile-mechanic booking platform. This
 
 ## Current task
 
-### 🟡 2026-09-17 — BUILT, migration pending: offers and push for the mechanic app (Task 65)
+### ✅ 2026-09-17 — BUILT, `0082` applied: offers and push for the mechanic app (Task 65)
 
 **A mechanic can now take a job from the app, and hears about it with the app
 closed.** Seven more routes under `app/api/mobile/v1/mechanic/`:
@@ -144,14 +144,14 @@ customer token 403 on all seven; offer push recorded with
 `data: { type: "offer", offerId }` on the `offers` channel and not repeated on
 re-dispatch; arrival window set, and refused the second time.
 
-**⚠️ `0082` is NOT applied yet — Brad to run it (after `0081`).** Until it is,
-`/mechanic/devices` answers 500 and no mechanic push goes out — everything else
-works. It also fixes a privacy leak: a mechanic who declined or lost an offer
+**`0082` applied by Brad 2026-09-17** (after `0081`), so `/mechanic/devices` and
+mechanic push are live once deployed. Still to do: a real push received on a
+phone. It also fixes a privacy leak: a mechanic who declined or lost an offer
 kept a permanent read of that booking row, customer address and phone included.
 
 See `docs/tasks/65-mechanic-offers-and-push.md`.
 
-### 🟡 2026-09-17 — BUILT, migration pending: the mechanic app's first endpoints (Task 64)
+### ✅ 2026-09-17 — BUILT, `0081` applied: the mechanic app's first endpoints (Task 64)
 
 **The mechanic app (`bmt-mechanic-app`, a second Expo repo) now has a backend.**
 Three routes under `app/api/mobile/v1/mechanic/`, behind a new
@@ -174,11 +174,12 @@ Verified live against the e2e accounts: mechanic 200 on all three, customer 403,
 `https://evil.example` 400, online without payouts 409, and a real test-mode
 onboarding link minted (account deleted and the row reset afterwards).
 
-**⚠️ `0081` is NOT applied yet — Brad to run it.** It seeds the `mechanic`
+**`0081` applied by Brad 2026-09-17** — not yet re-verified from a mechanic
+session (see below). It seeds the `mechanic`
 rate-limit family (code defaults already apply) and closes the `mechanics`
 version of the Task 62 hole: a mechanic could write their own `rating`, `is_pro`,
 `is_suspended` and `stripe_*` flags, or `status = 'online'` past the payouts
-gate. After applying, verify as a mechanic that `update({ is_pro: true })` is
+gate. Still worth verifying as a mechanic that `update({ is_pro: true })` is
 refused with `42501` and the web online toggle still works. Both apps then
 regenerate types.
 
