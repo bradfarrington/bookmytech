@@ -1,6 +1,6 @@
 # Task 66: The mechanic app — Today extras (goal, accept rate, distance, timed offline, two pushes)
 
-**Status:** 🟡 **Built 2026-09-17, not yet live.** Typecheck, lint and 612 unit tests pass. Migration `0083` is **not applied** and nothing here has run against the database or a phone — see the unticked boxes. Everything in the prompt shipped with the field names and shapes unchanged. Additions: a `mechanic_daily_pushes` table for "once per day", `resume_online_at` cleared by trigger rather than by each caller, and `?force=1` on the evening cron.
+**Status:** 🟡 **Built 2026-09-17, not yet live.** Typecheck, lint and 612 unit tests pass. Migration `0083` was applied by Brad on 2026-09-17; nothing here has yet been run against the database or a phone — see the unticked boxes. Everything in the prompt shipped with the field names and shapes unchanged. Additions: a `mechanic_daily_pushes` table for "once per day", `resume_online_at` cleared by trigger rather than by each caller, and `?force=1` on the evening cron.
 
 Source: `bmt-mechanic-app/docs/today-crm-prompt.md`. Builds on Tasks 64 and 65.
 
@@ -45,7 +45,7 @@ Safe to deploy before it is applied: going offline still works (the failed clear
 - [ ] Offline with `{ "minutes": 30 }` sets `resume_online_at`; the cron brings them back online and re-dispatches; going online by hand clears it. *(Needs `0083`.)*
 - [ ] Both pushes arrive once, on the `updates` channel, with the right `data`. *(Copy and once-only logic unit-tested; not sent.)*
 - [x] The web mechanic surface behaves exactly as before. *(`setOwnAvailability` returns the same two fields; `completeAndCharge` gains one best-effort call. Typecheck, lint, 612 tests. Not clicked through.)*
-- [ ] **`0083` applied** — Brad.
+- [x] **`0083` applied** — Brad, 2026-09-17.
 
 ## For the app repos
 

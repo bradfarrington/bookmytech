@@ -190,7 +190,7 @@ settings rows only).
 test job confirmed → completed through the routes with a mechanic's token, a
 customer's token refused, and a failed capture retried.
 
-### 🟡 2026-09-17 — BUILT, `0083` NOT applied: the mechanic app's Today extras (Task 66)
+### 🟡 2026-09-17 — BUILT, `0083` applied: the mechanic app's Today extras (Task 66)
 
 **The data behind the app's Today, Tomorrow and End-of-day screens.** Spec and
 status: `docs/tasks/66-mechanic-today-extras.md`.
@@ -206,8 +206,8 @@ status: `docs/tasks/66-mechanic-today-extras.md`.
 Leave-by = window start − straight-line miles from base at 20 mph − 10 min,
 rounded down to 5. Accept rate = accepted / (accepted + declined), 30 days.
 
-**Not verified beyond typecheck, lint and unit tests.** `0083` needs applying
-(Brad), then: the summary against a real mechanic, the goal/`resume_online_at`
+**Not verified beyond typecheck, lint and unit tests.** `0083` was applied by
+Brad 2026-09-17. Still to check: the summary against a real mechanic, the goal/`resume_online_at`
 RLS check, a timed offline through the cron, and both pushes. Safe to deploy
 first — see the task md.
 
