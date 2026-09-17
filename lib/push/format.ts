@@ -27,6 +27,12 @@ export const ANDROID_CHANNEL = "bookings";
  * mute one kind of news by muting the other.
  */
 export const ANDROID_OFFERS_CHANNEL = "offers";
+/**
+ * The mechanic app's channel for everything that ISN'T an offer — back online,
+ * tomorrow at a glance, the end-of-day recap (Task 66). Default importance, so
+ * it never competes with `offers`, and muting it costs a mechanic no work.
+ */
+export const ANDROID_UPDATES_CHANNEL = "updates";
 
 export function isExpoPushToken(token: unknown): token is string {
   return typeof token === "string" && Expo.isExpoPushToken(token);

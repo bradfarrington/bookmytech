@@ -92,12 +92,12 @@ export function dayOfWeekForKey(key: string): number {
 }
 
 /**
- * The instant at `hour`:00 UK time on the given UK calendar day. Handles the
+ * The instant at `hour`:`minute` UK time on the given UK calendar day. Handles the
  * GMT↔BST switch by resolving the zone offset at the target itself.
  */
-export function londonInstant(key: string, hour: number): Date {
+export function londonInstant(key: string, hour: number, minute = 0): Date {
   const [y, m, d] = key.split("-").map(Number);
-  const wall = Date.UTC(y, m - 1, d, hour, 0, 0, 0);
+  const wall = Date.UTC(y, m - 1, d, hour, minute, 0, 0);
   // First guess: treat the wall time as UTC, ask what London's offset is then,
   // and pull back by it. Around a DST change the offset at the guess and at
   // the answer can differ, so resolve once more from the answer.
@@ -105,6 +105,17 @@ export function londonInstant(key: string, hour: number): Date {
   const settled = wall - londonOffsetMs(new Date(instant));
   if (settled !== instant) instant = settled;
   return new Date(instant);
+}
+
+/** The UK wall-clock hour (0–23) an instant falls in. */
+export function londonHour(at: Date): number {
+  return londonParts(at).hour;
+}
+
+/** "08:30" — an instant's UK wall-clock time, 24-hour. */
+export function londonClock(at: Date): string {
+  const p = londonParts(at);
+  return `${pad2(p.hour)}:${pad2(p.minute)}`;
 }
 
 /** ISO string for the start of a window on a UK calendar day. */

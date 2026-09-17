@@ -26,6 +26,10 @@ export interface MobileMechanicRow {
   stripe_payouts_enabled: boolean;
   is_suspended: boolean;
   suspended_until: string | null;
+  /** Their own daily earnings target (0083). Null = none set. */
+  daily_goal_pence: number | null;
+  /** When a timed offline ends (0083). Set by the status route, never by the app. */
+  resume_online_at: string | null;
   created_at: string;
   updated_at: string;
 }

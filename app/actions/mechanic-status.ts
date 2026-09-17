@@ -25,7 +25,7 @@ export async function setOwnAvailability(
   if (!user) return { ok: false, error: "Not signed in." };
 
   const result = await setAvailabilityFor(supabase, user.id, status);
-  if (result.ok) return result;
+  if (result.ok) return { ok: true, status: result.status };
 
   // The website can point at where to fix it; the app has its own screen.
   if (result.refused === "no_payouts") {

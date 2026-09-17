@@ -119,6 +119,27 @@ You are working on **Book My Tech**, a UK mobile-mechanic booking platform. This
 
 ## Current task
 
+### 🟡 2026-09-17 — BUILT, `0083` NOT applied: the mechanic app's Today extras (Task 66)
+
+**The data behind the app's Today, Tomorrow and End-of-day screens.** Spec and
+status: `docs/tasks/66-mechanic-today-extras.md`.
+
+- `GET …/mechanic/summary?day=` — per-job distances, a leave-by time, accept
+  rate and the day's totals (`lib/mechanics/day-summary.ts`)
+- `POST …/mechanic/status` takes `resume` (`{ minutes: 30 | 60 }` or
+  `{ at: "next_shift" }`) and answers `{ status, resumeAt }`
+- crons `resume-online` (5 min) and `tomorrow-at-a-glance` (hourly, acts at 8pm
+  UK time); "Job well done" goes out from `completeAndCharge`
+- pushes on a new quiet Android channel, `updates`
+
+Leave-by = window start − straight-line miles from base at 20 mph − 10 min,
+rounded down to 5. Accept rate = accepted / (accepted + declined), 30 days.
+
+**Not verified beyond typecheck, lint and unit tests.** `0083` needs applying
+(Brad), then: the summary against a real mechanic, the goal/`resume_online_at`
+RLS check, a timed offline through the cron, and both pushes. Safe to deploy
+first — see the task md.
+
 ### ✅ 2026-09-17 — BUILT, `0082` applied: offers and push for the mechanic app (Task 65)
 
 **A mechanic can now take a job from the app, and hears about it with the app

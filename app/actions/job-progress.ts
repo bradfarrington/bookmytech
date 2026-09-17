@@ -16,6 +16,7 @@ import { payoutToMechanic } from "@/lib/payments/payout";
 import { loadQuotesForBooking, quoteMoney } from "@/lib/quotes/load";
 import { loadRevisionsForBooking, revisionMoney } from "@/lib/revisions/load";
 import { sendPushToCustomer } from "@/lib/push/send";
+import { sendEndOfDayRecap } from "@/lib/mechanics/daily-pushes";
 import { shortPersonName } from "@/lib/utils";
 import { repairLinesFor, type BookingRepairRow } from "@/lib/bookings/repair-lines";
 import { unfinishedMessage } from "@/lib/checklists/checklists";
@@ -455,6 +456,11 @@ export async function completeAndCharge(bookingId: string): Promise<JobProgressR
       actorRole: "mechanic",
     });
   }
+
+  // --- End-of-day recap (mechanic app, Task 66) ------------------------------
+  // If that was the last job they had to do today, the app gets "Job well
+  // done" with the day's earnings. Once a day; never throws.
+  if (booking.mechanic_id) await sendEndOfDayRecap(admin, booking.mechanic_id);
 
   // --- Receipt email --------------------------------------------------------
   const serviceName = booking.repair_description ?? "Vehicle repair";

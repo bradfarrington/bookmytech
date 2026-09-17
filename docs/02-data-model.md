@@ -280,6 +280,8 @@ A `public.is_admin()` `SECURITY DEFINER` function is the single source of truth 
 
 **Offered-booking reads (`0082`, Task 65).** `Mechanics can view offered bookings` (`bookings`) and `Mechanics read offered booking repairs` (`booking_repairs`) now require the offer to be **live** (`response is null`). Before, a declined or superseded offer kept the customer's row readable for good.
 
+**Mechanic Today extras (`0083`, Task 66).** `mechanics.daily_goal_pence` (`integer`, null or 1000–200000) — the mechanic's own daily target, writable by them under RLS and the 0081 column grant. `mechanics.resume_online_at` (`timestamptz`) — when a timed offline ends; service-role writes only (status route, `/api/cron/resume-online`), restored by the 0081 trigger for a mechanic's session and nulled by it whenever status becomes `online` or `on_job`. **`mechanic_daily_pushes`** — `(mechanic_id, day, kind)` PK, `kind` in `tomorrow | recap`; the insert is the once-per-day lock for those two pushes. RLS on, no policies.
+
 **`booking_events`** — defined in `0005_booking_events.sql`. Append-only — there's no UPDATE or DELETE policy.
 - `SELECT`: `Admins can view all booking events` — `using (public.is_admin())`
 - `INSERT`: `Admins can insert booking events` — `with check (public.is_admin())` (server actions run under the admin's session; system-generated events are written via the service-role client)

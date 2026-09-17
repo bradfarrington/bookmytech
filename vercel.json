@@ -39,6 +39,14 @@
     {
       "path": "/api/cron/expire-quotes",
       "schedule": "30 * * * *"
+    },
+    {
+      "path": "/api/cron/resume-online",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/tomorrow-at-a-glance",
+      "schedule": "0 * * * *"
     }
   ]
 }
