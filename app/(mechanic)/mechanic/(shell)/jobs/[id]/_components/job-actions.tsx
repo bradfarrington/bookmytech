@@ -7,6 +7,7 @@ import { CalendarClock, Ban, CheckCircle2, Navigation, Wrench, BadgePoundSterlin
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { cancelOwnJob, proposeReschedule } from "@/app/actions/mechanic-jobs";
+import { CANCEL_REASONS as CANCEL_REASON_OPTIONS, joinCancelReason } from "@/lib/mechanics/cancel-reasons";
 import { startJourney, beginWork, completeAndCharge } from "@/app/actions/job-progress";
 import { formatPrice } from "@/lib/utils";
 
@@ -20,15 +21,7 @@ interface JobActionsProps {
   chargePence: number;
 }
 
-const CANCEL_REASONS = [
-  { value: "", label: "Select a reason…" },
-  { value: "Vehicle or parts issue", label: "Vehicle / parts issue" },
-  { value: "Scheduling clash", label: "Scheduling clash / double-booked" },
-  { value: "Unwell", label: "Unwell / unavailable" },
-  { value: "Customer unreachable", label: "Customer unreachable" },
-  { value: "Outside my area", label: "Too far / outside my area" },
-  { value: "Other", label: "Other" },
-];
+const CANCEL_REASONS = [{ value: "", label: "Select a reason…" }, ...CANCEL_REASON_OPTIONS];
 
 // Pre-fill the reschedule picker with the current slot in the format a
 // datetime-local input expects (local time, no timezone suffix).
@@ -199,7 +192,7 @@ export function JobActions({
       toast.error("Choose a reason for cancelling.");
       return;
     }
-    const full = reasonDetails.trim() ? `${reason}: ${reasonDetails.trim()}` : reason;
+    const full = joinCancelReason(reason, reasonDetails);
     startTransition(async () => {
       const res = await cancelOwnJob(bookingId, full);
       if (res.ok) {

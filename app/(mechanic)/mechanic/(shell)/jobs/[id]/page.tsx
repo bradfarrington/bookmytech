@@ -7,7 +7,7 @@ import { loadRevisionsForBooking, revisionMoney } from "@/lib/revisions/load";
 import { diffRevision, followOnLinesFromRevision } from "@/lib/revisions/diff";
 import { cancelFeeTiers } from "@/lib/bookings/manage-booking";
 import { geocodePostcode, haversineMiles, type LatLng } from "@/lib/geo/postcodes";
-import { mechanicSharePence } from "@/lib/earnings";
+import { jobMoney } from "@/lib/mechanics/job-money";
 import { isHaynesProConfigured } from "@/lib/haynespro/client";
 import { ALL_DAY_SLOT, formatBookingWhen, isFlexibleBooking, londonDateKey } from "@/lib/slots";
 import { formatJobNumber } from "@/lib/utils";
@@ -166,9 +166,12 @@ export default async function MechanicJobDetailPage({ params }: PageProps) {
     brand: (p.brand as string | null | undefined) ?? null,
   }));
   const partsPence = jobParts.reduce((s, p) => s + p.totalPence, 0);
-  const bmtPartsPence = jobParts
-    .filter((p) => p.sourcing === "bmt")
-    .reduce((s, p) => s + p.totalPence, 0);
+  // The same sum the mechanic app is served (lib/mechanics/job-money.ts).
+  const money = jobMoney(
+    booking,
+    jobParts.map((p) => ({ total_pence: p.totalPence, sourcing: p.sourcing })),
+  );
+  const bmtPartsPence = money.bmtPartsPence;
 
   // --- Match reasons --------------------------------------------------------
   const specialisms: string[] = Array.isArray(mechanic?.specialisms) ? mechanic.specialisms : [];
@@ -272,16 +275,14 @@ export default async function MechanicJobDetailPage({ params }: PageProps) {
     distanceLabel,
     // Every booking carries its exact billed duration (book time).
     durationLabel: `~${Number(booking.service_duration_hours ?? 1)}h`,
-    earningsPence:
-      mechanicSharePence(booking.total_pence ?? 0, booking.commission_rate ?? 0.15) -
-      bmtPartsPence,
+    earningsPence: money.payoutPence,
     customerName: booking.customer_name ?? "",
     customerPhone: booking.customer_phone,
     phoneRevealed: REVEAL_PHONE_STATUSES.includes(booking.status),
     specialInstructions: booking.special_instructions,
     address,
     totalPence: booking.total_pence ?? 0,
-    commissionRate: booking.commission_rate ?? 0.15,
+    commissionRate: money.commissionRate,
     parts: jobParts,
     partsPence,
     bmtPartsPence,
@@ -296,10 +297,7 @@ export default async function MechanicJobDetailPage({ params }: PageProps) {
     photos,
     // What "Complete job & charge" will take: the same figure completeAndCharge
     // captures (total − credit − discount).
-    chargePence: Math.max(
-      0,
-      (booking.total_pence ?? 0) - (booking.credit_applied_pence ?? 0) - (booking.discount_pence ?? 0),
-    ),
+    chargePence: money.chargePence,
     disputeId: disputeRow?.id ?? null,
     // In-app manuals + technical data (Task 27) need the Data Exchange
     // credentials, not the SSO ones.

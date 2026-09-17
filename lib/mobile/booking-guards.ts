@@ -78,6 +78,9 @@ export async function requireMobileCustomer(request: Request): Promise<MobileCus
  *              arrival-window picker). Kept apart from `mechanic` so a feed
  *              refreshing every few seconds can never use up the budget for
  *              accepting the job it just showed
+ *   mechanicchecklist — one checklist answer per request, 50–170 in a row
+ *   mechanicupload — job photos; a mechanic takes far more than a customer's
+ *              six dispute photos
  */
 export type MobileLimitFamily =
   | "checkout"
@@ -89,7 +92,9 @@ export type MobileLimitFamily =
   | "account"
   | "slots"
   | "mechanic"
-  | "mechanicfeed";
+  | "mechanicfeed"
+  | "mechanicchecklist"
+  | "mechanicupload";
 
 /**
  * Count this request against its bucket family. Returns a ready-to-return 429

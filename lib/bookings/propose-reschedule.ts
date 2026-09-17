@@ -7,6 +7,7 @@ import { sendSms } from "@/lib/sms/send-sms";
 import { renderSmsTemplate } from "@/lib/sms/render-template";
 import { formatBookingSlot } from "@/lib/slots";
 import { siteUrl } from "@/lib/utils";
+import { refuse, type MechanicRefusal } from "@/lib/mechanics/refusal";
 
 // The one implementation of "the mechanic proposes a new time" (Task 38 —
 // extracted from app/actions/mechanic-jobs.ts, which now calls it). The
@@ -17,7 +18,7 @@ import { siteUrl } from "@/lib/utils";
 // here is whatever the trusted layer resolved, never an argument a browser
 // supplied.
 
-export type ProposeRescheduleResult = { ok: true } | { ok: false; error: string };
+export type ProposeRescheduleResult = { ok: true } | MechanicRefusal;
 
 /** Only a confirmed job that hasn't started can be moved by proposal. */
 export const PROPOSABLE_STATUSES: readonly string[] = ["confirmed"];
@@ -30,8 +31,8 @@ export async function proposeRescheduleFor(
   admin: ReturnType<typeof createAdminClient> = createAdminClient(),
 ): Promise<ProposeRescheduleResult> {
   const when = new Date(newIso);
-  if (!newIso || Number.isNaN(when.getTime())) return { ok: false, error: "Pick a valid new date and time." };
-  if (when.getTime() < Date.now()) return { ok: false, error: "The new time must be in the future." };
+  if (!newIso || Number.isNaN(when.getTime())) return refuse("invalid", "Pick a valid new date and time.");
+  if (when.getTime() < Date.now()) return refuse("invalid", "The new time must be in the future.");
 
   const { data: booking } = await admin
     .from("bookings")
@@ -39,10 +40,10 @@ export async function proposeRescheduleFor(
     .eq("id", bookingId)
     .single();
 
-  if (!booking) return { ok: false, error: "That job no longer exists." };
-  if (booking.mechanic_id !== mechanicId) return { ok: false, error: "This isn't your job." };
+  if (!booking) return refuse("not_found", "That job no longer exists.");
+  if (booking.mechanic_id !== mechanicId) return refuse("forbidden", "This isn't your job.");
   if (!PROPOSABLE_STATUSES.includes(booking.status))
-    return { ok: false, error: "Only confirmed jobs that haven't started can be rescheduled." };
+    return refuse("conflict", "Only confirmed jobs that haven't started can be rescheduled.");
 
   const trimmedNote = note.trim() || null;
   const { error } = await admin
@@ -54,7 +55,7 @@ export async function proposeRescheduleFor(
     })
     .eq("id", bookingId)
     .eq("mechanic_id", mechanicId);
-  if (error) return { ok: false, error: error.message };
+  if (error) return refuse("failed", error.message);
 
   await admin.from("booking_events").insert({
     booking_id: bookingId,

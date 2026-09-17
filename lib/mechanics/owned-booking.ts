@@ -1,5 +1,6 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { refuse, type MechanicRefusal } from "@/lib/mechanics/refusal";
 
 // The second half of every mechanic-side write: after `requireMechanic()` has
 // proved the caller is a mechanic, re-read the booking under the service-role
@@ -18,7 +19,7 @@ export interface OwnedBooking {
 
 export type OwnedBookingResult =
   | { ok: true; booking: OwnedBooking; admin: ReturnType<typeof createAdminClient> }
-  | { ok: false; error: string };
+  | MechanicRefusal;
 
 export async function ownedBooking(bookingId: string, mechanicId: string): Promise<OwnedBookingResult> {
   const admin = createAdminClient();
@@ -27,7 +28,7 @@ export async function ownedBooking(bookingId: string, mechanicId: string): Promi
     .select("id, status, mechanic_id")
     .eq("id", bookingId)
     .single();
-  if (!booking) return { ok: false, error: "That job no longer exists." };
-  if (booking.mechanic_id !== mechanicId) return { ok: false, error: "This isn't your job." };
+  if (!booking) return refuse("not_found", "That job no longer exists.");
+  if (booking.mechanic_id !== mechanicId) return refuse("forbidden", "This isn't your job.");
   return { ok: true, booking, admin };
 }

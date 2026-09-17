@@ -119,6 +119,24 @@ export const RATE_LIMIT_DEFAULTS = {
   mobile_mechanicfeed_user_daily: 8000,
   mobile_mechanicfeed_ip_burst: 80,
   mobile_mechanicfeed_ip_daily: 24000,
+  // Checklist answers in the mechanic app (Task 67). One request per tap, and a
+  // checklist is 46–173 items: a mechanic working down a list of passes taps
+  // faster than once a second, which `mechanic`'s 15 a minute would refuse a
+  // quarter of a minute in. Each is one small upsert on a job they hold, so the
+  // ceiling only needs to stop a loop. Daily: several checklist jobs, each
+  // answered once and revised a little.
+  mobile_mechanicchecklist_user_burst: 150,
+  mobile_mechanicchecklist_user_daily: 4000,
+  mobile_mechanicchecklist_ip_burst: 300,
+  mobile_mechanicchecklist_ip_daily: 12000,
+  // Job photos from the mechanic app (Task 67). Apart from the customers'
+  // `upload`, which is sized for six dispute photos: a mechanic photographs
+  // every job, before and after, all day. Still up to 10 MB each into a bucket
+  // we keep for good, so not unlimited.
+  mobile_mechanicupload_user_burst: 20,
+  mobile_mechanicupload_user_daily: 300,
+  mobile_mechanicupload_ip_burst: 40,
+  mobile_mechanicupload_ip_daily: 900,
 } as const;
 
 export type RateLimitKey = keyof typeof RATE_LIMIT_DEFAULTS;

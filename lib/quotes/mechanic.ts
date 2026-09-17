@@ -13,15 +13,33 @@ import { loadRevisionsForBooking, revisionMoney } from "@/lib/revisions/load";
 import { safePriceQuoteLines, type QuoteLineInput } from "./pricing";
 import { QUOTABLE_STATUSES, quoteExpiry, type QuoteKind } from "./status";
 import { notifyCustomerQuoteSent, type QuoteBookingContact } from "./notify";
+import { refuse, type MechanicRefusal } from "@/lib/mechanics/refusal";
 
-// The mechanic's side of quotes and faults (Task 33). Called only from the
-// mechanic Server Actions (app/actions/job-quotes.ts, booking-faults.ts),
-// which resolve the mechanic from the cookie session and pass their id in —
-// the mechanic is never in the mobile app. Every write is service-role after
-// an ownership re-read, as with every other mechanic action.
+// The mechanic's side of quotes and faults (Task 33). Called from the mechanic
+// Server Actions (app/actions/job-quotes.ts, booking-faults.ts), which resolve
+// the mechanic from the cookie session, and — quotes only — from the mechanic
+// app's route handlers (app/api/mobile/v1/mechanic/…/quotes, Task 67), which
+// resolve them from a bearer token. Either way the id is passed in. Every write
+// is service-role after an ownership re-read, as with every other mechanic
+// action.
+//
+// The quote functions refuse with a `code` (lib/mechanics/refusal.ts) for the
+// routes to turn into a status; the website ignores it. Faults are web-only
+// and don't carry one.
 
 export type QuoteResult = { ok: true } | { ok: false; error: string };
-export type QuoteCreateResult = { ok: true; id: string } | { ok: false; error: string };
+export type QuoteWithdrawResult = { ok: true } | MechanicRefusal;
+export type QuoteCreateResult = { ok: true; id: string } | MechanicRefusal;
+export type QuotePreviewResult =
+  | {
+      ok: true;
+      lines: Array<{ linePence: number }>;
+      totalPence: number;
+      platformFeePence: number;
+      mechanicPayoutPence: number;
+      hourlyRatePence: number;
+    }
+  | MechanicRefusal;
 
 const BOOKING_COLUMNS =
   "id, job_number, status, mechanic_id, customer_id, customer_email, customer_name, customer_phone, vehicle_reg, total_pence, credit_applied_pence, commission_rate";
@@ -38,8 +56,8 @@ async function ownedBooking(bookingId: string, mechanicId: string) {
   const admin = createAdminClient();
   const { data } = await admin.from("bookings").select(BOOKING_COLUMNS).eq("id", bookingId).single();
   const booking = data as QuoteBooking | null;
-  if (!booking) return { ok: false as const, error: "That job no longer exists." };
-  if (booking.mechanic_id !== mechanicId) return { ok: false as const, error: "This isn't your job." };
+  if (!booking) return refuse("not_found", "That job no longer exists.");
+  if (booking.mechanic_id !== mechanicId) return refuse("forbidden", "This isn't your job.");
   return { ok: true as const, booking, admin };
 }
 
@@ -55,7 +73,7 @@ function revalidate(bookingId: string) {
 export async function addFault(
   mechanicId: string,
   input: { bookingId: string; description: string; severity?: string },
-): Promise<QuoteCreateResult> {
+): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   const description = (input.description ?? "").trim().replace(/\s+/g, " ");
   if (!description) return { ok: false, error: "Describe the fault." };
   if (description.length > 500) return { ok: false, error: "Keep the fault under 500 characters." };
@@ -114,6 +132,46 @@ export interface CreateQuoteInput {
 }
 
 /**
+ * Price a quote's lines for a booking: the platform's hourly rate, and the
+ * BOOKING's snapshotted commission (so a Pro-tier mechanic keeps theirs). The
+ * one place both the preview and the real thing get their settings from.
+ */
+async function priceForBooking(
+  admin: ReturnType<typeof createAdminClient>,
+  booking: Pick<QuoteBooking, "commission_rate">,
+  rawLines: unknown,
+) {
+  if (!Array.isArray(rawLines)) return refuse("invalid", "Add at least one line to the quote.");
+  const lines: QuoteLineInput[] = rawLines.map((l) => ({ ...(l as QuoteLineInput), partId: null }));
+  const [hourlyRatePence, defaultRate] = await Promise.all([getHourlyRatePence(admin), getTakeRateBase(admin)]);
+  const commissionRate = booking.commission_rate ?? defaultRate;
+  const priced = safePriceQuoteLines(lines, { hourlyRatePence, commissionRate });
+  if (!priced.ok) return refuse("invalid", priced.error);
+  return { ok: true as const, totals: priced.totals, hourlyRatePence, commissionRate };
+}
+
+/**
+ * What a quote WOULD come to — nothing is saved. The mechanic app calls this as
+ * the mechanic types, to show "Customer pays £90 · You earn £76.50" without
+ * owning a copy of ./pricing.ts, the hourly rate or the commission.
+ */
+export async function previewQuote(mechanicId: string, bookingId: string, lines: unknown): Promise<QuotePreviewResult> {
+  const owned = await ownedBooking(bookingId, mechanicId);
+  if (!owned.ok) return owned;
+  const priced = await priceForBooking(owned.admin, owned.booking, lines);
+  if (!priced.ok) return priced;
+  const { totals, hourlyRatePence } = priced;
+  return {
+    ok: true,
+    lines: totals.lines.map((l) => ({ linePence: l.linePence })),
+    totalPence: totals.totalPence,
+    platformFeePence: totals.platformFeePence,
+    mechanicPayoutPence: totals.mechanicPayoutPence,
+    hourlyRatePence,
+  };
+}
+
+/**
  * Price and send a quote in one go. Part lines are the mechanic's own: a name
  * and a price as typed, or filled in from an Alliance Automotive suggestion
  * (suggestQuoteParts). The frozen `parts` catalogue is no longer offered
@@ -125,13 +183,12 @@ export async function createQuote(mechanicId: string, input: CreateQuoteInput): 
   if (!owned.ok) return owned;
   const { booking, admin } = owned;
   if (!QUOTABLE_STATUSES[kind].includes(booking.status))
-    return {
-      ok: false,
-      error:
-        kind === "now"
-          ? "Extra work on this visit can only be quoted while the job is in progress."
-          : "A return visit can be quoted while the job is in progress or once it's complete.",
-    };
+    return refuse(
+      "conflict",
+      kind === "now"
+        ? "Extra work on this visit can only be quoted while the job is in progress."
+        : "A return visit can be quoted while the job is in progress or once it's complete.",
+    );
 
   // One open quote for this visit at a time — stacking approvals muddles the
   // customer and the capture. A revised job waiting on the customer (Task 37)
@@ -139,18 +196,14 @@ export async function createQuote(mechanicId: string, input: CreateQuoteInput): 
   if (kind === "now") {
     const existing = await loadQuotesForBooking(admin, booking.id);
     if (quoteMoney(existing).pendingNow)
-      return { ok: false, error: "A quote is already waiting on the customer. Withdraw it before sending another." };
+      return refuse("conflict", "A quote is already waiting on the customer. Withdraw it before sending another.");
     if (revisionMoney(await loadRevisionsForBooking(admin, booking.id)).pending)
-      return { ok: false, error: "The revised job is still waiting on the customer. Wait for their answer before quoting extra work." };
+      return refuse("conflict", "The revised job is still waiting on the customer. Wait for their answer before quoting extra work.");
   }
 
-  const lines: QuoteLineInput[] = input.lines.map((l) => ({ ...l, partId: null }));
-
-  const [hourlyRatePence, defaultRate] = await Promise.all([getHourlyRatePence(admin), getTakeRateBase(admin)]);
-  const commissionRate = booking.commission_rate ?? defaultRate;
-  const priced = safePriceQuoteLines(lines, { hourlyRatePence, commissionRate });
+  const priced = await priceForBooking(admin, booking, input.lines);
   if (!priced.ok) return priced;
-  const { totals } = priced;
+  const { totals, hourlyRatePence, commissionRate } = priced;
 
   const title = (input.title ?? "").trim().slice(0, 120) || null;
   const note = (input.note ?? "").trim().slice(0, 1000) || null;
@@ -176,7 +229,7 @@ export async function createQuote(mechanicId: string, input: CreateQuoteInput): 
     })
     .select("id")
     .single();
-  if (error || !quote) return { ok: false, error: error?.message ?? "Couldn't save the quote." };
+  if (error || !quote) return refuse("failed", error?.message ?? "Couldn't save the quote.");
 
   const { error: linesError } = await admin.from("job_quote_lines").insert(
     totals.lines.map((l) => ({
@@ -195,7 +248,7 @@ export async function createQuote(mechanicId: string, input: CreateQuoteInput): 
   );
   if (linesError) {
     await admin.from("job_quotes").delete().eq("id", quote.id);
-    return { ok: false, error: "We couldn't save the quote's lines. Please try again." };
+    return refuse("conflict", "We couldn't save the quote's lines. Please try again.");
   }
   // A fault quoted for points at its quote.
   const faultIds = [...new Set(totals.lines.map((l) => l.faultId).filter((v): v is string => Boolean(v)))];
@@ -219,12 +272,12 @@ export async function createQuote(mechanicId: string, input: CreateQuoteInput): 
   return { ok: true, id: quote.id };
 }
 
-export async function withdrawQuote(mechanicId: string, quoteId: string): Promise<QuoteResult> {
+export async function withdrawQuote(mechanicId: string, quoteId: string): Promise<QuoteWithdrawResult> {
   const admin = createAdminClient();
   const quote = await loadQuote(admin, quoteId);
-  if (!quote) return { ok: false, error: "That quote no longer exists." };
-  if (quote.mechanicId !== mechanicId) return { ok: false, error: "This isn't your quote." };
-  if (quote.status !== "sent") return { ok: false, error: "Only a quote that's waiting on the customer can be withdrawn." };
+  if (!quote) return refuse("not_found", "That quote no longer exists.");
+  if (quote.mechanicId !== mechanicId) return refuse("forbidden", "This isn't your quote.");
+  if (quote.status !== "sent") return refuse("conflict", "Only a quote that's waiting on the customer can be withdrawn.");
 
   // A hold the customer had started but not finished is released.
   if (quote.stripePaymentIntentId) await cancelIntentQuietly(quote.stripePaymentIntentId);
@@ -234,7 +287,7 @@ export async function withdrawQuote(mechanicId: string, quoteId: string): Promis
     .update({ status: "withdrawn", responded_at: new Date().toISOString(), updated_at: new Date().toISOString() })
     .eq("id", quoteId)
     .eq("status", "sent");
-  if (error) return { ok: false, error: error.message };
+  if (error) return refuse("failed", error.message);
   await admin.from("booking_faults").update({ quote_id: null }).eq("quote_id", quoteId);
   await admin.from("booking_events").insert({
     booking_id: quote.bookingId,
@@ -264,13 +317,15 @@ export async function searchJobRepairTimes(
   mechanicId: string,
   bookingId: string,
   query: string,
-): Promise<{ ok: true; hits: RepairTimeHit[]; truncated: boolean } | { ok: false; error: string }> {
+): Promise<{ ok: true; hits: RepairTimeHit[]; truncated: boolean } | MechanicRefusal> {
   const owned = await ownedBooking(bookingId, mechanicId);
   if (!owned.ok) return owned;
   const q = query.trim();
   if (q.length < 3) return { ok: true, hits: [], truncated: false };
   const result = await searchRepairCatalogue(owned.booking.vehicle_reg, q, owned.admin);
-  if (!result.ok) return { ok: false, error: result.message };
+  // The catalogue's own sentence ("We couldn't look up repairs for this
+  // vehicle…") — written for whoever is searching, so it goes through.
+  if (!result.ok) return refuse("conflict", result.message);
   return {
     ok: true,
     // Only a plain HaynesPro job carries a book time a quote line can cite;

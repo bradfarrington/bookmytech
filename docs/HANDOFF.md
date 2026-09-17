@@ -119,6 +119,28 @@ You are working on **Book My Tech**, a UK mobile-mechanic booking platform. This
 
 ## Current task
 
+### 🟡 2026-09-17 — BUILT, not run: the mechanic app's active job (Task 67)
+
+**Seventeen routes so a mechanic can work a whole job from the app.** Spec,
+route table and status: `docs/tasks/67-mechanic-active-job.md`.
+
+Every mechanic write that lived inside a `"use server"` file now lives in
+`lib/` with the mechanic id as a parameter — `lib/mechanics/job-progress.ts`
+(moved from `app/actions/`), `cancel-job.ts`, `job-media.ts`,
+`part-sourcing.ts`, `lib/checklists/save-result.ts` — and the actions are a
+guard plus one call. Cores refuse with a `code` (`lib/mechanics/refusal.ts`)
+that the routes turn into 400/403/404/409.
+
+Also: `completionGate()` is the one source of "why can't this complete";
+`jobMoney()` is the one sum for the job screen's figures (web page included);
+completion's status flip is now a claim, closing a double-payout race; a
+customer's message pushes the mechanic; two new rate-limit families (`0084`,
+settings rows only).
+
+**Not verified beyond typecheck, lint, unit tests and a build.** Still to do: a
+test job confirmed → completed through the routes with a mechanic's token, a
+customer's token refused, and a failed capture retried.
+
 ### 🟡 2026-09-17 — BUILT, `0083` NOT applied: the mechanic app's Today extras (Task 66)
 
 **The data behind the app's Today, Tomorrow and End-of-day screens.** Spec and

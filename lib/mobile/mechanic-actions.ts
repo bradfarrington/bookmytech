@@ -13,13 +13,23 @@ export type MobileMechanicCaller =
   | { ok: true; caller: MobileCaller; mechanic: MobileMechanicRow }
   | { ok: false; response: Response };
 
+/** The rate-limit families a mechanic route may count against. */
+export type MechanicLimitFamily =
+  | "mechanic"
+  | "mechanicfeed"
+  | "mechanicchecklist"
+  | "mechanicupload"
+  /** Shared with the customer app's thread: a conversation has two ends. */
+  | "message";
+
 /**
  * `requireMobileMechanic`, then a rate-limit family: `mechanic` for anything
- * that does something, `mechanicfeed` for the reads the app polls.
+ * that does something, `mechanicfeed` for the reads the app polls, and the
+ * three above for the things a mechanic does in bulk.
  */
 export async function mobileMechanicCaller(
   request: Request,
-  family: "mechanic" | "mechanicfeed" = "mechanic",
+  family: MechanicLimitFamily = "mechanic",
 ): Promise<MobileMechanicCaller> {
   const auth = await requireMobileMechanic(request);
   if (!auth.ok) return auth;

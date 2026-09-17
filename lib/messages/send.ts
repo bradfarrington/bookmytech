@@ -5,7 +5,8 @@ import { CLOSED_STATUSES } from "./constants";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendSms } from "@/lib/sms/send-sms";
 import { renderSmsTemplate } from "@/lib/sms/render-template";
-import { sendPushToCustomer } from "@/lib/push/send";
+import { ANDROID_UPDATES_CHANNEL } from "@/lib/push/format";
+import { sendPushToCustomer, sendPushToMechanic } from "@/lib/push/send";
 import { ownsBooking, type BookingCaller } from "@/lib/bookings/ownership";
 import { shortPersonName } from "@/lib/utils";
 
@@ -30,7 +31,15 @@ import { shortPersonName } from "@/lib/utils";
 // RLS: customers under "Customers read own booking messages", mechanics under
 // their own policy, so both clients read the thread straight from Supabase.
 
-export type MessageResult = { ok: true } | { ok: false; error: string };
+export type MessageResult =
+  | {
+      ok: true;
+      /** `sendMessageFor`: the new message's id. */
+      id?: string;
+      /** `markMessagesReadFor`: how many of the other side's messages this marked read. */
+      cleared?: number;
+    }
+  | { ok: false; error: string };
 
 export const MAX_MESSAGE_CHARS = 2000;
 
@@ -51,6 +60,7 @@ export interface MessageBooking {
   id: string;
   customer_id: string | null;
   customer_email: string | null;
+  customer_name: string | null;
   customer_phone: string | null;
   mechanic_id: string | null;
   status: string;
@@ -78,7 +88,7 @@ export async function partyForBooking(
   const admin = createAdminClient();
   const { data: booking } = await admin
     .from("bookings")
-    .select("id, customer_id, customer_email, customer_phone, mechanic_id, status")
+    .select("id, customer_id, customer_email, customer_name, customer_phone, mechanic_id, status")
     .eq("id", bookingId)
     .maybeSingle();
   if (!booking) return { ok: false, error: "That booking no longer exists." };
@@ -155,6 +165,21 @@ export async function sendMessageFor(
     }
   }
 
+  // The other direction (Task 67): a customer's message reaches the mechanic's
+  // phone at once, if they have the mechanic app. On its quiet `updates`
+  // channel — `offers` is for the first-to-accept race — and `data.type` +
+  // `bookingId` are what the app opens the thread from. A mechanic without the
+  // app still hears through the unread-message sweep, as before.
+  if (role === "customer") {
+    sendPushToMechanic(booking.mechanic_id, {
+      title: `New message from ${shortPersonName(booking.customer_name, "your customer")}`,
+      body: trimmed.slice(0, 120),
+      bookingId,
+      data: { type: "message" },
+      channelId: ANDROID_UPDATES_CHANNEL,
+    }).catch(() => {});
+  }
+
   // An audit row per message (Task 60). Two reasons it has to exist:
   //   • the customer's Inbox and its header dot are built from booking_events
   //     (lib/inbox/feed.ts), so without this a message never shows up as news —
@@ -190,7 +215,7 @@ export async function sendMessageFor(
   revalidatePath("/mechanic/messages");
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/inbox");
-  return { ok: true };
+  return { ok: true, id: inserted?.id as string | undefined };
 }
 
 /** Mark the counterpart's messages as read once the caller opens the thread. */
@@ -223,5 +248,5 @@ export async function markMessagesReadFor(
     revalidatePath("/mechanic/jobs");
     revalidatePath("/dashboard/inbox");
   }
-  return { ok: true };
+  return { ok: true, cleared: cleared?.length ?? 0 };
 }

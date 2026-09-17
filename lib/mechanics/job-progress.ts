@@ -1,0 +1,561 @@
+import "server-only";
+import { revalidatePath } from "next/cache";
+import { refuse, type MechanicRefusal } from "@/lib/mechanics/refusal";
+import { ownedBooking } from "@/lib/mechanics/owned-booking";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { sendEmail } from "@/lib/email/send";
+import { renderTemplateEmail } from "@/emails/resolve";
+import { sendSms } from "@/lib/sms/send-sms";
+import { renderSmsTemplate } from "@/lib/sms/render-template";
+import { formatPrice, siteUrl, formatJobNumber } from "@/lib/utils";
+import { completedBookingCount, grantCredit } from "@/lib/credits/credits";
+import { REFERRAL_BONUS_PENCE } from "@/lib/credits/constants";
+import { recomputeMechanicAggregates } from "@/lib/mechanics/aggregates";
+import { payoutToMechanic } from "@/lib/payments/payout";
+import { loadQuotesForBooking, quoteMoney } from "@/lib/quotes/load";
+import { loadRevisionsForBooking, revisionMoney } from "@/lib/revisions/load";
+import { sendPushToCustomer } from "@/lib/push/send";
+import { sendEndOfDayRecap } from "@/lib/mechanics/daily-pushes";
+import { shortPersonName } from "@/lib/utils";
+import { repairLinesFor, type BookingRepairRow } from "@/lib/bookings/repair-lines";
+import { unfinishedMessage } from "@/lib/checklists/checklists";
+import { loadBookingChecklists, productIdsInLines, type LoadedChecklist } from "@/lib/checklists/load";
+
+export type JobProgressResult = { ok: true } | MechanicRefusal;
+export type JobCompleteResult =
+  | {
+      ok: true;
+      /** What the customer's card was charged: total − credit − discount. */
+      chargedPence: number;
+      /** What is transferred to the mechanic. */
+      payoutPence: number;
+    }
+  | MechanicRefusal;
+
+// The live job lifecycle — start journey, begin work, mileage, complete &
+// charge — shared by the website's server actions (app/actions/job-progress.ts)
+// and the mechanic app's route handlers
+// (app/api/mobile/v1/mechanic/bookings/[id]/*, Task 67).
+//
+// Nothing here resolves WHO the mechanic is: the caller does that, from a
+// cookie session or a bearer token, and passes the id in.
+//
+// Task 06 originally planned start-journey / arrival / completion for the mobile
+// PWA, but the booking status enum and lifecycle timestamps (en_route_at,
+// started_at, completed_at) already exist (0004), so the mechanic can drive the
+// same transitions from the desktop dashboard. GPS live-location tracking stays
+// deferred to the mobile app — this is just the status flag the customer's
+// tracker reads.
+//
+// Same trust model as mechanic-jobs.ts / job-offers.ts: mechanics have no
+// UPDATE rights on bookings under RLS, so we verify the caller owns the job in
+// an RLS-aware client, re-read + re-check status under the service-role client,
+// then mutate. Each action only fires from one specific status, so a stale page
+// can't skip a step or double-fire.
+
+const MOVED_ON = "This job has already moved on. Refresh the page.";
+
+// Shared guard + transition. `from` is the only status the action is valid
+// from; `to` is the new status; `stamp` is the lifecycle timestamp column to
+// set to now(). Returns the mechanic id on success so callers can audit.
+async function transition(
+  mechanicId: string,
+  bookingId: string,
+  from: string,
+  to: string,
+  stamp: "en_route_at" | "started_at" | "completed_at",
+) {
+  const admin = createAdminClient();
+  const { data: booking } = await admin
+    .from("bookings")
+    .select("id, status, mechanic_id, customer_id, customer_email, customer_name, customer_phone")
+    .eq("id", bookingId)
+    .single();
+
+  if (!booking) return refuse("not_found", "That job no longer exists.");
+  if (booking.mechanic_id !== mechanicId) return refuse("forbidden", "This isn't your job.");
+  if (booking.status !== from) return refuse("conflict", MOVED_ON);
+
+  const { error } = await admin
+    .from("bookings")
+    .update({ status: to, [stamp]: new Date().toISOString() })
+    .eq("id", bookingId)
+    .eq("mechanic_id", mechanicId)
+    .eq("status", from);
+  if (error) return refuse("failed", error.message);
+
+  await admin.from("booking_events").insert({
+    booking_id: bookingId,
+    event_type: "status_changed",
+    actor_id: mechanicId,
+    actor_role: "mechanic",
+    payload: { status_from: from, status_to: to },
+  });
+
+  return { ok: true as const, mechanicId, booking, admin };
+}
+
+function revalidate(bookingId: string) {
+  revalidatePath("/mechanic/jobs");
+  revalidatePath(`/mechanic/jobs/${bookingId}`);
+  // The customer's tracker reads the same booking by id.
+  revalidatePath(`/book/confirmed/${bookingId}`);
+}
+
+/** confirmed → en_route. Stamps en_route_at and tells the customer you're on the way. */
+export async function startJourneyFor(mechanicId: string, bookingId: string): Promise<JobProgressResult> {
+  const res = await transition(mechanicId, bookingId, "confirmed", "en_route", "en_route_at");
+  if (!res.ok) return res;
+
+  const { booking } = res;
+  const enRouteEmail = booking.customer_email;
+  if (enRouteEmail) {
+    renderTemplateEmail("booking_en_route", { name: booking.customer_name ?? "there" })
+      .then(({ subject, html }) => sendEmail({ to: enRouteEmail, subject, html }))
+      .catch(console.error);
+  }
+
+  // High-value SMS touchpoint — the customer wants to know the mechanic's coming.
+  if (booking.customer_phone) {
+    const body = await renderSmsTemplate("mechanic_en_route");
+    sendSms({ to: booking.customer_phone, body }).catch(() => {});
+  }
+
+  // …and the same moment on their phone, if they have the app. Tapping it opens
+  // the booking, where the live map is.
+  const { data: profile } = await res.admin
+    .from("profiles")
+    .select("full_name")
+    .eq("id", res.mechanicId)
+    .maybeSingle();
+  sendPushToCustomer(booking.customer_id, {
+    title: "Your mechanic is on the way",
+    body: `${shortPersonName(profile?.full_name)} is on the way.`,
+    bookingId,
+  }).catch(() => {});
+
+  revalidate(bookingId);
+  return { ok: true };
+}
+
+/** en_route → in_progress. Stamps started_at. */
+export async function beginWorkFor(mechanicId: string, bookingId: string): Promise<JobProgressResult> {
+  const res = await transition(mechanicId, bookingId, "en_route", "in_progress", "started_at");
+  if (!res.ok) return res;
+  revalidate(bookingId);
+  return { ok: true };
+}
+
+// Mileage can be typed from acceptance until the job is complete — most
+// mechanics will read the odometer once they're with the car, but there's
+// no reason to refuse it earlier if the customer told them.
+const MILEAGE_STATUSES = ["confirmed", "en_route", "in_progress"];
+/** Matches the CHECK in 0059. */
+const MAX_MILEAGE = 1_500_000;
+
+/**
+ * Record the vehicle's odometer reading on the job (Task 30). Not a
+ * transition, so no `booking_events` row of its own — `completeAndCharge`
+ * carries the final figure in its `status_changed` payload. Servicing and
+ * inspection jobs REQUIRE it before completion (Task 32).
+ */
+export async function setJobMileageFor(
+  mechanicId: string,
+  bookingId: string,
+  mileage: number,
+): Promise<JobProgressResult> {
+  if (!Number.isFinite(mileage) || !Number.isInteger(mileage) || mileage < 0 || mileage > MAX_MILEAGE)
+    return refuse("invalid", "Enter the mileage as a whole number of miles.");
+
+  const res = await ownedBooking(bookingId, mechanicId);
+  if (!res.ok) return res;
+  if (!MILEAGE_STATUSES.includes(res.booking.status))
+    return refuse("conflict", "Mileage can only be recorded on an active job.");
+
+  const { error } = await res.admin
+    .from("bookings")
+    .update({ mileage })
+    .eq("id", bookingId)
+    .eq("mechanic_id", mechanicId);
+  if (error) return refuse("failed", error.message);
+
+  revalidate(bookingId);
+  revalidatePath(`/admin/jobs/${bookingId}`);
+  return { ok: true };
+}
+
+/**
+ * What stands between an in-progress job and completion, as the sentence
+ * `completeAndChargeFor` refuses with — or null when it would go through. One
+ * function so the refusal, the mechanic app's job screen (which explains it
+ * BEFORE the button is pressed) and its checklist counters can't disagree.
+ *
+ * It says nothing about the job's status: that is a different refusal, and the
+ * app knows the status already.
+ */
+export async function completionGate(
+  admin: ReturnType<typeof createAdminClient>,
+  bookingId: string,
+  mileage: number | null | undefined,
+  checklists: readonly LoadedChecklist[],
+): Promise<{ blocker: string | null; quotes: ReturnType<typeof quoteMoney> }> {
+  // Quotes are read even when a checklist already blocks: completion needs
+  // their money figures, and the order of the sentences below is the order the
+  // mechanic has to deal with them in.
+  const quotes = quoteMoney(await loadQuotesForBooking(admin, bookingId));
+
+  // Checklist gate (Task 32): every item answered, and the mileage recorded.
+  for (const list of checklists) {
+    const unfinished = unfinishedMessage(list.name, list.progress);
+    if (unfinished) return { blocker: unfinished, quotes };
+  }
+  if (checklists.length > 0 && mileage == null)
+    return { blocker: "Enter the vehicle's mileage before completing the job.", quotes };
+
+  // Quotes (Task 33): a quote still waiting on the customer blocks completion —
+  // charging for work the customer hasn't approved is the thing the T&Cs forbid.
+  if (quotes.pendingNow)
+    return {
+      blocker: "A quote is still waiting on the customer. Withdraw it or wait for their answer before completing.",
+      quotes,
+    };
+  // A revised job still waiting on the customer blocks completion too (Task
+  // 37): the job sheet — and the price — isn't settled until they answer.
+  if (revisionMoney(await loadRevisionsForBooking(admin, bookingId)).pending)
+    return {
+      blocker: "The revised job is still waiting on the customer. Withdraw it or wait for their answer before completing.",
+      quotes,
+    };
+  return { blocker: null, quotes };
+}
+
+/**
+ * in_progress → completed. Captures the Stripe pre-authorisation (manual capture
+ * from booking creation), stamps completed_at, and sends the customer a receipt.
+ *
+ * Capture failure is fatal: we do NOT mark the job complete if the money didn't
+ * move, so the mechanic can retry. If Stripe isn't configured at all (local dev
+ * without keys) we complete without capturing — mirroring create-booking's
+ * graceful degradation.
+ */
+export async function completeAndChargeFor(mechanicId: string, bookingId: string): Promise<JobCompleteResult> {
+  // Ownership + status, but DON'T flip status yet — capture first so a failed
+  // charge leaves the job in_progress and retryable.
+  const admin = createAdminClient();
+  const { data: booking } = await admin
+    .from("bookings")
+    .select(
+      `id, job_number, status, mechanic_id, customer_id, customer_email, customer_name, customer_phone, total_pence,
+       mechanic_payout_pence, credit_applied_pence, payment_mode,
+       stripe_payment_intent_id, repair_description, repair_node_id, mileage, discount_pence`,
+    )
+    .eq("id", bookingId)
+    .single();
+
+  if (!booking) return refuse("not_found", "That job no longer exists.");
+  if (booking.mechanic_id !== mechanicId) return refuse("forbidden", "This isn't your job.");
+  if (booking.status !== "in_progress") return refuse("conflict", MOVED_ON);
+
+  // Checklist gate (Task 32): a service or inspection can't complete until
+  // every item has an answer and the mileage is recorded — the report is what
+  // the customer paid for. Runs before anything touches Stripe.
+  const { data: lineRows } = await admin
+    .from("booking_repairs")
+    .select("*")
+    .eq("booking_id", bookingId)
+    .order("position");
+  const checklists = await loadBookingChecklists(
+    admin,
+    bookingId,
+    productIdsInLines(repairLinesFor(booking, (lineRows ?? null) as BookingRepairRow[] | null)),
+  );
+  const gate = await completionGate(admin, bookingId, booking.mileage, checklists);
+  if (gate.blocker) return refuse("conflict", gate.blocker);
+  const { quotes } = gate;
+  const reportUrl = checklists.length > 0 ? `${siteUrl()}/dashboard/bookings/${bookingId}/report` : "";
+
+  // --- Capture the pre-authorisation ---------------------------------------
+  let captured = false;
+  // The charges created by the captures (base hold, then each approved
+  // quote's hold); each becomes a transfer's source_transaction so Stripe
+  // releases the mechanic's payout from these exact funds as they settle — no
+  // need for the platform balance to be topped up manually.
+  const charges: Array<{ id: string; capturedPence: number }> = [];
+  // Hoisted so the same client drives the payout transfer below.
+  let stripe: typeof import("@/lib/stripe/server").stripe | null = null;
+  try {
+    stripe = (await import("@/lib/stripe/server")).stripe;
+  } catch {
+    // No STRIPE_SECRET_KEY (dev) — proceed without capturing or transferring.
+    stripe = null;
+  }
+  // What the customer actually owes = total minus any account credit applied.
+  // The base hold covers that minus whatever approved quotes hold separately.
+  // …minus the promo-code discount too (Task 35) — both it and credit are
+  // BMT-funded, so they reduce what is captured, never the payout.
+  const chargePence = Math.max(
+    0,
+    (booking.total_pence ?? 0) - (booking.credit_applied_pence ?? 0) - (booking.discount_pence ?? 0),
+  );
+  const baseChargePence = Math.max(0, chargePence - quotes.approvedNowPence);
+
+  // Every capture is idempotent: an intent already captured (a retry after a
+  // later step failed) is read back rather than captured again.
+  const captureIntent = async (
+    intentId: string,
+    amountToCapture: number,
+  ): Promise<{ ok: true; chargeId: string | null; amount: number } | { ok: false; error: string }> => {
+    try {
+      const current = await stripe!.paymentIntents.retrieve(intentId);
+      const chargeOf = (pi: typeof current) =>
+        typeof pi.latest_charge === "string" ? pi.latest_charge : (pi.latest_charge?.id ?? null);
+      if (current.status === "succeeded") return { ok: true, chargeId: chargeOf(current), amount: current.amount_received };
+      if (amountToCapture <= 0) {
+        await stripe!.paymentIntents.cancel(intentId);
+        return { ok: true, chargeId: null, amount: 0 };
+      }
+      const intent = await stripe!.paymentIntents.capture(intentId, {
+        amount_to_capture: Math.min(amountToCapture, current.amount),
+      });
+      return { ok: true, chargeId: chargeOf(intent), amount: intent.amount_received };
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : "Payment capture failed" };
+    }
+  };
+
+  if (booking.stripe_payment_intent_id && stripe) {
+    const base = await captureIntent(booking.stripe_payment_intent_id, baseChargePence);
+    if (!base.ok) return refuse("conflict", `Couldn't take payment: ${base.error}. The job stays open. Try again.`);
+    captured = true;
+    if (base.chargeId) charges.push({ id: base.chargeId, capturedPence: base.amount });
+  }
+  // Approved quotes for this visit: capture each hold in full.
+  if (stripe) {
+    for (const quote of quotes.approvedNow) {
+      if (!quote.stripePaymentIntentId || quote.capturedAt) {
+        if (quote.stripeChargeId) charges.push({ id: quote.stripeChargeId, capturedPence: quote.totalPence });
+        continue;
+      }
+      const q = await captureIntent(quote.stripePaymentIntentId, quote.totalPence);
+      if (!q.ok) return refuse("conflict", `Couldn't take the payment for the approved quote: ${q.error}. The job stays open. Try again.`);
+      captured = true;
+      if (q.chargeId) charges.push({ id: q.chargeId, capturedPence: q.amount });
+      await admin
+        .from("job_quotes")
+        .update({ stripe_charge_id: q.chargeId, captured_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+        .eq("id", quote.id);
+      await admin.from("booking_events").insert({
+        booking_id: bookingId,
+        event_type: "payment_captured",
+        actor_id: mechanicId,
+        actor_role: "mechanic",
+        payload: { amount_pence: q.amount, quote_id: quote.id },
+      });
+    }
+  }
+  // 'free' bookings (credit covered the whole total) have no hold to capture.
+
+  // --- Flip to completed (only after a successful / skipped capture) --------
+  // The flip is also the CLAIM. Two overlapping calls — a double tap, or the
+  // app retrying after a timeout while the first is still running — both get
+  // this far, because the captures above are idempotent. Only the one whose
+  // update actually changes the row goes on to pay the mechanic; without this
+  // both would, and the payout would be transferred twice.
+  const { data: flipped, error } = await admin
+    .from("bookings")
+    .update({ status: "completed", completed_at: new Date().toISOString() })
+    .eq("id", bookingId)
+    .eq("mechanic_id", mechanicId)
+    .eq("status", "in_progress")
+    .select("id");
+  if (error) return refuse("failed", error.message);
+  if (!flipped?.length) return refuse("conflict", MOVED_ON);
+
+  await admin.from("booking_events").insert({
+    booking_id: bookingId,
+    event_type: "status_changed",
+    actor_id: mechanicId,
+    actor_role: "mechanic",
+    // The odometer reading as recorded at completion, so the audit trail has
+    // it even if the column is later edited.
+    payload: {
+      status_from: "in_progress",
+      status_to: "completed",
+      // The mechanic's own confirmation is the record that the work was
+      // finished — the customer signature this used to require was removed on
+      // the owner's instruction (2026-09-08).
+      mechanic_confirmed: true,
+      charge_pence: chargePence,
+      mileage: booking.mileage ?? null,
+      // What was answered on each checklist, as it stood at completion.
+      ...(checklists.length > 0
+        ? {
+            checklists: checklists.map((c) => ({
+              key: c.checklist.key,
+              tier: c.tier,
+              answered: c.progress.answered,
+              total: c.progress.total,
+              advisories: c.progress.advisory,
+              fails: c.progress.fail,
+            })),
+          }
+        : {}),
+    },
+  });
+  if (captured) {
+    await admin.from("booking_events").insert({
+      booking_id: bookingId,
+      event_type: "payment_captured",
+      actor_id: mechanicId,
+      actor_role: "mechanic",
+      payload: {
+        amount_pence: chargePence,
+        credit_applied_pence: booking.credit_applied_pence ?? 0,
+        discount_pence: booking.discount_pence ?? 0,
+      },
+    });
+  }
+
+  // --- Mechanic aggregates --------------------------------------------------
+  // `job_count` counts completed jobs, so THIS is where it has to move — until
+  // now it was only ever written when someone left a review, which most jobs
+  // never get, so it read 0 on four surfaces that display it as fact.
+  // Non-fatal: the money has already moved and the job is complete, so a failed
+  // recount must not fail completion. It self-repairs on the next one.
+  if (booking.mechanic_id) {
+    try {
+      await recomputeMechanicAggregates(admin, booking.mechanic_id);
+    } catch (err) {
+      console.error("Mechanic aggregate recount failed for booking", bookingId, err);
+    }
+  }
+
+  // --- Referral bonus -------------------------------------------------------
+  // If this is the customer's first completed booking and they joined via a
+  // referral, reward the referrer with credit. Gated on first-completion so it
+  // fires exactly once per referee (completeAndCharge can't re-run once the job
+  // is 'completed').
+  if (booking.customer_id) {
+    try {
+      const completed = await completedBookingCount(admin, booking.customer_id);
+      if (completed === 1) {
+        const { data: prof } = await admin
+          .from("profiles")
+          .select("referred_by")
+          .eq("id", booking.customer_id)
+          .single();
+        if (prof?.referred_by) {
+          await grantCredit(
+            admin,
+            prof.referred_by,
+            REFERRAL_BONUS_PENCE,
+            "referral_bonus",
+            "Your friend completed their first booking",
+          );
+        }
+      }
+    } catch (err) {
+      console.error("Referral bonus failed for booking", bookingId, err);
+    }
+  }
+
+  // --- Pay the mechanic (Stripe Connect transfer) --------------------------
+  // After capturing the customer's payment on the platform account, transfer
+  // the mechanic's snapshotted share to their connected account; the platform
+  // retains the fee. The transfer goes to whoever currently holds the job, so a
+  // replacement mechanic is paid correctly. A failed transfer is NON-fatal —
+  // the money is already captured and the job is complete — so it is logged
+  // for reconciliation/retry rather than blocking completion. The mechanics
+  // are in lib/payments/payout.ts (Task 37), shared with the on-site and
+  // cancellation fees so every payout is written by one piece of code.
+  const payoutPence = booking.mechanic_payout_pence ?? 0;
+  // Pay the mechanic when we captured money, or when credit covered the whole
+  // total ('free') — in the free case there's no source_transaction, so the
+  // payout draws from the platform balance (which funded the credit).
+  const shouldPay = payoutPence > 0 && (captured || booking.payment_mode === "free");
+  if (shouldPay && booking.mechanic_id) {
+    await payoutToMechanic({
+      admin,
+      stripe,
+      bookingId,
+      mechanicId: booking.mechanic_id,
+      grossPence: payoutPence,
+      charges,
+      description: `Job ${formatJobNumber(booking.job_number)} payout`,
+      actorId: mechanicId,
+      actorRole: "mechanic",
+    });
+  }
+
+  // --- End-of-day recap (mechanic app, Task 66) ------------------------------
+  // If that was the last job they had to do today, the app gets "Job well
+  // done" with the day's earnings. Once a day; never throws.
+  if (booking.mechanic_id) await sendEndOfDayRecap(admin, booking.mechanic_id);
+
+  // --- Receipt email --------------------------------------------------------
+  const serviceName = booking.repair_description ?? "Vehicle repair";
+  const receiptEmail = booking.customer_email;
+  if (receiptEmail) {
+    const reductions = [
+      (booking.discount_pence ?? 0) > 0 ? `discount −${formatPrice(booking.discount_pence ?? 0)}` : null,
+      (booking.credit_applied_pence ?? 0) > 0
+        ? `account credit −${formatPrice(booking.credit_applied_pence ?? 0)}`
+        : null,
+    ].filter(Boolean);
+    const creditLine = reductions.length
+      ? `Repair total ${formatPrice(booking.total_pence ?? 0)} · ${reductions.join(" · ")}`
+      : "";
+    const chargeLine =
+      chargePence > 0
+        ? `Total charged: ${formatPrice(chargePence)}`
+        : "Nothing left to pay on this booking";
+    const settleLine =
+      chargePence === 0
+        ? "Your discount and account credit covered this booking."
+        : captured
+          ? "Your card has now been charged."
+          : "Payment will be settled shortly.";
+    renderTemplateEmail("job_complete", {
+      name: booking.customer_name ?? "there",
+      service: serviceName,
+      mileage_line:
+        booking.mileage != null ? `Mileage recorded: ${booking.mileage.toLocaleString("en-GB")} miles` : "",
+      credit_line: creditLine,
+      charge_line: chargeLine,
+      settle_line: settleLine,
+      review_url: `${siteUrl()}/review/${bookingId}`,
+      report_url: reportUrl,
+    })
+      .then(({ subject, html }) => sendEmail({ to: receiptEmail, subject, html }))
+      .catch(console.error);
+  }
+
+  if (booking.customer_phone) {
+    const body =
+      chargePence > 0
+        ? await renderSmsTemplate("job_complete_charged", { total: formatPrice(chargePence) })
+        : await renderSmsTemplate("job_complete_credit");
+    sendSms({ to: booking.customer_phone, body }).catch(() => {});
+  }
+
+  // --- Proactive service reminders ------------------------------------------
+  // Seed this car's future reminders (MOT due, annual service, seasonal, brake
+  // follow-up) now that the job is done. Best-effort — the daily scheduler cron
+  // also back-fills, and a reminder hiccup must never fail completion.
+  try {
+    const { scheduleRemindersForBooking, REMINDER_BOOKING_SELECT } = await import(
+      "@/lib/reminders/schedule-booking"
+    );
+    const { data: full } = await admin
+      .from("bookings")
+      .select(REMINDER_BOOKING_SELECT)
+      .eq("id", bookingId)
+      .single();
+    if (full) await scheduleRemindersForBooking(full, admin);
+  } catch (err) {
+    console.error("Failed to schedule reminders for", bookingId, err);
+  }
+
+  revalidate(bookingId);
+  return { ok: true, chargedPence: chargePence, payoutPence };
+}

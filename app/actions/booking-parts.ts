@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { setPartSourcingFor } from "@/lib/mechanics/part-sourcing";
 
 // Mechanic-facing actions for the parts on one of their jobs (Task 10 Stage 2).
 //
@@ -49,55 +50,19 @@ async function assertAssignedMechanic(
   return { ok: true, bookingId: line.booking_id, userId: user.id };
 }
 
-/** Recompute and persist the booking's mechanic payout from its parts sourcing. */
-async function recomputePayout(bookingId: string): Promise<void> {
-  const admin = createAdminClient();
-  const [{ data: booking }, { data: parts }] = await Promise.all([
-    admin
-      .from("bookings")
-      .select("total_pence, platform_fee_pence")
-      .eq("id", bookingId)
-      .single(),
-    admin.from("booking_parts").select("total_pence, sourcing").eq("booking_id", bookingId),
-  ]);
-  if (!booking) return;
-
-  const total = booking.total_pence ?? 0;
-  const fee = booking.platform_fee_pence ?? 0;
-  const bmtParts = (parts ?? [])
-    .filter((p) => p.sourcing === "bmt")
-    .reduce((s, p) => s + (p.total_pence ?? 0), 0);
-
-  const payout = Math.max(0, total - fee - bmtParts);
-  await admin.from("bookings").update({ mechanic_payout_pence: payout }).eq("id", bookingId);
-}
-
 export async function setPartSourcing(
   bookingPartId: string,
   sourcing: Sourcing,
 ): Promise<BookingPartResult> {
-  if (sourcing !== "self" && sourcing !== "bmt") {
-    return { ok: false, error: "Invalid sourcing option." };
-  }
-  const guard = await assertAssignedMechanic(bookingPartId);
-  if (!guard.ok) return guard;
-
-  const admin = createAdminClient();
-  // Ordering via BMT moves the line into the ordering workflow; self-sourcing
-  // resets it to pending (the mechanic handles it themselves).
-  const { error } = await admin
-    .from("booking_parts")
-    .update({
-      sourcing,
-      status: sourcing === "bmt" ? "ordered" : "pending",
-      ordered_at: sourcing === "bmt" ? new Date().toISOString() : null,
-    })
-    .eq("id", bookingPartId);
-  if (error) return { ok: false, error: error.message };
-
-  await recomputePayout(guard.bookingId);
-  revalidatePath(`/mechanic/jobs/${guard.bookingId}`);
-  return { ok: true };
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Not signed in." };
+  // The check, the write and the payout recompute live in
+  // lib/mechanics/part-sourcing.ts, shared with the mechanic app (Task 67).
+  const result = await setPartSourcingFor(user.id, bookingPartId, sourcing);
+  return result.ok ? { ok: true } : { ok: false, error: result.error };
 }
 
 export async function markPartStatus(
