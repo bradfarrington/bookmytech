@@ -119,7 +119,7 @@ You are working on **Book My Tech**, a UK mobile-mechanic booking platform. This
 
 ## Current task
 
-### 🟡 2026-09-17 — BUILT, `0085` NOT applied: the mechanic app's Inbox, cases and disputes (Task 69)
+### 🟡 2026-09-17 — BUILT, `0085` applied: the mechanic app's Inbox, cases and disputes (Task 69)
 
 **One feed, Get-help cases with evidence, and disputes a mechanic can answer
 with photos — and nothing more than answer.** Fourteen routes; spec, tables and
@@ -130,9 +130,14 @@ can open, reply with their own words and photos, ask BMT to step in, and
 withdraw an issue they raised. No route resolves one or moves money on one, and
 none may be added.
 
-⚠️ **Apply `0085`. Do NOT run `0032`** — it looks never to have reached
-production, and its `booking_events` CHECK is now out of date; `0085` creates
-the Resolution Center's tables itself.
+**`0085` applied by Brad 2026-09-17.** It creates the Resolution Center's
+tables itself, because `0032` never reached production. ⚠️ **Never run `0032`**:
+its `booking_events` CHECK is out of date. Brad did run it earlier that day; it
+errored and rolled back. To confirm the live CHECK is intact (it should list
+`revision_sent` and `quote_sent`):
+
+    select pg_get_constraintdef(oid) from pg_constraint
+     where conname = 'booking_events_event_type_check';
 
 New cores: `lib/resolutions/core.ts` (out of the cookie-bound action),
 `escalateDisputeFor`, `lib/inbox/mechanic-feed.ts` + `mechanic-events.ts`,

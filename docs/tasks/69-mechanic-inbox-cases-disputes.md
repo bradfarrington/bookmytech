@@ -1,6 +1,6 @@
 # Task 69: The mechanic app — Inbox, Get-help cases and disputes
 
-**Status:** 🟡 **Built 2026-09-17, not yet run.** Typecheck, lint on every touched file, 631 unit tests and a production build pass; all 14 routes register. **Nothing has been called with a token, and migration `0085` is not applied** — see the unticked boxes. Paths, field names and shapes are as the prompt gave them. Deviations: document pushes follow the cron's real milestones (30 / 7 / 0 days and on expiry, not 30 / 14 / 1); one bug fixed on the way (withdrawing a mechanic-raised dispute marked an unfinished job `completed`).
+**Status:** 🟡 **Built 2026-09-17, not yet run.** Typecheck, lint on every touched file, 631 unit tests and a production build pass; all 14 routes register. **Nothing has been called with a token.** Migration `0085` was applied by Brad on 2026-09-17 — see the unticked boxes for what is still to check. Paths, field names and shapes are as the prompt gave them. Deviations: document pushes follow the cron's real milestones (30 / 7 / 0 days and on expiry, not 30 / 14 / 1); one bug fixed on the way (withdrawing a mechanic-raised dispute marked an unfinished job `completed`).
 
 Source: `bmt-mechanic-app/docs/inbox-crm-prompt.md`. Builds on Tasks 64–68.
 
@@ -94,7 +94,7 @@ A private note for the customer alone does not push, email or nudge the mechanic
 - [x] No mechanic route can resolve a dispute or move money on one. *(By inspection: the six dispute routes are open, photo, read, reply, escalate, withdraw-own.)*
 - [ ] Each push arrives once, on `updates`, with its `data`. *(Not sent.)*
 - [x] The customer app and the web dispute, case and inbox pages behave as before. *(Same cores and return shapes; typecheck, lint, 631 tests, production build. Not clicked through.)*
-- [ ] **`0085` applied** — Brad. **Not `0032`.**
+- [x] **`0085` applied** — Brad, 2026-09-17. He had run `0032` earlier the same day; it errored (on the out-of-date `booking_events` CHECK, as expected) and, having no explicit transaction of its own, rolled back whole. Worth one look at the live CHECK to be sure — the query is in `docs/HANDOFF.md`.
 
 ## For the app repos
 
