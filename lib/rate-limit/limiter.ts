@@ -137,6 +137,23 @@ export const RATE_LIMIT_DEFAULTS = {
   mobile_mechanicupload_user_daily: 300,
   mobile_mechanicupload_ip_burst: 40,
   mobile_mechanicupload_ip_daily: 900,
+  // Applying to be a mechanic from the app (Task 71). Both routes are
+  // ANONYMOUS — the applicant has no account yet — so they are limited per IP,
+  // with a global ceiling on top because nothing else identifies a caller.
+  //
+  // Document uploads: one person uploads up to five documents and replaces a
+  // couple, so a burst of 10 a minute and 40 a day. Each is up to 10 MB into
+  // the private bucket and stays there even if the draft is abandoned, so the
+  // global daily (~100 applicants' worth) is what protects the bucket.
+  mobile_applydoc_ip_burst: 10,
+  mobile_applydoc_ip_daily: 40,
+  mobile_applydoc_global_daily: 600,
+  // Submitting: a person applies once, or twice after a typo refusal. Sized
+  // like `mobile_signup`, but by the hour: every submit writes a row the admin
+  // team has to review and sends two emails, one of them to the ops inbox.
+  mobile_apply_ip_hourly: 5,
+  mobile_apply_ip_daily: 10,
+  mobile_apply_global_daily: 100,
 } as const;
 
 export type RateLimitKey = keyof typeof RATE_LIMIT_DEFAULTS;

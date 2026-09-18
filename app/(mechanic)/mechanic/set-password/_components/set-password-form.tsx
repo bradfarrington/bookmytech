@@ -8,7 +8,14 @@ import { createClient } from "@/lib/supabase/client";
 // The mechanic lands here from the "set your password" link in their approval
 // email (a recovery link redeemed in /auth/callback, which leaves them with a
 // session). They choose a password; from then on they sign in with email +
-// password on /mechanic/login.
+// password — on /mechanic/login, or in the BMT Mechanic app.
+//
+// The link only works on the website (/auth/callback sets cookies, and safeNext
+// refuses any other scheme), which is fine: they set the password here and sign
+// in to the app with it. So once it's saved the page SAYS so, rather than
+// redirecting at once — an applicant who came from the app would otherwise be
+// dropped into the web dashboard with no idea the app is where they work
+// (Task 71).
 const MIN_LENGTH = 8;
 
 export function SetPasswordForm() {
@@ -18,6 +25,7 @@ export function SetPasswordForm() {
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [noSession, setNoSession] = useState(false);
+  const [saved, setSaved] = useState(false);
   const [pending, startTransition] = useTransition();
 
   // If they arrived without a valid session (link expired or opened directly),
@@ -45,10 +53,38 @@ export function SetPasswordForm() {
         setError(updateErr.message);
         return;
       }
-      // Session is now a full password session — straight to the dashboard.
-      router.replace("/mechanic");
-      router.refresh();
+      // Session is now a full password session. Say where to sign in next
+      // before offering the website's dashboard.
+      setSaved(true);
     });
+  }
+
+  if (saved) {
+    return (
+      <div className="flex flex-col gap-4">
+        <div
+          role="status"
+          className="rounded-button border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800"
+        >
+          <p className="font-semibold">Your password is set.</p>
+          <p className="mt-1">
+            Now sign in on the BMT Mechanic app with this email and password.
+          </p>
+        </div>
+        <Button
+          type="button"
+          variant="secondary"
+          size="lg"
+          fullWidth
+          onClick={() => {
+            router.replace("/mechanic");
+            router.refresh();
+          }}
+        >
+          Or continue on the website
+        </Button>
+      </div>
+    );
   }
 
   if (noSession) {

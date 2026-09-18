@@ -119,10 +119,10 @@ You are working on **Book My Tech**, a UK mobile-mechanic booking platform. This
 
 ## Current task
 
-### 📌 2026-09-18 — Where the mechanic-app backend stands (Tasks 64–70)
+### 📌 2026-09-18 — Where the mechanic-app backend stands (Tasks 64–71)
 
-All seven tasks are built and pushed to `main`, and **every migration is
-applied**: `0081`–`0085` by Brad on 2026-09-17, `0086` on 2026-09-18 (verified
+All eight tasks are built and pushed to `main`, and **every migration is
+applied** (Task 71 needed none): `0081`–`0085` by Brad on 2026-09-17, `0086` on 2026-09-18 (verified
 against the live database — both new columns, the function, its guard raising
 before any write, and `anon` refused with 42501). Nothing is waiting on the
 database. **Never run `0032`** — see Task 69.
@@ -130,7 +130,7 @@ database. **Never run `0032`** — see Task 69.
 **Outstanding, and not in this repo: `npm run db:types` in BOTH app repos**, now
 that `0086` is in. Nothing was renamed or dropped, so old builds keep working.
 
-**What is left is verification, not building.** Tasks 66–70 have only been
+**What is left is verification, not building.** Tasks 66–71 have only been
 checked by typecheck, lint, unit tests and a production build. Each task md
 lists its unticked boxes; in short, with real tokens on a test job:
 
@@ -147,9 +147,22 @@ lists its unticked boxes; in short, with real tokens on a test job:
   a document uploaded, opened and replaced (and the Inbox going quiet about the
   one it replaced); an avatar; a review reply edited; an email change end to
   end; each deletion blocker, then a clean deletion.
+- Task 71 — an application from the app with no session: each document type,
+  a submit landing in approvals with both emails; the IP limits; the web wizard
+  unchanged; set-password's app line after approval.
 
 And on a phone: a real push received, which needs the app build and its Expo
 push credentials.
+
+### 🟡 2026-09-18 — BUILT: applying to join from the mechanic app (Task 71)
+
+**The web wizard, done natively.** Two anonymous routes over one shared core
+(`lib/applications/`), which the website's actions now call too. The server
+now enforces what only the wizard's pages used to — including that every
+document path is the draft's own, so a submit can't point at someone else's
+file. The upload route requires `X-BMT-Client: mechanic-app`; both are IP
+limited. Set-password now tells an approved mechanic to sign in on the app.
+No migration. `docs/tasks/71-mechanic-app-apply.md`.
 
 ### 🟡 2026-09-18 — BUILT, `0086` applied: the mechanic app's Account tab (Task 70)
 
@@ -166,6 +179,12 @@ bucket or the `mechanics` row dispatch reads. `0086` adds its twin. A mechanic
 whose ledger isn't settled, or who also has admin access, is refused rather than
 deleted — and no mechanic has actually been deleted yet, so that path is the one
 to watch first.
+
+Payouts on `/earnings` now come from the ledger's `stripe_transfer_id`s, read
+from Stripe one by one, rather than listing by the current Connect account —
+so a replaced account no longer hides earlier payouts (same shape). And the two
+orphaned Job 00081 ledger rows were deleted on Brad's say-so; the task md says
+how they came about.
 
 It also carries one fix to Task 69's Inbox: it kept flagging a document the
 mechanic had already replaced, because it read every finished row and the

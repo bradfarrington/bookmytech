@@ -83,8 +83,11 @@ export function ReviewStep({ services }: { services: ServiceLookup[] }) {
         vatRegistered: data.vatRegistered,
         specialisms: data.specialisms,
         serviceRadiusMiles: data.serviceRadiusMiles,
+        // Only the documents this page lists: a VAT file uploaded before the
+        // applicant unticked "VAT registered" stays in the draft but isn't
+        // sent, because the server now refuses one (lib/applications/validate.ts).
         docs: Object.fromEntries(
-          Object.entries(data.docs).map(([k, v]) => [k, v?.path]),
+          docDefs.map((d) => [d.type, data.docs[d.type]?.path]).filter(([, path]) => path),
         ),
         bankSortCode: bank.sortCode,
         bankAccountNumber: bank.accountNumber,
