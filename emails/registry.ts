@@ -474,6 +474,34 @@ export const EMAIL_TEMPLATE_DEFS: readonly EmailTemplateDef[] = [
     ],
   },
   {
+    key: "mechanic_account_deleted",
+    label: "Account deleted (mechanic)",
+    description:
+      "Sent to the mechanic's old address when they delete their account from the mechanic app. Locked on: it is how someone notices a deletion they did not make.",
+    category: "mechanic",
+    subject: "Your Book My Tech account has been deleted",
+    preheader: "Your mechanic account has been closed and you'll receive no further jobs.",
+    variables: [],
+    blocks: [
+      { id: "heading", type: "heading", text: "Your account has been deleted" },
+      {
+        id: "body",
+        type: "paragraph",
+        text: "Your Book My Tech mechanic account has been deleted, as you asked. You are offline and will receive no further job offers, your contact details and profile have been removed, and the documents you had on file have been deleted.",
+      },
+      {
+        id: "records",
+        type: "paragraph",
+        text: "Records of the jobs you completed, your earnings ledger and the reviews customers left are kept for accounting purposes, as our privacy policy explains. They are no longer linked to a usable account.",
+      },
+      {
+        id: "footnote",
+        type: "note",
+        text: "If you didn't ask for this, contact us straight away at [support@bookmytech.co.uk](mailto:support@bookmytech.co.uk).",
+      },
+    ],
+  },
+  {
     key: "booking_rescheduled",
     label: "Booking rescheduled (customer)",
     description: "Sent to the customer confirming a new booking time.",

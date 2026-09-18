@@ -73,3 +73,52 @@ export async function createOnboardingLink(
 export async function retrieveAccount(accountId: string): Promise<Stripe.Account> {
   return stripe.accounts.retrieve(accountId);
 }
+
+/**
+ * A single-use link into the mechanic's Stripe Express dashboard, where the
+ * bank account is changed and every transfer is itemised (Task 70).
+ *
+ * The mechanic app opens it in the in-app browser, the same as onboarding.
+ * Stripe refuses this on an account that hasn't finished onboarding, so the
+ * caller checks `stripe_payouts_enabled` first and says something readable.
+ */
+export async function createDashboardLink(accountId: string): Promise<string> {
+  const link = await stripe.accounts.createLoginLink(accountId);
+  return link.url;
+}
+
+/** Bank name and last four of the account Stripe pays out to. Nothing else. */
+export interface ExternalBankAccount {
+  bankName: string | null;
+  last4: string | null;
+}
+
+/**
+ * The connected account's default payout bank account, or null when they have
+ * not added one yet. Deliberately narrow: the app shows "Barclays ••••4831" to
+ * confirm where the money lands, and Stripe's own dashboard owns everything
+ * else about it.
+ */
+export async function primaryExternalAccount(
+  accountId: string,
+): Promise<ExternalBankAccount | null> {
+  const { data } = await stripe.accounts.listExternalAccounts(accountId, {
+    object: "bank_account",
+    limit: 10,
+  });
+  const accounts = data.filter(
+    (a): a is Stripe.BankAccount => a.object === "bank_account",
+  );
+  const chosen = accounts.find((a) => a.default_for_currency) ?? accounts[0];
+  if (!chosen) return null;
+  return { bankName: chosen.bank_name ?? null, last4: chosen.last4 ?? null };
+}
+
+/** The real transfer history to this account, newest first. */
+export async function listTransfersTo(
+  accountId: string,
+  limit = 12,
+): Promise<Stripe.Transfer[]> {
+  const { data } = await stripe.transfers.list({ destination: accountId, limit });
+  return data;
+}

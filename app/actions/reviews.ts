@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { respondToReviewFor } from "@/lib/reviews/respond";
 import { submitReviewFor } from "@/lib/reviews/submit-review";
 
 export type ReviewResult = { ok: true } | { ok: false; error: string };
@@ -66,9 +66,11 @@ export async function submitReviewAsCustomer(
 }
 
 /**
- * Mechanic leaves (or edits) their single reply to a review. Mechanics have no
- * write rights on `reviews` under RLS, so we verify ownership in the RLS-aware
- * client, then write the response via service-role.
+ * Mechanic leaves (or edits) their single reply to a review. The WEBSITE's
+ * entry point into `respondToReviewFor` (lib/reviews/respond.ts), which the
+ * mechanic app's route (POST /api/mobile/v1/mechanic/reviews/[id]/response)
+ * also calls. The caller is resolved from the cookie session here and from a
+ * verified Bearer token there; the core never derives it.
  */
 export async function respondToReview(
   reviewId: string,
@@ -80,27 +82,8 @@ export async function respondToReview(
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Not signed in." };
 
-  const text = response.trim();
-  if (!text) return { ok: false, error: "Write a reply first." };
-  if (text.length > 1000)
-    return { ok: false, error: "Keep your reply under 1000 characters." };
-
-  const admin = createAdminClient();
-  const { data: review } = await admin
-    .from("reviews")
-    .select("id, mechanic_id")
-    .eq("id", reviewId)
-    .single();
-
-  if (!review) return { ok: false, error: "That review no longer exists." };
-  if (review.mechanic_id !== user.id)
-    return { ok: false, error: "This isn't your review." };
-
-  const { error } = await admin
-    .from("reviews")
-    .update({ mechanic_response: text })
-    .eq("id", reviewId);
-  if (error) return { ok: false, error: error.message };
+  const result = await respondToReviewFor(user.id, reviewId, response);
+  if (!result.ok) return { ok: false, error: result.error };
 
   revalidatePath("/mechanic/reviews");
   return { ok: true };

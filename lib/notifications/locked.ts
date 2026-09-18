@@ -19,11 +19,15 @@ import { EMAIL_TEMPLATE_BY_KEY } from "@/emails/registry";
 //   • `email_change_notice` is the only warning the CURRENT address gets. It is
 //     what lets someone notice an account being moved that they did not ask
 //     for, which is the same argument as `account_deleted`.
+//
+// `mechanic_account_deleted` is the mechanic twin of `account_deleted` and is
+// locked for the same reason (Task 70).
 
 /** Email templates that stay on no matter what. */
 export const LOCKED_EMAIL_KEYS: ReadonlySet<string> = new Set([
   "password_reset",
   "account_deleted",
+  "mechanic_account_deleted",
   "email_change_confirm",
   "email_change_notice",
 ]);

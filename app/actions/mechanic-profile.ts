@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireMechanic } from "@/lib/mechanics/require-mechanic";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { uploadAvatarFor } from "@/lib/mechanics/avatar";
 
 export type ProfileActionResult = { ok: true } | { ok: false; error: string };
 
@@ -127,51 +127,17 @@ export async function updateAvailability(
 }
 
 // --- Avatar upload ----------------------------------------------------------
-const MAX_AVATAR_BYTES = 5 * 1024 * 1024;
-const ALLOWED_TYPES: Record<string, string> = {
-  "image/jpeg": "jpg",
-  "image/png": "png",
-  "image/webp": "webp",
-};
-
+// The WEBSITE's entry point into lib/mechanics/avatar.ts; the mechanic app's is
+// POST /api/mobile/v1/mechanic/avatar. Both do the same service-role writes.
 export async function uploadAvatar(
   formData: FormData,
 ): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
   const guard = await requireMechanic();
   if (!guard.ok) return guard;
 
-  const file = formData.get("avatar");
-  if (!(file instanceof File) || file.size === 0)
-    return { ok: false, error: "Choose an image to upload." };
-  if (file.size > MAX_AVATAR_BYTES)
-    return { ok: false, error: "Image must be 5 MB or smaller." };
-
-  const ext = ALLOWED_TYPES[file.type];
-  if (!ext) return { ok: false, error: "Use a JPG, PNG or WebP image." };
-
-  // Service-role client for the Storage write + profile update. Path is
-  // namespaced by mechanic id; upsert keeps a single current avatar per folder.
-  const admin = createAdminClient();
-  const path = `${guard.mechanicId}/avatar.${ext}`;
-  const bytes = new Uint8Array(await file.arrayBuffer());
-
-  const { error: upErr } = await admin.storage
-    .from("avatars")
-    .upload(path, bytes, { contentType: file.type, upsert: true });
-  if (upErr) return { ok: false, error: upErr.message };
-
-  const {
-    data: { publicUrl },
-  } = admin.storage.from("avatars").getPublicUrl(path);
-  // Cache-bust so the new image shows immediately after re-upload.
-  const url = `${publicUrl}?v=${Date.now()}`;
-
-  const { error: profErr } = await admin
-    .from("profiles")
-    .update({ avatar_url: url })
-    .eq("id", guard.mechanicId);
-  if (profErr) return { ok: false, error: profErr.message };
+  const result = await uploadAvatarFor(guard.mechanicId, formData.get("avatar"));
+  if (!result.ok) return { ok: false, error: result.error };
 
   revalidate();
-  return { ok: true, url };
+  return { ok: true, url: result.url };
 }

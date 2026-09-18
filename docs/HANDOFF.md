@@ -119,13 +119,22 @@ You are working on **Book My Tech**, a UK mobile-mechanic booking platform. This
 
 ## Current task
 
-### 📌 2026-09-17 — Where the mechanic-app backend stands (Tasks 64–69)
+### 🔴 2026-09-18 — APPLY `0086` (Task 70)
 
-All six tasks are built, pushed to `main`, and **every migration is applied**:
-`0081`–`0085`, by Brad (`0083`, `0084`, `0085` on 2026-09-17). Nothing is
-waiting on the database. **Never run `0032`** — see Task 69.
+`supabase/migrations/0086_mechanic_account_deletion.sql` is the only migration
+waiting. Until it runs, `POST /api/mobile/v1/mechanic/account/delete` answers a
+500 and nothing else is affected. It is idempotent and additive: two nullable
+columns on the service-role-only `account_deletions`, and
+`delete_mechanic_account()`. **After applying, run `npm run db:types` in BOTH app
+repos.**
 
-**What is left is verification, not building.** Tasks 66–69 have only been
+### 📌 2026-09-18 — Where the mechanic-app backend stands (Tasks 64–70)
+
+All seven tasks are built and pushed to `main`. Migrations `0081`–`0085` are
+applied (Brad, 2026-09-17); **`0086` is not** — see above. **Never run `0032`**
+— see Task 69.
+
+**What is left is verification, not building.** Tasks 66–70 have only been
 checked by typecheck, lint, unit tests and a production build. Each task md
 lists its unticked boxes; in short, with real tokens on a test job:
 
@@ -138,9 +147,27 @@ lists its unticked boxes; in short, with real tokens on a test job:
   moved in one call.
 - Task 69 — the inbox with one of each source; a case and a dispute with a
   photo; a private note unreadable with the other party's token; each push.
+- Task 70 — `/earnings` against a real connected account; the dashboard link;
+  a document uploaded, opened and replaced; an avatar; a review reply edited;
+  an email change end to end; each deletion blocker, then a clean deletion.
 
 And on a phone: a real push received, which needs the app build and its Expo
 push credentials.
+
+### 🟡 2026-09-18 — BUILT, `0086` PENDING: the mechanic app's Account tab (Task 70)
+
+**The last of the seven mechanic-app prompts.** Earnings and payouts read from
+Stripe, a link into the Express dashboard, document upload and signed reads,
+avatar upload, review replies, and the two account-level things Apple requires —
+changing the sign-in email and deleting the account. Eight routes; spec,
+blockers, migration and status:
+`docs/tasks/70-mechanic-account-earnings.md`.
+
+Worth knowing: deleting a mechanic is NOT `delete_customer_account()` — that one
+is role-gated to customers and knows nothing about a ledger, offers, a private
+bucket or the `mechanics` row dispatch reads. `0086` adds its twin. A mechanic
+whose ledger isn't settled, or who also has admin access, is refused rather than
+deleted.
 
 ### 🟡 2026-09-17 — BUILT, `0085` applied: the mechanic app's Inbox, cases and disputes (Task 69)
 

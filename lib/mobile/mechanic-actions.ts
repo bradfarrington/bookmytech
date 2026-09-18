@@ -20,12 +20,20 @@ export type MechanicLimitFamily =
   | "mechanicchecklist"
   | "mechanicupload"
   /** Shared with the customer app's thread: a conversation has two ends. */
-  | "message";
+  | "message"
+  /**
+   * Shared with the customer app's account management (Task 70): changing the
+   * sign-in address and deleting the account are the same two endpoints on both
+   * sides, doing the same password check and the same irreversible write, so
+   * they count against the same tight bucket.
+   */
+  | "action";
 
 /**
  * `requireMobileMechanic`, then a rate-limit family: `mechanic` for anything
- * that does something, `mechanicfeed` for the reads the app polls, and the
- * three above for the things a mechanic does in bulk.
+ * that does something, `mechanicfeed` for the reads the app polls, the three
+ * above for the things a mechanic does in bulk, and `action` for the two
+ * account-management endpoints shared in spirit with the customer app.
  */
 export async function mobileMechanicCaller(
   request: Request,
