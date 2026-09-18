@@ -5,7 +5,9 @@ import { apiError, apiOk, readJsonBody } from "@/lib/mobile/respond";
 // POST /api/mobile/v1/disputes/:id/messages — post into the dispute thread.
 // AUTHENTICATED.
 //
-// Body: { body }
+// Body: { body, photos? } — `photos` is up to 6 URLs from
+//       POST …/disputes/photos; anything that isn't the caller's own upload is
+//       dropped by the core. With photos, `body` may be empty.
 // 200:  { ok: true } | { ok: false, error }. "This dispute is closed" is a
 //       request that RAN with a negative answer. Only transport-level problems
 //       return `{ error }` with a non-2xx: 401, 400/415, 429.
@@ -27,6 +29,7 @@ import { apiError, apiOk, readJsonBody } from "@/lib/mobile/respond";
 
 interface MessageBody {
   body?: unknown;
+  photos?: unknown;
 }
 
 export async function POST(
@@ -44,5 +47,5 @@ export async function POST(
 
   const body = typeof parsed.body.body === "string" ? parsed.body.body : "";
 
-  return apiOk(await sendDisputeMessageFor(id, body, auth.caller));
+  return apiOk(await sendDisputeMessageFor(id, body, auth.caller, { photos: parsed.body.photos }));
 }

@@ -560,7 +560,7 @@ keeps that spec's history readable rather than rewriting it.
 | `POST /bookings/:id/reschedule-response` `{decision}` | `respondToReschedule` | ″ |
 | `POST /bookings/:id/review` `{rating, tags?, comment?}` | `submitReview` | `lib/reviews/submit-review.ts` |
 | `POST /bookings/:id/disputes` | `openDispute` | `lib/disputes/core.ts` |
-| `POST /disputes/:id/messages` `{body}` | `sendDisputeMessage` | ″ |
+| `POST /disputes/:id/messages` `{ body, photos? }` | `sendDisputeMessage` | ″ |
 | `POST /disputes/:id/withdraw` | `withdrawDispute` | ″ |
 | `POST /disputes/photos` (multipart) | `uploadDisputePhoto` | ″ |
 | `POST /checkout/cancel` `{paymentIntentId}` | *(new)* | `lib/stripe/release-hold.ts` |
