@@ -148,8 +148,9 @@ lists its unticked boxes; in short, with real tokens on a test job:
 - Task 69 — the inbox with one of each source; a case and a dispute with a
   photo; a private note unreadable with the other party's token; each push.
 - Task 70 — `/earnings` against a real connected account; the dashboard link;
-  a document uploaded, opened and replaced; an avatar; a review reply edited;
-  an email change end to end; each deletion blocker, then a clean deletion.
+  a document uploaded, opened and replaced (and the Inbox going quiet about the
+  one it replaced); an avatar; a review reply edited; an email change end to
+  end; each deletion blocker, then a clean deletion.
 
 And on a phone: a real push received, which needs the app build and its Expo
 push credentials.
@@ -168,6 +169,11 @@ is role-gated to customers and knows nothing about a ledger, offers, a private
 bucket or the `mechanics` row dispatch reads. `0086` adds its twin. A mechanic
 whose ledger isn't settled, or who also has admin access, is refused rather than
 deleted.
+
+It also carries one fix to Task 69's Inbox: it kept flagging a document the
+mechanic had already replaced, because it read every finished row and the
+replacement sits in `pending_review`. It now reads only the current row of each
+type, which is how the Documents screen and the grace sweep already worked.
 
 ### 🟡 2026-09-17 — BUILT, `0085` applied: the mechanic app's Inbox, cases and disputes (Task 69)
 

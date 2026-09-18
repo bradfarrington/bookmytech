@@ -1,6 +1,6 @@
 # Task 70: The mechanic app — the Account tail (earnings, documents, profile, reviews, account)
 
-**Status:** 🟡 **Built 2026-09-18, not yet run.** Typecheck, lint on every touched file, 649 unit tests and a production build pass; all 8 routes register. **Nothing has been called with a token, and no Stripe call has been made for real.** Migration `0086` is **NOT yet applied** — `POST /mechanic/account/delete` answers 500 until it is. Paths, field names and shapes are as the prompt gave them, with the deviations listed under "Deviations" below.
+**Status:** 🟡 **Built 2026-09-18, not yet run.** Typecheck, lint on every touched file, 654 unit tests and a production build pass; all 8 routes register. **Nothing has been called with a token, and no Stripe call has been made for real.** Migration `0086` is **NOT yet applied** — `POST /mechanic/account/delete` answers 500 until it is. Paths, field names and shapes are as the prompt gave them, with the deviations listed under "Deviations" below. One bug fixed on the way (the Inbox went on flagging a document the mechanic had already replaced — see "Replacing a document" below).
 
 Source: `bmt-mechanic-app/docs/account-crm-prompt.md`. Seventh and last of the mechanic-app prompts; builds on Tasks 64–69.
 
@@ -94,6 +94,17 @@ so the newest row per type is the current one and older rows are history — whi
 is what the app assumed, and what the grace sweep already reads
 (`app/api/cron/enforce-grace-periods` counts a type as supplied the moment a
 `pending_review` row exists).
+
+**Bug fixed: the Inbox disagreed with all of that.** `documentDrafts`
+(`lib/inbox/mechanic-feed.ts`) read EVERY `verified` / `rejected` / `expired`
+row, so after a replacement was uploaded it kept saying "Trade insurance has
+expired" or "wasn't accepted" about the row that had just been superseded — the
+replacement is `pending_review` and said nothing. Two screens, two answers.
+Now the feed reads every status and passes the rows through
+`currentDocumentPerType` (`lib/inbox/mechanic-events.ts`, pure, 5 unit tests),
+which keeps the newest upload of each type and drops the history. Reading the
+`pending_review` row is the point: it is what silences the one it replaces,
+because `describeDocument` returns null for it. Owner's call, 2026-09-18.
 
 ## 3. Profile
 
@@ -228,6 +239,7 @@ dropped, so old builds keep working.
 - [ ] `0086` applied, then each deletion blocker refuses with its code, and a clear account deletes: profile anonymised, `mechanics` offline + suspended, documents and avatar gone from their buckets, push tokens gone, live offers superseded, ledger and reviews still there.
 - [ ] A customer's token gets 403 on every route; another mechanic's gets 403/404 on `documents/[id]/url` and `reviews/[id]/response`.
 - [ ] The web earnings, documents, profile and reviews pages behave exactly as before.
+- [ ] After a replacement upload, the Inbox stops flagging the document it replaced.
 - [x] Typecheck, lint, unit tests and a production build pass; all 8 routes register.
 
 ## When complete

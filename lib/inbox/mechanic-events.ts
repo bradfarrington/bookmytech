@@ -251,6 +251,42 @@ export const DOCUMENT_NOTICE_DAYS = 30;
 export const DOCUMENT_URGENT_DAYS = 14;
 
 /**
+ * The current row for each `doc_type` — the newest upload — and nothing else.
+ *
+ * A replacement document is a NEW ROW, never an update: `mechanic_documents`
+ * has no unique key on (mechanic_id, doc_type) and the object path carries a
+ * timestamp, so the newest row per type is the current one and older rows are
+ * history. Every other surface already reads it that way — the Documents screen
+ * lists newest first, and the grace sweep counts a type as supplied the moment
+ * a `pending_review` row exists — so the Inbox does too. Without this it keeps
+ * saying "has expired" about a document the mechanic has already replaced,
+ * because the replacement is still in review and the old row is still expired.
+ *
+ * A null `uploaded_at` sorts oldest, so a row that somehow has none can never
+ * displace a real one. The id breaks a tie so the answer is stable.
+ */
+export function currentDocumentPerType<
+  T extends { id: string; doc_type: string; uploaded_at: string | null },
+>(rows: readonly T[]): T[] {
+  const newest = new Map<string, T>();
+  for (const row of rows) {
+    const held = newest.get(row.doc_type);
+    if (!held || isNewer(row, held)) newest.set(row.doc_type, row);
+  }
+  return [...newest.values()];
+}
+
+function isNewer(
+  a: { id: string; uploaded_at: string | null },
+  b: { id: string; uploaded_at: string | null },
+): boolean {
+  const at = a.uploaded_at ? Date.parse(a.uploaded_at) : Number.NEGATIVE_INFINITY;
+  const bt = b.uploaded_at ? Date.parse(b.uploaded_at) : Number.NEGATIVE_INFINITY;
+  if (at !== bt) return at > bt;
+  return a.id > b.id;
+}
+
+/**
  * A document that needs the mechanic: rejected, expired, or within 30 days of
  * expiring. `at` is when it BECAME this news — the 30-day mark, the 14-day
  * mark, the expiry date, the review — so a document that turns urgent is news

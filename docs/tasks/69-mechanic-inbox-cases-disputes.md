@@ -58,7 +58,7 @@ Seven sources, newest first, capped at `FEED_LIMIT` (60); `unreadCount` counts p
 - **Assembled on the service role, scoped to the mechanic in every query** — not through the caller's client like the customer's feed. A job reassigned away stops being readable under RLS at the moment it becomes news.
 - **Events are an allow-list**, and never anything the mechanic did themselves (`actor_id` or `actor_role`). `mechanic_reassigned` only reaches the mechanic who *lost* the job.
 - **Read state** is the customer's rules (`lib/inbox/read-state.ts`): an instant for "Mark all read", ids for single items, seven days and it counts as read. `thread:` items ignore it; a `case:` is unread only while an admin's message is the latest.
-- **Documents**: `at` is when it became this news (the 30-day mark, the 14-day mark, the expiry, the review), so one that turns urgent is news again after "Mark all read".
+- **Documents**: `at` is when it became this news (the 30-day mark, the 14-day mark, the expiry, the review), so one that turns urgent is news again after "Mark all read". **Amended 2026-09-18 (Task 70):** only the CURRENT row of each `doc_type` speaks — `currentDocumentPerType` keeps the newest upload and drops the history. As shipped here it read every finished row, so a document the mechanic had already replaced went on being flagged; the replacement is `pending_review` and said nothing, so the Inbox and the Documents screen disagreed.
 - Titles shared with their pushes: `reviewTitle`, `payoutTitle`.
 
 ## Pushes — all via `pushMechanicUpdate` (`lib/push/mechanic-updates.ts`), channel `updates`

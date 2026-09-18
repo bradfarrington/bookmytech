@@ -9,6 +9,7 @@ import { FEED_LIMIT } from "./feed";
 import {
   MECHANIC_EVENT_TYPES,
   READABLE_ITEM_ID,
+  currentDocumentPerType,
   describeDispute,
   describeDocument,
   describeLedgerEntry,
@@ -157,14 +158,19 @@ async function reviewDrafts(admin: Admin, mechanicId: string): Promise<InboxDraf
   return (data ?? []).map((row) => describeReview(row as never, one(row.booking as unknown as Job | Job[])));
 }
 
+/**
+ * Only the CURRENT document of each type speaks. Every status is read, not just
+ * the finished three: a `pending_review` replacement has to be able to silence
+ * the expired row it replaces, and it can only do that by being seen here.
+ * `describeDocument` returns null for it, which is the silence.
+ */
 async function documentDrafts(admin: Admin, mechanicId: string, now: Date): Promise<InboxDraft[]> {
   const { data, error } = await admin
     .from("mechanic_documents")
-    .select("id, doc_type, status, expires_at, reviewed_at, updated_at")
-    .eq("mechanic_id", mechanicId)
-    .in("status", ["verified", "rejected", "expired"]);
+    .select("id, doc_type, status, expires_at, reviewed_at, updated_at, uploaded_at")
+    .eq("mechanic_id", mechanicId);
   check(error);
-  return (data ?? []).flatMap((row) => {
+  return currentDocumentPerType(data ?? []).flatMap((row) => {
     const draft = describeDocument(row as never, now);
     return draft ? [draft] : [];
   });
