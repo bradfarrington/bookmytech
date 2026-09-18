@@ -10,8 +10,10 @@ import { mechanicEarningsFor } from "@/lib/mechanics/earnings-summary";
 //                         while a refund Book My Tech fronted is being recovered
 //         commissionRate  the rate their next job is charged at, as a fraction
 //         account         the payout bank's name and last four, or null
-//         payouts         the real Stripe transfers, newest first, up to 12
-//         payoutsLive     false when Connect isn't set up or Stripe is
+//         payouts         every transfer we recorded in the ledger, newest
+//                         first, up to 12 — including ones sent to an earlier
+//                         Connect account — each read from Stripe by id
+//         payoutsLive     false when Connect isn't set up now or Stripe is
 //                         unconfigured, so the app says "Payouts start once
 //                         you're set up" rather than "No payouts yet"
 //       Otherwise `{ error }`: 401, 403 (not a mechanic), 429, 500.

@@ -13,6 +13,15 @@ import { formatJobNumber } from "@/lib/utils";
 // aggregate, the bank account behind the payouts and the real transfer history
 // all need the secret key or the service role.
 //
+// PAYOUTS COME FROM THE LEDGER, not from `stripe.transfers.list({ destination })`
+// (owner decision 2026-09-18). Every transfer `payoutToMechanic` makes is
+// recorded as a `payout` row carrying its `stripe_transfer_id`, so the ledger is
+// the complete list of what we sent this mechanic — whichever Connect account it
+// went to. Listing by the CURRENT account hid everything sent to an earlier one
+// the moment an account was replaced. Each transfer is then read from Stripe by
+// id for its live state (a reversal, the exact time); if Stripe can't produce
+// one, the ledger row still shows, from its own figures.
+//
 // Mechanics are paid PER JOB on completion (owner decision 2026-07-01), so there
 // is no "next payout" here and none is drawn. The website's `buildPayoutRows`
 // weekly preview — and its `•••• 4242` seed — is deliberately NOT ported: it is
@@ -37,8 +46,9 @@ export interface MechanicEarnings {
   account: { bankName: string | null; last4: string | null } | null;
   payouts: MechanicPayout[];
   /**
-   * False when Connect isn't set up or Stripe isn't configured, so the app can
-   * say "Payouts start once you're set up" rather than "No payouts yet".
+   * False when there's no Connect account to pay into now, or Stripe isn't
+   * configured, so the app can say "Payouts start once you're set up" rather
+   * than "No payouts yet". Earlier payouts can still be listed while it's false.
    */
   payoutsLive: boolean;
 }
@@ -72,40 +82,41 @@ export async function mechanicEarningsFor(mechanicId: string): Promise<MechanicE
   ]);
 
   const accountId = mechanic?.stripe_account_id ?? null;
-  const connect = accountId ? await loadConnect() : null;
-  if (!accountId || !connect) {
-    return { balance, commissionRate, account: null, payouts: [], payoutsLive: false };
-  }
+  const connect = await loadConnect();
 
-  const [account, transfers] = await Promise.all([
-    connect.primaryExternalAccount(accountId).catch((err) => {
-      console.error("[mechanic/earnings] bank account lookup failed", mechanicId, err);
-      return null;
-    }),
-    connect.listTransfersTo(accountId, 12).catch((err) => {
-      console.error("[mechanic/earnings] transfer list failed", mechanicId, err);
-      return null;
-    }),
+  const [account, payouts] = await Promise.all([
+    accountId && connect
+      ? connect.primaryExternalAccount(accountId).catch((err) => {
+          console.error("[mechanic/earnings] bank account lookup failed", mechanicId, err);
+          return null;
+        })
+      : Promise.resolve(null),
+    ledgerPayouts(admin, mechanicId, connect),
   ]);
-
-  // A Stripe outage must not blank the screen, but it must not lie about it
-  // either: no transfers AND no live read is "not live", so the app says the
-  // set-up line rather than "no payouts yet".
-  if (!transfers) {
-    return { balance, commissionRate, account, payouts: [], payoutsLive: false };
-  }
 
   return {
     balance,
     commissionRate,
     account,
-    payouts: await describeTransfers(admin, mechanicId, transfers),
-    payoutsLive: true,
+    payouts,
+    // "Set up" is about NOW: a Connect account to pay into and Stripe to pay
+    // with. A mechanic whose account was replaced still has earlier payouts in
+    // `payouts`; this only says whether the next one can go.
+    payoutsLive: !!accountId && !!connect,
   };
 }
 
+const PAYOUT_LIMIT = 12;
+
+interface LedgerPayoutRow {
+  booking_id: string | null;
+  amount_pence: number;
+  stripe_transfer_id: string;
+  description: string | null;
+  created_at: string;
+}
+
 interface TransferLite {
-  id: string;
   created: number;
   amount: number;
   reversed: boolean;
@@ -114,35 +125,54 @@ interface TransferLite {
 }
 
 /**
- * Name each transfer's job. The booking id comes from the transfer's own
- * metadata (`payoutToMechanic` writes it) and falls back to the `payout` ledger
- * row that recorded the same transfer — older transfers predate the metadata.
+ * The mechanic's last `PAYOUT_LIMIT` transfers, newest first, from the ledger.
+ *
+ * Each is read from Stripe by id, in parallel, for its live state. A transfer
+ * Stripe won't return — a key for a different mode, a transient failure — is not
+ * dropped: the ledger row is the record that we sent it, so it shows from the
+ * ledger's own amount and time, as `paid`.
+ *
+ * `bookingId` is only given when the booking still exists, so the app never
+ * links to a job it can't open; `description` then falls back to the ledger's
+ * own wording ("Job 00123 payout").
  */
-async function describeTransfers(
+async function ledgerPayouts(
   admin: ReturnType<typeof createAdminClient>,
   mechanicId: string,
-  transfers: ReadonlyArray<TransferLite>,
+  connect: Connect | null,
 ): Promise<MechanicPayout[]> {
-  const ids = transfers.map((t) => t.id);
-  const { data: ledgerRows } = await admin
+  const { data, error } = await admin
     .from("mechanic_ledger")
-    .select("stripe_transfer_id, booking_id")
+    .select("booking_id, amount_pence, stripe_transfer_id, description, created_at")
     .eq("mechanic_id", mechanicId)
     .eq("entry_type", "payout")
-    .in("stripe_transfer_id", ids.length > 0 ? ids : ["-"]);
-  const bookingByTransfer = new Map(
-    (ledgerRows ?? []).map((r) => [r.stripe_transfer_id as string, r.booking_id as string | null]),
+    .not("stripe_transfer_id", "is", null)
+    .order("created_at", { ascending: false })
+    .limit(PAYOUT_LIMIT);
+  if (error) throw new Error(`ledger payouts: ${error.message}`);
+  const rows = (data ?? []) as LedgerPayoutRow[];
+  if (rows.length === 0) return [];
+
+  const transfers = await Promise.all(
+    rows.map((r) =>
+      connect
+        ? connect.retrieveTransfer(r.stripe_transfer_id).catch((err) => {
+            console.error("[mechanic/earnings] transfer lookup failed", r.stripe_transfer_id, err?.message ?? err);
+            return null;
+          })
+        : Promise.resolve(null),
+    ),
   );
 
-  const bookingIdFor = (t: TransferLite): string | null =>
-    t.metadata?.booking_id || bookingByTransfer.get(t.id) || null;
-
-  const bookingIds = [...new Set(transfers.map(bookingIdFor).filter((id): id is string => !!id))];
-  const { data: bookings } = bookingIds.length
-    ? await admin
-        .from("bookings")
-        .select("id, job_number, repair_description")
-        .in("id", bookingIds)
+  const candidateIds = [
+    ...new Set(
+      rows
+        .map((r, i) => r.booking_id || transfers[i]?.metadata?.booking_id || null)
+        .filter((id): id is string => !!id),
+    ),
+  ];
+  const { data: bookings } = candidateIds.length
+    ? await admin.from("bookings").select("id, job_number, repair_description").in("id", candidateIds)
     : { data: [] };
   const bookingById = new Map(
     (bookings ?? []).map((b) => [
@@ -151,21 +181,22 @@ async function describeTransfers(
     ]),
   );
 
-  return transfers.map((t) => {
-    const bookingId = bookingIdFor(t);
-    const booking = bookingId ? bookingById.get(bookingId) : undefined;
+  return rows.map((r, i) => {
+    const t: TransferLite | null = transfers[i];
+    const candidate = r.booking_id || t?.metadata?.booking_id || null;
+    const booking = candidate ? bookingById.get(candidate) : undefined;
     const parts = booking
       ? [
           booking.service?.trim() || null,
           booking.jobNumber == null ? null : `Job ${formatJobNumber(booking.jobNumber)}`,
         ]
-      : [t.description?.trim() || null];
+      : [r.description?.trim() || t?.description?.trim() || null];
     return {
-      id: t.id,
-      at: new Date(t.created * 1000).toISOString(),
-      amountPence: t.amount,
-      status: t.reversed ? ("reversed" as const) : ("paid" as const),
-      bookingId,
+      id: r.stripe_transfer_id,
+      at: t ? new Date(t.created * 1000).toISOString() : new Date(r.created_at).toISOString(),
+      amountPence: t ? t.amount : Math.abs(r.amount_pence),
+      status: t?.reversed ? ("reversed" as const) : ("paid" as const),
+      bookingId: booking ? candidate : null,
       description: parts.filter(Boolean).join(" · ") || null,
     };
   });

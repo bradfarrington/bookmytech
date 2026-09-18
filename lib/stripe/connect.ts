@@ -114,11 +114,11 @@ export async function primaryExternalAccount(
   return { bankName: chosen.bank_name ?? null, last4: chosen.last4 ?? null };
 }
 
-/** The real transfer history to this account, newest first. */
-export async function listTransfersTo(
-  accountId: string,
-  limit = 12,
-): Promise<Stripe.Transfer[]> {
-  const { data } = await stripe.transfers.list({ destination: accountId, limit });
-  return data;
+/**
+ * One transfer by id. The mechanic app's payout list reads transfers by the ids
+ * the ledger recorded rather than listing by destination, so a replaced Connect
+ * account doesn't hide what was sent to the old one (Task 70).
+ */
+export async function retrieveTransfer(transferId: string): Promise<Stripe.Transfer> {
+  return stripe.transfers.retrieve(transferId);
 }

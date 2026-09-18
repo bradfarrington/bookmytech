@@ -52,14 +52,19 @@ secret key or the service role.
   `stripe.accounts.listExternalAccounts(…, { object: "bank_account" })`,
   preferring `default_for_currency`. Nothing else about the bank account leaves
   Stripe.
-- **`payouts`** — `stripe.transfers.list({ destination, limit: 12 })`, newest
-  first. Each carries `bookingId` from the transfer's own metadata
-  (`payoutToMechanic` writes it) falling back to the `payout` ledger row that
-  recorded the same `stripe_transfer_id`, and a `description` built from that
-  booking.
-- **`payoutsLive`** — false when Connect isn't set up, Stripe is unconfigured,
-  **or the transfer list call failed**, so the app says "Payouts start once
-  you're set up" rather than "No payouts yet".
+- **`payouts`** — the last 12 `payout` rows in the **ledger**, newest first,
+  each read from Stripe by its `stripe_transfer_id` for its live state.
+  *Changed 2026-09-18:* this first shipped as `stripe.transfers.list({
+  destination })`, which lists by the mechanic's CURRENT Connect account — so
+  replacing an account hid every payout sent to the old one (found on Job 00081,
+  below). The ledger records every transfer whichever account it went to. A
+  transfer Stripe won't return still shows, from the ledger's own amount and
+  time. `bookingId` is given only when the booking still exists;
+  `description` falls back to the ledger's wording ("Job 00123 payout").
+- **`payoutsLive`** — false when there's no Connect account to pay into NOW, or
+  Stripe is unconfigured, so the app says "Payouts start once you're set up"
+  rather than "No payouts yet". Earlier payouts can still be listed while it is
+  false. Response shape unchanged.
 
 **The website's `buildPayoutRows` is deliberately not ported.** It is a weekly
 accrual preview with a `•••• 4242` seed, and mechanics are paid per job on
@@ -210,8 +215,9 @@ dropped, so old builds keep working.
 - **`payouts[].status`** is `"paid"` or `"reversed"`. Stripe transfers have no
   status field; `reversed` is the one true distinction, and the web page's
   hardcoded `"paid"` is otherwise correct.
-- **`payoutsLive` is false when the transfer call throws**, not only when Connect
-  is unset. A Stripe outage must not make the app say "No payouts yet".
+- **Payouts are listed from the ledger**, not by Stripe destination (owner's
+  call, 2026-09-18), so a replaced Connect account doesn't hide earlier payouts.
+  Same shape.
 - **A fifth deletion code, `staff_account`** — see above. The app shows the
   sentence regardless, so this is additive.
 - **Two web copy strings changed** where the website now shares the core:
@@ -223,6 +229,20 @@ dropped, so old builds keep working.
   `account_deleted` is: it is how someone notices a deletion they did not make.
   The customer template's wording is about reminders and bookings, so a mechanic
   gets its own.
+
+## Job 00081 — why the Inbox showed a £51 payout nobody received
+
+Investigated 2026-09-18 (test mode, Brad's own mechanic account). The job
+completed on 27 August and £51 was transferred; 33 seconds later a dispute
+opened and the reverse-on-open code of the day reversed the whole transfer —
+removed two hours later in `527a5fe`. That code wrote a booking event but no
+ledger row, so the ledger still said "paid". The booking was later deleted
+(`on delete set null` left both ledger rows orphaned), and on 1 September the
+mechanic got a new Connect account, so listing by destination found nothing.
+**Brad authorised deleting the two orphaned rows; done 2026-09-18** (balance
+was and is £0). Neither cause can recur as it did: reverse-on-open is gone and
+nothing but test scripts deletes a booking. The one lasting lesson — a replaced
+account hiding history — is why payouts now come from the ledger.
 
 ## What the app repo has to do
 
