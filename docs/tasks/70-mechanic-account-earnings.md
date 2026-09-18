@@ -1,6 +1,6 @@
 # Task 70: The mechanic app — the Account tail (earnings, documents, profile, reviews, account)
 
-**Status:** 🟡 **Built 2026-09-18, not yet run.** Typecheck, lint on every touched file, 654 unit tests and a production build pass; all 8 routes register. **Nothing has been called with a token, and no Stripe call has been made for real.** Migration `0086` is **NOT yet applied** — `POST /mechanic/account/delete` answers 500 until it is. Paths, field names and shapes are as the prompt gave them, with the deviations listed under "Deviations" below. One bug fixed on the way (the Inbox went on flagging a document the mechanic had already replaced — see "Replacing a document" below).
+**Status:** 🟡 **Built 2026-09-18, not yet run.** Typecheck, lint on every touched file, 654 unit tests and a production build pass; all 8 routes register. **Nothing has been called with a token, and no Stripe call has been made for real.** Migration `0086` was applied by Brad on 2026-09-18 and verified against the live database (both columns present, the function there, its guard raising before any write, and `anon` refused with 42501). Paths, field names and shapes are as the prompt gave them, with the deviations listed under "Deviations" below. One bug fixed on the way (the Inbox went on flagging a document the mechanic had already replaced — see "Replacing a document" below).
 
 Source: `bmt-mechanic-app/docs/account-crm-prompt.md`. Seventh and last of the mechanic-app prompts; builds on Tasks 64–69.
 
@@ -181,9 +181,13 @@ someone else's booking. Their `mechanic_applications` row is scrubbed of the
 home postcode, references and AES-GCM bank details but kept as the record that
 they were vetted.
 
-## ⚠️ Migration `0086_mechanic_account_deletion.sql` — NOT YET APPLIED
+## ✅ Migration `0086_mechanic_account_deletion.sql` — APPLIED 2026-09-18
 
-**Run it in the Supabase SQL editor. Idempotent.**
+Applied by Brad and checked against the live database: `account_deletions` has
+both new columns and no existing row was left without a role,
+`delete_mechanic_account` exists and raises `has no mechanics row` before it
+writes anything, and `anon` executing it is refused with 42501 — so the revoke
+held. Idempotent, so a re-run is harmless.
 
 1. `account_deletions` gains `account_role text not null default 'customer'` and
    `details jsonb`. Both additive; the table is service-role only and invisible
@@ -191,11 +195,10 @@ they were vetted.
 2. `delete_mechanic_account(uuid, text, text, text)` — SECURITY DEFINER,
    `service_role` only, everything above in one transaction.
 
-**Safe to deploy before it is applied.** Only `POST /mechanic/account/delete`
-touches it, and until it exists that route answers its 500 sentence. Every other
-route in this task is unaffected.
+It was safe to deploy ahead of this: only `POST /mechanic/account/delete`
+touches it, and until it existed that route answered its 500 sentence.
 
-**After applying: `npm run db:types` in BOTH app repos.** Nothing is renamed or
+**Still to do: `npm run db:types` in BOTH app repos.** Nothing is renamed or
 dropped, so old builds keep working.
 
 ## Deviations from the prompt
@@ -223,7 +226,7 @@ dropped, so old builds keep working.
 
 ## What the app repo has to do
 
-- Generate types after `0086` (`npm run db:types`).
+- Generate types now that `0086` is in (`npm run db:types`). **Outstanding.**
 - Nothing else breaks: every route here is NEW, and no existing response shape,
   path or field name changed.
 
@@ -236,7 +239,8 @@ dropped, so old builds keep working.
 - [ ] An avatar uploads and `profiles.avatar_url` carries the cache-buster.
 - [ ] A review reply posts, and the same call edits it.
 - [ ] An email change sends both emails and the web confirmation page applies it.
-- [ ] `0086` applied, then each deletion blocker refuses with its code, and a clear account deletes: profile anonymised, `mechanics` offline + suspended, documents and avatar gone from their buckets, push tokens gone, live offers superseded, ledger and reviews still there.
+- [x] `0086` applied (Brad, 2026-09-18) and verified: columns, function, its guard, and `anon` refused.
+- [ ] Each deletion blocker refuses with its code, and a clear account deletes: profile anonymised, `mechanics` offline + suspended, documents and avatar gone from their buckets, push tokens gone, live offers superseded, ledger and reviews still there.
 - [ ] A customer's token gets 403 on every route; another mechanic's gets 403/404 on `documents/[id]/url` and `reviews/[id]/response`.
 - [ ] The web earnings, documents, profile and reviews pages behave exactly as before.
 - [ ] After a replacement upload, the Inbox stops flagging the document it replaced.

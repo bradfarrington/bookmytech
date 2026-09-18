@@ -119,20 +119,16 @@ You are working on **Book My Tech**, a UK mobile-mechanic booking platform. This
 
 ## Current task
 
-### 🔴 2026-09-18 — APPLY `0086` (Task 70)
-
-`supabase/migrations/0086_mechanic_account_deletion.sql` is the only migration
-waiting. Until it runs, `POST /api/mobile/v1/mechanic/account/delete` answers a
-500 and nothing else is affected. It is idempotent and additive: two nullable
-columns on the service-role-only `account_deletions`, and
-`delete_mechanic_account()`. **After applying, run `npm run db:types` in BOTH app
-repos.**
-
 ### 📌 2026-09-18 — Where the mechanic-app backend stands (Tasks 64–70)
 
-All seven tasks are built and pushed to `main`. Migrations `0081`–`0085` are
-applied (Brad, 2026-09-17); **`0086` is not** — see above. **Never run `0032`**
-— see Task 69.
+All seven tasks are built and pushed to `main`, and **every migration is
+applied**: `0081`–`0085` by Brad on 2026-09-17, `0086` on 2026-09-18 (verified
+against the live database — both new columns, the function, its guard raising
+before any write, and `anon` refused with 42501). Nothing is waiting on the
+database. **Never run `0032`** — see Task 69.
+
+**Outstanding, and not in this repo: `npm run db:types` in BOTH app repos**, now
+that `0086` is in. Nothing was renamed or dropped, so old builds keep working.
 
 **What is left is verification, not building.** Tasks 66–70 have only been
 checked by typecheck, lint, unit tests and a production build. Each task md
@@ -155,7 +151,7 @@ lists its unticked boxes; in short, with real tokens on a test job:
 And on a phone: a real push received, which needs the app build and its Expo
 push credentials.
 
-### 🟡 2026-09-18 — BUILT, `0086` PENDING: the mechanic app's Account tab (Task 70)
+### 🟡 2026-09-18 — BUILT, `0086` applied: the mechanic app's Account tab (Task 70)
 
 **The last of the seven mechanic-app prompts.** Earnings and payouts read from
 Stripe, a link into the Express dashboard, document upload and signed reads,
@@ -168,7 +164,8 @@ Worth knowing: deleting a mechanic is NOT `delete_customer_account()` — that o
 is role-gated to customers and knows nothing about a ledger, offers, a private
 bucket or the `mechanics` row dispatch reads. `0086` adds its twin. A mechanic
 whose ledger isn't settled, or who also has admin access, is refused rather than
-deleted.
+deleted — and no mechanic has actually been deleted yet, so that path is the one
+to watch first.
 
 It also carries one fix to Task 69's Inbox: it kept flagging a document the
 mechanic had already replaced, because it read every finished row and the
