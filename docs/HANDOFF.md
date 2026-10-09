@@ -180,10 +180,11 @@ You are working on **Book My Tech**, a UK mobile-mechanic booking platform. This
    parts check on a handful of typical customer cars.
 4. **Local dev has no `TEST_OUTBOX_DIR` set, so test bookings send real
    emails and texts.** Use your own contact details, or set it while rehearsing.
-5. Known "charging the wrong thing" cases to fix later (HaynesPro lists parts
-   a job touches, and we charge them all): "Renew the engine earth cable" and
-   battery check/charge jobs charge a battery; CV-boot jobs charge both a
-   bellow and a bellow kit; coolant/brake-fluid top-ups charge a full fill.
+5. **Task 73 (planned, to revisit): charge only the parts a job replaces.**
+   HaynesPro tags each job with the parts it *involves*, and we charge them
+   all, so "Check the battery" charges a new battery (£89.22 on FN60KYP), and
+   CV-boot jobs charge both a bellow and a bellow kit. The proposed fix and
+   open questions are in `docs/tasks/73-charge-only-replaced-parts.md`.
 
 ### 📌 2026-09-18 — Where the mechanic-app backend stands (Tasks 64–71)
 
