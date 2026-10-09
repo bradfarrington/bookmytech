@@ -1,6 +1,6 @@
 "use server";
 
-import { aagQuote, isAagConfigured, isAagSandbox } from "@/lib/aag/client";
+import { aagQuoteResult, isAagConfigured, isAagSandbox } from "@/lib/aag/client";
 import { cheapestLine, flattenQuote, type AagQuoteLine } from "@/lib/aag/quote";
 import type { AagVehicleDetails } from "@/lib/aag/types";
 import { requireAdmin } from "@/lib/auth/require-admin";
@@ -42,14 +42,14 @@ export async function checkAagQuoteAction(input: {
     return { ok: false, error: "AAG isn't configured on this environment. Add the AAG_* values first." };
   }
 
-  const body = await aagQuote(reg, genart);
-  if (!body) {
-    return {
-      ok: false,
-      error:
-        "AAG didn't return a quote. The status banner above shows what it last told us; the server log has the detail.",
-    };
+  const outcome = await aagQuoteResult(reg, genart, { includeVehicleDetails: true });
+  if (outcome.kind === "no_parts") {
+    return { ok: false, error: `AAG answered: it has no parts for ${reg} in product group ${genart}.` };
   }
+  if (outcome.kind === "failed") {
+    return { ok: false, error: `AAG didn't return a quote. ${outcome.reason}` };
+  }
+  const body = outcome.body;
   const lines = flattenQuote(body);
   return {
     ok: true,

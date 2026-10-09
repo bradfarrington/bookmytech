@@ -177,6 +177,7 @@ export default async function MatchPage({ searchParams }: MatchPageProps) {
           brand: part.brand,
           quantity: part.quantity,
           linePence: part.linePence,
+          estimated: part.source === "estimate",
         }))}
         includes={singleProduct ? productIncludes(singleProduct.description) : undefined}
         visitHours={quote.visitHours}

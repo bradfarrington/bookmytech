@@ -10,14 +10,25 @@
 // labour (owner decisions, 2026-09-15).
 //
 // A charged group AAG can't price (down, blocked or listing nothing, with no
-// answer from the last 7 days) takes the admin's set price for the group when
+// answer from the last 7 days) is ESTIMATED from what AAG charged for it on
+// other cars of the same make and model, any year (Task 72,
+// lib/parts/part-estimates.ts). Never a different model.
+// With no estimate either, it takes the admin's set price for the group when
 // there is one (migration 0071: consumables AAG doesn't list). Otherwise the
 // set is unpriceable: the booking stops rather than go out without its parts.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { aagRegKey } from "@/lib/aag/client";
 import { loadAagPartOffers, type AagPartOffers } from "./aag-part-prices";
-import { loadPartGroupSettings, type PartGroupSetPrice } from "./part-group-settings";
+import {
+  estimatePart,
+  loadPartEstimates,
+  type EstimateBasis,
+  type EstimateRow,
+  type EstimateVehicle,
+} from "./part-estimates";
+import { isMissingColumn, loadPartGroupSettings, type PartGroupSetPrice } from "./part-group-settings";
 import { jobPosition, selectJobParts, type RepairPartChoiceRow } from "./repair-part-choice";
 import type { PartPosition, SupplierId } from "./supplier-offer";
 
@@ -28,7 +39,7 @@ export interface QuotedPart {
   genartId: number;
   /** HaynesPro's name for the part group, e.g. "Air filter". */
   groupLabel: string;
-  /** Null for a set price: no supplier part was priced. */
+  /** Null for a set price or an estimate: no supplier part was priced. */
   supplier: SupplierId | null;
   /** Null for a set price. */
   partNumber: string | null;
@@ -46,10 +57,14 @@ export interface QuotedPart {
   linePence: number;
   /**
    * "chosen": an admin picked it for this engine variant. "default": AAG's
-   * best-rated, dearest within. "set_price": AAG had no price, so the admin's
-   * set price for the part group.
+   * best-rated, dearest within. "estimate": AAG had no price for this car, so
+   * it was estimated from other cars of the same model (Task 72; see `estimate`). "set_price":
+   * AAG had no price and there was no estimate, so the admin's set price for
+   * the part group.
    */
-  source: "chosen" | "default" | "set_price";
+  source: "chosen" | "default" | "estimate" | "set_price";
+  /** ADDITIVE (Task 72). Where an estimate came from; only on `source: "estimate"`. */
+  estimate?: { basis: EstimateBasis; samples: number };
   /** True when AAG couldn't answer and its answer from the last 7 days was used. */
   lastKnown: boolean;
   /** When the price was given (by AAG, or set by the admin), ISO. */
@@ -91,11 +106,45 @@ export function priceJobParts(args: {
   choices?: ReadonlyMap<string, RepairPartChoiceRow>;
   uncharged?: ReadonlySet<number>;
   setPrices?: ReadonlyMap<number, PartGroupSetPrice>;
+  /** Other cars' AAG answers to estimate from (Task 72), with the car being priced. */
+  estimates?: { vehicle: EstimateVehicle; rows: ReadonlyMap<number, readonly EstimateRow[]> };
+  /** When estimates are priced, ISO. */
+  now?: string;
 }): JobPartsResult {
   const parts: QuotedPart[] = [];
   const missing: MissingPart[] = [];
 
   const unpriced = (job: PartsJob, group: PartsJob["groups"][number], position: PartPosition | null) => {
+    const estimate = args.estimates
+      ? estimatePart({
+          jobDescription: job.description,
+          position,
+          vehicle: args.estimates.vehicle,
+          rows: args.estimates.rows.get(group.genartId) ?? [],
+        })
+      : null;
+    if (estimate) {
+      parts.push({
+        nodeId: job.nodeId,
+        genartId: group.genartId,
+        groupLabel: group.label,
+        supplier: null,
+        partNumber: null,
+        brand: null,
+        description: null,
+        imageUrl: null,
+        position,
+        rating: null,
+        quantity: estimate.quantity,
+        unitPence: estimate.unitPence,
+        linePence: estimate.linePence,
+        source: "estimate",
+        estimate: { basis: estimate.basis, samples: estimate.samples },
+        lastKnown: false,
+        pricedAt: args.now ?? new Date().toISOString(),
+      });
+      return;
+    }
     const set = args.setPrices?.get(group.genartId);
     if (!set) {
       missing.push({ nodeId: job.nodeId, genartId: group.genartId, label: group.label, position });
@@ -205,12 +254,30 @@ export async function quoteJobParts(args: {
   ]);
   if (!offers.enabled) return { ok: true, parts: [] };
 
+  const priced = priceJobParts({
+    jobs: args.jobs,
+    offers: offers.byGenart,
+    choices,
+    uncharged: settings.uncharged,
+    setPrices: settings.setPrices,
+  });
+  if (priced.ok) return priced;
+
+  // Something AAG couldn't price on this car: estimate it from other cars of the same model
+  // (Task 72). Only the groups that need it are read.
+  const estimates = await loadPartEstimates(
+    args.db,
+    aagRegKey(args.reg),
+    priced.missing.map((m) => m.genartId),
+  );
+  if (!estimates) return priced;
   return priceJobParts({
     jobs: args.jobs,
     offers: offers.byGenart,
     choices,
     uncharged: settings.uncharged,
     setPrices: settings.setPrices,
+    estimates,
   });
 }
 
@@ -240,7 +307,32 @@ export function catalogueBookingPartRows(bookingId: string, parts: readonly Quot
     genart_id: part.genartId,
     node_id: part.nodeId,
     priced_at: part.pricedAt,
+    // Migration 0087 (Task 72). Only written when true, so a booking with no
+    // estimate saves exactly as before while the column is missing; see
+    // insertCatalogueBookingParts.
+    ...(part.source === "estimate" ? { price_estimated: true } : {}),
   }));
+}
+
+/**
+ * Insert the rows `catalogueBookingPartRows` built. Until migration 0087 adds
+ * `price_estimated`, a row carrying it would fail the whole insert, so it is
+ * retried without the flag: the price is still right, only the marker is lost.
+ */
+export async function insertCatalogueBookingParts(
+  db: SupabaseClient,
+  rows: ReturnType<typeof catalogueBookingPartRows>,
+): Promise<{ error: { code?: string; message?: string } | null }> {
+  const first = await db.from("booking_parts").insert(rows);
+  if (!first.error || !isMissingColumn(first.error) || !rows.some((r) => "price_estimated" in r)) return first;
+  console.error("[parts] booking_parts.price_estimated is missing (migration 0087); saving without it");
+  return db.from("booking_parts").insert(
+    rows.map((row) => {
+      const rest: Record<string, unknown> = { ...row };
+      delete rest.price_estimated;
+      return rest;
+    }),
+  );
 }
 
 /**
@@ -253,12 +345,17 @@ export interface CustomerPartLine {
   nodeId: string;
   /** HaynesPro's name for the part group, e.g. "Brake disc". */
   name: string;
-  /** Null for a set price. */
+  /** Null for a set price or an estimate. */
   brand: string | null;
   position: PartPosition | null;
   quantity: number;
   unitPence: number;
   linePence: number;
+  /**
+   * ADDITIVE (Task 72). True when no supplier priced this part for the car, so
+   * the price is estimated from other cars of the same model. Say so beside the line.
+   */
+  estimated: boolean;
 }
 
 export function customerPartLines(parts: readonly QuotedPart[]): CustomerPartLine[] {
@@ -270,5 +367,6 @@ export function customerPartLines(parts: readonly QuotedPart[]): CustomerPartLin
     quantity: part.quantity,
     unitPence: part.unitPence,
     linePence: part.linePence,
+    estimated: part.source === "estimate",
   }));
 }

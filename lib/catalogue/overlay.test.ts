@@ -105,9 +105,10 @@ describe("composeLevel", () => {
     });
   });
 
-  it("hides an option when one of its jobs is hidden or missing on this vehicle", () => {
+  it("keeps an option whose job is hidden on its own, but drops one whose job is missing on this vehicle", () => {
+    // Hiding a job takes it away as a choice on its own, not out of a combined repair.
     const hiddenPads = compose(customGroupId("cat-1"), [], ["1M01510000WV0"]);
-    expect(hiddenPads.map((n) => n.id)).toEqual(["1M01534000WV0", bundleOptionId("opt-rear")]);
+    expect(hiddenPads.map((n) => n.id)).toEqual(["1M01534000WV0", bundleOptionId("opt-front"), bundleOptionId("opt-rear")]);
 
     const noRearDiscs = composeLevel({
       levelId: customGroupId("cat-1"),

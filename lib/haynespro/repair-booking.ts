@@ -380,8 +380,10 @@ export async function quoteRepairsResult(
       // Admin-hidden repairs aren't bookable even via a stale/crafted URL.
       // (Only the leaf itself is checked — ancestors aren't knowable from the
       // node id alone; hiding a group already removes the path to its leaves.)
+      // Only a job chosen on its own: inside a combined repair a hidden job
+      // still counts, as the catalogue lists it (lib/catalogue/overlay.ts).
       const excluded = await excludedRepairNodeIdsForVehicle(vehicle.hpModelLabel, db);
-      if (nodeIds.some((id) => excluded.has(id))) return fail;
+      if (items.some((item) => item.label == null && item.nodeIds.some((id) => excluded.has(id)))) return fail;
 
       const nodes = await getRepairNodesByIds(hpVehicle, nodeIds);
       const byId = new Map(nodes.filter((n) => n.id != null).map((n) => [n.id as string, n]));

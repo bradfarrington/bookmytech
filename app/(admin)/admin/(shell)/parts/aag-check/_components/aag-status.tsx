@@ -1,5 +1,5 @@
 import { AlertTriangle, CheckCircle2, WifiOff } from "lucide-react";
-import type { AagHealth } from "@/lib/aag/health";
+import { describeAagHealthSource, type AagHealth } from "@/lib/aag/health";
 
 // Operational status of the AAG parts integration (Task 40) — the same
 // four-state banner as the HaynesPro one on /admin/vehicles, for the same
@@ -18,14 +18,37 @@ function relative(iso: string): string {
   return `${days} day${days === 1 ? "" : "s"} ago`;
 }
 
+/**
+ * "Seen 4 minutes ago on the live site." The status row is shared by every
+ * environment, so a failure seen elsewhere says so rather than reading as this
+ * one's: the sandbox refuses Vercel but answers a local dev server.
+ */
+function Seen({ health, here }: { health: AagHealth; here: string }) {
+  const where = describeAagHealthSource(health.source);
+  const elsewhere = health.source != null && health.source !== here;
+  return (
+    <>
+      Seen {relative(health.at)}
+      {where && <> on {where}</>}
+      {health.errorCode && <> · error code {health.errorCode}</>}.
+      {elsewhere && (
+        <> This page is running on {describeAagHealthSource(here)}, so it may not apply here. Run a check below to find out.</>
+      )}
+    </>
+  );
+}
+
 export function AagStatus({
   configured,
   sandbox,
   health,
+  here,
 }: {
   configured: boolean;
   sandbox: boolean;
   health: AagHealth | null;
+  /** This environment, as AagHealth.source records it. */
+  here: string;
 }) {
   const host = sandbox ? "AAG's sandbox" : "AAG live";
 
@@ -50,13 +73,12 @@ export function AagStatus({
       <div className="flex items-start gap-3 rounded-button border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
         <AlertTriangle size={18} className="mt-0.5 shrink-0" />
         <div>
-          <p className="font-semibold">{host} is refusing our credentials.</p>
+          <p className="font-semibold">
+            {health.errorCode ? `${host} is refusing our credentials.` : `${host} turned us away.`}
+          </p>
           <p className="mt-0.5 text-red-800">{health.detail}</p>
           <p className="mt-1.5 text-red-800">
-            Seen {relative(health.at)}
-            {health.errorCode && <> · error code {health.errorCode}</>}.
-            If this is an HTTP 401/403 rather than an AAG error code, it is
-            either the API-key header name or AAG&apos;s IP allowlist.
+            <Seen health={health} here={here} />
           </p>
         </div>
       </div>
@@ -70,7 +92,7 @@ export function AagStatus({
         <div>
           <p className="font-semibold">We couldn&apos;t reach {host}.</p>
           <p className="mt-0.5 text-amber-800">
-            {health.detail} Seen {relative(health.at)}.
+            {health.detail} <Seen health={health} here={here} />
           </p>
         </div>
       </div>

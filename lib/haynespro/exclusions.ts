@@ -137,6 +137,37 @@ export function isNodeVisible(availability: NodeAvailability): boolean {
   return availability === "shown" || availability === "shown_override";
 }
 
+/** PostgREST's default row cap, and the page size the whole-table read uses. */
+const EXCLUSION_PAGE_SIZE = 1000;
+
+/**
+ * Every row of repair_vehicle_exclusions, read in pages. A plain select stops
+ * at PostgREST's 1,000-row cap without saying so — past 1,000 hides (reached
+ * 2026-10), whichever rows fell outside the first page were silently ignored:
+ * hidden repairs showed to customers and the admin switch showed them on.
+ * Throws on a read error; callers decide what that means.
+ */
+export async function loadRepairExclusionRows<T extends RepairExclusionRow = RepairExclusionRow>(
+  db: SupabaseClient,
+): Promise<T[]> {
+  const rows: T[] = [];
+  for (let from = 0; ; from += EXCLUSION_PAGE_SIZE) {
+    // "*" rather than naming `mode`: until migration 0054 is applied the column
+    // does not exist, and asking for it would make Postgres fall back to the
+    // mode() aggregate and error — which would switch every hide off. The
+    // matcher treats a missing mode as 'hide', so per-model rows keep working
+    // through the deploy window either way. Ordered by id so pages are stable.
+    const { data, error } = await db
+      .from("repair_vehicle_exclusions")
+      .select("*")
+      .order("id", { ascending: true })
+      .range(from, from + EXCLUSION_PAGE_SIZE - 1);
+    if (error) throw error;
+    rows.push(...((data ?? []) as T[]));
+    if (!data || data.length < EXCLUSION_PAGE_SIZE) return rows;
+  }
+}
+
 /**
  * The repair-tree node ids to hide for an already-resolved vehicle. Small
  * admin-curated table, read whole and matched in memory; never throws —
@@ -147,13 +178,7 @@ export async function excludedRepairNodeIdsForVehicle(
   db: SupabaseClient,
 ): Promise<Set<string>> {
   try {
-    // "*" rather than naming `mode`: until migration 0054 is applied the column
-    // does not exist, and asking for it would make Postgres fall back to the
-    // mode() aggregate and error — which would switch every hide off. The
-    // matcher treats a missing mode as 'hide', so per-model rows keep working
-    // through the deploy window either way.
-    const { data: rows } = await db.from("repair_vehicle_exclusions").select("*");
-    return excludedRepairNodeIdsForLabel(modelLabel, (rows ?? []) as RepairExclusionRow[]);
+    return excludedRepairNodeIdsForLabel(modelLabel, await loadRepairExclusionRows(db));
   } catch (err) {
     console.error("[haynespro] repair exclusion lookup failed:", err);
     return new Set();

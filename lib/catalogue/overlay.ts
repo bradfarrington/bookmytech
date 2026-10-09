@@ -276,8 +276,11 @@ export function composeLevel(input: ComposeInput): CatalogueNode[] {
     for (const option of options) {
       const ids = option.node_ids;
       if (ids.length === 0) continue;
-      // Every job in the option must exist and be bookable on this vehicle.
-      if (ids.some((id) => excluded.has(id) || !((nodeHours.get(id) ?? 0) > 0))) continue;
+      // Every job in the option must exist on this vehicle with a time. Hidden
+      // jobs still count: hiding takes a job away as a choice on its own, while
+      // a combined repair is the admin's own pick of jobs (owner decision,
+      // 2026-10-09: brake discs alone hidden, pads and discs kept).
+      if (ids.some((id) => !((nodeHours.get(id) ?? 0) > 0))) continue;
       const node = priceLeaf(
         bundleOptionId(option.id),
         optionDisplayName(bundle, option, options.length),

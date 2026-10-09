@@ -29,6 +29,10 @@ import { createAdminClient } from "@/lib/supabase/admin";
 // absent, not zero. Render the old "£X + parts" there: a quote for that job
 // would refuse the booking, so labour alone is not what the customer pays.
 //
+// ADDITIVE (Task 72): `partsEstimated: true` rides alongside `partsPence` when
+// a part no supplier priced for this car was estimated from other cars of the same model.
+// Absent otherwise. Show "Includes estimated parts" under the price.
+//
 // The admin client is deliberate and safe: nothing here is user data. It reads
 // the public catalogue and writes the shared reg → car-type cache, exactly as
 // the website's RepairBrowser server component does. No mobile request may

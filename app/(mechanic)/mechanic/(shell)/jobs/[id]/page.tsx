@@ -164,6 +164,8 @@ export default async function MechanicJobDetailPage({ params }: PageProps) {
     source: (p.source === "catalogue" ? "catalogue" : "manual") as "manual" | "catalogue",
     supplierPartNumber: (p.supplier_part_number as string | null | undefined) ?? null,
     brand: (p.brand as string | null | undefined) ?? null,
+    // Migration 0087 (Task 72); absent until it's applied.
+    estimated: p.price_estimated === true,
   }));
   const partsPence = jobParts.reduce((s, p) => s + p.totalPence, 0);
   // The same sum the mechanic app is served (lib/mechanics/job-money.ts).

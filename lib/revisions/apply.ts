@@ -1,7 +1,7 @@
 import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
-import { catalogueBookingPartRows } from "@/lib/parts/quote-parts";
+import { catalogueBookingPartRows, insertCatalogueBookingParts } from "@/lib/parts/quote-parts";
 import { loadQuotesForBooking } from "@/lib/quotes/load";
 import { approvedExtras } from "./snapshot";
 import { diffRevision } from "./diff";
@@ -82,9 +82,10 @@ export async function applyRevision(
     .map((r) => r.id as string);
   if (toDelete.length) await admin.from("booking_parts").delete().in("id", toDelete);
   if (after.catalogueParts?.length) {
-    const { error: catalogueError } = await admin
-      .from("booking_parts")
-      .insert(catalogueBookingPartRows(revision.bookingId, after.catalogueParts));
+    const { error: catalogueError } = await insertCatalogueBookingParts(
+      admin,
+      catalogueBookingPartRows(revision.bookingId, after.catalogueParts),
+    );
     if (catalogueError) console.error("[revisions] catalogue parts insert failed", revision.id, catalogueError);
   }
   const added = after.parts.filter((p) => !p.id);

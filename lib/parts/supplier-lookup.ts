@@ -8,10 +8,8 @@
 // Refuses to throw. Every failure comes back as a panel state, so AAG being
 // down degrades its own panel and never the page.
 
-import { aagQuote, isAagConfigured } from "@/lib/aag/client";
-import { readAagHealth } from "@/lib/aag/health";
+import { aagQuoteResult, isAagConfigured } from "@/lib/aag/client";
 import { flattenQuote } from "@/lib/aag/quote";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { aagOffers, type SupplierPanel } from "./supplier-offer";
 
 /** A TecDoc part group ("GenArt") as HaynesPro names it on a repair. AAG prices by its id directly. */
@@ -33,24 +31,19 @@ export async function lookupAagPanel(reg: string, group: AagPartGroup): Promise<
     };
   }
 
-  const body = await aagQuote(reg, group.genart);
-  if (!body) {
-    let hint: string | null = "The connection check shows what Alliance Automotive last told us.";
-    try {
-      const health = await readAagHealth(createAdminClient());
-      if (health?.detail) hint = health.detail;
-    } catch {
-      // Keep the default explanation.
-    }
+  // This call's own reason, not the shared status row: that row may be another
+  // environment's (the sandbox refuses Vercel but answers a local machine).
+  const outcome = await aagQuoteResult(reg, group.genart, { includeVehicleDetails: true });
+  if (outcome.kind === "failed") {
     return {
       state: "not_connected",
       message: "Alliance Automotive didn't return a price.",
-      hint,
+      hint: outcome.reason,
       href: "/admin/parts/aag-check",
     };
   }
 
-  const offers = aagOffers(flattenQuote(body));
+  const offers = outcome.kind === "ok" ? aagOffers(flattenQuote(outcome.body)) : [];
   if (offers.length === 0) {
     return {
       state: "empty",

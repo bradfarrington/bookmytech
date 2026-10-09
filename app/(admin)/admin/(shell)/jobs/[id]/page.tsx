@@ -548,7 +548,11 @@ export default async function BookingDetailPage({ params }: PageProps) {
                       {part.part_name}
                       {part.quantity > 1 ? ` × ${part.quantity}` : ""}
                       <span className="block font-mono text-text-muted">
-                        {part.supplier_part_number ? `Alliance Automotive ${part.supplier_part_number}` : "Set price"}
+                        {part.price_estimated === true
+                          ? "Estimated from the same model"
+                          : part.supplier_part_number
+                            ? `Alliance Automotive ${part.supplier_part_number}`
+                            : "Set price"}
                       </span>
                     </span>
                     <span className="shrink-0 text-text-muted">{formatPrice(part.total_pence)}</span>

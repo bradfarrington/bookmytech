@@ -92,7 +92,7 @@ export default async function SlotPage({ searchParams }: SlotPageProps) {
         priceExtras={[
           ...quote.parts.map((part, index) => ({
             key: `part:${index}`,
-            label: `${partGroupName(part)}${part.brand ? ` · ${part.brand}` : ""}${part.quantity === 2 ? " · pair" : part.quantity > 2 ? ` · × ${part.quantity}` : ""}`,
+            label: `${partGroupName(part)}${part.brand ? ` · ${part.brand}` : ""}${part.quantity === 2 ? " · pair" : part.quantity > 2 ? ` · × ${part.quantity}` : ""}${part.source === "estimate" ? " · estimated" : ""}`,
             pence: part.linePence,
           })),
           ...(quote.oil && quote.oil.pence > 0

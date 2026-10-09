@@ -3,7 +3,7 @@ import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Overline } from "@/components/ui/overline";
 import { isAagConfigured, isAagSandbox } from "@/lib/aag/client";
-import { readAagHealth } from "@/lib/aag/health";
+import { aagHealthSource, readAagHealth } from "@/lib/aag/health";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { AagCheckForm } from "./_components/aag-check-form";
 import { AagStatus } from "./_components/aag-status";
@@ -43,7 +43,7 @@ export default async function AagCheckPage() {
         </Link>
       </header>
 
-      <AagStatus configured={configured} sandbox={sandbox} health={health} />
+      <AagStatus configured={configured} sandbox={sandbox} health={health} here={aagHealthSource()} />
 
       <AagCheckForm disabled={!configured} />
     </div>

@@ -42,9 +42,13 @@ import { createAdminClient } from "@/lib/supabase/admin";
 //
 // Since Task 43 repairs carry their supplier parts. ADDITIVE on both shapes:
 //   parts:        [{ nodeId, name, brand, position, quantity, unitPence,
-//                    linePence }] — one per job, part group and axle
+//                    linePence, estimated }] — one per job, part group and axle
 //                 (position "front" | "rear" | null). `partsPence` is oil
 //                 plus these, and `totalPence` includes it.
+//                 `estimated` (ADDITIVE, Task 72): true when no supplier
+//                 priced that part for this car and it was estimated from
+//                 other cars of the same make and model; brand is
+//                 then null.
 // A repair whose parts can't be priced right now is `not_priceable` with a
 // parts-specific `message`; the code is unchanged.
 //

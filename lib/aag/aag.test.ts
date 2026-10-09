@@ -7,11 +7,13 @@ import {
   aagRegKey,
   buildAagHeaders,
   describeAagError,
+  describeAagGatewayRefusal,
   isAagAuthFailure,
   isAagSandbox,
   parseAagEnvelope,
   type AagConfig,
 } from "./client";
+import { describeAagHealthSource } from "./health";
 import { cheapestLine, flattenQuote, isSellable, poundsToPence } from "./quote";
 import type { AagQuoteBody, AagQuoteResponse } from "./types";
 
@@ -131,6 +133,28 @@ describe("isAagAuthFailure", () => {
     expect(isAagAuthFailure("ISE0101")).toBe(true);
     expect(isAagAuthFailure("ISE0005")).toBe(false);
     expect(isAagAuthFailure(null)).toBe(false);
+  });
+});
+
+describe("describeAagGatewayRefusal", () => {
+  it("blames the sandbox's IP allowlist, not our credentials, on the sandbox", () => {
+    const reason = describeAagGatewayRefusal(403, true);
+    expect(reason).toContain("HTTP 403");
+    expect(reason).toContain("allowlisted");
+    expect(reason).not.toContain("API-key header");
+  });
+
+  it("keeps both explanations open on live", () => {
+    expect(describeAagGatewayRefusal(401, false)).toContain("API-key header");
+  });
+});
+
+describe("describeAagHealthSource", () => {
+  it("names where a status was seen", () => {
+    expect(describeAagHealthSource("production")).toBe("the live site");
+    expect(describeAagHealthSource("preview")).toBe("a preview deployment");
+    expect(describeAagHealthSource("local")).toBe("a local dev server");
+    expect(describeAagHealthSource(null)).toBeNull();
   });
 });
 

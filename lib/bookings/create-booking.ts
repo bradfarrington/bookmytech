@@ -17,7 +17,12 @@ import {
 } from "@/lib/slots";
 import { dispatchBooking } from "@/lib/dispatch/dispatch";
 import { PARTS_UNAVAILABLE_MESSAGE, quoteRepairsResult, type RepairsQuote } from "@/lib/haynespro/repair-booking";
-import { catalogueBookingPartRows, customerPartLines, type CustomerPartLine } from "@/lib/parts/quote-parts";
+import {
+  catalogueBookingPartRows,
+  customerPartLines,
+  insertCatalogueBookingParts,
+  type CustomerPartLine,
+} from "@/lib/parts/quote-parts";
 import { recordBookedVehicle } from "@/lib/garage/garage";
 import { checkoutCustomerFor, type CardSurface } from "@/lib/payments/saved-cards";
 import { MAX_REPAIRS_PER_BOOKING, repairIdsFromInput } from "@/lib/bookings/repair-ids";
@@ -419,9 +424,7 @@ export async function createBooking(
   // before anything references the booking, so a failure takes the booking
   // row with it, as the job lines do. There are none until migration 0070.
   if (quote.parts.length > 0) {
-    const { error: partsError } = await db
-      .from("booking_parts")
-      .insert(catalogueBookingPartRows(data.id, quote.parts));
+    const { error: partsError } = await insertCatalogueBookingParts(db, catalogueBookingPartRows(data.id, quote.parts));
     if (partsError) {
       console.error("[booking] catalogue parts insert failed; booking rolled back", data.id, partsError);
       await db.from("booking_repairs").delete().eq("booking_id", data.id);

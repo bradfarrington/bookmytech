@@ -19,6 +19,8 @@ export interface JobPart {
   /** The exact part to buy, when the booking priced one. */
   supplierPartNumber?: string | null;
   brand?: string | null;
+  /** The price was estimated for this car, not taken from a listed part (Task 72). */
+  estimated?: boolean;
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -73,7 +75,9 @@ export function PartsOrder({
                 </span>
                 {p.source === "catalogue" && (
                   <p className="mt-0.5 text-xs text-text-muted">
-                    {p.supplierPartNumber ? (
+                    {p.estimated ? (
+                      "Estimated price: buy a suitable part. If it costs more, send the customer a quote for the difference."
+                    ) : p.supplierPartNumber ? (
                       <>
                         Priced as Alliance Automotive{p.brand ? ` · ${p.brand}` : ""} ·{" "}
                         <span className="font-mono">{p.supplierPartNumber}</span>

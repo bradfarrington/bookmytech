@@ -23,6 +23,34 @@ export interface AagHealth {
   detail: string;
   /** Which host answered — the sandbox and live are different accounts. */
   baseUrl: string | null;
+  /**
+   * Where the call was made from: "production", "preview", "development"
+   * (Vercel's VERCEL_ENV) or "local". The row is shared by every environment,
+   * and the sandbox answers a local machine but never Vercel, so a banner
+   * that doesn't say where it was seen misleads. Null on rows written before.
+   */
+  source: string | null;
+}
+
+/** This process's environment, as `AagHealth.source` records it. */
+export function aagHealthSource(): string {
+  return process.env.VERCEL_ENV || "local";
+}
+
+/** "the live site" — a source as an admin reads it. */
+export function describeAagHealthSource(source: string | null): string | null {
+  switch (source) {
+    case null:
+      return null;
+    case "production":
+      return "the live site";
+    case "preview":
+      return "a preview deployment";
+    case "local":
+      return "a local dev server";
+    default:
+      return `the ${source} environment`;
+  }
 }
 
 /**
@@ -31,10 +59,10 @@ export interface AagHealth {
  */
 export async function recordAagHealth(
   db: SupabaseClient,
-  health: Omit<AagHealth, "at">,
+  health: Omit<AagHealth, "at" | "source">,
 ): Promise<void> {
   try {
-    const value: AagHealth = { ...health, at: new Date().toISOString() };
+    const value: AagHealth = { ...health, source: aagHealthSource(), at: new Date().toISOString() };
     await db
       .from("platform_settings")
       .upsert({ key: HEALTH_SETTINGS_KEY, value, updated_at: new Date().toISOString() });
@@ -59,6 +87,7 @@ export async function readAagHealth(db: SupabaseClient): Promise<AagHealth | nul
       at: typeof raw.at === "string" ? raw.at : new Date(0).toISOString(),
       detail: typeof raw.detail === "string" ? raw.detail : "",
       baseUrl: typeof raw.baseUrl === "string" ? raw.baseUrl : null,
+      source: typeof raw.source === "string" ? raw.source : null,
     };
   } catch {
     return null;

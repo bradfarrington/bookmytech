@@ -247,9 +247,17 @@ export interface AagCallOptions {
 /**
  * The outcome of one AAG call, keeping AAG's error code for callers that must
  * tell "no parts" apart from a failure. `errorCode` is null when AAG was
- * unconfigured, unreachable or refused at its gateway.
+ * unconfigured, unreachable or refused at its gateway. `reason` says why THIS
+ * call failed, for the admin pages — never shown to a customer.
  */
-export type AagCallResult<T> = { ok: true; body: T } | { ok: false; errorCode: string | null };
+export type AagCallResult<T> = { ok: true; body: T } | { ok: false; errorCode: string | null; reason: string };
+
+/** Why AAG's gateway (not its API) turned us away with a 401/403. Pure. */
+export function describeAagGatewayRefusal(status: number, sandbox: boolean): string {
+  return sandbox
+    ? `AAG's sandbox turned this server away with HTTP ${status}. It only answers allowlisted IP addresses (the development connection), never Vercel, so this is expected anywhere but a local dev server. Live AAG has no allowlist.`
+    : `AAG's gateway refused us with HTTP ${status}. Either the API-key header is wrong or our address isn't on their allowlist.`;
+}
 
 /** POST one AAG method. Never throws. */
 export async function aagCallResult<T>(
@@ -258,7 +266,7 @@ export async function aagCallResult<T>(
   options: AagCallOptions = {},
 ): Promise<AagCallResult<T>> {
   const config = getAagConfig();
-  if (!config) return { ok: false, errorCode: null };
+  if (!config) return { ok: false, errorCode: null, reason: "AAG isn't configured on this environment." };
 
   let raw: unknown;
   try {
@@ -275,21 +283,19 @@ export async function aagCallResult<T>(
       // Outside 2xx is the gateway, not the API: a wrong auth header name, or
       // AAG's IP allowlist, both land here as 401/403.
       console.error(`[aag] ${path} responded HTTP ${res.status}: ${text.slice(0, 200)}`);
-      await noteFailure(
-        config,
-        res.status === 401 || res.status === 403 ? "auth_failed" : "unreachable",
-        null,
-        res.status === 401 || res.status === 403
-          ? `AAG's gateway refused us with HTTP ${res.status}. Either the API-key header is wrong or our address isn't on their allowlist.`
-          : `AAG responded HTTP ${res.status}.`,
-      );
-      return { ok: false, errorCode: null };
+      const gateway = res.status === 401 || res.status === 403;
+      const reason = gateway
+        ? describeAagGatewayRefusal(res.status, isAagSandbox(config))
+        : `AAG responded HTTP ${res.status}.`;
+      await noteFailure(config, gateway ? "auth_failed" : "unreachable", null, reason);
+      return { ok: false, errorCode: null, reason };
     }
     raw = text ? (JSON.parse(text) as unknown) : null;
   } catch (err) {
     console.error(`[aag] ${path} failed:`, err);
-    await noteFailure(config, "unreachable", null, "We couldn't reach AAG at all (network error or timeout).");
-    return { ok: false, errorCode: null };
+    const reason = "We couldn't reach AAG at all (network error or timeout).";
+    await noteFailure(config, "unreachable", null, reason);
+    return { ok: false, errorCode: null, reason };
   }
 
   const parsed = parseAagEnvelope<T>(raw);
@@ -300,7 +306,7 @@ export async function aagCallResult<T>(
     if (isAagAuthFailure(parsed.errorCode)) {
       await noteFailure(config, "auth_failed", parsed.errorCode, describeAagError(parsed.errorCode));
     }
-    return { ok: false, errorCode: parsed.errorCode };
+    return { ok: false, errorCode: parsed.errorCode, reason: describeAagError(parsed.errorCode) };
   }
   await noteOk(config);
   return { ok: true, body: parsed.body };
@@ -338,23 +344,27 @@ export async function aagQuote(
 export type AagQuoteOutcome =
   | { kind: "ok"; body: AagQuoteBody }
   | { kind: "no_parts" }
-  | { kind: "failed" };
+  /** `reason` is for the admin pages, never a customer. */
+  | { kind: "failed"; reason: string };
 
-/** `aagQuote` for customer pricing: a short timeout, and "no parts" kept apart from a failure. */
+/**
+ * `aagQuote` with "no parts" kept apart from a failure. Customer pricing passes
+ * a short timeout; the admin pages ask for the vehicle details too.
+ */
 export async function aagQuoteResult(
   reg: string,
   genart: string | number,
-  options: AagCallOptions = {},
+  options: AagCallOptions & { includeVehicleDetails?: boolean } = {},
 ): Promise<AagQuoteOutcome> {
   const vrm = aagRegKey(reg);
-  if (!vrm) return { kind: "failed" };
+  if (!vrm) return { kind: "failed", reason: "No registration was given." };
   const result = await aagCallResult<AagQuoteBody>(
     "/api/quote",
-    { CustomerProductGroup: String(genart), VRM: vrm, IncludeVehicleDetails: false },
-    options,
+    { CustomerProductGroup: String(genart), VRM: vrm, IncludeVehicleDetails: options.includeVehicleDetails ?? false },
+    { timeoutMs: options.timeoutMs },
   );
   if (result.ok) return { kind: "ok", body: result.body };
-  return isAagNoParts(result.errorCode) ? { kind: "no_parts" } : { kind: "failed" };
+  return isAagNoParts(result.errorCode) ? { kind: "no_parts" } : { kind: "failed", reason: result.reason };
 }
 
 /** The older flat quote: several GenArts at once (slower, per the manual). */

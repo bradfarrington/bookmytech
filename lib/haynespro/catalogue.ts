@@ -148,6 +148,12 @@ export interface CatalogueNode {
    */
   partsPence?: number;
   totalPence?: number;
+  /**
+   * ADDITIVE (Task 72). True when `partsPence` includes a part no supplier
+   * priced for this car, estimated from other cars of the same model instead. Only present
+   * alongside `partsPence`. Say so beside the price.
+   */
+  partsEstimated?: boolean;
 }
 
 /**
@@ -456,12 +462,17 @@ async function withLevelParts(
   }
 
   const parts = await priceLevelParts({ db, reg, carTypeId: context.carTypeId, rows });
-  if (parts.size === 0) return nodes;
+  if (parts.totals.size === 0) return nodes;
 
   return nodes.map((node) => {
-    const partsPence = parts.get(node.id);
+    const partsPence = parts.totals.get(node.id);
     if (partsPence == null || node.pricePence == null) return node;
-    return { ...node, partsPence, totalPence: node.pricePence + partsPence };
+    return {
+      ...node,
+      partsPence,
+      totalPence: node.pricePence + partsPence,
+      ...(parts.estimated.has(node.id) ? { partsEstimated: true } : {}),
+    };
   });
 }
 
@@ -790,7 +801,9 @@ async function bundleSearchHits(
     const optionCount = (context.overlay.optionsByBundle.get(bundle.id) ?? []).length;
     for (const option of options) {
       if (option.node_ids.length === 0) continue;
-      if (option.node_ids.some((id) => context.excluded.has(id) || !((nodeHours.get(id) ?? 0) > 0))) continue;
+      // Hidden jobs still count inside a combined repair, as on a browsed level
+      // (lib/catalogue/overlay.ts).
+      if (option.node_ids.some((id) => !((nodeHours.get(id) ?? 0) > 0))) continue;
       const raw = await context.combineHours(option.node_ids, nodeHours);
       const billed = billableHours(raw);
       if (billed == null) continue;

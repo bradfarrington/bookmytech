@@ -37,6 +37,8 @@ export interface PriceHeroPart {
   brand: string | null;
   quantity: number;
   linePence: number;
+  /** No supplier priced it for this car, so it's estimated from other cars of the same model (Task 72). */
+  estimated?: boolean;
 }
 
 interface PriceHeroProps {
@@ -182,13 +184,16 @@ export function PriceHero({
                     {part.name}
                     {part.brand ? ` · ${part.brand}` : ""}
                     {part.quantity === 2 ? " · pair" : part.quantity > 2 ? ` · × ${part.quantity}` : ""}
+                    {part.estimated && <span className="text-blue-200"> · estimated</span>}
                   </span>
                   <span className="shrink-0 font-semibold text-white">{formatPrice(part.linePence)}</span>
                 </li>
               ))}
             </ul>
             <p className="mt-1.5 text-xs text-blue-200">
-              Parts for your exact vehicle, included in the price above
+              {parts!.some((part) => part.estimated)
+                ? "Parts for your exact vehicle, included in the price above. Parts marked estimated are our best price for your vehicle; if one costs more, your mechanic will ask you before going ahead."
+                : "Parts for your exact vehicle, included in the price above"}
             </p>
           </div>
         )}

@@ -46,9 +46,15 @@ export interface PartsRow {
  * Parts cost in pence per row id, for rows that could be priced in full.
  * A row is absent when any part group one of its jobs needs has no price.
  */
-export type LevelParts = Map<string, number>;
+export type LevelPartTotals = Map<string, number>;
 
-const EMPTY: LevelParts = new Map();
+export interface LevelParts {
+  totals: LevelPartTotals;
+  /** Rows (among `totals`) with at least one estimated part price (Task 72). */
+  estimated: Set<string>;
+}
+
+const EMPTY: LevelParts = { totals: new Map(), estimated: new Set() };
 
 /** The job description parts pricing reads — the same one `quoteRepairsResult` passes. */
 function jobDescription(node: HpRepairtimeNode): string {
@@ -68,14 +74,14 @@ function partsJob(node: HpRepairtimeNode): PartsJob {
 }
 
 /** Sum a priced result into per-row totals, dropping any row with a part we couldn't price. */
-export function foldLevelParts(rows: readonly PartsRow[], result: JobPartsResult): LevelParts {
+export function foldLevelParts(rows: readonly PartsRow[], result: JobPartsResult): LevelPartTotals {
   const byNode = new Map<string, number>();
   for (const part of result.parts) {
     byNode.set(part.nodeId, (byNode.get(part.nodeId) ?? 0) + part.linePence);
   }
   const unpriced = new Set(result.ok ? [] : result.missing.map((m) => m.nodeId));
 
-  const out: LevelParts = new Map();
+  const out: LevelPartTotals = new Map();
   for (const row of rows) {
     if (row.nodes.some((n) => n.id == null || unpriced.has(n.id))) continue;
     let pence = 0;
@@ -83,6 +89,16 @@ export function foldLevelParts(rows: readonly PartsRow[], result: JobPartsResult
     out.set(row.rowId, pence);
   }
   return out;
+}
+
+/** The rows priced in full whose parts include an estimate (Task 72). Pure. */
+export function estimatedLevelRows(rows: readonly PartsRow[], result: JobPartsResult, totals: LevelPartTotals): Set<string> {
+  const estimatedNodes = new Set(result.parts.filter((p) => p.source === "estimate").map((p) => p.nodeId));
+  return new Set(
+    rows
+      .filter((row) => totals.has(row.rowId) && row.nodes.some((n) => n.id != null && estimatedNodes.has(n.id)))
+      .map((row) => row.rowId),
+  );
 }
 
 /**
@@ -122,7 +138,9 @@ export async function priceLevelParts(args: {
       quoteJobParts({ db: args.db, reg: args.reg, carTypeId: args.carTypeId, jobs: [...jobs.values()] }),
       timeout,
     ]);
-    return result ? foldLevelParts(rows, result) : EMPTY;
+    if (!result) return EMPTY;
+    const totals = foldLevelParts(rows, result);
+    return { totals, estimated: estimatedLevelRows(rows, result, totals) };
   } catch (err) {
     console.error("[catalogue] pricing a level's parts failed:", err);
     return EMPTY;

@@ -170,6 +170,104 @@ describe("priceJobParts", () => {
     expect(result.ok && result.parts[0].lastKnown).toBe(true);
   });
 
+  describe("estimates (Task 72)", () => {
+    const ranger = { reg: "S28BSW", carTypeId: 900, make: "FORD", modelLabel: "FORD Ranger" };
+    const other = (reg: string, costPence: number, vehicle: { carTypeId: number; make: string; modelLabel: string } | null) => ({
+      reg,
+      genartId: 2021,
+      offers: [{ ...filter, partNumber: `P-${reg}`, costPence }],
+      vehicle,
+    });
+    const rangerCar = { carTypeId: 901, make: "FORD", modelLabel: "FORD Ranger" };
+    const empty2021 = new Map<number, AagPartOffers>([
+      [8, filters],
+      [2021, { state: "empty", pricedAt: PRICED_AT }],
+    ]);
+
+    it("estimates a part AAG can't price from the closest similar car, dearest plus 15%", () => {
+      const result = priceJobParts({
+        jobs: [job],
+        offers: empty2021,
+        estimates: {
+          vehicle: ranger,
+          rows: new Map([
+            [
+              2021,
+              [
+                other("RANGER1", 4000, { carTypeId: 901, make: "FORD", modelLabel: "FORD Ranger" }),
+                other("RANGER2", 5000, { carTypeId: 902, make: "FORD", modelLabel: "FORD Ranger" }),
+                other("FIESTA", 9000, { carTypeId: 100, make: "FORD", modelLabel: "FORD Fiesta" }),
+              ],
+            ],
+          ]),
+        },
+        now: PRICED_AT,
+      });
+      expect(result.ok).toBe(true);
+      expect(result.parts[1]).toMatchObject({
+        genartId: 2021,
+        source: "estimate",
+        supplier: null,
+        partNumber: null,
+        brand: null,
+        unitPence: 5750,
+        linePence: 5750,
+        estimate: { basis: "model", samples: 2 },
+        pricedAt: PRICED_AT,
+      });
+    });
+
+    it("prefers an estimate to the admin's set price", () => {
+      const result = priceJobParts({
+        jobs: [job],
+        offers: empty2021,
+        setPrices: new Map([[2021, { pence: 100, setAt: PRICED_AT }]]),
+        estimates: { vehicle: ranger, rows: new Map([[2021, [other("RANGER1", 1000, rangerCar)]]]) },
+      });
+      expect(result.ok && result.parts[1]).toMatchObject({ source: "estimate", linePence: 1150, estimate: { basis: "model" } });
+    });
+
+    it("never estimates from another model", () => {
+      const result = priceJobParts({
+        jobs: [job],
+        offers: empty2021,
+        estimates: { vehicle: ranger, rows: new Map([[2021, [other("FIESTA", 1000, { carTypeId: 100, make: "FORD", modelLabel: "FORD Fiesta" })]]]) },
+      });
+      expect(result.ok).toBe(false);
+    });
+
+    it("falls back to the set price when no car has a price", () => {
+      const result = priceJobParts({
+        jobs: [job],
+        offers: empty2021,
+        setPrices: new Map([[2021, { pence: 100, setAt: PRICED_AT }]]),
+        estimates: { vehicle: ranger, rows: new Map() },
+      });
+      expect(result.ok && result.parts[1]).toMatchObject({ source: "set_price", linePence: 100 });
+    });
+
+    it("never estimates from the car's own answer", () => {
+      const result = priceJobParts({
+        jobs: [job],
+        offers: empty2021,
+        estimates: { vehicle: ranger, rows: new Map([[2021, [other("S28BSW", 1000, null)]]]) },
+      });
+      expect(result.ok).toBe(false);
+    });
+
+    it("marks the booking row and the customer line as estimated", () => {
+      const result = priceJobParts({
+        jobs: [job],
+        offers: empty2021,
+        estimates: { vehicle: ranger, rows: new Map([[2021, [other("RANGER1", 1000, rangerCar)]]]) },
+      });
+      const [, row] = catalogueBookingPartRows("b1", result.parts);
+      expect(row).toMatchObject({ price_estimated: true, supplier: null, supplier_part_number: null, total_pence: 1150 });
+      expect(catalogueBookingPartRows("b1", result.parts)[0]).not.toHaveProperty("price_estimated");
+      expect(customerPartLines(result.parts).map((l) => l.estimated)).toEqual([false, true]);
+    });
+  });
+
   it("prices nothing for a job with no part groups", () => {
     expect(priceJobParts({ jobs: [{ nodeId: "check", description: "Check the brakes", groups: [] }], offers: new Map() })).toEqual({
       ok: true,
@@ -249,7 +347,7 @@ describe("customerPartLines", () => {
       pricedAt: PRICED_AT,
     };
     expect(customerPartLines([part])).toEqual([
-      { nodeId: "discs", name: "Brake disc", brand: "BREMBO", position: "front", quantity: 2, unitPence: 4354, linePence: 8708 },
+      { nodeId: "discs", name: "Brake disc", brand: "BREMBO", position: "front", quantity: 2, unitPence: 4354, linePence: 8708, estimated: false },
     ]);
   });
 });

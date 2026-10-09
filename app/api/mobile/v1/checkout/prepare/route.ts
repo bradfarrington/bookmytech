@@ -19,7 +19,8 @@ import { requireMobileUser } from "@/lib/supabase/mobile";
 //
 // ADDITIVE (Task 43): both success arms carry `parts`, the supplier parts
 // inside `totalPence`, in the same shape as POST /quote's `parts`:
-//   [{ nodeId, name, brand, position, quantity, unitPence, linePence }]
+//   [{ nodeId, name, brand, position, quantity, unitPence, linePence,
+//      estimated }] — `estimated` ADDITIVE (Task 72), see /quote
 // (brand is null for a set price; position "front" | "rear" | null). Confirm
 // can list them without calling /quote as well. Empty for a follow-on quote.
 //

@@ -46,6 +46,15 @@ function includesParts(node: CatalogueNode): boolean {
   return node.totalPence != null && (node.partsPence ?? 0) > 0;
 }
 
+/**
+ * The caption's parts note: whether the price includes parts, and whether any
+ * of them is estimated for this car because no supplier listed it (Task 72).
+ */
+function partsNote(node: CatalogueNode): string {
+  if (!includesParts(node)) return "";
+  return node.partsEstimated ? " · includes estimated parts" : " · parts included";
+}
+
 export interface RepairRowsProps {
   nodes: CatalogueNode[];
   /** Items already in the booking. */
@@ -158,7 +167,7 @@ export function RepairRows({
                     </p>
                     <p className="mt-0.5 text-xs text-text-muted">
                       {single
-                        ? `Combined repair · estimated ${row.options[0].billedHours} hour${row.options[0].billedHours === 1 ? "" : "s"} on your car${includesParts(row.options[0]) ? " · parts included" : ""}`
+                        ? `Combined repair · estimated ${row.options[0].billedHours} hour${row.options[0].billedHours === 1 ? "" : "s"} on your car${partsNote(row.options[0])}`
                         : "Combined repair · choose an option"}
                     </p>
                   </div>
@@ -208,7 +217,7 @@ export function RepairRows({
                 <p className="mt-0.5 text-xs text-text-muted">
                   Estimated {row.node.billedHours} hour
                   {row.node.billedHours === 1 ? "" : "s"} on your car
-                  {includesParts(row.node) && " · parts included"}
+                  {partsNote(row.node)}
                 </p>
               </div>
               {bookButton(row.node)}

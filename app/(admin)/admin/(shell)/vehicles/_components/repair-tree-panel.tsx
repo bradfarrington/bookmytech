@@ -7,9 +7,9 @@ import type { ExclusionTarget } from "@/app/actions/vehicle-exclusions";
 import {
   exclusionStateForModel,
   isNodeVisible,
+  loadRepairExclusionRows,
   nodeAvailability,
   type NodeAvailability,
-  type RepairExclusionRow,
 } from "@/lib/haynespro/exclusions";
 import { genartIdsOf } from "@/lib/haynespro/genarts";
 import { getRepairNodesByIds, getRepairtimeSubnodes, getRepairtimeTypeId } from "@/lib/haynespro/tree";
@@ -133,16 +133,17 @@ export async function RepairTreePanel({
   const supabase = await createClient();
   // The whole (small) exclusions table, partitioned in memory by the same rule
   // the funnel applies — so this page and the customer browser can't disagree.
-  const [rawNodes, { data: exclusionRows }, overlay] = await Promise.all([
+  const [rawNodes, exclusionRows, overlay] = await Promise.all([
     isCustomGroupId(nodeId)
       ? Promise.resolve([] as HpRepairtimeNode[])
       : getRepairtimeSubnodes({ carTypeId, repairtimeTypeId }, nodeId),
-    supabase.from("repair_vehicle_exclusions").select("*"),
+    // Every row, not the first 1,000 a plain select stops at.
+    loadRepairExclusionRows(supabase).catch(() => []),
     loadCatalogueOverlay(createAdminClient()),
   ]);
   const global = target.scope === "global";
   const state = exclusionStateForModel(
-    (exclusionRows ?? []) as RepairExclusionRow[],
+    exclusionRows,
     global ? "" : target.makeName,
     global ? "" : target.modelName,
   );

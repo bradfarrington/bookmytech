@@ -119,6 +119,72 @@ You are working on **Book My Tech**, a UK mobile-mechanic booking platform. This
 
 ## Current task
 
+### 📌 2026-10-09 — Pick up here: AAG parts, estimates, the demo (Task 72)
+
+**Pushed to `main` 2026-10-09.** Read `docs/tasks/72-estimated-part-prices.md`.
+
+**Where AAG stands**
+- We only have AAG's **sandbox (UAT)** account (customer ID `NAPATEST`).
+  **Live credentials come only after we demo the integration to AAG.**
+- The sandbox is **IP-allowlisted**: Brad's office connection (`80.6.218.98`)
+  and Gareth's property. It refuses Vercel (HTTP 403), and that won't change:
+  the call to AAG comes from our server, never the browser. So **the deployed
+  site can't ask AAG for prices**, wherever the person browsing is. Only a dev
+  server running on an allowlisted connection can.
+- The deployed site still prices from the **shared price cache**
+  (`aag_part_prices`): fresh for 12 h, then AAG's last answer for 7 days when
+  AAG can't be reached. **FN60KYP was fully priced on 2026-10-09 ~10:20 UTC, so
+  it prices on the live site until ~2026-10-16.** Looking FN60KYP up on an
+  allowlisted dev server refreshes it.
+- The sandbox catalogue is a sample. A 2024 Ranger (S28BSW) priced 21 of 306
+  parts repairs; a 2010 Fiesta (**FN60KYP**) priced 157 of 396. **Use FN60KYP
+  for testing and the demo.** Good repairs to show: Full Service, Interim
+  Service, Oil and Filter, Front Brake Pads and Discs, clutch, timing belt kit,
+  front shocks, battery. Avoid rear pads/discs/shoes (the Fiesta has rear
+  drums), and battery check/charge jobs (they charge a whole battery).
+- `/admin/parts/aag-check` now says which environment saw each status and
+  gives each check's real answer ("no parts for this vehicle" vs a failure).
+
+**Estimated part prices (Task 72)**
+- When AAG has no price for a part on a car, it's estimated from AAG's prices
+  for the same part on **other cars of the same make and model, any year**,
+  dearest plus 15%. **Never a different model** (owner rule). With no other
+  car of that model priced, the repair still shows "+ parts".
+- Customer wording says "estimated" / "our best price for your vehicle" and
+  **never mentions AAG, a supplier, or a price not being found**.
+- Mechanic keeps the difference if the part is cheaper; a dearer part goes
+  through the existing extra-cost quote.
+- **Next step proposed, not built:** seed the price pool with real
+  registrations of the models customers book (several years each), priced on
+  a schedule from an allowlisted machine (or anywhere once live).
+
+**Also changed 2026-10-09**
+- Every read of `repair_vehicle_exclusions` now reads all rows. It used to
+  stop at 1,000 (there are 1,208), silently ignoring the rest of the admin's
+  hides. ~200 hidden repairs now actually hide.
+- A hidden job still counts inside a combined repair: brake discs are hidden on
+  their own, and Front/Rear Pads and Discs stay.
+- Data changes made directly (shared DB): part groups 2746 "Wear indicator,
+  brake pad" and 3369 "High performance brake disc" not charged; duplicate
+  "Brake disc" group `1M01800000GCJ` hidden for all vehicles.
+
+**Outstanding**
+1. **Apply migration `0087`** (`booking_parts.price_estimated`), then
+   `npm run db:types` in **both** app repos.
+2. **App prompts are ready to paste:** `docs/app-prompts/2026-10-09-customer-app-estimated-parts.md`
+   (`bmt-customer-app`) and `docs/app-prompts/2026-10-09-mechanic-app-estimated-parts.md`
+   (`bmt-mechanic-app`).
+3. Gareth tests FN60KYP end to end; then the demo to AAG for live credentials.
+   On live: set `AAG_BASE_URL=https://sales.allianceautomotiveapis.co.uk` and the
+   live customer ID / key / verification ID in Vercel, redeploy, then re-run the
+   parts check on a handful of typical customer cars.
+4. **Local dev has no `TEST_OUTBOX_DIR` set, so test bookings send real
+   emails and texts.** Use your own contact details, or set it while rehearsing.
+5. Known "charging the wrong thing" cases to fix later (HaynesPro lists parts
+   a job touches, and we charge them all): "Renew the engine earth cable" and
+   battery check/charge jobs charge a battery; CV-boot jobs charge both a
+   bellow and a bellow kit; coolant/brake-fluid top-ups charge a full fill.
+
 ### 📌 2026-09-18 — Where the mechanic-app backend stands (Tasks 64–71)
 
 All eight tasks are built and pushed to `main`, and **every migration is

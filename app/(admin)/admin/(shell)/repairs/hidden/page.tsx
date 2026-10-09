@@ -3,6 +3,7 @@ import { ArrowLeft, EyeOff } from "lucide-react";
 import { Overline } from "@/components/ui/overline";
 import {
   isGlobalExclusionRow,
+  loadRepairExclusionRows,
   type RepairExclusionRow,
 } from "@/lib/haynespro/exclusions";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -35,11 +36,10 @@ function modelLabel(row: Pick<RepairExclusionRow, "make_name" | "model_name">): 
 }
 
 export default async function AdminHiddenRepairsPage() {
-  const { data } = await createAdminClient()
-    .from("repair_vehicle_exclusions")
-    .select("*")
-    .order("description", { ascending: true });
-  const rows = (data ?? []) as HiddenRow[];
+  // Every row, not the first 1,000 a plain select stops at.
+  const rows = (await loadRepairExclusionRows<HiddenRow>(createAdminClient()).catch(() => [] as HiddenRow[])).sort((a, b) =>
+    (a.description ?? "").localeCompare(b.description ?? ""),
+  );
 
   const globalHides = rows.filter((r) => isGlobalExclusionRow(r) && r.mode !== "show");
   const overridesByNode = new Map<string, string[]>();

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { JobPartsResult, QuotedPart } from "@/lib/parts/quote-parts";
-import { foldLevelParts, type PartsRow } from "./level-parts";
+import { estimatedLevelRows, foldLevelParts, type PartsRow } from "./level-parts";
 
 const PRICED_AT = "2026-09-16T09:00:00.000Z";
 
@@ -86,5 +86,18 @@ describe("foldLevelParts", () => {
     const rows = [row("n1", ["n1"])];
 
     expect(foldLevelParts(rows, { ok: true, parts: [] })).toEqual(new Map([["n1", 0]]));
+  });
+});
+
+describe("estimatedLevelRows", () => {
+  it("flags the priced rows whose parts include an estimate (Task 72)", () => {
+    const rows = [row("n1", ["n1"]), row("n2", ["n2"]), row("b:opt", ["n1", "n3"]), row("n4", ["n4"])];
+    const result: JobPartsResult = {
+      ok: false,
+      parts: [{ ...part("n1", 1000), source: "estimate" }, part("n2", 2000), part("n3", 500)],
+      missing: [{ nodeId: "n4", genartId: 402, label: "Brake pad", position: null }],
+    };
+    const totals = foldLevelParts(rows, result);
+    expect([...estimatedLevelRows(rows, result, totals)]).toEqual(["n1", "b:opt"]);
   });
 });

@@ -7,6 +7,7 @@ import {
   exclusionStateForModel,
   isGlobalExclusionRow,
   isNodeVisible,
+  loadRepairExclusionRows,
   nodeAvailability,
   normaliseLabel,
 } from "./exclusions";
@@ -563,5 +564,47 @@ describe("makesMatch — the guard on a shared, unscoped price", () => {
     expect(makesMatch(null, "FORD")).toBe(false);
     expect(makesMatch("FORD", null)).toBe(false);
     expect(makesMatch("", "")).toBe(false);
+  });
+});
+
+describe("loadRepairExclusionRows", () => {
+  // A stand-in for the Supabase query chain that serves `total` rows in the
+  // ranges asked for, as PostgREST does — never more than 1,000 at once.
+  function fakeDb(total: number) {
+    const ranges: Array<[number, number]> = [];
+    const db = {
+      from: () => ({
+        select: () => ({
+          order: () => ({
+            range: async (from: number, to: number) => {
+              ranges.push([from, to]);
+              const end = Math.min(to + 1, total, from + 1000);
+              const data = Array.from({ length: Math.max(0, end - from) }, (_, i) => ({
+                node_id: `n${from + i}`,
+                make_name: GLOBAL_SCOPE,
+                model_name: GLOBAL_SCOPE,
+                mode: "hide",
+              }));
+              return { data, error: null };
+            },
+          }),
+        }),
+      }),
+    };
+    return { db: db as never, ranges };
+  }
+
+  it("reads past the 1,000-row cap a plain select stops at", async () => {
+    const { db, ranges } = fakeDb(1208);
+    const rows = await loadRepairExclusionRows(db);
+    expect(rows).toHaveLength(1208);
+    expect(rows.at(-1)?.node_id).toBe("n1207");
+    expect(ranges).toEqual([[0, 999], [1000, 1999]]);
+  });
+
+  it("stops after one read when everything fits", async () => {
+    const { db, ranges } = fakeDb(12);
+    expect(await loadRepairExclusionRows(db)).toHaveLength(12);
+    expect(ranges).toHaveLength(1);
   });
 });
