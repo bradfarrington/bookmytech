@@ -47,7 +47,7 @@ export default async function MechanicJobDetailPage({ params }: PageProps) {
        address_line_1, address_line_2,
        customer_name, customer_phone, special_instructions,
        cancellation_reason, reschedule_status, reschedule_proposed_at,
-       repair_description, service_duration_hours, mileage, hourly_rate_pence,
+       repair_node_id, repair_description, vehicle_raw_duration_hours, service_duration_hours, mileage, hourly_rate_pence,
        credit_applied_pence, discount_pence`,
     )
     .eq("id", id)

@@ -108,7 +108,7 @@ export default async function BookingDetailPage({ params }: PageProps) {
        commission_rate, platform_fee_pence, mechanic_payout_pence, credit_applied_pence,
        customer_name, customer_email,
        vehicle_reg, vehicle_make, vehicle_model, mechanic_id,
-       repair_description,
+       repair_node_id, repair_description, vehicle_raw_duration_hours,
        scheduled_at, slot_window, candidate_days, created_at, address_line_1, address_line_2, parking_type,
        special_instructions, stripe_payment_intent_id, mileage`,
     )
