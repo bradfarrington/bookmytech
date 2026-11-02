@@ -4,6 +4,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getRevisionFor } from "@/lib/revisions/customer";
 import { formatJobNumber } from "@/lib/utils";
 import { PageHeader, Screen } from "@/components/dashboard/ui";
+import { diffRevision } from "@/lib/revisions/diff";
+import { customerSafeDiff, customerSafeRevision } from "@/lib/revisions/load";
 import { RevisionApproval } from "./_components/revision-approval";
 
 export const dynamic = "force-dynamic";
@@ -34,7 +36,8 @@ export default async function CustomerRevisionPage({ params }: { params: Promise
     <Screen>
       <PageHeader title="Revised job" backHref={`/dashboard/bookings/${booking.id}`} />
       <RevisionApproval
-        revision={revision}
+        revision={customerSafeRevision(revision)}
+        diff={customerSafeDiff(diffRevision(revision.before, revision.after))}
         bookingRef={formatJobNumber(booking.job_number)}
         bookingStatus={booking.status}
         mechanicName={mech?.full_name ?? "Your mechanic"}

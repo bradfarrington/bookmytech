@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -20,7 +20,7 @@ import {
 import { HoldPayment, useResumeHold } from "@/components/customer/hold-payment";
 import { cn, formatPrice } from "@/lib/utils";
 import { REVISION_STATUS_LABEL, isRevisionExpired } from "@/lib/revisions/status";
-import { customerDirectionSentence, diffRevision, differenceLabel } from "@/lib/revisions/diff";
+import { customerDirectionSentence, differenceLabel, type RevisionDiff } from "@/lib/revisions/diff";
 import type { RevisionView } from "@/lib/revisions/load";
 import type { RevisionLine, RevisionPart } from "@/lib/revisions/snapshot";
 import { approveRevision, confirmRevisionPayment, declineRevision } from "@/app/actions/customer-revisions";
@@ -34,7 +34,10 @@ import { approveRevision, confirmRevisionPayment, declineRevision } from "@/app/
 // building blocks. The stages, calls and redirects are unchanged.
 
 interface RevisionApprovalProps {
+  /** Already customer-safe (customerSafeRevision): totals only. */
   revision: RevisionView;
+  /** Diffed on the server from the full revision, then made customer-safe. */
+  diff: RevisionDiff;
   bookingRef: string;
   bookingStatus: string;
   mechanicName: string;
@@ -48,11 +51,10 @@ type Stage =
   | { phase: "confirming" }
   | { phase: "done"; outcome: "approved" | "declined" };
 
-export function RevisionApproval({ revision, bookingRef, bookingStatus, mechanicName, customerName, customerEmail }: RevisionApprovalProps) {
+export function RevisionApproval({ revision, diff, bookingRef, bookingStatus, mechanicName, customerName, customerEmail }: RevisionApprovalProps) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [stage, setStage] = useState<Stage>({ phase: "review" });
-  const diff = useMemo(() => diffRevision(revision.before, revision.after), [revision]);
 
   const open = revision.status === "sent" && !isRevisionExpired(revision);
   const dearer = revision.differencePence > 0;
@@ -145,7 +147,7 @@ export function RevisionApproval({ revision, bookingRef, bookingStatus, mechanic
       <DiffSection title="Still on the job" lines={diff.lines.kept} parts={diff.parts.kept} />
       {revision.after.oil && (
         <Caption>
-          Includes engine oil · {revision.after.oil.litres} L × {formatPrice(revision.after.oil.pencePerLitre)}
+          Includes engine oil · {revision.after.oil.litres} L
         </Caption>
       )}
 
@@ -304,8 +306,9 @@ function DiffSection({
               </>
             }
             titleClassName={titleClassName}
-            caption={l.kind === "product" ? "Fixed price" : `${l.chargedHours} h labour`}
-            trailing={<span className={price}>{formatPrice(l.linePence)}</span>}
+            // Labour is named by its hours, never priced: the customer sees the totals only.
+            caption={l.kind === "product" ? "Fixed price" : `${l.chargedHours} h labour · included`}
+            trailing={l.kind === "product" ? <span className={price}>{formatPrice(l.linePence)}</span> : undefined}
           />
         ))}
         {parts.map((p, i) => (
@@ -314,8 +317,8 @@ function DiffSection({
             leading={strike ? undefined : <Tile icon={Package} size="sm" />}
             title={p.name}
             titleClassName={titleClassName}
-            caption={p.quantity > 1 ? `Part × ${p.quantity}` : "Part"}
-            trailing={<span className={price}>{formatPrice(p.linePence)}</span>}
+            // Named, never priced: the customer sees the job's total, not what a part costs.
+            caption={p.quantity > 1 ? `Part × ${p.quantity} · included` : "Part · included"}
           />
         ))}
       </ListCard>

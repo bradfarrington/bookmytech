@@ -237,9 +237,8 @@ export default async function BookingDetailPage({ params }: { params: Promise<{ 
         <Section title="Payment">
           <ListCard>
             <DetailRow label="Total" value={formatPrice(booking.totalPence)} />
-            {booking.partsPricePence > 0 && (
-              <DetailRow label="Includes parts" value={formatPrice(booking.partsPricePence)} />
-            )}
+            {/* Parts are inside the total, never priced on their own to a customer. */}
+            {booking.partsPricePence > 0 && <DetailRow label="Includes parts" value="Yes" />}
             {booking.discountPence > 0 && (
               <DetailRow
                 label={booking.promoCode ? `Discount (${booking.promoCode})` : "Discount"}

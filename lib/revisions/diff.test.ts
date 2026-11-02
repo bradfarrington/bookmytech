@@ -194,8 +194,8 @@ describe("diffRevision", () => {
 
   it("packs the lists for the email and derives the follow-on lines (Task 38)", () => {
     const packed = packDiff(diff);
-    expect(packed.removed).toBe("Renew the front brake pads · 1 h|Front brake pads · £32");
-    expect(packed.added).toMatch(/^Renew the front wheel bearing · 1.1 h\|Wheel bearing kit · £45$/);
+    expect(packed.removed).toBe("Renew the front brake pads · 1 h|Front brake pads");
+    expect(packed.added).toMatch(/^Renew the front wheel bearing · 1.1 h\|Wheel bearing kit$/);
     const follow = followOnLinesFromRevision(diff);
     expect(follow).toEqual([
       { kind: "labour", description: "Renew the front brake pads", hours: 1, quantity: 1, unitPence: null, nodeId: "pads", partId: null },

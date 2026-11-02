@@ -122,8 +122,6 @@ export function QuoteApproval({
           ? { tone: "pending", label: "Waiting on you" }
           : { tone: quote.status === "approved" ? "success" : "neutral", label: QUOTE_STATUS_LABEL[quote.status] };
 
-  const splitAddsUp = quote.labourPence > 0 && quote.partsPence > 0 && quote.labourPence + quote.partsPence === quote.totalPence;
-
   return (
     <Stack>
       <div>
@@ -160,9 +158,9 @@ export function QuoteApproval({
           {quote.lines.map((l) => {
             const detail =
               l.kind === "labour"
-                ? `Labour · ${l.hours} h × ${formatPrice(l.unitPence)}`
+                ? `Labour · ${l.hours} h · included`
                 : l.kind === "part"
-                  ? `Part${l.quantity > 1 ? ` × ${l.quantity}` : ""}${l.quantity > 1 ? ` · ${formatPrice(l.unitPence)} each` : ""}`
+                  ? `Part${l.quantity > 1 ? ` × ${l.quantity}` : ""} · included`
                   : l.quantity > 1
                     ? `× ${l.quantity} · ${formatPrice(l.unitPence)} each`
                     : "";
@@ -172,8 +170,11 @@ export function QuoteApproval({
                 leading={<Tile icon={l.kind === "labour" ? Clock : l.kind === "part" ? Package : Wrench} size="sm" />}
                 title={l.description}
                 caption={detail || undefined}
+                // Labour and parts are named, never priced: the customer sees only the total.
                 trailing={
-                  <span className="shrink-0 text-sm font-bold tabular-nums text-text-primary">{formatPrice(l.linePence)}</span>
+                  l.kind === "labour" || l.kind === "part" ? undefined : (
+                    <span className="shrink-0 text-sm font-bold tabular-nums text-text-primary">{formatPrice(l.linePence)}</span>
+                  )
                 }
               />
             );
@@ -185,11 +186,6 @@ export function QuoteApproval({
         <div className="flex items-center justify-between gap-4">
           <div className="min-w-0 text-xs leading-4 text-white/60">
             <div>Total</div>
-            {splitAddsUp && (
-              <div className="mt-0.5">
-                Labour {formatPrice(quote.labourPence)} · Parts {formatPrice(quote.partsPence)}
-              </div>
-            )}
           </div>
           <div className="font-display text-[28px] font-extrabold leading-8 tracking-[-0.7px] text-white tabular-nums">
             {formatPrice(quote.totalPence)}

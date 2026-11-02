@@ -170,13 +170,12 @@ export default async function MatchPage({ searchParams }: MatchPageProps) {
         }
         combinedRawHours={multiJobs ? quote.combinedRawHours : undefined}
         combineSource={multiJobs ? quote.combineSource : null}
-        oil={quote.oil}
+        oil={quote.oil && quote.oil.pence > 0 ? { litres: quote.oil.litres, source: quote.oil.source } : null}
         parts={quote.parts.map((part, index) => ({
           key: `${part.nodeId}:${part.genartId}:${part.position ?? "any"}:${index}`,
           name: partGroupName(part),
           brand: part.brand,
           quantity: part.quantity,
-          linePence: part.linePence,
           estimated: part.source === "estimate",
         }))}
         includes={singleProduct ? productIncludes(singleProduct.description) : undefined}

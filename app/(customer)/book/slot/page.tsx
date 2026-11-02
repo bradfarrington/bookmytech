@@ -92,12 +92,9 @@ export default async function SlotPage({ searchParams }: SlotPageProps) {
         priceExtras={[
           ...quote.parts.map((part, index) => ({
             key: `part:${index}`,
-            label: `${partGroupName(part)}${part.brand ? ` · ${part.brand}` : ""}${part.quantity === 2 ? " · pair" : part.quantity > 2 ? ` · × ${part.quantity}` : ""}${part.source === "estimate" ? " · estimated" : ""}`,
-            pence: part.linePence,
+            label: `${partGroupName(part)}${part.brand ? ` · ${part.brand}` : ""}${part.quantity === 2 ? " · pair" : part.quantity > 2 ? ` · × ${part.quantity}` : ""}`,
           })),
-          ...(quote.oil && quote.oil.pence > 0
-            ? [{ key: "oil", label: `Engine oil · ${quote.oil.litres} L`, pence: quote.oil.pence }]
-            : []),
+          ...(quote.oil && quote.oil.pence > 0 ? [{ key: "oil", label: `Engine oil · ${quote.oil.litres} L` }] : []),
         ]}
         pricePence={quote.breakdown.totalPence}
         preferredMechanicId={base.pref}

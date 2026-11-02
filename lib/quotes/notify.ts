@@ -25,13 +25,19 @@ export interface QuoteBookingContact {
   mechanic_id: string | null;
 }
 
-/** "Renew the rear brake pads · 0.8 h × £60|Rear brake pads × 1 · £32.00" for the email's packed-list renderer. */
+/**
+ * "Renew the rear brake pads · 0.8 h|Rear brake pads × 2" for the email's
+ * packed-list renderer. Labour and parts are named, never priced: the customer
+ * sees what they cost only as the total.
+ */
 export function packQuoteLines(quote: QuoteView): string {
   return quote.lines
     .map((l) =>
       l.kind === "labour"
-        ? `${l.description} · ${l.hours ?? 0} h × ${formatPrice(l.unitPence)} = ${formatPrice(l.linePence)}`
-        : `${l.description}${l.quantity > 1 ? ` × ${l.quantity}` : ""} · ${formatPrice(l.linePence)}`,
+        ? `${l.description} · ${l.hours ?? 0} h`
+        : l.kind === "part"
+          ? `${l.description}${l.quantity > 1 ? ` × ${l.quantity}` : ""}`
+          : `${l.description}${l.quantity > 1 ? ` × ${l.quantity}` : ""} · ${formatPrice(l.linePence)}`,
     )
     .join("|");
 }

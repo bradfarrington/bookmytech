@@ -82,10 +82,13 @@ function lineText(l: RevisionLine): string {
   return l.kind === "product" ? `${name} · fixed price ${formatPrice(l.linePence)}` : `${name} · ${l.chargedHours} h`;
 }
 function partText(p: RevisionPart): string {
-  return `${p.name}${p.quantity > 1 ? ` × ${p.quantity}` : ""} · ${formatPrice(p.linePence)}`;
+  return `${p.name}${p.quantity > 1 ? ` × ${p.quantity}` : ""}`;
 }
 
-/** Packed "a|b|c" lists for the email renderer. */
+/**
+ * Packed "a|b|c" lists for the customer's email. Labour by hours and parts by
+ * name, never by price: a customer sees only the totals.
+ */
 export function packDiff(diff: RevisionDiff): { removed: string; added: string; kept: string } {
   const pack = (items: string[]) => items.join("|");
   return {

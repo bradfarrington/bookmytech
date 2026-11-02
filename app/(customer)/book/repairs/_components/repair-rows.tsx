@@ -201,7 +201,7 @@ export function RepairRows({
                       : `Estimated ${node.billedHours} hour${node.billedHours === 1 ? "" : "s"} at our hourly rate`}
                     {node.oil && node.oil.pence > 0 && (
                       <>
-                        {" · "}includes engine oil, {node.oil.litres} L × {formatPrice(node.oil.pencePerLitre)}
+                        {" · "}includes engine oil, {node.oil.litres} L
                       </>
                     )}
                   </p>

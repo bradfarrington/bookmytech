@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { parseSnapshot, type RevisionSnapshot } from "./snapshot";
+import type { RevisionDiff } from "./diff";
+import { parseSnapshot, type RevisionLine, type RevisionPart, type RevisionSnapshot } from "./snapshot";
 import { isRevisionExpired, type RevisionStatus } from "./status";
 
 // Reads revisions for a booking into plain, serialisable views (Task 37).
@@ -118,5 +119,41 @@ export function revisionMoney(revisions: readonly RevisionView[], now: Date = ne
     approved,
     declined: pending ? null : declined,
     holdQuoteIds: new Set(revisions.map((r) => r.holdQuoteId).filter((v): v is string => Boolean(v))),
+  };
+}
+
+/**
+ * A revision as the customer's browser may see it: the before and after
+ * totals and what the work is, never what a part, the oil or the labour
+ * costs, nor the platform's cut. Zeroed rather than dropped so the shape is
+ * unchanged. Diff it BEFORE redacting (`diffRevision` keys new parts on their
+ * price). The web page only — the mobile API's shape is a contract.
+ */
+const safeLine = (l: RevisionLine): RevisionLine => (l.kind === "product" ? l : { ...l, linePence: 0 });
+const safePart = (p: RevisionPart): RevisionPart => ({ ...p, unitPence: 0, linePence: 0 });
+
+export function customerSafeRevision(revision: RevisionView): RevisionView {
+  const snap = (s: RevisionSnapshot): RevisionSnapshot => ({
+    ...s,
+    lines: s.lines.map(safeLine),
+    parts: s.parts.map(safePart),
+    catalogueParts: undefined,
+    oil: s.oil ? { ...s.oil, pencePerLitre: 0, pence: 0 } : null,
+    hourlyRatePence: 0,
+    commissionRate: 0,
+    basePricePence: 0,
+    partsPricePence: 0,
+    platformFeePence: 0,
+    mechanicPayoutPence: 0,
+  });
+  return { ...revision, before: snap(revision.before), after: snap(revision.after) };
+}
+
+/** The same redaction for a diff made from the unredacted revision. */
+export function customerSafeDiff(diff: RevisionDiff): RevisionDiff {
+  return {
+    ...diff,
+    lines: { added: diff.lines.added.map(safeLine), removed: diff.lines.removed.map(safeLine), kept: diff.lines.kept.map(safeLine) },
+    parts: { added: diff.parts.added.map(safePart), removed: diff.parts.removed.map(safePart), kept: diff.parts.kept.map(safePart) },
   };
 }

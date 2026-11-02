@@ -207,10 +207,10 @@ function returnParams(c: ConfirmCommon): Record<string, string> {
 }
 
 /** One line inside the price that isn't labour: a part, or engine oil (Task 43). */
+/** A part or the engine oil inside the price. Named only: a customer never sees what one costs. */
 export interface PriceExtraLine {
   key: string;
   label: string;
-  pence: number;
 }
 
 interface ConfirmCheckoutProps {
@@ -1136,7 +1136,7 @@ function PriceSummary({
           {extras!.map((line) => (
             <div key={line.key} className="flex items-start justify-between gap-3 text-text-muted">
               <span className="min-w-0">{line.label}</span>
-              <span className="shrink-0 text-xs">{formatPrice(line.pence)}</span>
+              <span className="shrink-0 text-xs">included</span>
             </div>
           ))}
         </div>

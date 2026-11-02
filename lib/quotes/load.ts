@@ -186,3 +186,24 @@ export function quoteMoney(quotes: readonly QuoteView[]): {
     pendingNow: quotes.find((q) => q.kind === "now" && q.status === "sent") ?? null,
   };
 }
+
+/**
+ * A quote as the customer's browser may see it: what the labour and each part
+ * cost, and the platform's cut, are blanked (zeroed, so the shape is
+ * unchanged). The page shows labour and parts by name and the quote by its
+ * total only; this keeps those
+ * figures out of the page payload too. The web page only — the mobile API's
+ * response shape is a contract and is not changed here.
+ */
+export function customerSafeQuote(quote: QuoteView): QuoteView {
+  return {
+    ...quote,
+    labourPence: 0,
+    partsPence: 0,
+    hourlyRatePence: 0,
+    commissionRate: 0,
+    platformFeePence: 0,
+    mechanicPayoutPence: 0,
+    lines: quote.lines.map((l) => (l.kind === "labour" || l.kind === "part" ? { ...l, unitPence: 0, linePence: 0 } : l)),
+  };
+}

@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getQuoteFor } from "@/lib/quotes/customer";
+import { customerSafeQuote } from "@/lib/quotes/load";
 import { formatBookingSlot } from "@/lib/slots";
 import { formatJobNumber } from "@/lib/utils";
 import { PageHeader, Screen } from "@/components/dashboard/ui";
@@ -34,7 +35,7 @@ export default async function CustomerQuotePage({ params }: { params: Promise<{ 
     <Screen>
       <PageHeader title="Quote" backHref={`/dashboard/bookings/${booking.id}`} />
       <QuoteApproval
-        quote={quote}
+        quote={customerSafeQuote(quote)}
         bookingRef={formatJobNumber(booking.job_number)}
         bookingStatus={booking.status}
         mechanicName={mech?.full_name ?? "Your mechanic"}

@@ -21,22 +21,22 @@ export interface PriceHeroLine {
   linePence?: number;
 }
 
-/** The engine-oil line a servicing product adds (Task 31). */
+/**
+ * The engine-oil line a servicing product adds (Task 31). Litres only: what
+ * oil or a part costs us is never shown to a customer, only the total.
+ */
 export interface PriceHeroOil {
   litres: number;
-  pencePerLitre: number;
-  pence: number;
   source: "haynespro" | "default";
 }
 
-/** A supplier part priced into the job (Task 43). */
+/** A supplier part priced into the job (Task 43). Named, never priced, to the customer. */
 export interface PriceHeroPart {
   key: string;
   /** "Brake disc (front)". */
   name: string;
   brand: string | null;
   quantity: number;
-  linePence: number;
   /** No supplier priced it for this car, so it's estimated from other cars of the same model (Task 72). */
   estimated?: boolean;
 }
@@ -104,7 +104,7 @@ export function PriceHero({
   const multiItems = groups.length > 1;
   const minimumApplied =
     multiJobs && estimatedHours != null && combinedRawHours != null && estimatedHours > combinedRawHours;
-  const hasOil = oil != null && oil.pence > 0;
+  const hasOil = oil != null && oil.litres > 0;
   const hasParts = (parts?.length ?? 0) > 0;
 
   return (
@@ -179,20 +179,16 @@ export function PriceHero({
             </p>
             <ul className="mt-1.5 flex flex-col gap-1">
               {parts!.map((part) => (
-                <li key={part.key} className="flex items-start justify-between gap-3">
-                  <span className="min-w-0 text-blue-100">
-                    {part.name}
-                    {part.brand ? ` · ${part.brand}` : ""}
-                    {part.quantity === 2 ? " · pair" : part.quantity > 2 ? ` · × ${part.quantity}` : ""}
-                    {part.estimated && <span className="text-blue-200"> · estimated</span>}
-                  </span>
-                  <span className="shrink-0 font-semibold text-white">{formatPrice(part.linePence)}</span>
+                <li key={part.key} className="text-blue-100">
+                  {part.name}
+                  {part.brand ? ` · ${part.brand}` : ""}
+                  {part.quantity === 2 ? " · pair" : part.quantity > 2 ? ` · × ${part.quantity}` : ""}
                 </li>
               ))}
             </ul>
             <p className="mt-1.5 text-xs text-blue-200">
               {parts!.some((part) => part.estimated)
-                ? "Parts for your exact vehicle, included in the price above. Parts marked estimated are our best price for your vehicle; if one costs more, your mechanic will ask you before going ahead."
+                ? "Parts for your exact vehicle, included in the price above. If a part costs more than we've allowed for, your mechanic will ask you before going ahead."
                 : "Parts for your exact vehicle, included in the price above"}
             </p>
           </div>
@@ -200,11 +196,11 @@ export function PriceHero({
 
         {/* Engine oil — a servicing product's parts line */}
         {hasOil && (
-          <div className="mt-3 flex items-start justify-between gap-3 rounded-xl bg-white/10 px-3 py-2.5 text-sm">
+          <div className="mt-3 rounded-xl bg-white/10 px-3 py-2.5 text-sm">
             <div className="min-w-0">
               <p className="flex items-center gap-1.5 font-medium text-white">
                 <Droplets size={14} className="shrink-0 text-blue-200" />
-                Engine oil · {oil.litres} L × {formatPrice(oil.pencePerLitre)}
+                Engine oil · {oil.litres} L
               </p>
               <p className="mt-0.5 text-xs text-blue-200">
                 {oil.source === "haynespro"
@@ -212,7 +208,6 @@ export function PriceHero({
                   : "Estimated: your mechanic adjusts it to what your engine takes"}
               </p>
             </div>
-            <span className="shrink-0 font-semibold text-white">{formatPrice(oil.pence)}</span>
           </div>
         )}
 
