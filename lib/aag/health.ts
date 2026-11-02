@@ -4,14 +4,21 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 //
 // Same design as lib/haynespro/health.ts, for the same reason: a supplier
 // refusing our credentials must be visible on an admin page, not only in a
-// server log nobody reads. One row of operational state in `platform_settings`,
-// shared across serverless instances.
+// server log nobody reads. One row of operational state in `platform_settings`
+// PER ENVIRONMENT, shared across that environment's serverless instances. Dev
+// and live share one database, and AAG's sandbox answers a local machine but
+// not the deployed site, so a single shared row let one environment's failure
+// show up on the other's page.
 //
 // NB: no `import "server-only"` here, deliberately — lib/aag/client.ts imports
 // this at its top level and the unit tests import that file for its pure
 // helpers. Everything here takes its Supabase client as a PARAMETER.
 
-const HEALTH_SETTINGS_KEY = "aag_health";
+const HEALTH_SETTINGS_PREFIX = "aag_health";
+
+function healthKey(): string {
+  return `${HEALTH_SETTINGS_PREFIX}:${aagHealthSource()}`;
+}
 
 export interface AagHealth {
   state: "ok" | "auth_failed" | "unreachable";
@@ -25,9 +32,7 @@ export interface AagHealth {
   baseUrl: string | null;
   /**
    * Where the call was made from: "production", "preview", "development"
-   * (Vercel's VERCEL_ENV) or "local". The row is shared by every environment,
-   * and the sandbox answers a local machine but never Vercel, so a banner
-   * that doesn't say where it was seen misleads. Null on rows written before.
+   * (VERCEL_ENV) or "local". Also the suffix of the row's key.
    */
   source: string | null;
 }
@@ -35,22 +40,6 @@ export interface AagHealth {
 /** This process's environment, as `AagHealth.source` records it. */
 export function aagHealthSource(): string {
   return process.env.VERCEL_ENV || "local";
-}
-
-/** "the live site" — a source as an admin reads it. */
-export function describeAagHealthSource(source: string | null): string | null {
-  switch (source) {
-    case null:
-      return null;
-    case "production":
-      return "the live site";
-    case "preview":
-      return "a preview deployment";
-    case "local":
-      return "a local dev server";
-    default:
-      return `the ${source} environment`;
-  }
 }
 
 /**
@@ -65,19 +54,19 @@ export async function recordAagHealth(
     const value: AagHealth = { ...health, source: aagHealthSource(), at: new Date().toISOString() };
     await db
       .from("platform_settings")
-      .upsert({ key: HEALTH_SETTINGS_KEY, value, updated_at: new Date().toISOString() });
+      .upsert({ key: healthKey(), value, updated_at: new Date().toISOString() });
   } catch {
     // Diagnostics only.
   }
 }
 
-/** Read the last recorded state. Returns null when nothing has been recorded. */
+/** Read this environment's last recorded state. Null when nothing has been recorded. */
 export async function readAagHealth(db: SupabaseClient): Promise<AagHealth | null> {
   try {
     const { data } = await db
       .from("platform_settings")
       .select("value")
-      .eq("key", HEALTH_SETTINGS_KEY)
+      .eq("key", healthKey())
       .maybeSingle();
     const raw = data?.value as Partial<AagHealth> | null | undefined;
     if (!raw || typeof raw.state !== "string") return null;

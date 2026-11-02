@@ -255,7 +255,7 @@ export type AagCallResult<T> = { ok: true; body: T } | { ok: false; errorCode: s
 /** Why AAG's gateway (not its API) turned us away with a 401/403. Pure. */
 export function describeAagGatewayRefusal(status: number, sandbox: boolean): string {
   return sandbox
-    ? `AAG's sandbox turned this server away with HTTP ${status}. It only answers allowlisted IP addresses (the development connection), never Vercel, so this is expected anywhere but a local dev server. Live AAG has no allowlist.`
+    ? `AAG's sandbox refused this connection (HTTP ${status}). The sandbox only accepts requests from approved addresses, and this server isn't one of them. AAG's live system doesn't have this restriction.`
     : `AAG's gateway refused us with HTTP ${status}. Either the API-key header is wrong or our address isn't on their allowlist.`;
 }
 

@@ -1,10 +1,11 @@
-import { AlertTriangle, CheckCircle2, WifiOff } from "lucide-react";
-import { describeAagHealthSource, type AagHealth } from "@/lib/aag/health";
+import { AlertTriangle, WifiOff } from "lucide-react";
+import type { AagHealth } from "@/lib/aag/health";
 
-// Operational status of the AAG parts integration (Task 40) — the same
-// four-state banner as the HaynesPro one on /admin/vehicles, for the same
-// reason: a supplier refusing our credentials must be visible somewhere a
-// person looks, not only in a server log.
+// Operational status of the AAG parts integration (Task 40): a supplier
+// refusing us must be visible somewhere a person looks, not only in a server
+// log. It renders ONLY when something is wrong — unconfigured, refused or
+// unreachable. A working connection shows nothing. The status read is this
+// environment's own (lib/aag/health.ts), so dev never shows live's failure.
 
 function relative(iso: string): string {
   const then = new Date(iso).getTime();
@@ -18,22 +19,11 @@ function relative(iso: string): string {
   return `${days} day${days === 1 ? "" : "s"} ago`;
 }
 
-/**
- * "Seen 4 minutes ago on the live site." The status row is shared by every
- * environment, so a failure seen elsewhere says so rather than reading as this
- * one's: the sandbox refuses Vercel but answers a local dev server.
- */
-function Seen({ health, here }: { health: AagHealth; here: string }) {
-  const where = describeAagHealthSource(health.source);
-  const elsewhere = health.source != null && health.source !== here;
+function Seen({ health }: { health: AagHealth }) {
   return (
     <>
       Seen {relative(health.at)}
-      {where && <> on {where}</>}
       {health.errorCode && <> · error code {health.errorCode}</>}.
-      {elsewhere && (
-        <> This page is running on {describeAagHealthSource(here)}, so it may not apply here. Run a check below to find out.</>
-      )}
     </>
   );
 }
@@ -42,13 +32,10 @@ export function AagStatus({
   configured,
   sandbox,
   health,
-  here,
 }: {
   configured: boolean;
   sandbox: boolean;
   health: AagHealth | null;
-  /** This environment, as AagHealth.source records it. */
-  here: string;
 }) {
   const host = sandbox ? "AAG's sandbox" : "AAG live";
 
@@ -78,7 +65,7 @@ export function AagStatus({
           </p>
           <p className="mt-0.5 text-red-800">{health.detail}</p>
           <p className="mt-1.5 text-red-800">
-            <Seen health={health} here={here} />
+            <Seen health={health} />
           </p>
         </div>
       </div>
@@ -92,31 +79,13 @@ export function AagStatus({
         <div>
           <p className="font-semibold">We couldn&apos;t reach {host}.</p>
           <p className="mt-0.5 text-amber-800">
-            {health.detail} <Seen health={health} here={here} />
+            {health.detail} <Seen health={health} />
           </p>
         </div>
       </div>
     );
   }
 
-  if (health?.state === "ok") {
-    return (
-      <div className="flex items-center gap-2.5 rounded-button border border-border bg-surface-card px-4 py-2.5 text-sm text-text-secondary">
-        <CheckCircle2 size={16} className="shrink-0 text-success" />
-        <span>
-          {host} connected. Last successful call {relative(health.at)}.
-        </span>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex items-center gap-2.5 rounded-button border border-border bg-surface-card px-4 py-2.5 text-sm text-text-muted">
-      <CheckCircle2 size={16} className="shrink-0 text-text-disabled" />
-      <span>
-        {host} is configured. No call recorded yet. Run a check below and the
-        status will show here.
-      </span>
-    </div>
-  );
+  // Working, or not called yet: nothing to flag.
+  return null;
 }
