@@ -142,8 +142,9 @@ You are working on **Book My Tech**, a UK mobile-mechanic booking platform. This
   Service, Oil and Filter, Front Brake Pads and Discs, clutch, timing belt kit,
   front shocks, battery. Avoid rear pads/discs/shoes (the Fiesta has rear
   drums), and battery check/charge jobs (they charge a whole battery).
-- `/admin/parts/aag-check` now says which environment saw each status and
-  gives each check's real answer ("no parts for this vehicle" vs a failure).
+- `/admin/parts/aag-check` keeps a status per environment (`aag_health:<env>`)
+  and shows a banner only when AAG is failing there — on live that's expected
+  until the live credentials arrive. It gives each check's real answer ("no parts for this vehicle" vs a failure).
 
 **Estimated part prices (Task 72)**
 - When AAG has no price for a part on a car, it's estimated from AAG's prices
