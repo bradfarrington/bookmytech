@@ -71,6 +71,8 @@ interface BookingBody {
    * A follow-on quote (Task 34, additive). When set, the price, lines and
    * vehicle come from the quote and the quoting mechanic is offered the job
    * first; `vehicleReg`, `vehicleMake` and the repair ids may be omitted.
+   * Task 75: also a CUSTOM quote's id (GET /custom-quotes, `canBook`): price,
+   * vehicle and job name come from it, and it is offered to every mechanic.
    */
   quoteId?: unknown;
   /**

@@ -66,7 +66,7 @@ export default async function SlotPage({ searchParams }: SlotPageProps) {
     <div className="flex flex-col gap-6">
       <StepHeader
         backHref={addressHref}
-        title={base.quote ? "Confirm your return visit" : "Confirm booking"}
+        title={ctx.source === "follow_on" ? "Confirm your return visit" : "Confirm booking"}
         subtitle={`${ctx.summary} · ${ctx.vehicle}`}
       />
 
@@ -76,7 +76,7 @@ export default async function SlotPage({ searchParams }: SlotPageProps) {
         initialTime={time}
         timeHref={`/book/time?${stepQuery(base, time)}`}
         addressHref={addressHref}
-        priceHref={base.quote ? null : `/book/match?${stepQuery(base)}`}
+        priceHref={base.quote ? null : ctx.priceHref}
         reg={base.reg}
         make={(base.make ?? "").toUpperCase()}
         model={base.model}

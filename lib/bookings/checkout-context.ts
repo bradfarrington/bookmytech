@@ -6,6 +6,7 @@ import { vehicleLabel } from "@/lib/utils";
 import { quoteRepairsResult, type RepairsQuote } from "@/lib/haynespro/repair-booking";
 import { parseRepairIds } from "./repair-ids";
 import { quoteFollowOn } from "@/lib/quotes/book-follow-on";
+import { quoteCustomQuoteForBooking } from "@/lib/custom-quotes/server";
 import { stepQuery, type BookingBaseParams } from "./step-params";
 
 // The job being booked, loaded once per step of the second half of the funnel
@@ -22,7 +23,7 @@ export interface CheckoutSearchParams {
   model?: string;
   postcode?: string;
   pref?: string;
-  /** A follow-on quote (Task 34). */
+  /** A follow-on quote (Task 34), or a custom quote (Task 75). */
   quote?: string;
 }
 
@@ -33,6 +34,10 @@ export interface CheckoutContext {
   summary: string;
   /** "AB12 CDE · Ford Focus". */
   vehicle: string;
+  /** Where the price came from: the catalogue, a mechanic's return-visit quote, or a custom quote (Task 75). */
+  source: "catalogue" | "follow_on" | "custom";
+  /** Where "back" goes from the first step after the price. */
+  priceHref: string;
 }
 
 /**
@@ -53,9 +58,32 @@ export async function loadCheckoutContext(
       data: { user },
     } = await session.auth.getUser();
     if (!user) redirect(`/login?next=${encodeURIComponent(`${stepPath}?quote=${quoteId}`)}`);
+    const caller = { userId: user.id, email: user.email ?? null };
+
+    // A custom quote the admin priced (Task 75): the price, the vehicle and the
+    // description come from it; offered to every mechanic.
+    const custom = await quoteCustomQuoteForBooking(quoteId, caller, createAdminClient());
+    if (custom) {
+      if (!custom.ok) redirect(`/book/quote/${quoteId}`);
+      const row = custom.source;
+      return withLabels(
+        {
+          reg: row.vehicle_reg,
+          repairs: [],
+          make: row.vehicle_make ?? undefined,
+          model: row.vehicle_model ?? undefined,
+          postcode: params.postcode?.trim() || row.postcode || undefined,
+          quote: quoteId,
+        },
+        custom.quote,
+        "custom",
+        `/book/quote/${quoteId}`,
+      );
+    }
+
     const followOn = await quoteFollowOn(
       quoteId,
-      { userId: user.id, email: user.email ?? null },
+      caller,
       createAdminClient(),
     );
     if (!followOn.ok) redirect(`/dashboard/quotes/${quoteId}`);
@@ -71,6 +99,8 @@ export async function loadCheckoutContext(
         quote: quoteId,
       },
       followOn.quote,
+      "follow_on",
+      `/dashboard/quotes/${quoteId}`,
     );
   }
 
@@ -91,24 +121,29 @@ export async function loadCheckoutContext(
     redirect(`/book/repairs?reg=${encodeURIComponent(reg)}`);
   }
   const quote = result.quote;
-  return withLabels(
-    {
-      reg,
-      repairs: quote.itemIds,
-      make: params.make,
-      model: params.model,
-      postcode: params.postcode?.trim() || undefined,
-      pref: params.pref,
-    },
-    quote,
-  );
+  const base: BookingBaseParams = {
+    reg,
+    repairs: quote.itemIds,
+    make: params.make,
+    model: params.model,
+    postcode: params.postcode?.trim() || undefined,
+    pref: params.pref,
+  };
+  return withLabels(base, quote, "catalogue", `/book/match?${stepQuery(base)}`);
 }
 
-function withLabels(base: BookingBaseParams, quote: RepairsQuote): CheckoutContext {
+function withLabels(
+  base: BookingBaseParams,
+  quote: RepairsQuote,
+  source: CheckoutContext["source"],
+  priceHref: string,
+): CheckoutContext {
   return {
     base,
     quote,
     summary: quote.items.length > 1 ? `${quote.items.length} jobs` : quote.description,
     vehicle: vehicleLabel(base.reg, base.make, base.model),
+    source,
+    priceHref,
   };
 }

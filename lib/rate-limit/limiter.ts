@@ -83,6 +83,13 @@ export const RATE_LIMIT_DEFAULTS = {
   // Dispute photo uploads. Each one puts up to 10 MB into the job-media bucket
   // that we then store forever, so the bucket — not CPU — is what's being
   // protected. A dispute takes at most MAX_DISPUTE_PHOTOS (6) images.
+  // Asking for a quote for a job we don't list (Task 75). Guests can ask, and
+  // every request emails the admin and the customer, so this is tight: a real
+  // customer asks once or twice.
+  mobile_quoterequest_user_burst: 3,
+  mobile_quoterequest_user_daily: 10,
+  mobile_quoterequest_ip_burst: 4,
+  mobile_quoterequest_ip_daily: 20,
   mobile_upload_user_burst: 10,
   mobile_upload_user_daily: 60,
   mobile_upload_ip_burst: 20,

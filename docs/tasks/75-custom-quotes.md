@@ -1,31 +1,63 @@
 # Task 75: Custom quotes from the admin dashboard
 
-**Status:** 📝 **Planned, not started (raised 2026-11-13).** Waiting on Brad's answers to "Open questions" before building.
+**Status:** 🟡 **Built 2026-11-13, not verified end to end.** Typecheck clean, 716 unit tests pass (new: `lib/custom-quotes/model.test.ts`), lint clean on every touched file, production build compiles. Checked on a dev server: the request page renders on desktop and phone, an unknown quote 404s, and `/book/time?quote=…` sends a signed-out visitor to sign in. **Migration `0089` is written, not applied.** Until it is, the admin Quotes page shows an error banner, a request fails politely, and nothing else changes. Deviation from the plan: the website quote page lives at `/book/quote/<id>` (sign-in `next=` only allows `/book` and `/dashboard`).
 
 ## Why (Brad, 2026-11-13)
 
 > "Is there a way I can add a custom quote so if the customer requests a quote on a job we don't list I can custom make it and email them for approval from my dashboard?"
 
-Not today. Every quote in the system (Task 33/34 `job_quotes`) is raised by a **mechanic** on an **existing booking**: `booking_id` and `mechanic_id` are required. There is nothing for "a customer asked us about a job the catalogue doesn't list".
+## Owner decisions (Brad, 2026-11-13)
 
-## Proposed shape
+1. **Yes** to an "Ask us for a quote" button for customers.
+2. Approving goes **straight to booking** (time, address, card pre-authorised, dispatched).
+3. **One total**, like every other price.
+4. Offered to **every mechanic** (broadcast), never a chosen one.
+5. Open **until either side cancels**: no expiry.
 
-Reuse Task 34's machinery, which already turns an approved quote into an ordinary booking ("priced from the quote instead of the catalogue, through the funnel from the slot step"). The difference is that an office quote has no original job and no mechanic.
+## What shipped
 
-1. **`custom_quotes`** (new table, admin-only RLS): customer (profile id when they have an account, else name, email and phone), vehicle (reg, make, model, looked up by reg as usual), lines (description and price, plus optional labour hours at the platform rate), a note, status (`draft` → `sent` → `approved` / `declined` / `expired` → `booked`), `expires_at`, a random link token, `booking_id` once booked, and a snapshot of the hourly and commission rates.
-2. **Admin**: `/admin/quotes` lists them by status. "New quote" is a form: find or enter the customer, enter the reg, add lines and see the total update live, add a note, then **Send**. Sending emails the customer a link (new `custom_quote_sent` template), and SMS too if they have a phone.
-3. **Customer**: the link opens `/quote/<token>` with the lines, total, note and expiry, plus **Approve and book** or **Decline**. Approve goes to `/book/slot?customQuote=<id>`: sign in or create an account (Task 61), pick a time and address, then the normal pre-auth hold and confirmation.
-4. **Funnel**: `resolveBookingQuote` (Task 34) gains a third source, the custom quote. It writes `bookings.source_custom_quote_id`, and dispatch broadcasts like any booking. Mobile: `quoteId`-style additive field on `/checkout/prepare` and `/bookings`.
-5. Optionally, **customers ask from the site**: a "Can't find your job? Ask us for a quote" link on the repair search's empty state and the browse page. The customer describes the job and gives their reg, and the request appears in `/admin/quotes` as a request to price.
+### Data: `0089_custom_quotes.sql`
 
-## Open questions for Brad
+`custom_quotes` and `bookings.source_custom_quote_id`; full description in `docs/02-data-model.md`. `requested → sent → booked`, or `declined` (customer) / `withdrawn` (admin). The hourly rate and commission are snapshotted when a quote is sent.
 
-1. **How do customers ask now**, and do you want the "Ask us for a quote" button (point 5) on the website, and later the app?
-2. **When the customer approves**, should it go straight into booking (pick a time, card pre-authorised, mechanic dispatched), or just mark it approved so you arrange the visit yourself?
-3. **How do you want to price it**: one total, or lines (labour hours at our rate, parts, fixed items)? If there are parts, does the mechanic buy them (as now) or do you?
-4. **Mechanic**: broadcast like every other job, or do you sometimes want to pick the mechanic?
-5. **Expiry**: how long should a quote stay open (14 days?)
+### Pricing and booking: one field, no new funnel
 
-## App work (when built)
+- `lib/custom-quotes/model.ts` (pure, tested): input cleaning, ownership (`customer_id`, or the account's email = the quote's email), `customQuoteRefusal`, and **`buildCustomQuote`**, which turns a sent quote into the same `RepairsQuote` the funnel already prices: one fixed line `q:<quote id>` at the total, the visit length, and the snapshotted commission.
+- **The quote's id rides in the existing `quoteId` field** (website `?quote=`, mobile `/checkout/prepare` and `/bookings`). `resolveBookingQuote` and `loadCheckoutContext` try `custom_quotes` first, then follow-on quotes. A uuid is never both. So the time, address and confirm steps, the 3-D Secure return, account credit, discount codes and the mobile endpoints all work unchanged.
+- `createBooking` takes the vehicle from the quote, sets no preferred mechanic (broadcast), appends "Quoted work: <details>" to the special instructions so the mechanic sees it, writes `source_custom_quote_id`, then marks the quote `booked`. The new job gets a `quote_approved` event (an existing type, so the apps already render it).
+- The time and confirm steps say "When suits you?" / "Confirm booking" (not "return visit"), and Back goes to the quote.
 
-A schema migration (`npm run db:types` in both apps), plus an optional customer-app screen for the quote link. The website flow works in a phone browser without app work.
+### Customer (website)
+
+- **"Ask us for a quote"**: a card under the repair list, a link under search results ("Not what you need?"), and one in the "Nothing matches" state. They carry the reg, make, model, postcode and search text.
+- **`/book/quote/request`**: describe the job, plus reg, postcode, name, email and mobile. Prefilled for a signed-in customer, whose request is tied to their account and email. Guests can ask. Rate-limited (`mobile_quoterequest_*`: 3–4 a minute, 10–20 a day). Emails the admin (`ADMIN_NOTIFY_EMAIL`) and the customer.
+- **`/book/quote/<id>`** (the link in the email): the price card, details, and **Book a time** (→ `/book/time?quote=<id>`; signed out → sign in, with "Create an account" prefilled). **Decline** / **Cancel my request** appear for the owner. Readable by anyone with the link (first name, car, price), but booking and declining need the matching account.
+
+### Admin: **Operations → Quotes** (`/admin/quotes`)
+
+Three lists: **To price**, **Sent**, **Closed**. **New quote** starts one from scratch (for a customer who rang). A quote's page shows the customer's words and the form: customer, vehicle, "What's the work?", details, total, visit length. Buttons: **Save draft**, **Send to customer** (emails, plus a text when there's a mobile number), **Send updated quote** (corrects a sent one), and **Withdraw**. A booked quote links to its job.
+
+### Notifications
+
+Email templates (editable in `/admin/emails`): `custom_quote_request_received`, `custom_quote_sent`, `custom_quote_request_admin`, `custom_quote_declined_admin`. SMS: `custom_quote_sent`. No push: customer pushes only deep-link on a booking id.
+
+### Mobile API (all additive)
+
+- `POST /api/mobile/v1/quote-requests`: guest or signed in.
+- `GET /api/mobile/v1/custom-quotes`, `GET /custom-quotes/:id`, `POST /custom-quotes/:id/decline`: signed in.
+- Book with the quote's id as `quoteId` on the existing `/checkout/prepare` and `/bookings`.
+
+## Acceptance
+
+- [x] A customer can ask for a quote from the repair list and search, signed in or not.
+- [x] The admin sees requests, prices them as one total, and emails the customer.
+- [x] The admin can start a quote from scratch.
+- [x] The customer books it straight from the link, through the normal time / address / card steps; offered to every mechanic.
+- [x] No expiry; the customer can decline, the admin can withdraw.
+- [x] Mobile endpoints for requesting, listing, declining and booking.
+- [ ] End to end after `0089`: request → price → send → email link → book → job dispatched; decline; withdraw. *(Needs `0089` applied.)*
+
+## App work
+
+- **Customer app:** `docs/app-prompts/2026-11-13-customer-app-custom-quotes.md`. Run `npm run db:types` after `0089`.
+- **Mechanic app:** `npm run db:types` after `0089` only. A booked custom quote reaches mechanics as an ordinary job with one fixed-price line; its details are in the special instructions.

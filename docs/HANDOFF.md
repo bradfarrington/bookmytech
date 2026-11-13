@@ -119,20 +119,21 @@ You are working on **Book My Tech**, a UK mobile-mechanic booking platform. This
 
 ## Current task
 
-### 📌 2026-11-13: Search, DPF services, fuel-specific products (Task 74); custom quotes planned (Task 75)
+### 📌 2026-11-13: Search, DPF services, fuel-specific products (Task 74); custom quotes (Task 75)
 
-Read `docs/tasks/74-search-dpf-and-fuel-products.md`. Built, **not browser-verified**.
+Read `docs/tasks/74-search-dpf-and-fuel-products.md` and `docs/tasks/75-custom-quotes.md`. Both built, **not verified end to end** (they need `0088` and `0089` applied).
+
+- **Custom quotes (Task 75).** Customers "Ask us for a quote" from the repair list and search (`/book/quote/request`). Brad prices it as one total in **Operations → Quotes** (`/admin/quotes`), or starts one himself, and sends it. The customer books it from the emailed link (`/book/quote/<id>`) straight into the normal time / address / card steps, offered to every mechanic. No expiry; the customer declines or the admin withdraws. The quote's id rides in the existing `quoteId` field, so the funnel and the mobile checkout and booking endpoints work unchanged.
 
 - **Repair search fixed.** "pads" on a BMW found no HaynesPro jobs because group *names* steered the walk ("Brake pad" ≠ "pads"). It now steers by a generated vocabulary of every word under each HaynesPro group (`lib/haynespro/search-vocabulary.json`, rebuilt by `scripts/build-search-vocabulary.mjs`), with stems, synonyms (dpf, water pump, cambelt…) and weak verbs (`lib/haynespro/search-terms.ts`). Typical search: 5–10 upstream calls instead of 40.
 - **Products can be for one fuel** (`catalogue_products.fuel_types`). A hybrid counts as petrol, and an unknown fuel sees everything. A wrong-fuel product id is swapped for its same-named twin. **Major service** is split petrol (spark plugs) / diesel (none). **DPF chemical clean £139.99** and **DPF forced regeneration £89.99** are added, diesel only, under Servicing.
 - **Info sheets** (`catalogue_products.info_sheet`): shown under the price before booking, in the confirmation email, and on the mobile quote. The DPF services carry Brad's document. The terms have a new §16 and a warranty exclusion.
 
 **Outstanding**
-1. **Apply migration `0088`**, then `npm run db:types` in **both** app repos. Then check a diesel and a petrol reg in a browser (Task 74 acceptance).
+1. **Apply migrations `0088` and `0089`**, then `npm run db:types` in **both** app repos. Then check a diesel and a petrol reg (Task 74), and a quote end to end: request, price, send, book, decline, withdraw (Task 75).
 2. Visit lengths for the DPF services (2 h / 1 h) are placeholders. The diesel Major service is priced the same as petrol (£240). Adjust both in `/admin/services`.
-3. Customer-app prompt: `docs/app-prompts/2026-11-13-customer-app-dpf-info-sheets.md`.
+3. Customer-app prompts: `docs/app-prompts/2026-11-13-customer-app-dpf-info-sheets.md` and `docs/app-prompts/2026-11-13-customer-app-custom-quotes.md`.
 4. Add the DPF section to Brad's `customer-terms.odt` so the numbering matches again (`docs/legal/README.md`).
-5. **Task 75 (custom quotes from the dashboard)** is planned only, with open questions for Brad: `docs/tasks/75-custom-quotes.md`.
 
 ### 2026-10-09: AAG parts, estimates, the demo (Task 72)
 

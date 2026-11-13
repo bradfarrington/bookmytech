@@ -28,6 +28,8 @@ import { recordBookedVehicle } from "@/lib/garage/garage";
 import { checkoutCustomerFor, type CardSurface } from "@/lib/payments/saved-cards";
 import { MAX_REPAIRS_PER_BOOKING, repairIdsFromInput } from "@/lib/bookings/repair-ids";
 import { quoteFollowOn, type FollowOnOrigin } from "@/lib/quotes/book-follow-on";
+import { markCustomQuoteBooked, quoteCustomQuoteForBooking } from "@/lib/custom-quotes/server";
+import type { CustomQuoteRow } from "@/lib/custom-quotes/model";
 import type { QuoteView } from "@/lib/quotes/load";
 import { trackEvent } from "@/app/actions/track-event";
 import { FUNNEL_EVENTS } from "@/lib/analytics/events";
@@ -115,12 +117,22 @@ export interface CreateBookingInput {
    * lines come from the quote (what the customer approved), the vehicle from
    * the job it was raised on, and the quoting mechanic is offered the job
    * first. `repairNodeId(s)` and the vehicle fields are ignored. Signed-in only.
+   *
+   * Task 75: the same field carries a CUSTOM quote's id (one the admin priced
+   * for a job the catalogue doesn't list). Price, vehicle and description come
+   * from that quote; it is broadcast like any booking.
    */
   quoteId?: string;
 }
 
 type ResolvedQuote =
-  | { ok: true; quote: RepairsQuote; followOn: { source: QuoteView; origin: FollowOnOrigin } | null }
+  | {
+      ok: true;
+      quote: RepairsQuote;
+      followOn: { source: QuoteView; origin: FollowOnOrigin } | null;
+      /** Task 75: the custom quote it's booked from. */
+      custom: CustomQuoteRow | null;
+    }
   | { ok: false; error: string };
 
 /**
@@ -137,9 +149,16 @@ async function resolveBookingQuote(
     const admin = createAdminClient();
     // The caller's email, for a guest-booked original job matched on email.
     const { data: userData } = await admin.auth.admin.getUserById(customerId);
-    const followOn = await quoteFollowOn(input.quoteId, { userId: customerId, email: userData?.user?.email ?? null }, admin);
+    const caller = { userId: customerId, email: userData?.user?.email ?? null };
+    // A custom quote (Task 75) first; null means the id isn't one.
+    const custom = await quoteCustomQuoteForBooking(input.quoteId, caller, admin);
+    if (custom) {
+      if (!custom.ok) return custom;
+      return { ok: true, quote: custom.quote, followOn: null, custom: custom.source };
+    }
+    const followOn = await quoteFollowOn(input.quoteId, caller, admin);
     if (!followOn.ok) return followOn;
-    return { ok: true, quote: followOn.quote, followOn: { source: followOn.source, origin: followOn.origin } };
+    return { ok: true, quote: followOn.quote, followOn: { source: followOn.source, origin: followOn.origin }, custom: null };
   }
   const ids = repairIdsFromInput(input);
   if (ids.length === 0) return { ok: false, error: "Choose the repairs you need first." };
@@ -156,7 +175,7 @@ async function resolveBookingQuote(
             ? "We couldn't price these repairs. Please start the booking again."
             : "We couldn't price this repair. Please start the booking again.",
     };
-  return { ok: true, quote: result.quote, followOn: null };
+  return { ok: true, quote: result.quote, followOn: null, custom: null };
 }
 
 export type CreateBookingResult =
@@ -273,13 +292,27 @@ export async function createBooking(
   // snapshotted onto the row so later pricing changes never apply retroactively.
   const resolved = await resolveBookingQuote(input, customerId);
   if (!resolved.ok) return resolved;
-  const { quote, followOn } = resolved;
+  const { quote, followOn, custom } = resolved;
   const price = quote.breakdown;
-  // A return visit is for the car and the mechanic the quote was raised on.
-  const vehicleReg = followOn ? followOn.origin.vehicle_reg : input.vehicleReg;
-  const vehicleMake = followOn ? (followOn.origin.vehicle_make ?? input.vehicleMake) : input.vehicleMake;
-  const vehicleModel = followOn ? (followOn.origin.vehicle_model ?? input.vehicleModel ?? null) : (input.vehicleModel ?? null);
-  const preferredMechanicId = followOn ? followOn.origin.mechanic_id : (input.preferredMechanicId ?? null);
+  // A return visit is for the car and the mechanic the quote was raised on; a
+  // custom quote (Task 75) for the car it was priced for, offered to everyone.
+  const vehicleReg = followOn ? followOn.origin.vehicle_reg : custom ? custom.vehicle_reg : input.vehicleReg;
+  const vehicleMake = followOn
+    ? (followOn.origin.vehicle_make ?? input.vehicleMake)
+    : custom
+      ? (custom.vehicle_make ?? input.vehicleMake)
+      : input.vehicleMake;
+  const vehicleModel = followOn
+    ? (followOn.origin.vehicle_model ?? input.vehicleModel ?? null)
+    : custom
+      ? (custom.vehicle_model ?? input.vehicleModel ?? null)
+      : (input.vehicleModel ?? null);
+  const preferredMechanicId = followOn ? followOn.origin.mechanic_id : custom ? null : (input.preferredMechanicId ?? null);
+  // The mechanic reads what was quoted with the customer's own instructions.
+  const specialInstructions =
+    [input.specialInstructions?.trim(), custom?.details ? `Quoted work: ${custom.details}` : null]
+      .filter(Boolean)
+      .join("\n\n") || null;
 
   // The discount code (Task 35), re-validated and CLAIMED before anything is
   // written: a code that ran out while the customer was at the card step must
@@ -335,6 +368,9 @@ export async function createBooking(
       // Booked from a follow-on quote (Task 34): only named when so — the
       // column arrives with 0062.
       ...(followOn ? { source_quote_id: followOn.source.id } : {}),
+      // Booked from a custom quote (Task 75): only named when so — the column
+      // arrives with 0089.
+      ...(custom ? { source_custom_quote_id: custom.id } : {}),
       scheduled_at: scheduledAt,
       slot_window: input.slotWindow ?? null,
       // Only named when set: the column arrives with migration 0057, and an
@@ -374,7 +410,7 @@ export async function createBooking(
       address_line_1: input.addressLine1,
       address_line_2: input.addressLine2 ?? null,
       parking_type: input.parkingType,
-      special_instructions: input.specialInstructions ?? null,
+      special_instructions: specialInstructions,
       postcode: input.postcode,
       preferred_mechanic_id: preferredMechanicId,
       payment_mode: mode,
@@ -482,6 +518,10 @@ export async function createBooking(
       payload: { quote_id: followOn.source.id, follow_on_booking_id: data.id, amount_pence: followOn.source.totalPence },
     });
   }
+
+  // A custom quote (Task 75) is booked: closed, tied to this account, and the
+  // new job's timeline says where its price came from.
+  if (custom && customerId) await markCustomQuoteBooked(db, custom, data.id, customerId);
 
   // Tie the claimed discount to the booking that used it.
   if (promoClaim) await attachPromoRedemption(createAdminClient(), promoClaim.redemptionId, data.id);

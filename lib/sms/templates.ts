@@ -232,6 +232,19 @@ export const SMS_TEMPLATE_DEFS: readonly SmsTemplateDef[] = [
     defaultBody: "Book My Tech: your mechanic has sent a quote for {{total}}. Nothing is charged until you approve: {{url}}",
   },
 
+  // --- Custom quotes (Task 75) -------------------------------------------------
+  {
+    key: "custom_quote_sent",
+    label: "Custom quote sent",
+    description: "Sent to the customer when we send them a quote for a job we don't list.",
+    audience: "customer",
+    variables: [
+      { name: "total", description: "Quote total", example: "£145.00" },
+      { name: "url", description: "Link to view and book it", example: "https://bookmytech.co.uk/book/quote/…" },
+    ],
+    defaultBody: "Book My Tech: your quote is ready, {{total}}. View it and book a time: {{url}}",
+  },
+
   // --- Revised job on site (Task 37) ------------------------------------------
   {
     key: "revision_sent",

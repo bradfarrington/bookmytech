@@ -7,6 +7,8 @@ import { MIN_SEARCH_QUERY_LENGTH } from "@/lib/haynespro/search-query";
 import { buildRepairHrefs } from "@/lib/bookings/repair-hrefs";
 import { searchRepairsAction } from "@/app/actions/repair-search";
 import { RepairRows } from "./repair-rows";
+import Link from "next/link";
+import { quoteRequestHref } from "@/lib/custom-quotes/href";
 
 // The search box above the customer's repair browser (Task 30). Type what's
 // wrong and the matching jobs appear, priced for this car, with the same
@@ -187,11 +189,29 @@ export function RepairSearch({
               groupCaption={() => "A group of repairs: open it to see them"}
               emptyLabel={
                 <>
-                  Nothing matches &ldquo;{trimmed}&rdquo;. Try fewer or different words, or
-                  browse the categories instead.
+                  Nothing matches &ldquo;{trimmed}&rdquo;. Try fewer or different words, browse the
+                  categories, or{" "}
+                  <Link
+                    href={quoteRequestHref({ reg, make, model, postcode, q: trimmed })}
+                    className="font-semibold text-brand-blue hover:underline"
+                  >
+                    ask us for a quote
+                  </Link>
+                  .
                 </>
               }
             />
+          )}
+          {!searching && !error && hits.length > 0 && (
+            <p className="text-xs text-text-muted">
+              Not what you need?{" "}
+              <Link
+                href={quoteRequestHref({ reg, make, model, postcode, q: trimmed })}
+                className="font-semibold text-brand-blue hover:underline"
+              >
+                Ask us for a quote
+              </Link>
+            </p>
           )}
           {truncated && !searching && hits.length > 0 && (
             <p className="text-xs text-text-muted">

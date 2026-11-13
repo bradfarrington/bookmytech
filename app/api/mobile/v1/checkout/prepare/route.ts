@@ -56,6 +56,8 @@ interface PrepareBody {
    * A follow-on quote (Task 34, additive): the price and the vehicle come from
    * the quote, so `vehicleReg` and the repair ids may be omitted. The quote
    * must be the caller's; see /bookings/:id/quotes/:quoteId/respond.
+   * Task 75: also a CUSTOM quote's id (GET /custom-quotes, `canBook`), priced
+   * and described from that quote and offered to every mechanic.
    */
   quoteId?: unknown;
   /**

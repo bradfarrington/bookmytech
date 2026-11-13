@@ -11,6 +11,7 @@ import { VehiclePicker } from "@/components/customer/vehicle-picker";
 import { VehicleBanner } from "./vehicle-banner";
 import { RepairRows } from "./repair-rows";
 import { RepairSearch } from "./repair-search";
+import { quoteRequestHref } from "@/lib/custom-quotes/href";
 
 // Customer-facing browse of the repair catalogue for THEIR car (Task 16
 // Stage G): HaynesPro's repair-times tree plus the admin's layer over it
@@ -178,6 +179,18 @@ export async function RepairBrowser({
         set prices.
         {adding && " Jobs booked together are done in one visit."}
       </p>
+
+      {/* Task 75: a job we don't list is priced by hand. */}
+      <Link
+        href={quoteRequestHref({ reg, make, model, postcode })}
+        className="flex items-center justify-between gap-3 rounded-2xl border border-dashed border-border bg-surface-card px-4 py-3.5 text-sm hover:border-brand-blue"
+      >
+        <span>
+          <span className="font-semibold text-text-primary">Can&apos;t find the job you need?</span>{" "}
+          <span className="text-text-secondary">Tell us about it and we&apos;ll email you a price.</span>
+        </span>
+        <span className="shrink-0 font-semibold text-brand-blue">Ask for a quote</span>
+      </Link>
 
       {adding && (
         <div className="sticky bottom-4 z-10 flex items-center justify-between gap-3 rounded-2xl border border-brand-blue/30 bg-surface-card p-4 shadow-hero">

@@ -81,6 +81,8 @@ export async function requireMobileCustomer(request: Request): Promise<MobileCus
  *   mechanicchecklist — one checklist answer per request, 50–170 in a row
  *   mechanicupload — job photos; a mechanic takes far more than a customer's
  *              six dispute photos
+ *   quoterequest — asking for a quote for a job we don't list (Task 75); also
+ *              open to guests, see lib/custom-quotes/server.ts
  */
 export type MobileLimitFamily =
   | "checkout"
@@ -94,7 +96,8 @@ export type MobileLimitFamily =
   | "mechanic"
   | "mechanicfeed"
   | "mechanicchecklist"
-  | "mechanicupload";
+  | "mechanicupload"
+  | "quoterequest";
 
 /**
  * Count this request against its bucket family. Returns a ready-to-return 429
