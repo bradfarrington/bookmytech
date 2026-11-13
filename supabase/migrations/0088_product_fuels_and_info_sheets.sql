@@ -48,10 +48,12 @@ comment on column public.catalogue_products.fuel_types is
 comment on column public.catalogue_products.info_sheet is
   'What the customer reads before booking: "## " headings, "- " bullets, paragraphs. Shown under the price and in the booking confirmation email (Task 74).';
 
--- One name per category per set of fuels.
+-- One name per category per set of fuels. The array itself is indexed
+-- (array_to_string isn't immutable, so it can't be); the app always writes the
+-- fuels in the same order (lib/catalogue/products.ts FUEL_FAMILIES).
 drop index if exists public.catalogue_products_category_name_key;
 create unique index if not exists catalogue_products_category_name_fuels_key
-  on public.catalogue_products (category, lower(name), coalesce(array_to_string(fuel_types, ','), ''));
+  on public.catalogue_products (category, lower(name), coalesce(fuel_types, '{}'::text[]));
 
 -- Major service: a diesel copy without spark plugs, taken from the live row so
 -- the admin's current price, duration and checklist carry over.
