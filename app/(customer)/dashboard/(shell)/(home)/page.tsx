@@ -15,6 +15,9 @@ import { LiveHero } from "../_home/live-hero";
 import { PastJobs } from "../_home/past-jobs";
 import { UpcomingList } from "../_home/upcoming-list";
 import { WaitingCard } from "../_home/waiting-on-you";
+import { listCustomQuotesFor } from "@/lib/custom-quotes/server";
+import { CustomQuoteList, openQuotes } from "../quotes/_components/custom-quote-list";
+import { TextLink } from "@/components/dashboard/ui";
 
 // The customer's Home (Task 48; mockup 02 "Dashboard · Live booking" and
 // "Dashboard · First-time"): greeting, a hero per live job, what's waiting on
@@ -34,12 +37,15 @@ export default async function DashboardHomePage() {
   if (!user) redirect("/login");
 
   const admin = createAdminClient();
-  const [bookings, { data: profile }, creditPence, garage] = await Promise.all([
+  const [bookings, { data: profile }, creditPence, garage, quotes] = await Promise.all([
     loadCustomerBookings({ userId: user.id, email: user.email ?? null }),
     admin.from("profiles").select("full_name, referral_code").eq("id", user.id).maybeSingle(),
     availableCreditPence(admin, user.id),
     listGarage(user.id, { refresh: false }),
+    // Custom quotes (Task 75): the open ones are listed above the bookings.
+    listCustomQuotesFor({ userId: user.id, email: user.email ?? null }),
   ]);
+  const liveQuotes = openQuotes(quotes);
 
   const now = new Date();
   const { live, upcoming, past } = groupCustomerBookings(bookings);
@@ -62,6 +68,15 @@ export default async function DashboardHomePage() {
 
       <div className={cn("mt-4 grid items-start gap-6", hasSide && "lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-8")}>
         <Stack className="min-w-0 md:gap-5">
+          {liveQuotes.length > 0 && (
+            <Section
+              title="Your quotes"
+              action={<TextLink href="/dashboard/quotes">See all</TextLink>}
+            >
+              <CustomQuoteList quotes={liveQuotes} />
+            </Section>
+          )}
+
           {bookings.length === 0 ? (
             <FirstTime />
           ) : (

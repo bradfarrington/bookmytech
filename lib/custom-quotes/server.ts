@@ -52,6 +52,22 @@ export async function loadCustomQuote(db: SupabaseClient, id: string): Promise<C
   }
 }
 
+/**
+ * The customer account an email belongs to (0089's
+ * custom_quote_account_for_email), so a quote raised for an email reaches that
+ * account's dashboard, app and push notifications. Null when there's none, or
+ * on any error: a quote still works by email alone.
+ */
+export async function accountForEmail(db: SupabaseClient, email: string): Promise<string | null> {
+  try {
+    const { data, error } = await db.rpc("custom_quote_account_for_email", { p_email: email });
+    if (error || typeof data !== "string") return null;
+    return data;
+  } catch {
+    return null;
+  }
+}
+
 // --- Booking ------------------------------------------------------------------
 
 export type CustomQuoteBooking =
@@ -148,9 +164,12 @@ export async function requestCustomQuote(
   });
   if (!cleaned.ok) return cleaned;
   const db = createAdminClient();
+  // A guest who already has an account (by the email they typed) sees the
+  // request there too.
+  const customerId = caller?.userId ?? (await accountForEmail(db, cleaned.request.customer_email));
   const { data, error } = await db
     .from("custom_quotes")
-    .insert({ ...cleaned.request, status: "requested", source: "customer", customer_id: caller?.userId ?? null })
+    .insert({ ...cleaned.request, status: "requested", source: "customer", customer_id: customerId })
     .select(CUSTOM_QUOTE_COLUMNS)
     .single();
   if (error || !data) {
@@ -193,7 +212,13 @@ export async function listCustomQuotesFor(caller: QuoteCaller): Promise<CustomQu
       : await query.eq("customer_id", caller.userId);
     if (error) return [];
     // The OR on email is a convenience; ownership is still checked row by row.
-    return ((data ?? []) as CustomQuoteRow[]).filter((r) => ownsCustomQuote(r, caller)).map(toCustomQuoteView);
+    const rows = ((data ?? []) as CustomQuoteRow[]).filter((r) => ownsCustomQuote(r, caller));
+    // Quotes sent to this email before the account existed join the account now.
+    const unlinked = rows.filter((r) => !r.customer_id).map((r) => r.id);
+    if (unlinked.length) {
+      await db.from("custom_quotes").update({ customer_id: caller.userId }).in("id", unlinked).is("customer_id", null);
+    }
+    return rows.map(toCustomQuoteView);
   } catch {
     return [];
   }
@@ -230,6 +255,11 @@ export async function saveCustomQuote(
   }
 
   const values: Record<string, unknown> = { ...cleaned.quote, updated_at: now };
+  // Tie it to the customer's account when the email has one, so it shows in
+  // their dashboard and app and can be pushed. A changed email re-links it.
+  if (!existing || !existing.customer_id || existing.customer_email !== cleaned.quote.customer_email) {
+    values.customer_id = await accountForEmail(db, cleaned.quote.customer_email);
+  }
   if (options.send) {
     Object.assign(values, await pricingSnapshot(db), { status: "sent", sent_at: now });
   }

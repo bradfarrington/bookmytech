@@ -19,7 +19,8 @@ The backend (`bookmytech`, Task 75) adds **custom quotes**: when a customer can'
 3. **`GET /api/mobile/v1/custom-quotes/:id`** (signed in): `{ quote: CustomQuoteView }`, or `404`.
 4. **`POST /api/mobile/v1/custom-quotes/:id/decline`** (signed in, no body): `{ ok: true }` or `{ ok: false, error }`.
 5. **Booking a custom quote uses the existing endpoints.** Send its `id` as **`quoteId`** to `POST /checkout/prepare` and `POST /bookings`, exactly as for a follow-on quote. `vehicleReg`, `vehicleMake` and the repair ids may be omitted. The price, the car and the job name come from the quote, and the job is offered to every mechanic. Response shapes are unchanged.
-6. The quote email links to `https://bookmytech.co.uk/book/quote/<id>`. If the app handles universal links, open that path in the app's quote screen.
+6. **Push notification** when a quote is sent: title "Your quote is ready", body "£145 for <title>. Tap to view and book.", and `data: { customQuoteId, url }` with **no** `bookingId`. Today the app only deep-links on `bookingId`, so it just opens the app. Handle `data.customQuoteId` by opening the quote screen for that id (`GET /custom-quotes/:id`).
+7. The quote email links to `https://bookmytech.co.uk/book/quote/<id>`. If the app handles universal links, open that path in the app's quote screen.
 
 ## What to build
 
@@ -39,4 +40,4 @@ The backend (`bookmytech`, Task 75) adds **custom quotes**: when a customer can'
 ## Also
 
 - After Brad applies migration `0089`, run `npm run db:types`. It adds `custom_quotes`, which a customer may read for their own rows under RLS, and `bookings.source_custom_quote_id`.
-- No push notifications for quotes. The customer is told by email and text.
+- The website now lists a customer's quotes at `/dashboard/quotes` and shows open ones on the dashboard home. Put the app's quotes list in the same places: an account-area row "Your quotes" and a home section while one is open.

@@ -4,6 +4,7 @@ import { sendEmail } from "@/lib/email/send";
 import { renderTemplateEmail } from "@/emails/resolve";
 import { sendSms } from "@/lib/sms/send-sms";
 import { renderSmsTemplate } from "@/lib/sms/render-template";
+import { sendPushToCustomer } from "@/lib/push/send";
 import { formatPrice, siteUrl } from "@/lib/utils";
 import { describeQuoteVehicle } from "./href";
 import type { CustomQuoteRow } from "./model";
@@ -62,6 +63,14 @@ export async function notifyCustomerQuoteSent(row: CustomQuoteRow): Promise<void
       .then((body) => sendSms({ to: phone, body }))
       .catch(() => {});
   }
+  // The customer app (when the quote is tied to an account). `customQuoteId`
+  // is what a current app build opens; an older build ignores it and just
+  // opens the app, since pushes there only deep-link on a booking id.
+  sendPushToCustomer(row.customer_id, {
+    title: "Your quote is ready",
+    body: `${total} for ${row.title ?? "your job"}. Tap to view and book.`,
+    data: { customQuoteId: row.id, url },
+  }).catch(() => {});
 }
 
 export async function notifyAdminQuoteDeclined(row: CustomQuoteRow): Promise<void> {

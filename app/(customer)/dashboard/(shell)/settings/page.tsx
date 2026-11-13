@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Bell, CreditCard, KeyRound, LifeBuoy, Mail, MailCheck, MapPin } from "lucide-react";
+import { Bell, CreditCard, FileText, KeyRound, LifeBuoy, Mail, MailCheck, MapPin } from "lucide-react";
 import { signOut } from "@/app/actions/sign-out";
 import {
   AvatarTile,
@@ -173,6 +173,12 @@ export default async function SettingsPage({
                   <CardsCaption userId={user.id} />
                 </Suspense>
               }
+            />
+            <ListRow
+              href="/dashboard/quotes"
+              icon={FileText}
+              title="Your quotes"
+              caption="Prices we've worked out for jobs we don't list"
             />
             <ListRow
               href="/dashboard/settings/addresses"

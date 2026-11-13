@@ -33,13 +33,18 @@
 - **`/book/quote/request`**: describe the job, plus reg, postcode, name, email and mobile. Prefilled for a signed-in customer, whose request is tied to their account and email. Guests can ask. Rate-limited (`mobile_quoterequest_*`: 3–4 a minute, 10–20 a day). Emails the admin (`ADMIN_NOTIFY_EMAIL`) and the customer.
 - **`/book/quote/<id>`** (the link in the email): the price card, details, and **Book a time** (→ `/book/time?quote=<id>`; signed out → sign in, with "Create an account" prefilled). **Decline** / **Cancel my request** appear for the owner. Readable by anyone with the link (first name, car, price), but booking and declining need the matching account.
 
+### Customer (dashboard)
+
+- **`/dashboard/quotes`** ("Your quotes"): open quotes first, then closed ones. Each row opens `/book/quote/<id>`. It's linked from **Account → Your quotes**, and the dashboard home shows a **Your quotes** section whenever one is open (being priced, or ready to book).
+- A quote joins the customer's account by email: when they ask (signed in, or a guest whose email has an account), when it's sent, and when they next open their quotes. `0089`'s `custom_quote_account_for_email` (service role only) finds the account. That is what lets a quote show in their dashboard and app, and be pushed.
+
 ### Admin: **Operations → Quotes** (`/admin/quotes`)
 
 Three lists: **To price**, **Sent**, **Closed**. **New quote** starts one from scratch (for a customer who rang). A quote's page shows the customer's words and the form: customer, vehicle, "What's the work?", details, total, visit length. Buttons: **Save draft**, **Send to customer** (emails, plus a text when there's a mobile number), **Send updated quote** (corrects a sent one), and **Withdraw**. A booked quote links to its job.
 
 ### Notifications
 
-Email templates (editable in `/admin/emails`): `custom_quote_request_received`, `custom_quote_sent`, `custom_quote_request_admin`, `custom_quote_declined_admin`. SMS: `custom_quote_sent`. No push: customer pushes only deep-link on a booking id.
+Email templates (editable in `/admin/emails`): `custom_quote_request_received`, `custom_quote_sent`, `custom_quote_request_admin`, `custom_quote_declined_admin`. SMS: `custom_quote_sent`. **Push** when a quote is sent to an account: "Your quote is ready" / "£145 for <title>. Tap to view and book.", with `data: { customQuoteId, url }`. Current app builds only deep-link on `bookingId`, so until the app handles `customQuoteId` the push just opens the app.
 
 ### Mobile API (all additive)
 
@@ -55,6 +60,8 @@ Email templates (editable in `/admin/emails`): `custom_quote_request_received`, 
 - [x] The customer books it straight from the link, through the normal time / address / card steps; offered to every mechanic.
 - [x] No expiry; the customer can decline, the admin can withdraw.
 - [x] Mobile endpoints for requesting, listing, declining and booking.
+- [x] The customer's quotes in their web dashboard (`/dashboard/quotes`, a home section, an Account link).
+- [x] A push notification when a quote is sent (the app opening it from `customQuoteId` is app work).
 - [ ] End to end after `0089`: request → price → send → email link → book → job dispatched; decline; withdraw. *(Needs `0089` applied.)*
 
 ## App work

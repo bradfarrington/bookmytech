@@ -81,3 +81,24 @@ alter table public.bookings
 
 comment on column public.bookings.source_custom_quote_id is
   'The custom quote this booking was made from (Task 75); null otherwise.';
+
+-- The customer account an email belongs to, so a quote raised for an email
+-- (a guest's request, or one the admin typed) reaches that account: its
+-- dashboard, its app and its push notifications. Customer accounts only.
+-- Service role only: it reads auth.users.
+create or replace function public.custom_quote_account_for_email(p_email text)
+returns uuid
+language sql
+stable
+security definer
+set search_path = public, auth
+as $$
+  select u.id
+    from auth.users u
+    left join public.profiles p on p.id = u.id
+   where lower(u.email) = lower(trim(p_email))
+     and coalesce(p.role, 'customer') = 'customer'
+   limit 1;
+$$;
+revoke all on function public.custom_quote_account_for_email(text) from public, anon, authenticated;
+grant execute on function public.custom_quote_account_for_email(text) to service_role;

@@ -40,6 +40,7 @@ export default async function CustomQuotePage({ params }: { params: Promise<{ id
   return (
     <div className="flex flex-col gap-6">
       <StepHeader
+        backHref={owner ? "/dashboard/quotes" : undefined}
         title={row.status === "requested" ? "We're pricing your job" : `Your quote, ${firstName}`}
         subtitle={vehicle}
       />
