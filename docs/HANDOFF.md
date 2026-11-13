@@ -121,7 +121,7 @@ You are working on **Book My Tech**, a UK mobile-mechanic booking platform. This
 
 ### 📌 2026-11-13: Search, DPF services, fuel-specific products (Task 74); custom quotes (Task 75)
 
-Read `docs/tasks/74-search-dpf-and-fuel-products.md` and `docs/tasks/75-custom-quotes.md`. Both built, **not verified end to end** (they need `0088` and `0089` applied).
+Read `docs/tasks/74-search-dpf-and-fuel-products.md` and `docs/tasks/75-custom-quotes.md`. Both built and deployed 2026-11-13; **migrations `0088` and `0089` are applied** to the live database; **not yet verified end to end** in a browser or on a phone.
 
 - **Custom quotes (Task 75).** Customers "Ask us for a quote" from the repair list and search (`/book/quote/request`). Brad prices it as one total in **Operations → Quotes** (`/admin/quotes`), or starts one himself, and sends it. The customer books it from the emailed link (`/book/quote/<id>`) straight into the normal time / address / card steps, offered to every mechanic. No expiry; the customer declines or the admin withdraws. Customers see their quotes at `/dashboard/quotes` (and on the dashboard home while one is open), and a sent quote pushes "Your quote is ready" (`data.customQuoteId`) to their app. The quote's id rides in the existing `quoteId` field, so the funnel and the mobile checkout and booking endpoints work unchanged.
 
@@ -130,9 +130,9 @@ Read `docs/tasks/74-search-dpf-and-fuel-products.md` and `docs/tasks/75-custom-q
 - **Info sheets** (`catalogue_products.info_sheet`): shown under the price before booking, in the confirmation email, and on the mobile quote. The DPF services carry Brad's document. The terms have a new §16 and a warranty exclusion.
 
 **Outstanding**
-1. **Apply migrations `0088` and `0089`**, then `npm run db:types` in **both** app repos. Then check a diesel and a petrol reg (Task 74), and a quote end to end: request, price, send, book, decline, withdraw (Task 75).
+1. **Check on the live site:** a diesel and a petrol reg under Servicing (Task 74), and a quote end to end: request, price, send, book, decline, withdraw (Task 75).
 2. Visit lengths for the DPF services (2 h / 1 h) are placeholders. The diesel Major service is priced the same as petrol (£240). Adjust both in `/admin/services`.
-3. Customer-app prompts: `docs/app-prompts/2026-11-13-customer-app-dpf-info-sheets.md` and `docs/app-prompts/2026-11-13-customer-app-custom-quotes.md`.
+3. **Apps (done 2026-11-13, pushed):** both apps' types regenerated after `0088`/`0089`. The customer app has Ask for a quote, Your quotes (list, home section, Account row), the quote screen (Book a time / Decline), the quote push link and the DPF info sheet on the price screen (`bmt-customer-app` `20e7de5`). It needs a new build to reach phones; the prompts it was built from are in `docs/app-prompts/2026-11-13-*`.
 4. Add the DPF section to Brad's `customer-terms.odt` so the numbering matches again (`docs/legal/README.md`).
 
 ### 2026-10-09: AAG parts, estimates, the demo (Task 72)

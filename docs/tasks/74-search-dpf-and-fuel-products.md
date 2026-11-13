@@ -1,6 +1,6 @@
 # Task 74: Repair search that finds things, DPF services, products for one fuel
 
-**Status:** 🟡 **Built 2026-11-13, not verified in a browser.** Typecheck clean, 707 unit tests pass (new ones for search terms, the vocabulary, fuels and info sheets), lint clean on every touched file. The search walk was replayed against the real HaynesPro trees of three cars (see "How the search was checked"). **Migration `0088` is written, not applied.** Until it is, nothing is filtered by fuel, the DPF services and the diesel Major service don't exist, and the admin can't set a fuel or an info sheet (it says why). Search works without it.
+**Status:** 🟡 **Built 2026-11-13, not verified in a browser.** Typecheck clean, 707 unit tests pass (new ones for search terms, the vocabulary, fuels and info sheets), lint clean on every touched file. The search walk was replayed against the real HaynesPro trees of three cars (see "How the search was checked"). **Migration `0088` applied to the live database 2026-11-13** (after fixing its unique index: `array_to_string` isn't immutable, so the fuels array itself is indexed). Deployed the same day. Customer app updated (`bmt-customer-app` `20e7de5`).
 
 ## Why (Brad, 2026-11-13)
 

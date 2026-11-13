@@ -1,6 +1,6 @@
 # Task 75: Custom quotes from the admin dashboard
 
-**Status:** 🟡 **Built 2026-11-13, not verified end to end.** Typecheck clean, 716 unit tests pass (new: `lib/custom-quotes/model.test.ts`), lint clean on every touched file, production build compiles. Checked on a dev server: the request page renders on desktop and phone, an unknown quote 404s, and `/book/time?quote=…` sends a signed-out visitor to sign in. **Migration `0089` is written, not applied.** Until it is, the admin Quotes page shows an error banner, a request fails politely, and nothing else changes. Deviation from the plan: the website quote page lives at `/book/quote/<id>` (sign-in `next=` only allows `/book` and `/dashboard`).
+**Status:** 🟡 **Built 2026-11-13, not verified end to end.** Typecheck clean, 716 unit tests pass (new: `lib/custom-quotes/model.test.ts`), lint clean on every touched file, production build compiles. Checked on a dev server: the request page renders on desktop and phone, an unknown quote 404s, and `/book/time?quote=…` sends a signed-out visitor to sign in. **Migration `0089` applied to the live database 2026-11-13**; deployed the same day. Customer app updated (`bmt-customer-app` `20e7de5`). Deviation from the plan: the website quote page lives at `/book/quote/<id>` (sign-in `next=` only allows `/book` and `/dashboard`).
 
 ## Why (Brad, 2026-11-13)
 
