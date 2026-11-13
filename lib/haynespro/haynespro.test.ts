@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { affinityFor, matchRank, toCatalogueNode } from "./catalogue";
+import { parseSearchQuery } from "./search-terms";
+import { groupVocabulary } from "./search-vocabulary";
 import { extractStatusCode, isAuthFailure } from "./client";
 import {
   GLOBAL_SCOPE,
@@ -408,31 +410,80 @@ describe("toCatalogueNode", () => {
 });
 
 describe("repair search ranking", () => {
-  // matchRank takes an already-lowercased query — searchRepairCatalogue does
-  // that once per search rather than once per node.
-  const rank = (description: string, query: string) => {
-    const needle = query.toLowerCase();
-    return matchRank(description, needle, needle.split(/\s+/).filter(Boolean));
-  };
+  const rank = (description: string, query: string) => matchRank(description, parseSearchQuery(query));
 
   it("promotes whole-name and prefix matches above scattered tokens", () => {
     expect(rank("Brake pads", "brake pads")).toBe(0); // starts with
     expect(rank("Renew the front brake pads", "brake pads")).toBe(1); // contains
-    expect(rank("Renew the brake caliper and pads", "brake pads")).toBe(2); // all tokens
+    expect(rank("Renew the brake caliper and pads", "brake pads")).toBe(2); // all terms
   });
 
-  it("requires every token, in any order, and ignores case on both sides", () => {
+  it("requires every term, in any order, and ignores case on both sides", () => {
     expect(rank("Renew the brake caliper and pads", "PADS Brake")).toBe(2);
     expect(rank("Renew the front brake discs", "brake pads")).toBeNull();
     expect(rank("Renew the air filter", "brake")).toBeNull();
   });
 
-  it("scores group affinity by how many tokens the group name carries", () => {
-    // This is what makes the walk best-first rather than breadth-first: the
-    // path to a matching leaf is itself named for the query.
-    expect(affinityFor("Brake pads", ["brake", "pads"])).toBe(2);
-    expect(affinityFor("Brakes (Mechanical)", ["brake", "pads"])).toBe(1);
-    expect(affinityFor("Cooling system", ["brake", "pads"])).toBe(0);
+  // Task 74: the searches from Brad's screen recording, and their cousins.
+  it("meets plurals and singulars, and matches while the word is still being typed", () => {
+    expect(rank("Renew the front brake pads", "pad")).not.toBeNull();
+    expect(rank("Check the brake pad wear", "pads")).not.toBeNull();
+    expect(rank("Renew all the brake discs", "disc")).not.toBeNull();
+    expect(rank("Renew the front brake pads", "brak")).not.toBeNull();
+    expect(rank("Renew the battery", "batteries")).not.toBeNull();
+  });
+
+  it("finds HaynesPro's words for the customer's", () => {
+    expect(rank("Renew the diesel particulate filter", "dpf")).not.toBeNull();
+    expect(rank("Renew the diesel particulate filter", "dpf replacement")).toBe(2);
+    expect(rank("Renew the coolant pump", "water pump")).not.toBeNull();
+    expect(rank("Renew the ancillary drive belt", "fan belt")).not.toBeNull();
+    expect(rank("Renew the timing belt*", "cambelt")).not.toBeNull();
+    expect(rank("Renew the left track rod end", "tie rod end")).not.toBeNull();
+    expect(rank("Renew the front left stabiliser link", "drop links")).not.toBeNull();
+    expect(rank("Renew the parking brake cable", "handbrake cable")).not.toBeNull();
+    expect(rank("Air-conditioning compressor", "aircon compressor")).not.toBeNull();
+    // The word itself still matches: a synonym never takes a match away.
+    expect(rank("DPF chemical clean and regeneration", "dpf")).toBe(0);
+    expect(rank("DPF forced regeneration", "regen")).not.toBeNull();
+  });
+
+  it("ranks a job with the customer's verb first but still finds one without it", () => {
+    expect(rank("Renew the front brake pads", "change my brake pads")).toBe(2);
+    expect(rank("Check the brake pad wear", "change my brake pads")).toBe(3);
+    expect(rank("Check the brake pad wear", "check pads")).toBe(2);
+    // A query of nothing but a verb still searches for it.
+    expect(rank("Renew the front brake pads", "replace")).not.toBeNull();
+  });
+
+  it("scores group affinity by how many terms the text carries, never verbs", () => {
+    const q = parseSearchQuery("brake pads");
+    expect(affinityFor("Brake pad", q)).toBe(2);
+    expect(affinityFor("Brakes (Mechanical)", q)).toBe(1);
+    expect(affinityFor("Cooling system", q)).toBe(0);
+    expect(affinityFor("Renew everything", parseSearchQuery("renew pads"))).toBe(0);
+  });
+});
+
+describe("repair search vocabulary", () => {
+  // What fixes the recording: "pads" scores nothing on any group NAME on the
+  // way down ("Brakes (Mechanical)" > "Brake pad" is fine, but the BMW's root
+  // has 43 groups and none says "pads"), while the vocabulary knows where pads live.
+  it("steers 'pads' to the brakes and 'dpf' to the exhaust", () => {
+    const pads = parseSearchQuery("pads");
+    expect(affinityFor(groupVocabulary("1M2")!, pads)).toBe(1); // Brakes (Mechanical)
+    expect(affinityFor(groupVocabulary("1M01500000G")!, pads)).toBe(1); // Brake pad
+    expect(affinityFor(groupVocabulary("1D1")!, pads)).toBe(0); // Cooling system
+    const dpf = parseSearchQuery("dpf");
+    expect(affinityFor(groupVocabulary("1G1")!, dpf)).toBe(1); // Exhaust system
+    expect(affinityFor(groupVocabulary("1M2")!, dpf)).toBe(0);
+  });
+
+  it("knows every top-level group", () => {
+    for (const id of ["0CJ0", "1A1", "1E1", "1G1", "1M2", "1R1", "1V1"]) {
+      expect(groupVocabulary(id)).not.toBeNull();
+    }
+    expect(groupVocabulary("not-a-group")).toBeNull();
   });
 });
 

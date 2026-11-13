@@ -140,6 +140,7 @@ const diagnostic = {
   category: "diagnostics" as const,
   summary: null,
   description: null,
+  infoSheet: null,
 };
 const fullService = {
   id: "p:s1",
@@ -151,6 +152,7 @@ const fullService = {
   category: "servicing" as const,
   summary: null,
   description: null,
+  infoSheet: null,
 };
 const hourlyService = { ...fullService, id: "p:s2", name: "Interim service", pricePence: null, labourHours: 0.75 };
 const oil = { litres: 4.3, pencePerLitre: 1500, pence: 6450, source: "haynespro" as const, label: "Engine sump, including filter" };

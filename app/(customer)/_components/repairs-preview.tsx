@@ -10,9 +10,11 @@ import {
   PRODUCT_CATEGORIES,
   REPAIRS_TOP_NODE,
   productBasePence,
+  oneProductPerName,
   productsInCategory,
   toQuotableProduct,
   type ProductCategory,
+  type CatalogueProductRow,
 } from "@/lib/catalogue/products";
 import { getHourlyRatePence } from "@/lib/pricing/calculate";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -65,7 +67,14 @@ async function loadServiceGroups(): Promise<ServiceGroup[]> {
       getHourlyRatePence(db),
     ]);
     return PRODUCT_CATEGORIES.map((category) => {
-      const priced = productsInCategory(rows, category.key)
+      // Before the car is known, a name offered for several fuels (Task 74:
+      // the petrol and diesel Major service) is one card, at its lowest price.
+      const inCategory = productsInCategory(rows, category.key);
+      const priced = oneProductPerName(inCategory)
+        .map((row) => ({
+          ...row,
+          price_pence: lowestFixedPrice(inCategory, row),
+        }))
         .map(toQuotableProduct)
         .map((product) => ({ product, base: productBasePence(product, hourlyRatePence) }))
         .filter((p): p is { product: typeof p.product; base: number } => p.base != null);
@@ -89,6 +98,16 @@ async function loadServiceGroups(): Promise<ServiceGroup[]> {
     console.error("[homepage] services load failed:", err);
     return [];
   }
+}
+
+/** The lowest fixed price among the products sharing this one's name (its fuel variants). */
+function lowestFixedPrice(rows: readonly CatalogueProductRow[], row: CatalogueProductRow): number | null {
+  if (row.price_pence == null) return null;
+  const name = row.name.trim().toLowerCase();
+  const prices = rows
+    .filter((r) => r.name.trim().toLowerCase() === name && r.price_pence != null)
+    .map((r) => r.price_pence as number);
+  return prices.length ? Math.min(...prices) : row.price_pence;
 }
 
 const bookHref = (node: string) => `/book?node=${encodeURIComponent(node)}`;

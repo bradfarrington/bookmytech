@@ -13,6 +13,13 @@ import { formatPrice } from "@/lib/utils";
 //     within-24-hours fee unless the mechanic is already en route.
 //   • §22: rescheduling is always free on the platform, so the document's
 //     "a cancellation charge may apply" sentence is replaced.
+//
+// Added 13 November 2026 (Task 74), from Brad's "book my tech dpf.odt"
+// (docs/legal/dpf-info-sheet.odt): the "DPF Cleaning and Regeneration" section
+// (§16, so from here on the page is one section ahead of customer-terms.odt)
+// and its warranty exclusion. The same
+// document is each DPF product's info sheet in /admin/services, shown before
+// booking and in the confirmation email.
 
 export type CancelFeeTiers = { before24h: number; within24h: number; enRoute: number; diagnostic: number };
 
@@ -364,6 +371,16 @@ export function buildSections(tiers: CancelFeeTiers): LegalSection[] {
     ],
   },
   {
+    heading: "DPF Cleaning and Regeneration",
+    blocks: [
+      { type: "p", text: "Diesel Particulate Filter (DPF) cleaning and regeneration services aim to clear soot and ash from a blocked DPF. Before you book one, we show you how the service is carried out." },
+      { type: "p", text: "The DPF cleaning or regeneration fee applies whether or not the filter clears. It covers the mechanic’s time, specialist diagnostic equipment and any cleaning chemicals used to carry out the work properly." },
+      { type: "p", text: "We cannot guarantee that a DPF can be recovered. Some filters are too heavily blocked, damaged inside, or held back by another engine or exhaust fault. Because the mechanic’s time, tools and cleaning fluids are used up during the attempt, the full service charge still applies if your DPF cannot be recovered and needs further work or replacing." },
+      { type: "p", text: "Any further work, including a replacement DPF, is quoted separately through Book My Tech in accordance with Section 9." },
+      { type: "p", text: "DPF cleaning and regeneration services are excluded from the 12-month / 12,000-mile warranty." },
+    ],
+  },
+  {
     heading: "Vehicle Condition",
     blocks: [
       { type: "p", text: "Vehicles can have multiple faults, particularly older or high-mileage vehicles." },
@@ -620,6 +637,7 @@ export function buildSections(tiers: CancelFeeTiers): LegalSection[] {
           "unauthorised modifications;",
           "damage caused by another component;",
           "unrelated faults;",
+          "DPF cleaning and regeneration services;",
           "customer-supplied parts;",
           "repairs carried out by another party;",
           "failure to follow manufacturer instructions;",

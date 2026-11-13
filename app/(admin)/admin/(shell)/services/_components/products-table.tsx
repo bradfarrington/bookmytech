@@ -8,7 +8,10 @@ import { ArrowDown, ArrowUp, Droplets, Pencil, Trash2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { cn, formatPrice } from "@/lib/utils";
-import type { CatalogueProductRow } from "@/lib/catalogue/products";
+import { Pill } from "@/components/ui/pill";
+import { productFuels, type CatalogueProductRow, type FuelFamily } from "@/lib/catalogue/products";
+
+const FUEL_LABEL: Record<FuelFamily, string> = { petrol: "Petrol", diesel: "Diesel", electric: "Electric" };
 import { deleteProduct, reorderProduct, setProductActive } from "@/app/actions/catalogue-products";
 
 export function ProductsTable({ products }: { products: CatalogueProductRow[] }) {
@@ -74,7 +77,13 @@ export function ProductsTable({ products }: { products: CatalogueProductRow[] })
                   </div>
                 </td>
                 <td className="px-4 py-3">
-                  <div className="font-semibold text-text-primary">{p.name}</div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-semibold text-text-primary">{p.name}</span>
+                    {productFuels(p).length > 0 && (
+                      <Pill tone="info">{productFuels(p).map((f) => FUEL_LABEL[f]).join(" / ")} only</Pill>
+                    )}
+                    {p.info_sheet?.trim() && <Pill tone="accent">Info sheet</Pill>}
+                  </div>
                   {p.summary && <div className="text-xs text-text-muted">{p.summary}</div>}
                 </td>
                 <td className="px-4 py-3 text-right tabular-nums">

@@ -18,6 +18,7 @@ import { productIncludes } from "@/lib/catalogue/products";
 import { partGroupName } from "@/lib/parts/quote-parts";
 import { stepQuery } from "@/lib/bookings/step-params";
 import { PriceHero } from "./_components/price-hero";
+import { ProductInfoSheets } from "./_components/product-info-sheets";
 
 // Step 3: the price. One job, or several priced as one visit (Task 24) — the
 // customer can add another from here and comes back with it appended. A
@@ -181,6 +182,13 @@ export default async function MatchPage({ searchParams }: MatchPageProps) {
         includes={singleProduct ? productIncludes(singleProduct.description) : undefined}
         visitHours={quote.visitHours}
         productsOnly={productsOnly}
+      />
+
+      {/* Task 74: what a product asks the customer to read before booking it. */}
+      <ProductInfoSheets
+        sheets={quote.products.flatMap((p) =>
+          p.infoSheet ? [{ id: p.id, name: p.name, infoSheet: p.infoSheet }] : [],
+        )}
       />
 
       <div className="flex flex-col gap-3">

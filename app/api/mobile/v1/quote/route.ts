@@ -1,4 +1,5 @@
 import { PARTS_UNAVAILABLE_MESSAGE, quoteRepairsResult } from "@/lib/haynespro/repair-booking";
+import { parseInfoSheet } from "@/lib/catalogue/products";
 import { customerPartLines } from "@/lib/parts/quote-parts";
 import { MAX_REPAIRS_PER_BOOKING, readRepairIdList } from "@/lib/bookings/repair-ids";
 import { enforceCatalogueLimits } from "@/lib/mobile/catalogue-limits";
@@ -36,6 +37,13 @@ import { createAdminClient } from "@/lib/supabase/admin";
 //   oil:          { litres, pencePerLitre, pence, source, label } | null —
 //                 the engine-oil line a servicing product adds
 //   products:     [{ id, name, pricePence, labourHours, durationHours }]
+//                 `infoSheet` (ADDITIVE, Task 74): what the customer must read
+//                 before booking that product (e.g. a DPF clean's "charged
+//                 whether or not the filter clears"), as blocks —
+//                 { type: "heading" | "paragraph", text } | { type: "bullets",
+//                 items } — or null. Show it before checkout. A product id the
+//                 car's fuel isn't offered may come back as its same-named twin
+//                 for that fuel (a different `id`): carry the returned ids on.
 //   labourPence / fixedPence / visitHours
 // and each line may carry kind: "product" + productId. `nodeId` may be a
 // "p:" id when the first thing chosen was a product.
@@ -131,6 +139,7 @@ export async function POST(request: Request): Promise<Response> {
       labourHours: p.labourHours,
       durationHours: p.durationHours,
       category: p.category,
+      infoSheet: p.infoSheet ? parseInfoSheet(p.infoSheet) : null,
     })),
     labourPence: quote.labourPence,
     fixedPence: quote.fixedPence,

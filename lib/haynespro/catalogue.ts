@@ -31,6 +31,7 @@ import {
   composeTopLevel,
   isProductCategoryId,
   productCategoryOf,
+  productsForFuel,
   productsInCategory,
   toProductNode,
   toQuotableProduct,
@@ -38,6 +39,7 @@ import {
   type OilQuote,
 } from "@/lib/catalogue/products";
 import { engineOilForVehicle } from "./engine-oil";
+import { vehicleFuelFamily } from "./fuel";
 import { isHaynesProConfigured } from "./client";
 import { excludedRepairNodeIdsForVehicle } from "./exclusions";
 import { genartExtra, genartIdsOf } from "./genarts";
@@ -50,6 +52,15 @@ import {
 } from "./tree";
 import type { HpVehicleRef } from "./tree";
 import { resolveVehicle } from "./vehicle";
+import {
+  affinityFor,
+  haystackOf,
+  matchRank,
+  parseSearchQuery,
+  requiredTermCount,
+  type SearchQuery,
+} from "./search-terms";
+import { groupVocabulary } from "./search-vocabulary";
 import type { HpRepairtimeNode } from "./types";
 
 /** The node id HaynesPro uses for the top level of the repair-times tree. */
@@ -307,12 +318,13 @@ async function loadContext(
   }
   if (resolved.repairtimeTypeId == null) return NO_REPAIR_DATA;
 
-  const [hourlyRatePence, excluded, overlay, combineMode, products] = await Promise.all([
+  const [hourlyRatePence, excluded, overlay, combineMode, products, fuel] = await Promise.all([
     getHourlyRatePence(db),
     excludedRepairNodeIdsForVehicle(resolved.hpModelLabel, db),
     loadCatalogueOverlay(db),
     getRepairCombineMode(db),
     loadCatalogueProducts(db),
+    vehicleFuelFamily(resolved.carTypeId),
   ]);
   const repairtimeTypeId = resolved.repairtimeTypeId;
   const carTypeId = resolved.carTypeId;
@@ -357,7 +369,9 @@ async function loadContext(
       excluded,
       overlay,
       combineHours,
-      products,
+      // Only what this car's fuel is offered (Task 74): a diesel never sees
+      // the petrol major service, and only a diesel sees the DPF clean.
+      products: productsForFuel(products, fuel),
       oilFor,
     },
   };
@@ -584,16 +598,23 @@ export async function getRepairCatalogueLevel(
  * Verified — a 40-expansion breadth-first walk for "brake pads" found zero
  * hits on a live T-Roc.
  *
- * What makes best-first work is that the path to a matching leaf is itself
- * named for the query: "Renew the front brake pads" lives under "Brake pads"
- * under "Brakes". So groups are expanded in order of how many query tokens
- * their own name contains, shallowest first. Groups matching nothing are still
- * expanded if budget remains — a leaf can be named unlike its parents — they
- * just go last.
+ * Task 74: what steers it is the group's VOCABULARY — every word used beneath
+ * it on four reference cars (lib/haynespro/search-vocabulary.json) — not its
+ * name. Names alone failed in practice: "Renew the front brake pads" sits under
+ * "Brake pad" under "Brakes (Mechanical)", so "pads" scored nothing anywhere and
+ * the budget ran out before reaching the brakes. Group ids are one taxonomy on
+ * every vehicle, so the reference cars' words hold for all of them. A group the
+ * vocabulary doesn't know falls back to its own name.
  *
- * `truncated` means the queue wasn't drained, which for a tree this size is
- * the normal outcome. Both clients MUST surface it: "closest matches", never
- * "all matches".
+ * Groups whose vocabulary lacks any of the query's terms are not opened while
+ * there are hits: on the reference cars they hold nothing that matches (a job
+ * must carry every term, so its group's words must), and opening them
+ * costs a metered call each. If nothing at all is found, the walk carries on
+ * into them as it always did, in case this car has a job the reference cars
+ * lack.
+ *
+ * `truncated` means a group that could still hold a match was left unopened.
+ * Both clients MUST surface it: "closest matches", never "all matches".
  *
  * Expansions run in bounded-concurrency batches so the wall clock stays inside
  * a serverless request even on a cold memo.
@@ -608,8 +629,15 @@ export { MIN_SEARCH_QUERY_LENGTH } from "./search-query";
 interface PendingGroup {
   id: string;
   depth: number;
-  /** How many query tokens the group's own name contains. */
+  /** How many query terms the group's vocabulary (or, unknown, its name) contains. */
   affinity: number;
+  /** How many the group's own name contains — the tie-break. */
+  nameAffinity: number;
+  /**
+   * False when the vocabulary knows the group and it lacks one of the terms a
+   * job must match: no job beneath it can match.
+   */
+  promising: boolean;
   /** Discovery order, for a stable tie-break. */
   seq: number;
 }
@@ -659,13 +687,13 @@ export async function searchJobsForCarType(
  * this vehicle. Like combined repairs, they aren't in HaynesPro's tree, so
  * the walk can't find them.
  */
-async function productSearchHits(context: CatalogueContext, needle: string, tokens: string[]): Promise<CatalogueNode[]> {
+async function productSearchHits(context: CatalogueContext, query: SearchQuery): Promise<CatalogueNode[]> {
   const matching = context.products
     .filter((row) => row.is_active)
     .filter(
       (row) =>
-        matchRank(row.name, needle, tokens) != null ||
-        (row.summary != null && matchRank(row.summary, needle, tokens) != null),
+        matchRank(row.name, query) != null ||
+        (row.summary != null && matchRank(row.summary, query) != null),
     );
   if (matching.length === 0) return [];
   const products = matching.map(toQuotableProduct);
@@ -680,9 +708,8 @@ async function runSearch(
   query: string,
   options: { bundles: boolean },
 ): Promise<CatalogueSearch> {
-  const needle = query.trim().toLowerCase();
-  const tokens = needle.split(/\s+/).filter(Boolean);
-  if (tokens.length === 0) {
+  const parsed = parseSearchQuery(query);
+  if (parsed.terms.length === 0) {
     return { ok: true, vehicle: context.vehicle, hits: [], truncated: false };
   }
 
@@ -691,33 +718,47 @@ async function runSearch(
   // Guards against spending an expansion twice on a group that HaynesPro lists
   // under more than one parent.
   const queued = new Set<string>([ROOT_NODE_ID]);
-  const queue: PendingGroup[] = [{ id: ROOT_NODE_ID, depth: 0, affinity: 0, seq: 0 }];
+  const queue: PendingGroup[] = [
+    { id: ROOT_NODE_ID, depth: 0, affinity: 0, nameAffinity: 0, promising: true, seq: 0 },
+  ];
   let expansions = 0;
   let seq = 1;
+  const required = requiredTermCount(parsed);
 
   // Combined repairs (Task 26) aren't in HaynesPro's tree, so the walk can't
   // find them. Match them by name up front — cheap, and exactly what someone
   // typing "pads discs" is after.
   if (options.bundles) {
     const [bundleHits, productHits] = await Promise.all([
-      bundleSearchHits(context, needle, tokens),
-      productSearchHits(context, needle, tokens),
+      bundleSearchHits(context, parsed),
+      productSearchHits(context, parsed),
     ]);
     for (const node of [...productHits, ...bundleHits]) {
       seen.add(`${node.kind}:${node.description.toLowerCase()}`);
-      hits.push({ node, rank: matchRank(node.description, needle, tokens) ?? 2, order: seq++ });
+      hits.push({ node, rank: matchRank(node.description, parsed) ?? 3, order: seq++ });
     }
   }
 
   while (queue.length > 0 && expansions < SEARCH_MAX_EXPANSIONS) {
-    // Most promising first: name affinity, then shallowest, then discovery
-    // order. Re-sorted each round because a round can discover a better branch
-    // than anything already waiting.
-    queue.sort((a, b) => b.affinity - a.affinity || a.depth - b.depth || a.seq - b.seq);
+    // Most promising first: vocabulary affinity, then name, then shallowest,
+    // then discovery order. Re-sorted each round because a round can discover
+    // a better branch than anything already waiting.
+    queue.sort(
+      (a, b) =>
+        Number(b.promising) - Number(a.promising) ||
+        b.affinity - a.affinity ||
+        b.nameAffinity - a.nameAffinity ||
+        a.depth - b.depth ||
+        a.seq - b.seq,
+    );
+    // Open only groups that can hold a match; once none are left, stop if
+    // anything was found, else fall back to opening the rest (see above).
+    const promising = queue.filter((p) => p.promising).length;
+    if (promising === 0 && hits.length > 0) break;
 
     const batch = queue.splice(
       0,
-      Math.min(SEARCH_CONCURRENCY, SEARCH_MAX_EXPANSIONS - expansions),
+      Math.min(SEARCH_CONCURRENCY, SEARCH_MAX_EXPANSIONS - expansions, promising || queue.length),
     );
     expansions += batch.length;
 
@@ -742,16 +783,23 @@ async function runSearch(
         // unmatched group name can still contain a matching repair.
         if (node?.kind === "group" && !queued.has(node.id)) {
           queued.add(node.id);
+          const vocabulary = groupVocabulary(node.id);
+          const nameAffinity = affinityFor(node.description, parsed);
+          const affinity = vocabulary
+            ? affinityFor([...vocabulary, ...haystackOf(node.description)], parsed)
+            : nameAffinity;
           queue.push({
             id: node.id,
             depth,
-            affinity: affinityFor(node.description, tokens),
+            affinity,
+            nameAffinity,
+            promising: vocabulary == null || affinity >= required,
             seq: seq++,
           });
         }
         if (!node) continue;
 
-        const rank = matchRank(node.description, needle, tokens);
+        const rank = matchRank(node.description, parsed);
         if (rank == null) continue;
 
         // Dedupe on the NAME, not the id. HaynesPro files the same group under
@@ -770,7 +818,7 @@ async function runSearch(
     }
   }
 
-  return finish(context, hits, queue.length > 0);
+  return finish(context, hits, queue.some((p) => p.promising));
 }
 
 /**
@@ -779,15 +827,14 @@ async function runSearch(
  */
 async function bundleSearchHits(
   context: CatalogueContext,
-  needle: string,
-  tokens: string[],
+  query: SearchQuery,
 ): Promise<CatalogueNode[]> {
   const candidates: Array<{ bundle: (typeof context.overlay.bundles)[number]; options: ReturnType<typeof bundlesAt>[number]["options"] }> = [];
   for (const bundle of context.overlay.bundles) {
     if (!bundle.is_active) continue;
     const options = context.overlay.optionsByBundle.get(bundle.id) ?? [];
     const matching = options.filter(
-      (o) => matchRank(optionDisplayName(bundle, o, options.length), needle, tokens) != null,
+      (o) => matchRank(optionDisplayName(bundle, o, options.length), query) != null,
     );
     if (matching.length) candidates.push({ bundle, options: matching });
   }
@@ -825,30 +872,8 @@ async function bundleSearchHits(
   return out;
 }
 
-/** How many query tokens appear in a group's name — the walk's priority. */
-export function affinityFor(description: string, tokens: string[]): number {
-  const haystack = description.toLowerCase();
-  return tokens.reduce((n, t) => n + (haystack.includes(t) ? 1 : 0), 0);
-}
-
-/**
- * How well a description matches, lower being better, or null for no match.
- * Every token must appear — "brake pads front" finds "Renew the front brake
- * pads" — with whole-phrase and prefix matches promoted above that.
- *
- * `needle` and `tokens` must already be lower-cased: the caller does that once
- * per search rather than once per node, and the walk visits thousands of nodes.
- */
-export function matchRank(
-  description: string,
-  needle: string,
-  tokens: string[],
-): number | null {
-  const haystack = description.toLowerCase();
-  if (haystack.startsWith(needle)) return 0;
-  if (haystack.includes(needle)) return 1;
-  return tokens.every((t) => haystack.includes(t)) ? 2 : null;
-}
+// The matching itself (stems, synonyms, verbs) lives in ./search-terms.
+export { affinityFor, matchRank } from "./search-terms";
 
 function finish(
   context: CatalogueContext,

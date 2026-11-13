@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { productId, type ProductCategory } from "@/lib/catalogue/products";
+import { FUEL_FAMILIES, productId, type FuelFamily, type ProductCategory } from "@/lib/catalogue/products";
 
 // The admin's fixed-price products (Task 31): diagnostics, servicing and
 // pre-purchase inspections beside the HaynesPro repair tree. Every write goes
@@ -19,6 +19,7 @@ const CATEGORIES: readonly ProductCategory[] = ["diagnostics", "servicing", "ins
 const MAX_NAME = 80;
 const MAX_SUMMARY = 160;
 const MAX_DESCRIPTION = 2000;
+const MAX_INFO_SHEET = 8000;
 
 async function requireAdmin(): Promise<{ ok: true } | { ok: false; error: string }> {
   const supabase = await createClient();
@@ -46,6 +47,10 @@ export interface ProductInput {
   /** The checklist the mechanic fills in on this product (Task 32), and its tier for an inspection. */
   checklistId?: string | null;
   checklistTier?: string | null;
+  /** Task 74: the fuels it's offered for; empty or omitted = every vehicle. */
+  fuelTypes?: string[] | null;
+  /** Task 74: what the customer reads before booking it. */
+  infoSheet?: string | null;
 }
 
 type Cleaned = {
@@ -60,6 +65,8 @@ type Cleaned = {
   is_active: boolean;
   checklist_id: string | null;
   checklist_tier: string | null;
+  fuel_types: FuelFamily[] | null;
+  info_sheet: string | null;
 };
 
 const TIERS = ["bronze", "silver", "gold"];
@@ -93,6 +100,10 @@ function clean(input: ProductInput): { ok: true; row: Cleaned } | { ok: false; e
   const tierRaw = (input.checklistTier ?? "").trim().toLowerCase();
   const checklist_tier = checklist_id && TIERS.includes(tierRaw) ? tierRaw : null;
 
+  const fuels = FUEL_FAMILIES.filter((f) => (input.fuelTypes ?? []).includes(f));
+  const info_sheet = (input.infoSheet ?? "").trim() || null;
+  if (info_sheet && info_sheet.length > MAX_INFO_SHEET) return { ok: false, error: "That info sheet is too long." };
+
   return {
     ok: true,
     row: {
@@ -107,8 +118,35 @@ function clean(input: ProductInput): { ok: true; row: Cleaned } | { ok: false; e
       is_active: Boolean(input.isActive),
       checklist_id,
       checklist_tier,
+      fuel_types: fuels.length > 0 ? fuels : null,
+      info_sheet,
     },
   };
+}
+
+/**
+ * Write a product, coping with a database that predates 0088 (Task 74): the
+ * fuel and info-sheet columns don't exist yet. When they're left at their
+ * defaults the write goes ahead without them; when they're set, the admin is
+ * told why they can't be saved yet.
+ */
+async function writeWithoutMissingColumns<T>(
+  row: Cleaned,
+  write: (values: Partial<Cleaned>) => PromiseLike<{ data: T | null; error: { code?: string; message: string } | null }>,
+): Promise<{ data: T | null; error: { code?: string; message: string } | null }> {
+  const first = await write(row);
+  const missing = first.error && /fuel_types|info_sheet/.test(first.error.message);
+  if (!missing) return first;
+  if (row.fuel_types != null || row.info_sheet != null) {
+    return {
+      data: null,
+      error: { message: "Fuels and info sheets can't be saved until migration 0088 is applied." },
+    };
+  }
+  const { fuel_types: _fuels, info_sheet: _sheet, ...rest } = row;
+  void _fuels;
+  void _sheet;
+  return write(rest);
 }
 
 function revalidate() {
@@ -119,7 +157,9 @@ function revalidate() {
 }
 
 function duplicateMessage(error: { code?: string; message: string }): string {
-  return error.code === "23505" ? "There's already a product with that name in this category." : error.message;
+  return error.code === "23505"
+    ? "There's already a product with that name in this category for the same vehicles."
+    : error.message;
 }
 
 export async function createProduct(input: ProductInput): Promise<ProductCreateResult> {
@@ -137,11 +177,14 @@ export async function createProduct(input: ProductInput): Promise<ProductCreateR
     .order("display_order", { ascending: false })
     .limit(1)
     .maybeSingle();
-  const { data, error } = await admin
-    .from("catalogue_products")
-    .insert({ ...cleaned.row, display_order: (last?.display_order ?? -1) + 1 })
-    .select("id")
-    .single();
+  const displayOrder = (last?.display_order ?? -1) + 1;
+  const { data, error } = await writeWithoutMissingColumns<{ id: string }>(cleaned.row, (values) =>
+    admin
+      .from("catalogue_products")
+      .insert({ ...values, display_order: displayOrder })
+      .select("id")
+      .single(),
+  );
   if (error || !data) return { ok: false, error: error ? duplicateMessage(error) : "Couldn't create the product." };
   revalidate();
   return { ok: true, id: data.id };
@@ -153,10 +196,13 @@ export async function updateProduct(id: string, input: ProductInput): Promise<Pr
   const cleaned = clean(input);
   if (!cleaned.ok) return cleaned;
 
-  const { error } = await createAdminClient()
-    .from("catalogue_products")
-    .update({ ...cleaned.row, updated_at: new Date().toISOString() })
-    .eq("id", id);
+  const admin = createAdminClient();
+  const { error } = await writeWithoutMissingColumns(cleaned.row, (values) =>
+    admin
+      .from("catalogue_products")
+      .update({ ...values, updated_at: new Date().toISOString() })
+      .eq("id", id),
+  );
   if (error) return { ok: false, error: duplicateMessage(error) };
   revalidate();
   return { ok: true };

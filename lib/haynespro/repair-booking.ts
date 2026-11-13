@@ -48,6 +48,7 @@ import {
   type QuotableProduct,
 } from "@/lib/catalogue/products";
 import { partGroupsOnNodes } from "@/lib/parts/part-groups";
+import { vehicleFuelFamily } from "./fuel";
 import { quoteJobParts, type PartsJob, type QuotedPart } from "@/lib/parts/quote-parts";
 import type { CombinedRepairTimes } from "./combine";
 import { engineOilForVehicle } from "./engine-oil";
@@ -365,8 +366,13 @@ export async function quoteRepairsResult(
     if (!vehicle || vehicle.repairtimeTypeId == null) return fail;
     const hpVehicle = { carTypeId: vehicle.carTypeId, repairtimeTypeId: vehicle.repairtimeTypeId };
 
-    const products = productIds.length ? resolveProducts(productIds, productRows) : [];
+    // A product offered for another fuel is swapped for its same-named twin
+    // for this one (Task 74), so `order` follows the swap.
+    const fuel = productIds.length ? await vehicleFuelFamily(vehicle.carTypeId) : null;
+    const products = productIds.length ? resolveProducts(productIds, productRows, fuel) : [];
     if (!products) return fail;
+    const swapped = new Map(productIds.map((id, i) => [id, products[i].id]));
+    const orderIds = itemIds.map((id) => swapped.get(id) ?? id);
     const items = catalogueIds.length ? expandCatalogueItems(catalogueIds, overlay) : [];
     if (!items) return fail;
     if (items.length === 0 && products.length === 0) return fail;
@@ -441,7 +447,7 @@ export async function quoteRepairsResult(
         nodes: item.nodeIds.map((id) => quotable.get(id)!),
       })),
       products,
-      order: itemIds,
+      order: orderIds,
       oil,
       parts: pricedParts.parts,
       combined,

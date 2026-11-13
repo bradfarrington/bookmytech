@@ -50,7 +50,7 @@ export const PRODUCT_CATEGORIES: readonly ProductCategoryDef[] = [
     key: "servicing",
     id: "c:servicing",
     label: "Servicing",
-    blurb: "Interim, full and major services with the right oil for your engine",
+    blurb: "Interim, full and major services with the right oil for your engine, and DPF cleaning for diesels",
   },
   {
     key: "inspection",
@@ -88,6 +88,77 @@ export interface CatalogueProductRow {
   /** 0061 (Task 32) — the checklist the mechanic fills in on this product, and the tier of it. */
   checklist_id?: string | null;
   checklist_tier?: string | null;
+  /** 0088 (Task 74) — the fuels it's offered for; null or empty = every vehicle. */
+  fuel_types?: string[] | null;
+  /** 0088 (Task 74) — what the customer reads before booking it; headings, bullets and paragraphs. */
+  info_sheet?: string | null;
+}
+
+// --- Fuel (Task 74) ---------------------------------------------------------
+//
+// Some products only make sense for one fuel: a DPF clean for a diesel, spark
+// plugs in a petrol's major service. A product names the fuels it's for, and
+// the catalogue only lists it for a vehicle of one of them. Two products may
+// share a name in a category when their fuels differ — "Major service" for
+// petrol and "Major service" for diesel — and the customer only ever sees the
+// one that fits their car.
+
+export type FuelFamily = "petrol" | "diesel" | "electric";
+export const FUEL_FAMILIES: readonly FuelFamily[] = ["petrol", "diesel", "electric"];
+
+/**
+ * HaynesPro's fuel for a car type, as one family. A hybrid carries its
+ * combustion fuel ("PETROL"), so it is petrol here; a pure EV is "ELECTRICAL".
+ * Null when unknown or something else (LPG, CNG…): such a vehicle sees every
+ * product, as it did before fuels existed.
+ */
+export function fuelFamilyOf(fuelType: string | readonly string[] | null | undefined): FuelFamily | null {
+  const fuels = (Array.isArray(fuelType) ? fuelType : [fuelType])
+    .map((f) => (typeof f === "string" ? f.toUpperCase().trim() : ""))
+    .filter(Boolean);
+  if (fuels.some((f) => f.includes("DIESEL"))) return "diesel";
+  if (fuels.some((f) => f.includes("PETROL") || f.includes("GASOLINE"))) return "petrol";
+  if (fuels.length > 0 && fuels.every((f) => f.startsWith("ELECTRIC"))) return "electric";
+  return null;
+}
+
+/** A product's fuels, cleaned: known families only, sorted, empty = every vehicle. */
+export function productFuels(row: Pick<CatalogueProductRow, "fuel_types">): FuelFamily[] {
+  const raw = Array.isArray(row.fuel_types) ? row.fuel_types : [];
+  return FUEL_FAMILIES.filter((f) => raw.includes(f));
+}
+
+/** Whether a product is offered for a vehicle of this fuel. Unknown fuel sees everything. */
+export function productFitsFuel(row: Pick<CatalogueProductRow, "fuel_types">, fuel: FuelFamily | null): boolean {
+  const fuels = productFuels(row);
+  return fuels.length === 0 || fuel == null || fuels.includes(fuel);
+}
+
+/** The products a vehicle of this fuel is offered. */
+export function productsForFuel<T extends Pick<CatalogueProductRow, "fuel_types">>(
+  rows: readonly T[],
+  fuel: FuelFamily | null,
+): T[] {
+  return rows.filter((r) => productFitsFuel(r, fuel));
+}
+
+/**
+ * One product per name in each category — for a listing made before the car is
+ * known (the homepage). The first in display order stands for the name; the
+ * lowest price among them is what "from" should quote.
+ */
+export function oneProductPerName(rows: readonly CatalogueProductRow[]): CatalogueProductRow[] {
+  const seen = new Set<string>();
+  const out: CatalogueProductRow[] = [];
+  for (const row of [...rows].sort(
+    (a, b) => (a.display_order ?? 0) - (b.display_order ?? 0) || a.name.localeCompare(b.name),
+  )) {
+    const key = `${row.category}:${row.name.trim().toLowerCase()}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(row);
+  }
+  return out;
 }
 
 function num(value: number | string | null | undefined): number | null {
@@ -128,6 +199,8 @@ export interface QuotableProduct {
   summary: string | null;
   /** What's included — one item per line. */
   description: string | null;
+  /** What the customer reads before booking (Task 74); null when there is none. */
+  infoSheet: string | null;
 }
 
 export function toQuotableProduct(row: CatalogueProductRow): QuotableProduct {
@@ -143,7 +216,50 @@ export function toQuotableProduct(row: CatalogueProductRow): QuotableProduct {
     category: row.category,
     summary: row.summary?.trim() || null,
     description: row.description?.trim() || null,
+    infoSheet: row.info_sheet?.trim() || null,
   };
+}
+
+/** One block of an info sheet, as the price page and the email render it. */
+export type InfoSheetBlock =
+  | { type: "heading"; text: string }
+  | { type: "paragraph"; text: string }
+  | { type: "bullets"; items: string[] };
+
+/**
+ * An info sheet as blocks. The admin writes plain text: a line starting "## "
+ * is a heading, a line starting "- " or "• " is a bullet, a blank line ends a
+ * paragraph, anything else is paragraph text.
+ */
+export function parseInfoSheet(text: string | null | undefined): InfoSheetBlock[] {
+  const blocks: InfoSheetBlock[] = [];
+  let paragraph: string[] = [];
+  const flush = () => {
+    if (paragraph.length) blocks.push({ type: "paragraph", text: paragraph.join(" ") });
+    paragraph = [];
+  };
+  for (const rawLine of (text ?? "").split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line) {
+      flush();
+      continue;
+    }
+    const heading = /^#{1,6}\s+(.*)$/.exec(line);
+    const bullet = /^[-•*]\s+(.*)$/.exec(line);
+    if (heading) {
+      flush();
+      if (heading[1].trim()) blocks.push({ type: "heading", text: heading[1].trim() });
+    } else if (bullet) {
+      flush();
+      const last = blocks[blocks.length - 1];
+      if (last?.type === "bullets") last.items.push(bullet[1].trim());
+      else blocks.push({ type: "bullets", items: [bullet[1].trim()] });
+    } else {
+      paragraph.push(line);
+    }
+  }
+  flush();
+  return blocks;
 }
 
 /** "What's included" as a list — one item per line of the description. */
@@ -222,13 +338,36 @@ export function composeTopLevel(rows: readonly CatalogueProductRow[]): Catalogue
   return nodes;
 }
 
-/** Resolve chosen "p:" ids to products, or null when one is unknown or switched off (all-or-nothing, like the overlay). */
-export function resolveProducts(ids: readonly string[], rows: readonly CatalogueProductRow[]): QuotableProduct[] | null {
+/**
+ * Resolve chosen "p:" ids to products, in the same order, or null when one is
+ * unknown or switched off (all-or-nothing, like the overlay).
+ *
+ * `fuel` (Task 74): a product that isn't offered for the vehicle's fuel is
+ * swapped for the live one of the same name in the same category that is —
+ * the homepage, an old link or an older app can carry the petrol "Major
+ * service" onto a diesel. With no such twin it's refused like a switched-off one.
+ */
+export function resolveProducts(
+  ids: readonly string[],
+  rows: readonly CatalogueProductRow[],
+  fuel: FuelFamily | null = null,
+): QuotableProduct[] | null {
   const out: QuotableProduct[] = [];
   for (const id of ids) {
     if (!isProductId(id)) return null;
-    const row = rows.find((r) => r.id === productUuid(id));
+    let row = rows.find((r) => r.id === productUuid(id));
     if (!row || !row.is_active) return null;
+    if (!productFitsFuel(row, fuel)) {
+      const chosen = row;
+      row = rows.find(
+        (r) =>
+          r.is_active &&
+          r.category === chosen.category &&
+          r.name.trim().toLowerCase() === chosen.name.trim().toLowerCase() &&
+          productFitsFuel(r, fuel),
+      );
+      if (!row) return null;
+    }
     const product = toQuotableProduct(row);
     if (product.pricePence == null && product.labourHours == null) return null;
     out.push(product);

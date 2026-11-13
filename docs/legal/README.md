@@ -1,6 +1,6 @@
 # Legal documents — source of record
 
-The four `.odt` files here are Brad's authoritative legal documents (all "Last updated:
+The `.odt` files here are Brad's authoritative legal documents (the first four "Last updated:
 26 August 2026"). The website's policy pages are **hand-converted** from them:
 
 | Document | Published at | Content module |
@@ -9,6 +9,13 @@ The four `.odt` files here are Brad's authoritative legal documents (all "Last u
 | `mechanic-terms.odt` | `/mechanic-agreement` | `app/(customer)/mechanic-agreement/content.ts` |
 | `privacy-policy.odt` | `/privacy` | `app/(customer)/privacy/content.ts` |
 | `cookie-policy.odt` | `/cookies` | `app/(customer)/cookies/content.ts` |
+| `dpf-info-sheet.odt` | `/terms` §16 + the DPF products' info sheets | `app/(customer)/terms/content.ts`, migration `0088` |
+
+**The website's terms are one section ahead of `customer-terms.odt` from §16 on** (13 November
+2026, Task 74): §16 "DPF Cleaning and Regeneration" was added from `dpf-info-sheet.odt`, so the
+document's §16 onwards is the page's §17 onwards. Add the section to `customer-terms.odt` too, and
+the numbering lines up again. The DPF services' info sheets (shown before booking and in the
+confirmation email) are edited in `/admin/services`, not here.
 
 Each content module starts with a comment listing every place the published page
 deliberately deviates from the document (live fee figures, the dropped "on the day"

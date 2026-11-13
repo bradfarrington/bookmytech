@@ -17,9 +17,8 @@ export default async function AdminServicesPage() {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("catalogue_products")
-    .select(
-      "id, category, name, summary, description, price_pence, labour_hours, duration_hours, includes_engine_oil, display_order, is_active",
-    )
+    // Every column: 0088's fuel_types / info_sheet when applied (Task 74).
+    .select("*")
     .order("category")
     .order("display_order");
   const rows = (data ?? []) as CatalogueProductRow[];

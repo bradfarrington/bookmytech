@@ -1,6 +1,7 @@
 import "server-only";
 import { escapeHtml } from "./render";
 import type { MergeVars } from "./blocks";
+import type { InfoSheetBlock } from "@/lib/catalogue/products";
 
 // Code-side renderers for the dynamic, non-editable parts of an email (amber
 // panels, itemised lists, summary tables). A `custom` block in the registry
@@ -18,7 +19,52 @@ function packedList(value: unknown): string[] {
     .filter(Boolean);
 }
 
+/**
+ * booking_confirmed — the info sheets of the products booked (Task 74), passed
+ * as JSON `[{ name, blocks }]` with blocks from parseInfoSheet. Anything
+ * malformed renders nothing rather than failing the email.
+ */
+function infoSheets(value: unknown): Array<{ name: string; blocks: InfoSheetBlock[] }> {
+  if (typeof value !== "string" || !value.trim()) return [];
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (s): s is { name: string; blocks: InfoSheetBlock[] } =>
+        s != null && typeof s.name === "string" && Array.isArray(s.blocks),
+    );
+  } catch {
+    return [];
+  }
+}
+
 export const CUSTOM_RENDERERS: Record<string, CustomRenderer> = {
+  info_sheets(vars) {
+    const sheets = infoSheets(vars.info_sheets);
+    if (sheets.length === 0) return "";
+    return sheets
+      .map((sheet) => {
+        const body = sheet.blocks
+          .map((block) => {
+            if (block.type === "heading")
+              return `<div style="font-weight:700;color:#0F172A;margin:12px 0 4px;">${escapeHtml(block.text)}</div>`;
+            if (block.type === "bullets")
+              return `<ul style="margin:4px 0;padding-left:20px;">${block.items
+                .map((item) => `<li style="margin:2px 0;">${escapeHtml(item)}</li>`)
+                .join("")}</ul>`;
+            return `<p style="margin:6px 0;">${escapeHtml(block.text)}</p>`;
+          })
+          .join("");
+        return `<mj-text padding-top="16px" font-size="14px" color="#334155">
+      <div style="border:1px solid #E2E8F0;border-radius:12px;padding:16px;">
+        <div style="font-size:12px;font-weight:700;letter-spacing:1px;color:#2563EB;text-transform:uppercase;">About your ${escapeHtml(sheet.name)}</div>
+        ${body}
+      </div>
+    </mj-text>`;
+      })
+      .join("\n");
+  },
+
   // application_approved — amber "outstanding items" block, only when the
   // mechanic was approved with grace (grace_outstanding populated).
   grace_block(vars) {

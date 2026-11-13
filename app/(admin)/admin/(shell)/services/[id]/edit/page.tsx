@@ -16,9 +16,9 @@ export default async function AdminServiceEditPage({ params }: { params: Promise
   const [{ data: product, error }, { data: checklists }] = await Promise.all([
     supabase
       .from("catalogue_products")
-      .select(
-        "id, category, name, summary, description, price_pence, labour_hours, duration_hours, includes_engine_oil, display_order, is_active, checklist_id, checklist_tier",
-      )
+      // Every column: 0088's fuel_types / info_sheet when applied, without
+      // failing the page before it is (Task 74).
+      .select("*")
       .eq("id", id)
       .single(),
     supabase.from("checklists").select("id, key, name, kind").order("name"),

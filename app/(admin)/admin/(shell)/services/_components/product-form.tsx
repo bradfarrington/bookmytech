@@ -8,7 +8,13 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Select } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { PRODUCT_CATEGORIES, type CatalogueProductRow, type ProductCategory } from "@/lib/catalogue/products";
+import {
+  PRODUCT_CATEGORIES,
+  productFuels,
+  type CatalogueProductRow,
+  type FuelFamily,
+  type ProductCategory,
+} from "@/lib/catalogue/products";
 import type { ChecklistRow } from "@/lib/checklists/checklists";
 import { createProduct, updateProduct, type ProductInput } from "@/app/actions/catalogue-products";
 
@@ -22,6 +28,15 @@ function poundsToPence(v: string): number {
 }
 
 type Pricing = "fixed" | "hourly";
+
+type FuelChoice = "any" | FuelFamily;
+
+const FUEL_OPTIONS: Array<{ value: FuelChoice; label: string }> = [
+  { value: "any", label: "Every vehicle" },
+  { value: "petrol", label: "Petrol cars only (includes hybrids)" },
+  { value: "diesel", label: "Diesel cars only" },
+  { value: "electric", label: "Electric cars only" },
+];
 
 const TIER_OPTIONS = [
   { value: "", label: "Every item (no tier)" },
@@ -57,6 +72,9 @@ export function ProductForm({
   const [durationInput, setDurationInput] = useState(String(Number(product?.duration_hours ?? 1)));
   const [includesOil, setIncludesOil] = useState(product?.includes_engine_oil ?? category === "servicing");
   const [isActive, setIsActive] = useState(product?.is_active ?? true);
+  const initialFuels = product ? productFuels(product) : [];
+  const [fuel, setFuel] = useState<FuelChoice>(initialFuels.length === 1 ? initialFuels[0] : "any");
+  const [infoSheet, setInfoSheet] = useState(product?.info_sheet ?? "");
 
   function submit() {
     setError(null);
@@ -73,6 +91,8 @@ export function ProductForm({
       isActive,
       checklistId: checklistId || null,
       checklistTier: chosenChecklist?.kind === "inspection" ? checklistTier || null : null,
+      fuelTypes: fuel === "any" ? null : [fuel],
+      infoSheet,
     };
     startTransition(async () => {
       const result = mode === "create" ? await createProduct(input) : await updateProduct(product!.id, input);
@@ -146,6 +166,31 @@ export function ProductForm({
             className={`${FIELD_INPUT} h-auto resize-y py-2.5`}
           />
           <span className="text-xs font-normal text-text-muted">Shown on the price page, one bullet per line.</span>
+        </label>
+
+        <label className={FIELD_LABEL}>
+          <span>Offered for</span>
+          <Select<FuelChoice> value={fuel} onChange={setFuel} options={FUEL_OPTIONS} aria-label="Offered for" />
+          <span className="text-xs font-normal text-text-muted">
+            Customers only see it for a car of this fuel. Two products can share a name when they&apos;re
+            for different fuels (e.g. a petrol and a diesel Major service): each customer sees the one for their car.
+          </span>
+        </label>
+
+        <label className={FIELD_LABEL}>
+          <span>Before you book (info sheet)</span>
+          <textarea
+            value={infoSheet}
+            onChange={(e) => setInfoSheet(e.target.value)}
+            disabled={pending}
+            rows={8}
+            placeholder={"Optional. e.g.\n## How we do it\n- Diagnostic check: …\n\n## Before you book\nThe fee applies whether or not…"}
+            className={`${FIELD_INPUT} h-auto resize-y py-2.5`}
+          />
+          <span className="text-xs font-normal text-text-muted">
+            Shown under the price before the customer books, and in their booking confirmation email. Start a line
+            with &ldquo;## &rdquo; for a heading or &ldquo;- &rdquo; for a bullet; leave a blank line between paragraphs.
+          </span>
         </label>
 
         <div className="grid gap-5 sm:grid-cols-3">

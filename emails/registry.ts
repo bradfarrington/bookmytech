@@ -350,6 +350,11 @@ export const EMAIL_TEMPLATE_DEFS: readonly EmailTemplateDef[] = [
       { name: "vehicle", description: "Vehicle description", example: "AB12 CDE, Ford Focus" },
       { name: "when", description: "Scheduled date/time", example: "Monday 3 August · 8am–10am" },
       { name: "pay_line", description: "Payment summary line", example: "Amount pre-authorised: £120.00" },
+      {
+        name: "info_sheets",
+        description: "Set automatically: the 'before you book' sheet of any service booked that has one (e.g. a DPF clean). Empty otherwise",
+        example: "",
+      },
     ],
     blocks: [
       { id: "heading", type: "heading", text: "Your booking is confirmed!" },
@@ -367,6 +372,7 @@ export const EMAIL_TEMPLATE_DEFS: readonly EmailTemplateDef[] = [
         type: "note",
         text: "No money has left your account yet. Your payment will only be captured once your mechanic has completed the job.",
       },
+      { id: "info_sheets", type: "custom", render: "info_sheets" },
       {
         id: "help",
         type: "note",

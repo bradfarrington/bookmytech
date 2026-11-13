@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { parseInfoSheet } from "@/lib/catalogue/products";
 import { sendEmail } from "@/lib/email/send";
 import { renderTemplateEmail } from "@/emails/resolve";
 import { sendSms } from "@/lib/sms/send-sms";
@@ -564,6 +565,12 @@ export async function createBooking(
     vehicle: vehicleLabel,
     when: whenLabel,
     pay_line: payLine,
+    // Task 74: the info sheet of any product booked that has one (a DPF clean).
+    info_sheets: JSON.stringify(
+      quote.products
+        .filter((p) => p.infoSheet)
+        .map((p) => ({ name: p.name, blocks: parseInfoSheet(p.infoSheet) })),
+    ),
   })
     .then(({ subject, html }) => sendEmail({ to: input.customerEmail, subject, html }))
     .catch(console.error);

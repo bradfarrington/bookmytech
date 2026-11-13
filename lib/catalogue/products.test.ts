@@ -1,12 +1,16 @@
 import { describe, expect, it } from "vitest";
 import {
   composeTopLevel,
+  fuelFamilyOf,
   isProductCategoryId,
   isProductId,
   oilQuoteFor,
+  oneProductPerName,
+  parseInfoSheet,
   productCategoryOf,
   productId,
   productUuid,
+  productsForFuel,
   resolveProducts,
   toProductNode,
   toQuotableProduct,
@@ -122,5 +126,71 @@ describe("resolveProducts", () => {
     expect(resolveProducts(["p:nope"], rows)).toBeNull();
     expect(resolveProducts(["p:x1"], rows)).toBeNull();
     expect(resolveProducts(["1M01510000WV0"], rows)).toBeNull();
+  });
+});
+
+// Task 74 — products for one fuel, and the info sheet.
+describe("fuel", () => {
+  const majorPetrol: CatalogueProductRow = {
+    ...fullService,
+    id: "mp",
+    name: "Major service",
+    description: "Oil and filters replaced\nSpark plugs replaced",
+    fuel_types: ["petrol"],
+    display_order: 2,
+  };
+  const majorDiesel: CatalogueProductRow = { ...majorPetrol, id: "md", description: "Oil and filters replaced", fuel_types: ["diesel"], price_pence: 22000 };
+  const dpf: CatalogueProductRow = { ...fullService, id: "dpf", name: "DPF forced regeneration", fuel_types: ["diesel"], includes_engine_oil: false, display_order: 11 };
+  const rows = [fullService, majorPetrol, majorDiesel, dpf];
+
+  it("reads HaynesPro's fuel as one family; a hybrid is petrol", () => {
+    expect(fuelFamilyOf(["DIESEL"])).toBe("diesel");
+    expect(fuelFamilyOf("PETROL")).toBe("petrol");
+    expect(fuelFamilyOf(["PETROL", "ELECTRICAL"])).toBe("petrol");
+    expect(fuelFamilyOf(["ELECTRICAL"])).toBe("electric");
+    expect(fuelFamilyOf("LPG")).toBeNull();
+    expect(fuelFamilyOf(null)).toBeNull();
+  });
+
+  it("lists each car only what its fuel is offered", () => {
+    expect(productsForFuel(rows, "diesel").map((r) => r.id)).toEqual(["s1", "md", "dpf"]);
+    expect(productsForFuel(rows, "petrol").map((r) => r.id)).toEqual(["s1", "mp"]);
+    // An unknown fuel sees everything, as before fuels existed.
+    expect(productsForFuel(rows, null).map((r) => r.id)).toEqual(["s1", "mp", "md", "dpf"]);
+  });
+
+  it("swaps a product for its same-named twin for the car's fuel, in place", () => {
+    const products = resolveProducts(["p:s1", "p:mp"], rows, "diesel");
+    expect(products?.map((p) => p.id)).toEqual(["p:s1", "p:md"]);
+    expect(resolveProducts(["p:md"], rows, "petrol")?.map((p) => p.id)).toEqual(["p:mp"]);
+  });
+
+  it("refuses a product with no twin for the car's fuel", () => {
+    expect(resolveProducts(["p:dpf"], rows, "petrol")).toBeNull();
+    expect(resolveProducts(["p:dpf"], rows, "diesel")?.map((p) => p.id)).toEqual(["p:dpf"]);
+  });
+
+  it("shows one card per name before the car is known", () => {
+    expect(oneProductPerName(rows).map((r) => r.id)).toEqual(["s1", "mp", "dpf"]);
+  });
+});
+
+describe("parseInfoSheet", () => {
+  it("reads headings, bullets and paragraphs", () => {
+    const blocks = parseInfoSheet(
+      "Intro line one\nstill intro.\n\n## How we do it\n- Check\n• Soak\n\nThe fee applies.\n",
+    );
+    expect(blocks).toEqual([
+      { type: "paragraph", text: "Intro line one still intro." },
+      { type: "heading", text: "How we do it" },
+      { type: "bullets", items: ["Check", "Soak"] },
+      { type: "paragraph", text: "The fee applies." },
+    ]);
+    expect(parseInfoSheet(null)).toEqual([]);
+  });
+
+  it("carries the sheet onto the quotable product", () => {
+    expect(toQuotableProduct({ ...diagnostic, info_sheet: "  ## Hi  " }).infoSheet).toBe("## Hi");
+    expect(toQuotableProduct(diagnostic).infoSheet).toBeNull();
   });
 });

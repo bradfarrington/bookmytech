@@ -24,7 +24,7 @@ export default async function TermsPage() {
       eyebrow="Legal"
       title="Customer Terms & Conditions"
       intro="The terms that apply to your use of the Book My Tech website and booking platform. Please read them carefully. They explain how bookings, additional work, payment, cancellations and our warranty work."
-      lastUpdated="26 August 2026"
+      lastUpdated="13 November 2026"
       preamble={PREAMBLE}
       sections={buildSections(tiers)}
     />
