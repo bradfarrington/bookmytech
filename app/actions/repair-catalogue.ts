@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { customGroupId, isCustomGroupId, uniqueIds } from "@/lib/catalogue/overlay";
 import { searchJobsForCarType } from "@/lib/haynespro/catalogue";
+import { isSameVariantJob } from "@/lib/haynespro/exclusions";
 import { getReferenceVehicle } from "@/lib/haynespro/reference-vehicle";
 
 // The admin's layer over HaynesPro's repair tree (Task 26): categories we
@@ -126,6 +127,10 @@ export async function deleteCatalogueGroup(input: { id: string }): Promise<Catal
 
 // --- HaynesPro nodes: names and moves --------------------------------------
 
+/** For an admin: why a job sharing HaynesPro's number with another car's job can't be changed separately. */
+const SHARED_NUMBER_ERROR = (other: string | null) =>
+  `On another car HaynesPro uses this repair's number for "${(other ?? "").replace(/\*/g, "").trim()}", which already has its own name or place. This one can't be renamed or moved separately yet.`;
+
 async function upsertOverride(
   patch: { custom_name?: string | null; parent_id?: string | null },
   node: { nodeId: string; kind: "group" | "repair"; description?: string | null },
@@ -140,6 +145,12 @@ async function upsertOverride(
     .select("custom_name, parent_id, description")
     .eq("node_id", nodeId)
     .maybeSingle();
+  // One row per node id, but a variant id is numbered per car: the row may be
+  // another car's different job under the same number (Task 77). Writing over
+  // it would rename or move that job instead, so refuse.
+  if (existing && !isSameVariantJob(nodeId, existing.description, node.description)) {
+    return { ok: false, error: SHARED_NUMBER_ERROR(existing.description) };
+  }
   const next = {
     node_id: nodeId,
     kind: node.kind,

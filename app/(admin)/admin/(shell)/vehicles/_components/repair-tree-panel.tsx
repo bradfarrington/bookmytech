@@ -19,6 +19,7 @@ import {
   bundlesAt,
   customGroupId,
   isCustomGroupId,
+  overrideFor,
   overridesMovedTo,
   uniqueIds,
 } from "@/lib/catalogue/overlay";
@@ -164,8 +165,9 @@ export async function RepairTreePanel({
   ]);
   const extraNodes = extraIds.length ? await getRepairNodesByIds({ carTypeId, repairtimeTypeId }, extraIds) : [];
   const extraById = new Map(extraNodes.filter((n) => n.id != null).map((n) => [n.id as string, n]));
+  // A rename on a variant matches HaynesPro's name for the job on this car (Task 77).
   const nameFor = (id: string) =>
-    overlay.overrides.get(id)?.custom_name?.trim() ||
+    overrideFor({ id, description: extraById.get(id)?.description }, overlay)?.custom_name?.trim() ||
     extraById.get(id)?.description?.trim() ||
     overlay.overrides.get(id)?.description?.trim() ||
     id;
@@ -176,7 +178,7 @@ export async function RepairTreePanel({
   const seen = new Set<string>();
   for (const hp of rawNodes) {
     if (hp.id == null) continue;
-    const override = overlay.overrides.get(hp.id);
+    const override = overrideFor({ id: hp.id, description: hp.description }, overlay);
     if (override?.parent_id && override.parent_id !== nodeId) continue; // moved elsewhere
     seen.add(hp.id);
     const name = override?.custom_name?.trim() || hp.description?.trim() || hp.id;

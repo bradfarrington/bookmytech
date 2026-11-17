@@ -7,6 +7,8 @@ import {
   bundleOptionId,
   customGroupId,
   EMPTY_OVERLAY,
+  displayName,
+  overrideFor,
 } from "./overlay";
 import type { HpRepairtimeNode } from "@/lib/haynespro/types";
 
@@ -210,5 +212,61 @@ describe("expandCatalogueItems", () => {
     expect(expandCatalogueItems([customGroupId("cat-1")], overlay)).toBeNull();
     expect(expandCatalogueItems([bundleOptionId("nope")], overlay)).toBeNull();
     expect(expandCatalogueItems([bundleOptionId("opt-old")], overlay)).toBeNull();
+  });
+});
+
+// Task 77: HaynesPro numbers a job's versions per car. On a Leon
+// 1E05001991WV2 is the manual starter; on a 2010 Fiesta the manual starter is
+// …WV1 and …WV0 the automatic. A rename follows the job, not the number.
+describe("renames on variant ids", () => {
+  const starters = buildOverlay({
+    overrides: [
+      { node_id: "1E05001991WV2", kind: "repair", description: "Renew the starter motor Manual transmission", custom_name: "Renew the starter motor (manual)", parent_id: null, display_order: null },
+      { node_id: "1M10040000WV9", kind: "repair", description: null, custom_name: "Old unnamed rename", parent_id: null, display_order: null },
+      { node_id: "1E05000000G", kind: "group", description: "Starter motor", custom_name: "Starting", parent_id: null, display_order: null },
+    ],
+  });
+  const level = (raw: HpRepairtimeNode[]) =>
+    composeLevel({
+      levelId: "1E05000000G",
+      raw,
+      overlay: starters,
+      excluded: new Set<string>(),
+      hourlyRatePence: RATE,
+      nodeHours: new Map(),
+      combineHours: () => null,
+    }).map((n) => [n.id, n.description]);
+
+  it("renames the same job under another number on another car", () => {
+    expect(
+      level([
+        { id: "1E05001991WV0", description: "Renew the starter motor Automatic transmission", value: 100 },
+        { id: "1E05001991WV1", description: "Renew the starter motor Manual transmission", value: 100 },
+      ]),
+    ).toEqual([
+      ["1E05001991WV0", "Renew the starter motor Automatic transmission"],
+      ["1E05001991WV1", "Renew the starter motor (manual)"],
+    ]);
+  });
+
+  it("leaves a different job with the renamed job's number alone", () => {
+    expect(
+      level([
+        { id: "1E05001991WV1", description: "Renew the starter motor", value: 100 },
+        { id: "1E05001991WV2", description: "Renew the starter motor Dual-clutch transmission", value: 100 },
+      ]),
+    ).toEqual([
+      ["1E05001991WV1", "Renew the starter motor"],
+      ["1E05001991WV2", "Renew the starter motor Dual-clutch transmission"],
+    ]);
+  });
+
+  it("still renames by id when the rename or the job has no wording", () => {
+    expect(displayName({ id: "1M10040000WV9", description: "Anything" }, starters)).toBe("Old unnamed rename");
+    expect(displayName({ id: "1E05001991WV2", description: null }, starters)).toBe("Renew the starter motor (manual)");
+  });
+
+  it("renames groups by id", () => {
+    expect(overrideFor({ id: "1E05000000G", description: "Something else" }, starters)?.custom_name).toBe("Starting");
   });
 });

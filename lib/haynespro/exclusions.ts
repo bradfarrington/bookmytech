@@ -75,6 +75,26 @@ export function variantKey(nodeId: string, description: string | null | undefine
   return words ? `${nodeId.replace(VARIANT_ENDING, "")}|${words}` : null;
 }
 
+/**
+ * Whether a saved row (a hide or a rename) for `nodeId`, made where the job
+ * read `savedWording`, is about the job that reads `wordingHere`. Always true
+ * for a group or an id without a variant ending, and when either wording is
+ * unknown (matched by id, as before Task 77). Pure.
+ *
+ * The tables hold one row per node id, so a variant id that means a different
+ * job on another car can't carry a second row: the save actions use this to
+ * refuse rather than overwrite the other car's row.
+ */
+export function isSameVariantJob(
+  nodeId: string,
+  savedWording: string | null | undefined,
+  wordingHere: string | null | undefined,
+): boolean {
+  const saved = variantKey(nodeId, savedWording);
+  const here = variantKey(nodeId, wordingHere);
+  return saved == null || here == null || saved === here;
+}
+
 /** A set of hides that answers for a node on a given car: its id and its wording there. */
 export class NodeMatcher {
   private readonly ids = new Set<string>();

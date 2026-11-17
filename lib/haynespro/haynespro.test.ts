@@ -7,6 +7,7 @@ import {
   GLOBAL_SCOPE,
   excludedRepairNodeIdsForLabel,
   variantKey,
+  isSameVariantJob,
   exclusionStateForModel,
   isGlobalExclusionRow,
   isNodeVisible,
@@ -715,5 +716,18 @@ describe("hides on job variants follow the wording, not the variant number (Task
       "1E05001991|RENEW THE STARTER MOTOR MANUAL TRANSMISSION",
     );
     expect(variantKey("1E05000000G", "Starter motor")).toBeNull();
+  });
+});
+
+describe("isSameVariantJob", () => {
+  it("tells another car's job under the same variant number apart", () => {
+    expect(isSameVariantJob("1E05001991WV1", "Renew the starter motor Manual transmission", "Renew the starter motor")).toBe(false);
+    expect(isSameVariantJob("1E05001991WV1", "Renew the starter motor*", "renew the  starter motor")).toBe(true);
+  });
+
+  it("treats groups, plain ids and unknown wording as the same job", () => {
+    expect(isSameVariantJob("1E05000000G", "Starter motor", "Starting")).toBe(true);
+    expect(isSameVariantJob("1E05001991WV1", null, "Renew the starter motor")).toBe(true);
+    expect(isSameVariantJob("1E05001991WV1", "Renew the starter motor", null)).toBe(true);
   });
 });

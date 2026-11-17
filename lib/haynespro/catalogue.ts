@@ -23,6 +23,7 @@ import {
   isCustomGroupId,
   optionDisplayName,
   bundleOptionId,
+  overrideFor,
   type CatalogueOverlay,
 } from "@/lib/catalogue/overlay";
 import { priceLevelParts, type PartsRow } from "@/lib/catalogue/level-parts";
@@ -774,7 +775,7 @@ async function runSearch(
 
         // The admin's name for it, if any (Task 26). A moved node is still
         // found — it exists on the vehicle wherever we list it.
-        const custom = context.overlay.overrides.get(hpNode.id)?.custom_name?.trim();
+        const custom = overrideFor({ id: hpNode.id, description: hpNode.description }, context.overlay)?.custom_name?.trim();
         const node = toCatalogueNode(
           custom ? { ...hpNode, description: custom } : hpNode,
           context.vehicle.hourlyRatePence,

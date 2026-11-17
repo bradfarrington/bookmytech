@@ -7,7 +7,7 @@
 // "b:<option uuid>" for one bookable option of a combined repair. Both prefixes
 // are safe because HaynesPro ids never contain ":".
 
-import type { RepairExclusionSet } from "@/lib/haynespro/exclusions";
+import { variantKey, type RepairExclusionSet } from "@/lib/haynespro/exclusions";
 import { billableHours } from "@/lib/pricing/billable";
 import type { CatalogueNode } from "@/lib/haynespro/catalogue";
 import { genartExtra } from "@/lib/haynespro/genarts";
@@ -65,7 +65,10 @@ export interface BundleOptionRow {
 
 export interface CatalogueOverlay {
   groups: CatalogueGroupRow[];
+  /** By node id. Look a HaynesPro node up with overrideFor, not this map: variants need its wording. */
   overrides: Map<string, CatalogueOverrideRow>;
+  /** Overrides on variant ids, by HaynesPro job number + saved wording (variantKey). */
+  overridesByKey: Map<string, CatalogueOverrideRow>;
   bundles: BundleRow[];
   optionsByBundle: Map<string, BundleOptionRow[]>;
   optionsById: Map<string, BundleOptionRow>;
@@ -93,9 +96,15 @@ export function buildOverlay(rows: {
     optionsByBundle.set(option.bundle_id, list);
   }
   for (const list of optionsByBundle.values()) list.sort(byOrder);
+  const overridesByKey = new Map<string, CatalogueOverrideRow>();
+  for (const o of rows.overrides ?? []) {
+    const key = variantKey(o.node_id, o.description);
+    if (key) overridesByKey.set(key, o);
+  }
   return {
     groups: [...(rows.groups ?? [])].sort(byOrder),
     overrides: new Map((rows.overrides ?? []).map((o) => [o.node_id, o])),
+    overridesByKey,
     bundles: (rows.bundles ?? [])
       .map((b) => ({ ...b, node_ids: uniqueIds(b.node_ids ?? []) }))
       .sort(byOrder),
@@ -115,12 +124,34 @@ export function uniqueIds(ids: readonly (string | null | undefined)[]): string[]
   return out;
 }
 
+/**
+ * The admin's rename / move for a HaynesPro node on this car, given
+ * HaynesPro's name for it here. A variant id (…WV<n>) is numbered per car —
+ * 1E05001991WV2 is the manual starter on a Leon, while a Fiesta's manual
+ * starter is …WV1 — so an override on one matches by job number plus the
+ * wording saved with it, as hides do (lib/haynespro/exclusions.ts, Task 77).
+ * Groups, other ids, and calls or rows without wording match by id. Pure.
+ */
+export function overrideFor(
+  node: { id: string; description?: string | null },
+  overlay: CatalogueOverlay,
+): CatalogueOverrideRow | undefined {
+  const key = variantKey(node.id, node.description);
+  const byId = overlay.overrides.get(node.id);
+  if (!key) return byId;
+  const byKey = overlay.overridesByKey.get(key);
+  if (byKey) return byKey;
+  // A row on this id saved with no wording still matches by id; one saved
+  // with other wording is about a different job.
+  return byId && variantKey(byId.node_id, byId.description) == null ? byId : undefined;
+}
+
 /** The name customers see for a HaynesPro node: the admin's, else HaynesPro's. */
 export function displayName(
   node: { id: string; description?: string | null },
   overlay: CatalogueOverlay,
 ): string {
-  const custom = overlay.overrides.get(node.id)?.custom_name?.trim();
+  const custom = overrideFor(node, overlay)?.custom_name?.trim();
   return custom || node.description?.trim() || node.id;
 }
 
@@ -219,7 +250,7 @@ export function composeLevel(input: ComposeInput): CatalogueNode[] {
 
   for (const hp of raw) {
     if (hp.id == null || excluded.has(hp.id, hp.description)) continue;
-    const override = overlay.overrides.get(hp.id);
+    const override = overrideFor({ id: hp.id, description: hp.description }, overlay);
     if (override?.parent_id && override.parent_id !== levelId) continue; // moved elsewhere
     const description = displayName({ id: hp.id, description: hp.description }, overlay);
     const node: CatalogueNode | null = hp.hasSubnodes
