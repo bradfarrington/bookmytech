@@ -11,6 +11,7 @@ import {
   catalogueBookingPartRows,
   choiceKey,
   customerPartLines,
+  needsManualQuote,
   priceJobParts,
   type PartsJob,
   type QuotedPart,
@@ -113,7 +114,7 @@ describe("priceJobParts", () => {
     });
     expect(result).toMatchObject({
       ok: false,
-      missing: [{ nodeId: "air", genartId: 2021, label: "Battery charger", position: null }],
+      missing: [{ nodeId: "air", genartId: 2021, label: "Battery charger", position: null, reason: "not_listed" }],
     });
     expect(result.parts.map((p) => p.genartId)).toEqual([8]);
   });
@@ -121,6 +122,22 @@ describe("priceJobParts", () => {
   it("can't price a group AAG couldn't be asked about", () => {
     const result = priceJobParts({ jobs: [job], offers: new Map([[8, { state: "unavailable" }]]), uncharged: new Set([2021]) });
     expect(result.ok).toBe(false);
+    // No answer goes to a manual quote too (Brad, 2026-11-17).
+    expect(!result.ok && result.missing.map((m) => m.reason)).toEqual(["unavailable"]);
+    expect(!result.ok && needsManualQuote(result.missing)).toBe(true);
+  });
+
+  it("needs a manual quote when NAPA lists the part but nothing it will price", () => {
+    const unpriced: AagPartOffers = { state: "ok", offers: [{ ...filter, costPence: null }], pricedAt: PRICED_AT, lastKnown: false };
+    const result = priceJobParts({ jobs: [job], offers: new Map([[8, unpriced]]), uncharged: new Set([2021]) });
+    expect(!result.ok && result.missing.map((m) => m.reason)).toEqual(["not_listed"]);
+    expect(!result.ok && needsManualQuote(result.missing)).toBe(true);
+  });
+
+  it("needs a manual quote for any unpriced part, listed or not answered", () => {
+    expect(needsManualQuote([{ reason: "unavailable" }, { reason: "not_listed" }])).toBe(true);
+    expect(needsManualQuote([{ reason: "unavailable" }])).toBe(true);
+    expect(needsManualQuote([])).toBe(false);
   });
 
   it("uses the admin's set price when AAG has none", () => {

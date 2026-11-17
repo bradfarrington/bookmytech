@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { JobPartsResult, QuotedPart } from "@/lib/parts/quote-parts";
-import { estimatedLevelRows, foldLevelParts, type PartsRow } from "./level-parts";
+import { estimatedLevelRows, foldLevelParts, quoteOnlyLevelRows, type PartsRow } from "./level-parts";
 
 const PRICED_AT = "2026-09-16T09:00:00.000Z";
 
@@ -63,7 +63,7 @@ describe("foldLevelParts", () => {
     const result: JobPartsResult = {
       ok: false,
       parts: [part("n1", 4820)],
-      missing: [{ nodeId: "n2", genartId: 402, label: "Brake pad", position: null }],
+      missing: [{ nodeId: "n2", genartId: 402, label: "Brake pad", position: null, reason: "unavailable" }],
     };
 
     expect(foldLevelParts(rows, result)).toEqual(new Map([["n1", 4820]]));
@@ -74,7 +74,7 @@ describe("foldLevelParts", () => {
     const result: JobPartsResult = {
       ok: false,
       parts: [part("n1", 4820)],
-      missing: [{ nodeId: "n2", genartId: 82, label: "Brake disc", position: "front" }],
+      missing: [{ nodeId: "n2", genartId: 82, label: "Brake disc", position: "front", reason: "not_listed" }],
     };
 
     expect(foldLevelParts(rows, result)).toEqual(new Map());
@@ -95,9 +95,29 @@ describe("estimatedLevelRows", () => {
     const result: JobPartsResult = {
       ok: false,
       parts: [{ ...part("n1", 1000), source: "estimate" }, part("n2", 2000), part("n3", 500)],
-      missing: [{ nodeId: "n4", genartId: 402, label: "Brake pad", position: null }],
+      missing: [{ nodeId: "n4", genartId: 402, label: "Brake pad", position: null, reason: "unavailable" }],
     };
     const totals = foldLevelParts(rows, result);
     expect([...estimatedLevelRows(rows, result, totals)]).toEqual(["n1", "b:opt"]);
+  });
+});
+
+describe("quoteOnlyLevelRows", () => {
+  it("flags rows with a part NAPA doesn't list or didn't answer for", () => {
+    const rows = [row("n1", ["n1"]), row("n2", ["n2"]), row("b:opt", ["n1", "n3"]), row("n4", ["n4"])];
+    const result: JobPartsResult = {
+      ok: false,
+      parts: [part("n1", 1000)],
+      missing: [
+        { nodeId: "n3", genartId: 82, label: "Brake disc", position: "front", reason: "not_listed" },
+        { nodeId: "n4", genartId: 402, label: "Brake pad", position: null, reason: "unavailable" },
+        { nodeId: "n2", genartId: 402, label: "Brake pad", position: null, reason: "not_listed" },
+      ],
+    };
+    expect([...quoteOnlyLevelRows(rows, result)]).toEqual(["n2", "b:opt", "n4"]);
+  });
+
+  it("flags nothing when every part priced", () => {
+    expect(quoteOnlyLevelRows([row("n1", ["n1"])], { ok: true, parts: [part("n1", 1000)] }).size).toBe(0);
   });
 });

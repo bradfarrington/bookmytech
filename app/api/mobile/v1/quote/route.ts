@@ -1,4 +1,4 @@
-import { PARTS_UNAVAILABLE_MESSAGE, quoteRepairsResult } from "@/lib/haynespro/repair-booking";
+import { partsFailureMessage, quoteRepairsResult } from "@/lib/haynespro/repair-booking";
 import { parseInfoSheet } from "@/lib/catalogue/products";
 import { customerPartLines } from "@/lib/parts/quote-parts";
 import { MAX_REPAIRS_PER_BOOKING, readRepairIdList } from "@/lib/bookings/repair-ids";
@@ -58,7 +58,11 @@ import { createAdminClient } from "@/lib/supabase/admin";
 //                 other cars of the same make and model; brand is
 //                 then null.
 // A repair whose parts can't be priced right now is `not_priceable` with a
-// parts-specific `message`; the code is unchanged.
+// parts-specific `message`; the code is unchanged. ADDITIVE (2026-11-17):
+// `needsQuote: true` when NAPA has nothing for a part on this car, so trying
+// again won't help: offer "Ask us for a quote" (the message says so too).
+// With it, `quoteJobs: string[]` names the repairs that need it, to prefill
+// the request.
 //
 // Thin wrapper over quoteRepairsResult, which is the SAME function the web
 // funnel prices with — match, slot, checkout hold and booking create each
@@ -109,9 +113,15 @@ export async function POST(request: Request): Promise<Response> {
     return apiOk({
       ok: false as const,
       code: "not_priceable" as const,
+      // ADDITIVE (2026-11-17): NAPA has nothing for a part on this car, so
+      // the job is priced by hand. The app offers "Ask us for a quote"; old
+      // builds just show `message`, which says to ask.
+      ...(result.reason === "parts_unavailable" && result.needsQuote
+        ? { needsQuote: true as const, quoteJobs: result.quoteJobs ?? [] }
+        : {}),
       message:
         result.reason === "parts_unavailable"
-          ? PARTS_UNAVAILABLE_MESSAGE
+          ? partsFailureMessage(result)
           : ids.length > 1
             ? "We can't price one of those repairs for this vehicle. Please check the jobs you've chosen, " +
               "or get in touch and we'll sort it for you."

@@ -5,7 +5,8 @@ import { vehicleLabel } from "@/lib/utils";
 import { ProgressStepper } from "@/components/customer/progress-stepper";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { PARTS_UNAVAILABLE_MESSAGE, quoteRepairsResult } from "@/lib/haynespro/repair-booking";
+import { partsFailureMessage, quoteRepairsResult } from "@/lib/haynespro/repair-booking";
+import { quoteRequestHref } from "@/lib/custom-quotes/href";
 import {
   MAX_REPAIRS_PER_BOOKING,
   parseRepairIds,
@@ -83,12 +84,30 @@ export default async function MatchPage({ searchParams }: MatchPageProps) {
   );
 
   if (!result.ok) {
-    // A part the jobs need has no supplier price we can use right now (Task 43).
+    // A part the jobs need has no supplier price we can use right now (Task
+    // 43), or NAPA doesn't list it for this car, so it's priced by hand
+    // through a quote request (2026-11-17).
     return (
       <div className="flex flex-col gap-6">
         <ProgressStepper currentStep={3} />
         {heading(browserHref)}
-        <Alert tone="warning">{PARTS_UNAVAILABLE_MESSAGE}</Alert>
+        <Alert tone={result.needsQuote ? "info" : "warning"}>{partsFailureMessage(result)}</Alert>
+        {result.needsQuote && (
+          <Link
+            href={quoteRequestHref({
+              reg,
+              make: params.make,
+              model: params.model,
+              postcode: params.postcode,
+              q: (result.quoteJobs ?? []).join(", "),
+              reason: "parts",
+            })}
+          >
+            <Button variant="primary" size="lg" fullWidth>
+              Ask for a quote
+            </Button>
+          </Link>
+        )}
         <Link href={browserHref}>
           <Button variant="secondary" size="lg" fullWidth>
             Choose different repairs

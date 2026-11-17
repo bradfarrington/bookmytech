@@ -11,10 +11,10 @@
 //
 // Two things it deliberately will NOT do:
 //
-//  - **Guess.** A part group with no usable price leaves its row unpriced, and
-//    the client falls back to "+ parts". A quote for that job would refuse the
-//    booking outright (PARTS_UNAVAILABLE_MESSAGE); quoting a total we know is
-//    short of the truth would be worse than saying we don't know it yet.
+//  - **Guess.** A part group with no usable price leaves its row unpriced and
+//    flagged `needsQuote`: the customer asks for a manual quote instead of
+//    booking (2026-11-17). Quoting a total we know is short of the truth would
+//    be worse than pricing it by hand.
 //  - **Hold up the page.** A cold registration means live supplier calls, so
 //    the whole pass is bounded by LEVEL_PARTS_BUDGET_MS. Past that the level
 //    renders with "+ parts" as it did before. The abandoned work still
@@ -52,9 +52,16 @@ export interface LevelParts {
   totals: LevelPartTotals;
   /** Rows (among `totals`) with at least one estimated part price (Task 72). */
   estimated: Set<string>;
+  /**
+   * Rows (never among `totals`) with a part NAPA gave no usable price for on
+   * this car, listed or not answered: priced by hand through a quote request
+   * (2026-11-17). When the whole pass runs out of time nothing is known yet,
+   * and every row reads "+ parts" as before.
+   */
+  needsQuote: Set<string>;
 }
 
-const EMPTY: LevelParts = { totals: new Map(), estimated: new Set() };
+const EMPTY: LevelParts = { totals: new Map(), estimated: new Set(), needsQuote: new Set() };
 
 /** The job description parts pricing reads — the same one `quoteRepairsResult` passes. */
 function jobDescription(node: HpRepairtimeNode): string {
@@ -101,6 +108,15 @@ export function estimatedLevelRows(rows: readonly PartsRow[], result: JobPartsRe
   );
 }
 
+/** The rows with a part NAPA gave no usable price for on this car. Pure. */
+export function quoteOnlyLevelRows(rows: readonly PartsRow[], result: JobPartsResult): Set<string> {
+  if (result.ok) return new Set();
+  const unpriced = new Set(result.missing.map((m) => m.nodeId));
+  return new Set(
+    rows.filter((row) => row.nodes.some((n) => n.id != null && unpriced.has(n.id))).map((row) => row.rowId),
+  );
+}
+
 /**
  * Price the parts for a level's bookable rows. Never throws: a supplier that
  * is down, slow or unconfigured gives an empty map and the level reads exactly
@@ -140,7 +156,11 @@ export async function priceLevelParts(args: {
     ]);
     if (!result) return EMPTY;
     const totals = foldLevelParts(rows, result);
-    return { totals, estimated: estimatedLevelRows(rows, result, totals) };
+    return {
+      totals,
+      estimated: estimatedLevelRows(rows, result, totals),
+      needsQuote: quoteOnlyLevelRows(rows, result),
+    };
   } catch (err) {
     console.error("[catalogue] pricing a level's parts failed:", err);
     return EMPTY;

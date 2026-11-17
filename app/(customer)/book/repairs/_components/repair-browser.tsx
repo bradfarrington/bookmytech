@@ -174,6 +174,9 @@ export async function RepairBrowser({
           atCap={atCap}
           groupHref={hrefs.groupHref}
           bookHref={hrefs.bookHref}
+          quoteHref={(node) =>
+            quoteRequestHref({ reg, make, model, postcode, q: node.bundleName ?? node.description, reason: "parts" })
+          }
         />
       </RepairSearch>
 

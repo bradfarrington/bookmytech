@@ -17,7 +17,7 @@ import {
   slotIso,
 } from "@/lib/slots";
 import { dispatchBooking } from "@/lib/dispatch/dispatch";
-import { PARTS_UNAVAILABLE_MESSAGE, quoteRepairsResult, type RepairsQuote } from "@/lib/haynespro/repair-booking";
+import { partsFailureMessage, quoteRepairsResult, type RepairsQuote } from "@/lib/haynespro/repair-booking";
 import {
   catalogueBookingPartRows,
   customerPartLines,
@@ -170,7 +170,7 @@ async function resolveBookingQuote(
       ok: false,
       error:
         result.reason === "parts_unavailable"
-          ? PARTS_UNAVAILABLE_MESSAGE
+          ? partsFailureMessage(result)
           : ids.length > 1
             ? "We couldn't price these repairs. Please start the booking again."
             : "We couldn't price this repair. Please start the booking again.",

@@ -58,11 +58,26 @@ Rules that still apply: never match by similar wording, never ask AAG/NAPA to fi
 - **Saving a hide or rename could overwrite another car's row.** Both tables hold one row per node id, so hiding or renaming the Leon's plain starter (…WV1) would have replaced the Fiesta's manual-starter row (also …WV1). `setRepairVehicleAvailability` and `upsertOverride` now refuse when the row under that number was saved for different wording (`isSameVariantJob`), with a message naming the other job. A proper fix is a key that includes the wording (migration), not done.
 - **Customer app: a group opened from search kept the search on screen** (`bmt-customer-app` `src/app/book/repairs.tsx`, same bug as the website's). Opening a group from results now clears the search and starts its trail from the top.
 
+## Manual quote when NAPA doesn't list a part (2026-11-17)
+
+Gareth, on parts NAPA hasn't listed (the Ranger's): *"have a message pop up with contact us for a manual quote that way we can quote manually but hopefully not too much needs to be manually quoted"*. Brad: positive wording, no "we can't".
+
+- `MissingPart.reason` (`lib/parts/quote-parts.ts`): **`not_listed`** when NAPA answered and has nothing usable for the car (lists nothing, or nothing it will price), **`unavailable`** when NAPA didn't answer. `needsManualQuote` is true for **either** (Brad, 2026-11-17: "if it doesn't return then it should go to get a quote route"), so a refusal over parts always offers the quote and never says "try again". The reason is kept for the logs. The browse list flags a row as soon as its parts come back unpriced; only when the whole level runs past its time budget does a row still read "+ parts", and its price step then offers the quote.
+- `quoteRepairsResult` keeps `reason: "parts_unavailable"` (every caller's branching is unchanged) and adds `needsQuote: true` + `quoteJobs` (the repairs, by the names the customer saw). `PARTS_NEED_QUOTE_MESSAGE`: *"Our team prices the parts for this repair on your car by hand. Ask us for a quote and we'll email you a price."* It is what booking create returns too.
+- Catalogue levels flag such rows `needsQuote: true` (`quoteOnlyLevelRows`); never with `totalPence`. Search hits aren't parts-priced, so they read "+ parts" and the price step offers the quote.
+- **Website:** the row says "parts priced by our team" and **Get a quote** opens a pop-up (*"We'll price this one for you"*) → `/book/quote/request?…&for=parts` with the repair filled in; the price step shows the message and **Ask for a quote**.
+- **App** (`bmt-customer-app`): the same pop-up (native alert), "Get a quote" on the row, and **Ask for a quote** on the price step; `for=parts` changes the request screen's intro.
+- Live check on S28BSW: "Renew the glow plug" and "Renew the glow plug relay" come back `needsQuote`; the alternator, starter, air filter and front pads still price.
+
+**Pricing answers (Gareth via Brad, 2026-11-17):** no markup on parts (NAPA trade price, as now); VAT left as it is; mechanics buy the parts. Gareth worked out £24 profit for a mechanic on one repair: commission is taken on parts too, so a parts-heavy job leaves little (1 h + £175 of parts: £58.75, or £23.75 if the mechanic can't reclaim VAT on the parts). Left as is by decision.
+
 ## Migration `0090_parts_gaps.sql`
 
 Six new tables (`aag_engine_codes`, `part_code_maps`, `model_part_choices`, `aag_product_prices`, `part_gaps`, `model_part_scans`), three seeded code-match proposals, RLS on, admin select, service-role writes. Nothing existing changed. Until it's applied everything degrades to Task 76 behaviour: no stored engine codes (still learnt per request), nothing mapped, nothing picked, nothing recorded, and the screen says to apply it.
 
 ## Mobile apps
+
+**Manual quotes (2026-11-17), additive only:** `GET /repairs/tree` rows may carry `needsQuote: true`; a `not_priceable` reply from `POST /quote` may carry `needsQuote: true` and `quoteJobs: string[]`, with a new `message`. Old builds show the message verbatim (it says to ask for a quote) and their "Ask for a quote" card still works; the app update adds the pop-up and buttons.
 
 No API path, request or response shape changes. **Displayed figures and lists change** (AGENTS.md): oxygen sensor jobs are now priced with a lambda sensor, and repairs that were wrongly hidden by variant number appear again in both apps (the mobile repair endpoints use the same catalogue code). Nothing to do in the app repos beyond the type regeneration. `QuotedPart` and `SupplierOffer` gain optional fields only (`modelPart`, `napaGenart`); `customerPartLines` is unchanged. Both apps should regenerate their types after `0090` (`npm run db:types`), as after every migration; they don't read the new tables.
 

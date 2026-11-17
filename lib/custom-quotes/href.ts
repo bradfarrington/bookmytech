@@ -13,6 +13,8 @@ export function quoteRequestHref(params: {
   model?: string;
   postcode?: string;
   q?: string;
+  /** "parts": the repair is listed, but its parts are priced by hand (2026-11-17). */
+  reason?: "parts";
 }): string {
   const query = new URLSearchParams();
   if (params.reg) query.set("reg", params.reg);
@@ -20,5 +22,6 @@ export function quoteRequestHref(params: {
   if (params.model) query.set("model", params.model);
   if (params.postcode) query.set("postcode", params.postcode);
   if (params.q?.trim()) query.set("q", params.q.trim().slice(0, 200));
+  if (params.reason) query.set("for", params.reason);
   return `/book/quote/request?${query.toString()}`;
 }

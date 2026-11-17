@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Check, ChevronRight, Layers, Plus } from "lucide-react";
 import { formatPrice } from "@/lib/utils";
 import type { CatalogueNode } from "@/lib/haynespro/catalogue";
+import { QuoteButton } from "./quote-button";
 
 // One level of the repair catalogue as the customer sees it: groups to drill
 // into, priced repairs with a Book / Add button, and combined repairs drawn as
@@ -51,6 +52,7 @@ function includesParts(node: CatalogueNode): boolean {
  * of them is estimated for this car because no supplier listed it (Task 72).
  */
 function partsNote(node: CatalogueNode): string {
+  if (node.needsQuote) return " · parts priced by our team";
   if (!includesParts(node)) return "";
   return node.partsEstimated ? " · includes estimated parts" : " · parts included";
 }
@@ -69,6 +71,11 @@ export interface RepairRowsProps {
   emptyLabel?: React.ReactNode;
   /** Extra caption under a group row (the search box says where a hit lives). */
   groupCaption?: (node: CatalogueNode) => React.ReactNode;
+  /**
+   * The quote request for a job flagged `needsQuote` (a part NAPA doesn't list
+   * for this car). Without it such a job reads "+ parts" as before.
+   */
+  quoteHref?: (node: CatalogueNode) => string;
 }
 
 export function RepairRows({
@@ -80,10 +87,15 @@ export function RepairRows({
   bookHref,
   emptyLabel = "Nothing under this group.",
   groupCaption,
+  quoteHref,
 }: RepairRowsProps) {
   const rows = toRows(nodes);
 
   const bookButton = (node: CatalogueNode, label?: string) => {
+    // Its parts are priced by hand: a quote, not a booking (2026-11-17).
+    if (node.needsQuote && quoteHref && !selectedIds.includes(node.id)) {
+      return <QuoteButton repairName={label ? `${node.bundleName ?? node.description} · ${label}` : node.description} href={quoteHref(node)} />;
+    }
     if (selectedIds.includes(node.id)) {
       return (
         <span className="flex shrink-0 items-center gap-1.5 rounded-lg bg-green-50 px-3.5 py-2 text-sm font-bold text-success">

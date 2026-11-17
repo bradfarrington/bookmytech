@@ -166,6 +166,14 @@ export interface CatalogueNode {
    * alongside `partsPence`. Say so beside the price.
    */
   partsEstimated?: boolean;
+  /**
+   * ADDITIVE (2026-11-17). True when NAPA gave no usable price for a part
+   * this job needs on this car (not listed, or no answer), so it's priced by
+   * hand: offer "Ask us for a quote" instead of booking (a quote for it would
+   * refuse with `needsQuote`). Never alongside `totalPence`. Absent when the
+   * level's pricing ran out of time, which still reads "+ parts".
+   */
+  needsQuote?: true;
 }
 
 /**
@@ -477,9 +485,10 @@ async function withLevelParts(
   }
 
   const parts = await priceLevelParts({ db, reg, carTypeId: context.carTypeId, rows });
-  if (parts.totals.size === 0) return nodes;
+  if (parts.totals.size === 0 && parts.needsQuote.size === 0) return nodes;
 
   return nodes.map((node) => {
+    if (parts.needsQuote.has(node.id)) return { ...node, needsQuote: true as const };
     const partsPence = parts.totals.get(node.id);
     if (partsPence == null || node.pricePence == null) return node;
     return {

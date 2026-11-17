@@ -13,7 +13,7 @@ import { QuoteRequestForm } from "./_components/quote-request-form";
 export const metadata: Metadata = { title: "Ask for a quote · Book My Tech" };
 
 interface Props {
-  searchParams: Promise<{ reg?: string; make?: string; model?: string; q?: string; postcode?: string }>;
+  searchParams: Promise<{ reg?: string; make?: string; model?: string; q?: string; postcode?: string; for?: string }>;
 }
 
 export default async function QuoteRequestPage({ searchParams }: Props) {
@@ -44,7 +44,10 @@ export default async function QuoteRequestPage({ searchParams }: Props) {
         backHref={backHref}
         title="Ask us for a quote"
         subtitle={
-          reg
+          // From a listed repair whose parts are priced by hand (2026-11-17).
+          params.for === "parts"
+            ? `Our team prices the parts for this repair${reg ? ` on your ${describeQuoteVehicle(reg, params.make, params.model)}` : ""} by hand. Check the details and we'll email you a price.`
+            : reg
             ? `Can't find the job you need for your ${describeQuoteVehicle(reg, params.make, params.model)}? Tell us about it and we'll email you a price.`
             : "Can't find the job you need? Tell us about it and we'll email you a price."
         }

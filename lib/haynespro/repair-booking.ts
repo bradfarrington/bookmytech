@@ -39,7 +39,7 @@ import { dedupeRepairIds, MAX_REPAIRS_PER_BOOKING } from "@/lib/bookings/repair-
 import { repairSummary } from "@/lib/bookings/repair-lines";
 import { loadCatalogueOverlay } from "@/lib/catalogue/load-overlay";
 import { loadCatalogueProducts } from "@/lib/catalogue/load-products";
-import { expandCatalogueItems, type CatalogueItem } from "@/lib/catalogue/overlay";
+import { displayName, expandCatalogueItems, type CatalogueItem } from "@/lib/catalogue/overlay";
 import {
   isProductId,
   productUuid,
@@ -49,7 +49,7 @@ import {
 } from "@/lib/catalogue/products";
 import { partGroupsOnNodes } from "@/lib/parts/part-groups";
 import { vehicleFuelFamily } from "./fuel";
-import { quoteJobParts, type PartsJob, type QuotedPart } from "@/lib/parts/quote-parts";
+import { needsManualQuote, quoteJobParts, type PartsJob, type QuotedPart } from "@/lib/parts/quote-parts";
 import type { CombinedRepairTimes } from "./combine";
 import { engineOilForVehicle } from "./engine-oil";
 import { excludedRepairNodeIdsForVehicle } from "./exclusions";
@@ -327,11 +327,38 @@ export function buildRepairsQuote(args: {
  */
 export type RepairsQuoteFailure = "not_priceable" | "parts_unavailable";
 
-export type RepairsQuoteResult = { ok: true; quote: RepairsQuote } | { ok: false; reason: RepairsQuoteFailure };
+export type RepairsQuoteResult =
+  | { ok: true; quote: RepairsQuote }
+  | {
+      ok: false;
+      reason: RepairsQuoteFailure;
+      /**
+       * Only with "parts_unavailable": NAPA has no usable price for a part on
+       * this car (not listed, or no answer), so the job is priced by hand
+       * through a quote request (Gareth and Brad, 2026-11-17) rather than tried
+       * again later. Say PARTS_NEED_QUOTE_MESSAGE.
+       */
+      needsQuote?: true;
+      /** With `needsQuote`: the chosen repairs that need it, by the names the customer saw. */
+      quoteJobs?: string[];
+    };
 
 /** What a customer is told when a repair's parts can't be priced. Shown verbatim by the app. */
 export const PARTS_UNAVAILABLE_MESSAGE =
   "We can't get a price for the parts this repair needs right now. Please try again shortly, or get in touch.";
+
+/**
+ * What a customer is told when a part has to be priced by hand. Shown
+ * verbatim by the app, including old builds with no quote button, so it says
+ * where to ask. Positive on purpose (Brad, 2026-11-17: no "we can't").
+ */
+export const PARTS_NEED_QUOTE_MESSAGE =
+  "Our team prices the parts for this repair on your car by hand. Ask us for a quote and we'll email you a price.";
+
+/** The customer's sentence for a "parts_unavailable" failure. */
+export function partsFailureMessage(failure: { needsQuote?: true }): string {
+  return failure.needsQuote ? PARTS_NEED_QUOTE_MESSAGE : PARTS_UNAVAILABLE_MESSAGE;
+}
 
 /**
  * Price a set of chosen items for a specific reg. Fails when it can't be done
@@ -430,7 +457,14 @@ export async function quoteRepairsResult(
       getRepairCombineMode(db),
       quoteJobParts({ db, reg, carTypeId: vehicle.carTypeId, jobs: partsJobs }),
     ]);
-    if (!pricedParts.ok) return { ok: false, reason: "parts_unavailable" };
+    if (!pricedParts.ok) {
+      if (!needsManualQuote(pricedParts.missing)) return { ok: false, reason: "parts_unavailable" };
+      const unpriced = new Set(pricedParts.missing.map((m) => m.nodeId));
+      const quoteJobs = items
+        .filter((item) => item.nodeIds.some((id) => unpriced.has(id)))
+        .map((item) => item.label ?? displayName({ id: item.nodeIds[0], description: quotable.get(item.nodeIds[0])?.description }, overlay));
+      return { ok: false, reason: "parts_unavailable", needsQuote: true, quoteJobs };
+    }
 
     // The engine-oil line, only when a servicing product asks for it.
     const oil = products.some((p) => p.includesEngineOil)

@@ -93,6 +93,24 @@ export interface MissingPart {
   genartId: number;
   label: string;
   position: PartPosition | null;
+  /**
+   * Why it has no price. "not_listed": NAPA answered and has nothing we can
+   * use for this car (lists nothing, or nothing that fits). "unavailable":
+   * NAPA didn't answer (down, slow, blocked). Either way the job goes to a
+   * manual quote (Brad, 2026-11-17); the reason is kept for the logs.
+   */
+  reason: MissingReason;
+}
+
+export type MissingReason = "not_listed" | "unavailable";
+
+/**
+ * Whether a job set's missing parts need pricing by hand: any part with no
+ * price, whether NAPA lists nothing usable or didn't answer at all (Brad,
+ * 2026-11-17: "if it doesn't return then it should go to get a quote"). Pure.
+ */
+export function needsManualQuote(missing: readonly Pick<MissingPart, "reason">[]): boolean {
+  return missing.length > 0;
 }
 
 /**
@@ -124,7 +142,12 @@ export function priceJobParts(args: {
   const parts: QuotedPart[] = [];
   const missing: MissingPart[] = [];
 
-  const unpriced = (job: PartsJob, group: PartsJob["groups"][number], position: PartPosition | null) => {
+  const unpriced = (
+    job: PartsJob,
+    group: PartsJob["groups"][number],
+    position: PartPosition | null,
+    reason: MissingReason,
+  ) => {
     const estimate = args.estimates
       ? estimatePart({
           jobDescription: job.description,
@@ -157,7 +180,7 @@ export function priceJobParts(args: {
     }
     const set = args.setPrices?.get(group.genartId);
     if (!set) {
-      missing.push({ nodeId: job.nodeId, genartId: group.genartId, label: group.label, position });
+      missing.push({ nodeId: job.nodeId, genartId: group.genartId, label: group.label, position, reason });
       return;
     }
     parts.push({
@@ -186,13 +209,14 @@ export function priceJobParts(args: {
       if (args.uncharged?.has(group.genartId) || skipped.has(group.genartId)) continue;
       const lookup = args.offers.get(group.genartId);
       if (!lookup || lookup.state !== "ok") {
-        unpriced(job, group, jobPosition(job.description));
+        unpriced(job, group, jobPosition(job.description), lookup?.state === "empty" ? "not_listed" : "unavailable");
         continue;
       }
       const choice = args.choices?.get(choiceKey(job.nodeId, group.genartId)) ?? null;
       for (const { position, selection } of selectJobParts(job.description, lookup.offers, choice)) {
         if (selection.source === "none" || selection.offer.costPence == null) {
-          unpriced(job, group, position);
+          // NAPA listed the part type for this car, but nothing that fits.
+          unpriced(job, group, position, "not_listed");
           continue;
         }
         const offer = selection.offer;
