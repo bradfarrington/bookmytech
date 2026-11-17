@@ -95,6 +95,23 @@ Each product option lists one or more AAG locations with `Priority` (1 = quickes
 | UAT | `POST /api/quote/classic` with `api_key`, our IDs (and with an empty `verification_id`) | **HTTP 401**, RFC 7807 problem JSON `{"title":"Invalid Credentials","ISECode":"ISE0034"}` | The classic endpoint refuses differently: a real 401 and no `Header` envelope. `aagCall` reads any non-2xx as "gateway refused", so this shows as unreachable, not auth-failed. Revisit once credentials pass. |
 | Live | `POST /api/quote`, our key under `api_key` | HTTP 200 + `ISE0034` | The key is still refused on live, consistent with AAG saying these are **UAT credentials**. |
 
+**Third run 2026-11-17 (morning): Gareth's live credentials.** The live API key AAG issued under `api_key`, with `customer_id: AF3244`. (Brad confirmed the key is the live one, not the old UAT key.) All read-only quotes for `FN60KYP`, GenArt 82:
+
+| Host | Request | Result | What it tells us |
+|---|---|---|---|
+| Live | `POST /api/quote`, `customer_id` `af3244` and `AF3244`, no `verification_id` | HTTP 200 + `ISE0034` "check api key and customer key" | The real account number doesn't get our key past the first check. |
+| Live | Same, with the UAT `verification_id` | HTTP 200 + `ISE0034` | The verification ID makes no difference. |
+| Live | `POST /api/quote/classic`, `AF3244`, no `verification_id` | **HTTP 401** `{"title":"Invalid API Key","ISECode":"ISE0034"}` | **The classic endpoint names the cause: live doesn't recognise the key itself.** Since the key is correct, the likely explanations are that AAG haven't activated it yet or that it's tied to a different `customer_id`. Retry planned for lunchtime 2026-11-17; if it still fails, ask AAG whether the key is active and which `customer_id` / `verification_id` go with it. |
+
+**Fourth run 2026-11-17 (afternoon): live access proven.** Same live key and `AF3244`, plus the live `verification_id` AAG issued with them (now in `.env.local`). Read-only, from Brad's IP:
+
+| Host | Request | Result |
+|---|---|---|
+| Live | `POST /api/quote`, `FN60KYP`, GenArt 82 | **HTTP 201, `SuccessFlag: true`.** Resolved as a 2010 Ford Fiesta 1.4 petrol with its VIN. One article (Apec 258mm vented front disc) with three product options (NAPA £31.85, Brembo £45.69, Fahren £26.96 trade), all in stock at NAPA Auto Parts Tamworth (location 326), ETA "Please call branch". |
+| Live | `POST /api/quote/classic`, same | HTTP 201, `SuccessFlag: true`, 0 products. Auth passes; the classic body evidently needs something different, but the app uses `/api/quote`. |
+
+So this morning's ISE0034 was the missing live verification ID, not an inactive key. Still unproven: calls from Vercel (the allowlist has only ever let Brad's IP through).
+
 ~~Blocked on AAG: the verification ID.~~ Resolved the same day: AAG sent corrected UAT credentials (a different account number and verification ID, now in `.env.local`).
 
 **Third run 2026-09-14 — sandbox access proven.** Corrected credentials, `api_key` header, `DV12CGU` (AAG resolved it as a 2012 Vauxhall Meriva 1.4 petrol, VIN returned):

@@ -259,12 +259,30 @@ export function describeAagGatewayRefusal(status: number, sandbox: boolean): str
     : `AAG's gateway refused us with HTTP ${status}. Either the API-key header is wrong or our address isn't on their allowlist.`;
 }
 
+/**
+ * The only AAG methods this app may ever call: price and stock lookups. AAG
+ * processes anything sent to its order (and enquiry) methods for real on the
+ * live account, so every other path is refused here, before any request
+ * leaves, whatever a caller passes. Adding ordering is a deliberate decision,
+ * never a one-line change elsewhere.
+ */
+export const AAG_READ_ONLY_PATHS: readonly string[] = ["/api/quote", "/api/quote/classic", "/api/product/info"];
+
+/** Whether a path is one of the read-only methods. Exact match: no prefixes, no query strings. */
+export function isAagReadOnlyPath(path: string): boolean {
+  return AAG_READ_ONLY_PATHS.includes(path);
+}
+
 /** POST one AAG method. Never throws. */
 export async function aagCallResult<T>(
   path: string,
   body: unknown,
   options: AagCallOptions = {},
 ): Promise<AagCallResult<T>> {
+  if (!isAagReadOnlyPath(path)) {
+    console.error(`[aag] refused to call ${path}: only price and stock lookups are allowed`);
+    return { ok: false, errorCode: null, reason: "Only price and stock lookups may be sent to AAG." };
+  }
   const config = getAagConfig();
   if (!config) return { ok: false, errorCode: null, reason: "AAG isn't configured on this environment." };
 

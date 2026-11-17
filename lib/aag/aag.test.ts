@@ -4,8 +4,10 @@ import { join } from "node:path";
 import {
   AAG_LIVE_BASE_URL,
   AAG_UAT_BASE_URL,
+  aagCallResult,
   aagRegKey,
   buildAagHeaders,
+  isAagReadOnlyPath,
   describeAagError,
   describeAagGatewayRefusal,
   isAagAuthFailure,
@@ -77,6 +79,40 @@ const CONFIG: AagConfig = {
   authHeader: "api_key",
   authScheme: "",
 };
+
+describe("read-only AAG paths (nothing is ever ordered)", () => {
+  it("allows only the price and stock lookups", () => {
+    expect(isAagReadOnlyPath("/api/quote")).toBe(true);
+    expect(isAagReadOnlyPath("/api/quote/classic")).toBe(true);
+    expect(isAagReadOnlyPath("/api/product/info")).toBe(true);
+  });
+
+  it("refuses order, enquiry and anything look-alike", () => {
+    for (const path of ["/api/order", "/api/order/create", "/api/enquiry", "/api/quote/../order", "/api/quote?x=1", "/API/QUOTE", ""]) {
+      expect(isAagReadOnlyPath(path)).toBe(false);
+    }
+  });
+
+  it("never sends a refused path, even when AAG is configured", async () => {
+    const before = { ...process.env };
+    const realFetch = globalThis.fetch;
+    let called = false;
+    globalThis.fetch = (async () => {
+      called = true;
+      throw new Error("must not be called");
+    }) as typeof fetch;
+    process.env.AAG_API_KEY = "test";
+    process.env.AAG_CUSTOMER_ID = "test";
+    try {
+      const result = await aagCallResult("/api/order", { Lines: [] });
+      expect(result.ok).toBe(false);
+      expect(called).toBe(false);
+    } finally {
+      globalThis.fetch = realFetch;
+      process.env = before;
+    }
+  });
+});
 
 describe("parseAagEnvelope", () => {
   it("takes SuccessFlag as the truth and hands back the Body", () => {

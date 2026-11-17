@@ -67,11 +67,19 @@ export function regKey(reg) {
  * AAG's own envelope ({SuccessFlag, Message, ErrorCode}) and `body` is the
  * payload under it. Throws when the envelope says the call failed.
  */
+// Price and stock lookups only. AAG processes anything sent to its order (and
+// enquiry) methods for real on the live account, so nothing else may be sent —
+// the same list as lib/aag/client.ts AAG_READ_ONLY_PATHS.
+const READ_ONLY_PATHS = ["/api/quote", "/api/quote/classic", "/api/product/info"];
+
 export function createAagRest() {
   const env = requireEnv();
   const headers = buildHeaders(env);
 
   async function post(path, body) {
+    if (!READ_ONLY_PATHS.includes(path)) {
+      throw new Error(`Refusing to call AAG ${path}: only price and stock lookups are allowed`);
+    }
     const url = `${env.baseUrl}${path}`;
     const res = await fetch(url, {
       method: "POST",
