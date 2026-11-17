@@ -134,7 +134,11 @@ export async function RepairBrowser({
         make={vehicle.make}
       />
 
+      {/* Keyed on the level: opening a group from a search hit lands on the
+          same page with a new `node`, and without a fresh search box its query
+          and hits stayed on screen, hiding the group the customer opened. */}
       <RepairSearch
+        key={nodeId ?? "root"}
         reg={reg}
         make={make}
         model={model}

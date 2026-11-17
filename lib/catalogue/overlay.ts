@@ -7,6 +7,7 @@
 // "b:<option uuid>" for one bookable option of a combined repair. Both prefixes
 // are safe because HaynesPro ids never contain ":".
 
+import type { RepairExclusionSet } from "@/lib/haynespro/exclusions";
 import { billableHours } from "@/lib/pricing/billable";
 import type { CatalogueNode } from "@/lib/haynespro/catalogue";
 import { genartExtra } from "@/lib/haynespro/genarts";
@@ -162,8 +163,8 @@ export interface ComposeInput {
   /** HaynesPro's own subnodes of this level — [] for a category we created. */
   raw: readonly HpRepairtimeNode[];
   overlay: CatalogueOverlay;
-  /** Node ids hidden for this vehicle (lib/haynespro/exclusions.ts). */
-  excluded: ReadonlySet<string>;
+  /** Hides for this vehicle (lib/haynespro/exclusions.ts): asked with a node's id and HaynesPro's name for it. */
+  excluded: Pick<RepairExclusionSet, "has">;
   hourlyRatePence: number;
   /** Book time in hours per HaynesPro node id on THIS vehicle, for moved-in leaves and bundle jobs. */
   nodeHours: ReadonlyMap<string, number>;
@@ -217,7 +218,7 @@ export function composeLevel(input: ComposeInput): CatalogueNode[] {
   const seen = new Set<string>();
 
   for (const hp of raw) {
-    if (hp.id == null || excluded.has(hp.id)) continue;
+    if (hp.id == null || excluded.has(hp.id, hp.description)) continue;
     const override = overlay.overrides.get(hp.id);
     if (override?.parent_id && override.parent_id !== levelId) continue; // moved elsewhere
     const description = displayName({ id: hp.id, description: hp.description }, overlay);
@@ -237,7 +238,7 @@ export function composeLevel(input: ComposeInput): CatalogueNode[] {
   }
 
   for (const override of overridesMovedTo(levelId, overlay)) {
-    if (seen.has(override.node_id) || excluded.has(override.node_id)) continue;
+    if (seen.has(override.node_id) || excluded.has(override.node_id, override.description)) continue;
     const description =
       override.custom_name?.trim() || override.description?.trim() || override.node_id;
     if (override.kind === "group") {

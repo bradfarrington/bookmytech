@@ -6,6 +6,7 @@ import { extractStatusCode, isAuthFailure } from "./client";
 import {
   GLOBAL_SCOPE,
   excludedRepairNodeIdsForLabel,
+  variantKey,
   exclusionStateForModel,
   isGlobalExclusionRow,
   isNodeVisible,
@@ -28,6 +29,12 @@ import {
   toPickerType,
 } from "./vehicle-picker";
 import type { HpCarType } from "./types";
+
+
+/** The ids among the test rows' nodes that a hide set covers, asked without wording (by id). */
+function hiddenIds(set: { has(id: string, description: string | null): boolean }): Set<string> {
+  return new Set(["1P1", "1M01510000WV0", "1M2", "X", "A", "B", "C", "1F11100000GCJ", "1F11101000WV0"].filter((id) => set.has(id, null)));
+}
 
 describe("extractStatusCode", () => {
   it("reads the auth envelope ({statusCode})", () => {
@@ -283,11 +290,11 @@ describe("repair node exclusions", () => {
   ];
 
   it("matches groups and leaves for the vehicle's model label", () => {
-    expect(excludedRepairNodeIdsForLabel("FORD Ranger", rows)).toEqual(
+    expect(hiddenIds(excludedRepairNodeIdsForLabel("FORD Ranger", rows))).toEqual(
       new Set(["1F11100000GCJ", "1F11101000WV0"]),
     );
     expect(
-      excludedRepairNodeIdsForLabel("VOLKSWAGEN Golf IV (1J1, 1J5, 9B1)", rows),
+      hiddenIds(excludedRepairNodeIdsForLabel("VOLKSWAGEN Golf IV (1J1, 1J5, 9B1)", rows)),
     ).toEqual(new Set(["1F11101000WV0"]));
   });
 
@@ -308,22 +315,22 @@ describe("repair node exclusions", () => {
 
   it("global hides apply to every vehicle, resolved or not", () => {
     const everywhere = new Set(["1P1", "1M01510000WV0"]);
-    expect(excludedRepairNodeIdsForLabel(null, scoped)).toEqual(everywhere);
-    expect(excludedRepairNodeIdsForLabel("", scoped)).toEqual(everywhere);
-    expect(excludedRepairNodeIdsForLabel("SEAT Leon", scoped)).toEqual(everywhere);
+    expect(hiddenIds(excludedRepairNodeIdsForLabel(null, scoped))).toEqual(everywhere);
+    expect(hiddenIds(excludedRepairNodeIdsForLabel("", scoped))).toEqual(everywhere);
+    expect(hiddenIds(excludedRepairNodeIdsForLabel("SEAT Leon", scoped))).toEqual(everywhere);
   });
 
   it("a model's 'show' row lifts a global hide for that model only", () => {
-    expect(excludedRepairNodeIdsForLabel("VOLKSWAGEN Golf VII", scoped)).toEqual(
+    expect(hiddenIds(excludedRepairNodeIdsForLabel("VOLKSWAGEN Golf VII", scoped))).toEqual(
       new Set(["1P1"]),
     );
-    expect(excludedRepairNodeIdsForLabel("VOLKSWAGEN Golf VI", scoped)).toEqual(
+    expect(hiddenIds(excludedRepairNodeIdsForLabel("VOLKSWAGEN Golf VI", scoped))).toEqual(
       new Set(["1P1", "1M01510000WV0"]),
     );
   });
 
   it("a model's own hides add to the global set", () => {
-    expect(excludedRepairNodeIdsForLabel("FORD Ranger", scoped)).toEqual(
+    expect(hiddenIds(excludedRepairNodeIdsForLabel("FORD Ranger", scoped))).toEqual(
       new Set(["1P1", "1M01510000WV0", "1M2"]),
     );
   });
@@ -335,7 +342,7 @@ describe("repair node exclusions", () => {
 
   it("rows written before the mode column exist behave as hides", () => {
     const legacy = [{ node_id: "1M2", make_name: "FORD", model_name: "Ranger" }];
-    expect(excludedRepairNodeIdsForLabel("FORD Ranger", legacy)).toEqual(new Set(["1M2"]));
+    expect(hiddenIds(excludedRepairNodeIdsForLabel("FORD Ranger", legacy))).toEqual(new Set(["1M2"]));
   });
 
   it("partial wildcards are inert and a global 'show' row never hides", () => {
@@ -353,17 +360,17 @@ describe("repair node exclusions", () => {
 
   it("partitions rows for the admin model page and names each node's state", () => {
     const golf = exclusionStateForModel(scoped, "VOLKSWAGEN", "Golf VII");
-    expect(golf.globalHidden).toEqual(new Set(["1P1", "1M01510000WV0"]));
-    expect(golf.modelShown).toEqual(new Set(["1M01510000WV0"]));
+    expect(hiddenIds(golf.globalHidden)).toEqual(new Set(["1P1", "1M01510000WV0"]));
+    expect(hiddenIds(golf.modelShown)).toEqual(new Set(["1M01510000WV0"]));
     expect(golf.modelHidden.size).toBe(0); // the Ranger's row is not the Golf's
-    expect(nodeAvailability("1P1", golf)).toBe("hidden_global");
-    expect(nodeAvailability("1M01510000WV0", golf)).toBe("shown_override");
-    expect(nodeAvailability("1M2", golf)).toBe("shown");
+    expect(nodeAvailability("1P1", null, golf)).toBe("hidden_global");
+    expect(nodeAvailability("1M01510000WV0", null, golf)).toBe("shown_override");
+    expect(nodeAvailability("1M2", null, golf)).toBe("shown");
 
     // Same normalised match as the funnel — case and spacing don't matter.
     const ranger = exclusionStateForModel(scoped, "ford", "  ranger ");
-    expect(nodeAvailability("1M2", ranger)).toBe("hidden_model");
-    expect(nodeAvailability("1M01510000WV0", ranger)).toBe("hidden_global");
+    expect(nodeAvailability("1M2", null, ranger)).toBe("hidden_model");
+    expect(nodeAvailability("1M01510000WV0", null, ranger)).toBe("hidden_global");
 
     expect(isNodeVisible("shown")).toBe(true);
     expect(isNodeVisible("shown_override")).toBe(true);
@@ -657,5 +664,56 @@ describe("loadRepairExclusionRows", () => {
     const { db, ranges } = fakeDb(12);
     expect(await loadRepairExclusionRows(db)).toHaveLength(12);
     expect(ranges).toHaveLength(1);
+  });
+});
+
+describe("hides on job variants follow the wording, not the variant number (Task 77)", () => {
+  // Live, 2026-11-17: 1E05001991WV1 is "… Dual-clutch transmission" on the car
+  // the hide was set on, and "… Manual transmission" on a 2010 Fiesta.
+  const rows = [
+    {
+      node_id: "1E05001991WV1",
+      make_name: GLOBAL_SCOPE,
+      model_name: GLOBAL_SCOPE,
+      mode: "hide",
+      description: "Renew the starter motor Dual-clutch transmission",
+    },
+    { node_id: "1E05012000WV0", make_name: GLOBAL_SCOPE, model_name: GLOBAL_SCOPE, mode: "hide", description: "Repair the starter motor *" },
+    { node_id: "1E05000000G", make_name: "FORD", model_name: "Fiesta Mk VI", mode: "hide", description: "Starter motor" },
+  ];
+  const fiesta = excludedRepairNodeIdsForLabel("FORD Fiesta Mk VI", rows);
+  const other = excludedRepairNodeIdsForLabel("SEAT Leon III (5F)", rows);
+
+  it("doesn't hide the manual-gearbox starter on a car where it has the dual-clutch one's number", () => {
+    expect(fiesta.has("1E05001991WV1", "Renew the starter motor Manual transmission")).toBe(false);
+  });
+
+  it("hides the dual-clutch starter on any car, whatever its number there", () => {
+    expect(other.has("1E05001991WV0", "Renew the starter motor Dual-clutch transmission")).toBe(true);
+    expect(other.has("1E05001991WV1", "Renew the starter motor Dual-clutch transmission")).toBe(true);
+  });
+
+  it("never matches a different job with the same wording", () => {
+    expect(other.has("1E99001991WV1", "Renew the starter motor Dual-clutch transmission")).toBe(false);
+  });
+
+  it("ignores HaynesPro's follow-up star, case and spacing", () => {
+    expect(other.has("1E05012000WV0", "repair  the starter motor")).toBe(true);
+  });
+
+  it("matches by id when the wording isn't known, as before", () => {
+    expect(other.has("1E05001991WV1", null)).toBe(true);
+  });
+
+  it("matches groups by id", () => {
+    expect(fiesta.has("1E05000000G", "Anything")).toBe(true);
+    expect(other.has("1E05000000G", "Starter motor")).toBe(false);
+  });
+
+  it("builds its key from the job number and wording", () => {
+    expect(variantKey("1E05001991WV1", "Renew the starter motor Manual transmission ")).toBe(
+      "1E05001991|RENEW THE STARTER MOTOR MANUAL TRANSMISSION",
+    );
+    expect(variantKey("1E05000000G", "Starter motor")).toBeNull();
   });
 });

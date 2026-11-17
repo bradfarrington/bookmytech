@@ -41,7 +41,7 @@ import {
 import { engineOilForVehicle } from "./engine-oil";
 import { vehicleFuelFamily } from "./fuel";
 import { isHaynesProConfigured } from "./client";
-import { excludedRepairNodeIdsForVehicle } from "./exclusions";
+import { excludedRepairNodeIdsForVehicle, NO_EXCLUSIONS, type RepairExclusionSet } from "./exclusions";
 import { genartExtra, genartIdsOf } from "./genarts";
 import { isCatalogueOutage, readHaynesProHealth } from "./health";
 import {
@@ -246,8 +246,8 @@ const NO_REPAIR_DATA: CatalogueFailure = {
 interface CatalogueContext extends HpVehicleRef {
   repairtimeTypeId: number;
   vehicle: CatalogueVehicle;
-  /** Node ids switched off for this model — hidden, and never walked into. */
-  excluded: Set<string>;
+  /** Hides for this model — hidden, and never walked into. Ask with id and HaynesPro's name. */
+  excluded: RepairExclusionSet;
   /** The admin's layer over the tree (Task 26): names, moves, categories, combined repairs. */
   overlay: CatalogueOverlay;
   /** Hours for several jobs together — added up, or HaynesPro-combined when the admin opted in. */
@@ -673,7 +673,7 @@ export async function searchJobsForCarType(
     carTypeId,
     repairtimeTypeId,
     vehicle: { description: `car type ${carTypeId}`, hourlyRatePence },
-    excluded: new Set(),
+    excluded: NO_EXCLUSIONS,
     overlay,
     combineHours: async () => null,
     products: [],
@@ -770,7 +770,7 @@ async function runSearch(
       const depth = batch[i].depth + 1;
 
       for (const hpNode of levels[i]) {
-        if (hpNode.id == null || context.excluded.has(hpNode.id)) continue;
+        if (hpNode.id == null || context.excluded.has(hpNode.id, hpNode.description)) continue;
 
         // The admin's name for it, if any (Task 26). A moved node is still
         // found — it exists on the vehicle wherever we list it.

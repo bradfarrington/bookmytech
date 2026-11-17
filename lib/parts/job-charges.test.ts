@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { genartIdsOf } from "@/lib/haynespro/genarts";
 import type { AagPartOffers } from "./aag-part-prices";
-import { alternativePairs, chargedGroups, isConsumableGroup, isReplacingJob } from "./job-charges";
+import { alternativePairs, chargedGroups, correctedGroups, isConsumableGroup, isReplacingJob } from "./job-charges";
 import { partGroupsOnNodes } from "./part-groups";
 import { priceJobParts, type PartsJob } from "./quote-parts";
 import type { SupplierOffer } from "./supplier-offer";
@@ -190,5 +190,32 @@ describe("priceJobParts charges one of a part and its kit", () => {
   it("charges the single part when the kit has no price", () => {
     const result = priceJobParts({ jobs: [job], offers: new Map([[10, ok([offer("WB", 3000)])], [11, { state: "empty", pricedAt: "2026-11-17T12:00:00Z" }]]) });
     expect(result.ok && result.parts.map((p) => p.genartId)).toEqual([10]);
+  });
+});
+
+describe("correctedGroups: HaynesPro's known part-type mistakes (Task 77)", () => {
+  const EGT = { id: 3938, description: "Sensor, exhaust gas temperature" };
+  const O2 = { id: 3922, description: "Oxygen sensor" };
+
+  it("asks for an oxygen sensor, not an exhaust gas temperature sensor, on oxygen sensor jobs", () => {
+    for (const job of [
+      "Renew the upstream oxygen sensor",
+      "Renew the downstream oxygen sensor",
+      "Renew the catalytic converter downstream oxygen sensor",
+    ]) {
+      expect(chargedGroups(job, [EGT])).toEqual([O2]);
+    }
+  });
+
+  it("lists the oxygen sensor once when HaynesPro gives both", () => {
+    expect(chargedGroups("Renew the front oxygen sensor", [O2, EGT])).toEqual([O2]);
+  });
+
+  it("leaves exhaust gas temperature sensor jobs alone", () => {
+    expect(chargedGroups("Renew the exhaust gas temperature sensor", [EGT])).toEqual([EGT]);
+  });
+
+  it("keeps other fields on a corrected group", () => {
+    expect(correctedGroups("Renew the upstream oxygen sensor", [{ ...EGT, mandatory: true }])).toEqual([{ ...O2, mandatory: true }]);
   });
 });

@@ -47,14 +47,55 @@ export function isConsumableGroup(label: string | null | undefined): boolean {
 }
 
 /**
- * The part groups a job charges for: all of them on a job that fits a part,
- * only the consumables otherwise.
+ * Part types HaynesPro lists wrongly on some jobs, and the right one (Task 77).
+ * Each correction applies on every car, since a HaynesPro job is the same
+ * repair on every make; NAPA still picks the part that fits each car.
+ *
+ * - "Renew the upstream / downstream / catalytic converter downstream oxygen
+ *   sensor" carry "Sensor, exhaust gas temperature" (3938), a different part,
+ *   instead of "Oxygen sensor" (3922). NAPA prices 3938 as exhaust gas
+ *   temperature sensors (NGK 97265 on a Transit), so those jobs were quoted
+ *   with the wrong part (found 2026-11-17 across 11 scanned models).
  */
-export function chargedGroups<T extends { description?: string | null }>(
+const PART_TYPE_CORRECTIONS: ReadonlyArray<{
+  job: RegExp;
+  from: number;
+  to: { id: number; description: string };
+}> = [{ job: /\b(oxygen|lambda) sensor\b/i, from: 3938, to: { id: 3922, description: "Oxygen sensor" } }];
+
+/**
+ * A job's part groups with HaynesPro's known mistakes corrected, each part
+ * type once. Groups without an id pass through untouched.
+ */
+export function correctedGroups<T extends { id?: number | null; description?: string | null }>(
   jobDescription: string | null | undefined,
   groups: readonly T[] | null | undefined,
 ): T[] {
-  const all = [...(groups ?? [])];
+  const text = jobDescription?.trim() ?? "";
+  const out: T[] = [];
+  const seen = new Set<number>();
+  for (const group of groups ?? []) {
+    const fix = PART_TYPE_CORRECTIONS.find((c) => c.from === group.id && c.job.test(text));
+    const corrected = fix ? { ...group, id: fix.to.id, description: fix.to.description } : group;
+    if (typeof corrected.id === "number") {
+      if (seen.has(corrected.id)) continue;
+      seen.add(corrected.id);
+    }
+    out.push(corrected);
+  }
+  return out;
+}
+
+/**
+ * The part groups a job charges for: all of them on a job that fits a part,
+ * only the consumables otherwise, after HaynesPro's known mistakes are
+ * corrected (correctedGroups).
+ */
+export function chargedGroups<T extends { id?: number | null; description?: string | null }>(
+  jobDescription: string | null | undefined,
+  groups: readonly T[] | null | undefined,
+): T[] {
+  const all = correctedGroups(jobDescription, groups);
   return isReplacingJob(jobDescription) ? all : all.filter((g) => isConsumableGroup(g.description));
 }
 

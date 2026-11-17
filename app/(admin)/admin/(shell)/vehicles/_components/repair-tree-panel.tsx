@@ -149,8 +149,10 @@ export async function RepairTreePanel({
   );
   // What the toggle shows: in model scope the effective state for THIS model
   // (overrides included); in global scope only the global hide itself.
-  const visibleFor = (id: string) =>
-    global ? !state.globalHidden.has(id) : isNodeVisible(nodeAvailability(id, state));
+  // `original` is HaynesPro's own name on this car: a hide on a variant
+  // matches the job's wording as well as its id (Task 77).
+  const visibleFor = (id: string, original: string | null) =>
+    global ? !state.globalHidden.has(id, original) : isNodeVisible(nodeAvailability(id, original, state));
 
   // Times for jobs HaynesPro's listing of this level doesn't include: leaves
   // moved in, and the pool of every combined repair listed here.
@@ -291,8 +293,8 @@ export async function RepairTreePanel({
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
           {groups.map((row) => {
             const hpNode = row.source !== "custom";
-            const visible = hpNode ? visibleFor(row.id) : true;
-            const note = hpNode ? availabilityNote(nodeAvailability(row.id, state), global) : null;
+            const visible = hpNode ? visibleFor(row.id, row.original) : true;
+            const note = hpNode ? availabilityNote(nodeAvailability(row.id, row.original, state), global) : null;
             const caption = note?.text ?? sourceCaption(row.source);
             const GroupIcon = row.source === "custom" ? FolderOpen : repairGroupIcon(row.original ?? row.name);
             return (
@@ -337,7 +339,7 @@ export async function RepairTreePanel({
         <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
           {groups.map((row) => {
             const hpNode = row.source !== "custom";
-            const visible = hpNode ? visibleFor(row.id) : true;
+            const visible = hpNode ? visibleFor(row.id, row.original) : true;
             const GroupIcon = row.source === "custom" ? FolderOpen : repairGroupIcon(row.original ?? row.name);
             const caption = sourceCaption(row.source);
             return (
@@ -405,8 +407,8 @@ export async function RepairTreePanel({
           )}
           <ul className="divide-y divide-border-subtle">
             {leaves.map((row) => {
-              const visible = visibleFor(row.id);
-              const note = availabilityNote(nodeAvailability(row.id, state), global);
+              const visible = visibleFor(row.id, row.original);
+              const note = availabilityNote(nodeAvailability(row.id, row.original, state), global);
               const caption = note?.text ?? sourceCaption(row.source);
               return (
                 <li key={row.id} className="flex flex-wrap items-center gap-3 px-4 py-3 text-sm">
