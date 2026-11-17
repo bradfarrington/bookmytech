@@ -79,11 +79,11 @@ export function PartsOrder({
                       "Estimated price: buy a suitable part. If it costs more, send the customer a quote for the difference."
                     ) : p.supplierPartNumber ? (
                       <>
-                        Priced as Alliance Automotive{p.brand ? ` · ${p.brand}` : ""} ·{" "}
+                        Priced as NAPA Auto Parts{p.brand ? ` · ${p.brand}` : ""} ·{" "}
                         <span className="font-mono">{p.supplierPartNumber}</span>
                       </>
                     ) : (
-                      "Set price: Alliance Automotive had no price, so buy a suitable part"
+                      "Set price: NAPA Auto Parts had no price, so buy a suitable part"
                     )}
                   </p>
                 )}

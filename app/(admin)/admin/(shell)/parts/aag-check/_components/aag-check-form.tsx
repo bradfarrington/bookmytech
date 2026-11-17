@@ -73,7 +73,7 @@ export function AagCheckForm({ disabled }: { disabled: boolean }) {
             )}
           </div>
           <Button type="submit" variant="primary" iconLeft={Search} disabled={disabled || pending || !reg.trim() || !genart}>
-            {pending ? "Asking AAG…" : "Get prices"}
+            {pending ? "Asking NAPA Auto Parts…" : "Get prices"}
           </Button>
         </form>
       </Card>
@@ -98,7 +98,7 @@ function QuoteResult({ result }: { result: Extract<AagCheckResult, { ok: true }>
         </p>
         {v && (
           <p className="mt-1 text-sm text-text-secondary">
-            AAG identified: {[v.Make, v.Model].filter(Boolean).join(" ") || "unknown"}
+            NAPA Auto Parts identified: {[v.Make, v.Model].filter(Boolean).join(" ") || "unknown"}
             {v.EngineSize && <> · {v.EngineSize}cc</>}
             {v.Fuel && <> · {v.Fuel.toLowerCase()}</>}
             {v.YearOfManufacture && <> · {v.YearOfManufacture}</>}
@@ -109,7 +109,7 @@ function QuoteResult({ result }: { result: Extract<AagCheckResult, { ok: true }>
 
       {result.lines.length === 0 ? (
         <p className="px-6 py-8 text-center text-sm text-text-muted">
-          AAG answered but listed no products for this vehicle in that group.
+          NAPA Auto Parts answered but listed no products for this vehicle in that group.
         </p>
       ) : (
         <div className="overflow-x-auto">

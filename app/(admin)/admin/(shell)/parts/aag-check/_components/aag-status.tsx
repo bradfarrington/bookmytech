@@ -37,17 +37,17 @@ export function AagStatus({
   sandbox: boolean;
   health: AagHealth | null;
 }) {
-  const host = sandbox ? "AAG's sandbox" : "AAG live";
+  const host = sandbox ? "NAPA's sandbox" : "NAPA's live system";
 
   if (!configured) {
     return (
       <div className="flex items-start gap-3 rounded-button border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
         <AlertTriangle size={18} className="mt-0.5 shrink-0" />
         <div>
-          <p className="font-semibold">AAG isn&apos;t configured.</p>
+          <p className="font-semibold">NAPA Auto Parts isn&apos;t configured.</p>
           <p className="mt-0.5 text-amber-800">
             Add <code>AAG_API_KEY</code> and <code>AAG_CUSTOMER_ID</code> (and{" "}
-            <code>AAG_VERIFICATION_ID</code> if AAG issued one) to the
+            <code>AAG_VERIFICATION_ID</code> if NAPA issued one) to the
             environment. Nothing customer-facing depends on this yet.
           </p>
         </div>

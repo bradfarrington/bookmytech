@@ -551,7 +551,7 @@ export default async function BookingDetailPage({ params }: PageProps) {
                         {part.price_estimated === true
                           ? "Estimated from the same model"
                           : part.supplier_part_number
-                            ? `Alliance Automotive ${part.supplier_part_number}`
+                            ? `NAPA Auto Parts ${part.supplier_part_number}`
                             : "Set price"}
                       </span>
                     </span>

@@ -326,7 +326,7 @@ export function ReviseJob({ bookingId, status, lines, parts, revisions, fees }: 
               Add a part
             </Button>
             <p className="text-xs text-text-muted">
-              Parts for the repairs on the job are priced from Alliance Automotive for you. Add a part here only for something else the job needs.
+              Parts for the repairs on the job are priced from NAPA Auto Parts for you. Add a part here only for something else the job needs.
             </p>
           </section>
 

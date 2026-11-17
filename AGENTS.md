@@ -78,6 +78,20 @@ A non-exhaustive list of changes that always require telling him:
   endpoints callable from any web page.
 - The version stays `v1`.
 
+# NEVER place an order with AAG / NAPA Auto Parts
+
+The AAG credentials in `.env.local` and Vercel are for Gareth's **real live trade
+account**. Anything sent to AAG's order or enquiry methods is processed for real.
+
+- Only the read-only lookups may ever be called: `/api/quote`,
+  `/api/quote/classic`, `/api/product/info`. That includes tests, probes and
+  "just checking" calls.
+- Go through `lib/aag/client.ts` or `scripts/lib/aag-rest.mjs`. Both refuse
+  every other path (`AAG_READ_ONLY_PATHS`). Never call AAG with raw curl or
+  fetch to get round them, and never widen that list unless Brad asks for it
+  in so many words.
+- If a task looks like it needs ordering, stop and ask Brad first.
+
 # Task tracking
 
 Work is organised as numbered task specs in `docs/tasks/`. When you finish a task (or a step of one), keep its own md in sync — not just `docs/HANDOFF.md`:

@@ -39,15 +39,15 @@ export async function checkAagQuoteAction(input: {
   if (!reg) return { ok: false, error: "Enter a registration." };
   if (!/^\d{1,6}$/.test(genart)) return { ok: false, error: "Enter a numeric TecDoc GenArt id (82 = brake discs)." };
   if (!isAagConfigured()) {
-    return { ok: false, error: "AAG isn't configured on this environment. Add the AAG_* values first." };
+    return { ok: false, error: "NAPA Auto Parts isn't configured on this environment. Add the AAG_* values first." };
   }
 
   const outcome = await aagQuoteResult(reg, genart, { includeVehicleDetails: true });
   if (outcome.kind === "no_parts") {
-    return { ok: false, error: `AAG answered: it has no parts for ${reg} in product group ${genart}.` };
+    return { ok: false, error: `NAPA Auto Parts answered: it has no parts for ${reg} in product group ${genart}.` };
   }
   if (outcome.kind === "failed") {
-    return { ok: false, error: `AAG didn't return a quote. ${outcome.reason}` };
+    return { ok: false, error: `NAPA Auto Parts didn't return a quote. ${outcome.reason}` };
   }
   const body = outcome.body;
   const lines = flattenQuote(body);

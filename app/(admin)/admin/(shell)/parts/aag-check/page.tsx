@@ -26,10 +26,10 @@ export default async function AagCheckPage() {
         <div>
           <Overline>Commercial</Overline>
           <h1 className="mt-1 text-3xl font-bold tracking-tight text-text-primary">
-            AAG parts check
+            NAPA Auto Parts check
           </h1>
           <p className="mt-1.5 max-w-2xl text-sm text-text-muted">
-            Ask Alliance Automotive Group what parts fit a registration in one
+            Ask NAPA Auto Parts what parts fit a registration in one
             product group, at our trade price, with branch stock and delivery
             estimates. This is a read-only check against{" "}
             {sandbox ? "their sandbox" : "their live system"}. Nothing is
