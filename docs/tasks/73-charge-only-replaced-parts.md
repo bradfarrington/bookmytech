@@ -1,6 +1,6 @@
 # Task 73: Charge only the parts a job actually replaces
 
-**Status:** 📝 **Planned, not started (raised 2026-10-09).** To revisit with Brad before building. Not needed for the AAG demo; avoid the affected jobs there.
+**Status:** ✅ Complete (2026-11-17): the wording rule, on for every car, and part-or-kit pairs charged once. Code is in `lib/parts/job-charges.ts`; the effect is listed job by job in `docs/tasks/73-job-changes.md` for review before release. Deviations from the plan: the per-job admin switch (proposal 2) wasn't built, because Brad chose the automatic rule. Remove/refit jobs also keep their gaskets, seals and bolt sets (found in the review list). A part type listed twice on one job (two "Brake fluid" ids) is charged once.
 
 ## The problem
 
@@ -39,7 +39,13 @@ The existing switch (`part_group_settings.charged`) can't fix it, because it app
 2. **A per-job switch in the admin.** On a repair, choose which of its tagged part types are charged, e.g. "Check the battery: don't charge Starter battery". HaynesPro job ids are the same repair on every make (`lib/haynespro/exclusions.ts` header), so one setting covers every car. It overrides the wording rule both ways.
 3. **Alternatives charged twice** (bellow vs bellow kit, bearing vs bearing kit): when a job carries two part types that are alternatives, charge one. This could be a per-job choice (same admin switch) or a small list of known alternative pairs.
 
-## Questions for Brad
+## Brad's answers (2026-11-17)
+
+- Top-ups: **keep a full fill**, as now.
+- The wording rule: **on from day one**, with a list of every changed job to review first (`73-job-changes.md`).
+- Part and kit side by side: **charge one, automatically**: the kit when NAPA prices it, otherwise the single part.
+
+## Questions for Brad (answered above)
 
 - Should top-ups charge a fraction of a fill, a set price, or nothing?
 - Should the wording rule be on from day one, or only the per-job switch?
@@ -47,9 +53,9 @@ The existing switch (`part_group_settings.charged`) can't fix it, because it app
 
 ## Acceptance criteria (draft)
 
-- [ ] Battery check and charge jobs on FN60KYP price as labour only.
-- [ ] "Renew the battery" still charges the battery.
-- [ ] An admin can switch a part type off for one repair on every car, and back on.
-- [ ] CV-boot and wheel-bearing jobs charge one part, not both alternatives.
-- [ ] A report of every job whose price changes, reviewed before release.
-- [ ] Mobile contract unchanged: only the figures change. Tell the app teams that prices for these jobs will drop.
+- [x] Battery check and charge jobs on FN60KYP price as labour only.
+- [x] "Renew the battery" still charges the battery.
+- [ ] An admin can switch a part type off for one repair on every car, and back on. Not built: Brad chose the automatic wording rule instead. The existing per-part-type "not charged" switch still works.
+- [x] CV-boot and wheel-bearing jobs charge one part, not both alternatives.
+- [x] A report of every job whose price changes: `73-job-changes.md` (178 jobs; awaiting Brad's review before release).
+- [x] Mobile contract unchanged: only the figures change. Repair-tree `genartIds` now lists only the part types a job charges, so a "Check…" job has none and the apps show a plain price instead of "+ parts". Prices for these jobs drop.

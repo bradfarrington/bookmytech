@@ -29,6 +29,7 @@ import {
   type EstimateVehicle,
 } from "./part-estimates";
 import { isMissingColumn, loadPartGroupSettings, type PartGroupSetPrice } from "./part-group-settings";
+import { alternativePairs } from "./job-charges";
 import { jobPosition, selectJobParts, type RepairPartChoiceRow } from "./repair-part-choice";
 import type { PartPosition, SupplierId } from "./supplier-offer";
 
@@ -173,8 +174,9 @@ export function priceJobParts(args: {
   };
 
   for (const job of args.jobs) {
+    const skipped = alternativesToSkip(job, args.offers, args.uncharged);
     for (const group of job.groups) {
-      if (args.uncharged?.has(group.genartId)) continue;
+      if (args.uncharged?.has(group.genartId) || skipped.has(group.genartId)) continue;
       const lookup = args.offers.get(group.genartId);
       if (!lookup || lookup.state !== "ok") {
         unpriced(job, group, jobPosition(job.description));
@@ -213,6 +215,28 @@ export function priceJobParts(args: {
   }
 
   return missing.length > 0 ? { ok: false, parts, missing } : { ok: true, parts };
+}
+
+/**
+ * A job that lists a part and its kit side by side ("Wheel bearing" and
+ * "Wheel bearing kit") charges one of them (Task 73): the kit when NAPA has a
+ * buyable price for it, otherwise the single part. Returns the ids to skip.
+ */
+function alternativesToSkip(
+  job: PartsJob,
+  offers: ReadonlyMap<number, AagPartOffers>,
+  uncharged: ReadonlySet<number> | undefined,
+): Set<number> {
+  const skip = new Set<number>();
+  for (const { single, kit } of alternativePairs(job.groups)) {
+    const lookup = offers.get(kit);
+    const kitPriced =
+      !uncharged?.has(kit) &&
+      lookup?.state === "ok" &&
+      lookup.offers.some((offer) => offer.buyable && offer.costPence != null);
+    skip.add(kitPriced ? single : kit);
+  }
+  return skip;
 }
 
 async function loadChoices(

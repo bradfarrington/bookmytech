@@ -125,7 +125,9 @@ You are working on **Book My Tech**, a UK mobile-mechanic booking platform. This
 
 Read `docs/tasks/76-classic-quote-fallback.md`. Parts are now priced from the standard quote, then `/api/quote/classic` when it has nothing, but only from classic's exact matches: variants are dropped, never guessed (Fiesta: 23% → 30% of parts repairs fully priced). UI copy says "NAPA Auto Parts" everywhere it said Alliance Automotive or AAG. Env var names are unchanged.
 
-**Next:** Task 73 (confirm the spec with Brad), then an admin "repairs that don't price" list (hide, set price, or match to NAPA's equivalent part, per repair type), then the AAG email about the 2024 Ranger. Two pages for Gareth (rating per part type vs brand order per part type) are drafted in the session scratchpad, not published.
+**Task 73 built 2026-11-17** (`docs/tasks/73-charge-only-replaced-parts.md`): jobs that don't renew, replace, fit or repair something charge only their fluids, gaskets, seals and bolt sets. A part listed with its kit, or twice, is charged once. **Review `docs/tasks/73-job-changes.md` (178 jobs) before pushing.**
+
+**Next:** an admin "repairs that don't price" list (hide, set price, or match to NAPA's equivalent part, per repair type), then the AAG email about the 2024 Ranger. Two pages for Gareth (rating per part type vs brand order per part type) are drafted in the session scratchpad, not published.
 
 ### 📌 2026-11-13: Search, DPF services, fuel-specific products (Task 74); custom quotes (Task 75)
 

@@ -7,6 +7,7 @@
 // Pure: no I/O. Unit-tested.
 
 import type { HpRepairtimeNode } from "@/lib/haynespro/types";
+import { chargedGroups } from "./job-charges";
 
 export interface SeenPartGroup {
   genartId: number;
@@ -15,11 +16,15 @@ export interface SeenPartGroup {
   sampleRepair: string | null;
 }
 
-/** Distinct part groups on a set of repair nodes, first sighting wins. */
+/**
+ * Distinct part groups the repair nodes charge for, first sighting wins. A job
+ * that only checks, cleans or removes/refits a part charges just its
+ * consumables (Task 73, job-charges.ts).
+ */
 export function partGroupsOnNodes(nodes: readonly HpRepairtimeNode[]): SeenPartGroup[] {
   const byId = new Map<number, SeenPartGroup>();
   for (const node of nodes) {
-    for (const group of node.genarts ?? []) {
+    for (const group of chargedGroups(node.description, node.genarts)) {
       if (typeof group?.id !== "number" || group.id <= 0 || byId.has(group.id)) continue;
       byId.set(group.id, {
         genartId: group.id,

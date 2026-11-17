@@ -117,7 +117,7 @@ export async function priceLevelParts(args: {
   // A row whose jobs name no part group needs nothing priced: its labour is
   // already the whole price, and asking about it would be a wasted lookup.
   const rows = args.rows.filter((row) =>
-    row.nodes.some((n) => n.id != null && (n.genarts?.length ?? 0) > 0),
+    row.nodes.some((n) => n.id != null && partGroupsOnNodes([n]).length > 0),
   );
   if (rows.length === 0) return EMPTY;
 
