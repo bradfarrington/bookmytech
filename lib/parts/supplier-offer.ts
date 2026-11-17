@@ -66,6 +66,17 @@ export interface SupplierOffer {
    * Absent on offers cached before Task 76.
    */
   fromCatalogue?: boolean;
+  /**
+   * ADDITIVE (Task 77). The code NAPA was asked under when it isn't
+   * HaynesPro's: an approved mapping (part_code_maps). Absent otherwise.
+   */
+  napaGenart?: number;
+  /**
+   * ADDITIVE (Task 77). True when an admin picked this part for the car's
+   * model because NAPA lists nothing for it (model_part_choices). Priced live
+   * from NAPA by part number. Absent otherwise.
+   */
+  modelPart?: boolean;
 }
 
 export type SupplierPanel =

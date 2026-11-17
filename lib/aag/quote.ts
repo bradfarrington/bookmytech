@@ -209,31 +209,128 @@ const VEHICLE_CONDITION =
 /** "Only for article number" pairs a disc with its pads; it says nothing about the car. */
 const NOT_A_VEHICLE_CONDITION = /^only for article number$/i;
 
+/** "TecDoc Engine Number": the one condition that can be settled from NAPA's own data (Task 77). */
+const ENGINE_CONDITION = /^(tecdoc\s+)?engine\s+(number|code)$/i;
+
+/** Detail names that place a part on the car (which end, which side), not on a version of it. */
+const FITTING_POSITION = /^fitting position$/i;
+
+/**
+ * Engine codes as NAPA writes them, upper case: "BF2X"; several separated by
+ * commas; or one with its other name in brackets, "S55B30T0 (S55B30A)", which
+ * gives both.
+ */
+export function engineCodes(value: string | null | undefined): string[] {
+  return (value ?? "")
+    .split(/[,;()]/)
+    .map((code) => code.trim().toUpperCase())
+    .filter(Boolean);
+}
+
+function isVehicleCondition(detail: { name?: string | null; value?: string | null }): boolean {
+  const name = detail.name?.trim() ?? "";
+  if (NOT_A_VEHICLE_CONDITION.test(name)) return false;
+  return VEHICLE_CONDITION.test(name) || VEHICLE_CONDITION.test(detail.value ?? "");
+}
+
 /** Whether NAPA says a product is only for some versions of the model. */
 export function classicHasVehicleCondition(product: AagClassicProduct): boolean {
+  return (product.productDetails ?? []).some(isVehicleCondition);
+}
+
+/**
+ * Whether a product is placed somewhere on the car other than an axle:
+ * "Transmission sided" vs "Frontal sided" crankshaft seals, a left or right
+ * part. Which one a job needs depends on the job, so such a part is a variant
+ * and is never picked from the catalogue (Task 77).
+ */
+function hasNonAxlePosition(product: AagClassicProduct): boolean {
+  const fitment = classicFitment(product.fitment);
+  if (fitment && fitment !== "FR" && fitment !== "RR") return true;
   return (product.productDetails ?? []).some((detail) => {
-    const name = detail.name?.trim() ?? "";
-    if (NOT_A_VEHICLE_CONDITION.test(name)) return false;
-    return VEHICLE_CONDITION.test(name) || VEHICLE_CONDITION.test(detail.value ?? "");
+    if (!FITTING_POSITION.test(detail.name?.trim() ?? "")) return false;
+    const position = classicFitment(detail.value);
+    return !!position && position !== "FR" && position !== "RR";
   });
 }
 
 /**
- * The classic products that certainly fit, axle by axle (Task 76). The
- * standard quote is NAPA's exact match for the car; classic lists the model's
- * whole range. An axle's products are kept only when none of them carries a
- * vehicle condition: then every one fits and the usual rules pick between
- * them. A condition on even a lone part ("for vehicles with disc brakes on
- * the rear axle") means it may be for another version, so that axle is
- * dropped rather than guessed. Pure.
+ * Does a classic product fit this car? Pure.
+ *   - "fits": no vehicle condition, or its only conditions are engine codes and
+ *     one is the car's own (Task 77).
+ *   - "other_engine": its only conditions are engine codes, none the car's.
+ *     NAPA says it's for another engine, so it doesn't fit.
+ *   - "unsure": any other condition, an engine condition when the car's code
+ *     isn't known, or a fitting position other than an axle.
  */
-export function unambiguousClassic(body: AagQuoteClassicBody | null | undefined): AagQuoteClassicBody {
+export function classicFit(product: AagClassicProduct, carEngineCodes: readonly string[] = []): "fits" | "other_engine" | "unsure" {
+  const kind = conditionKind(product);
+  if (kind === "none") return "fits";
+  if (kind === "other") return "unsure";
+  const own = new Set(carEngineCodes.flatMap(engineCodes));
+  if (own.size === 0) return "unsure";
+  const listed = (product.productDetails ?? []).filter(isVehicleCondition).flatMap((d) => engineCodes(d.value));
+  return listed.some((code) => own.has(code)) ? "fits" : "other_engine";
+}
+
+/** What limits a product to some cars: nothing, only engine codes, or anything else. */
+function conditionKind(product: AagClassicProduct): "none" | "engine" | "other" {
+  if (hasNonAxlePosition(product)) return "other";
+  const conditions = (product.productDetails ?? []).filter(isVehicleCondition);
+  if (conditions.length === 0) return "none";
+  return conditions.every((detail) => ENGINE_CONDITION.test(detail.name?.trim() ?? "")) ? "engine" : "other";
+}
+
+/**
+ * The car's engine codes from NAPA's exact-match answer (Task 77): the
+ * "Engine Code" property on its articles. That answer is about this car, so
+ * each article's code is the car's engine under one naming or another (a
+ * 2010 Fiesta is C14HDEZ on its filters and SPJC on its pads; a BMW is
+ * "S55B30T0 (S55B30A)"). An article giving two different engines separated by
+ * commas is ambiguous and is skipped. Pure.
+ */
+export function engineCodesOf(body: AagQuoteBody | null | undefined): string[] {
+  const codes = new Set<string>();
+  for (const article of body?.Articles ?? []) {
+    for (const property of article.ArticleProperties ?? []) {
+      if (!/^engine\s+code$/i.test(property.Name?.trim() ?? "")) continue;
+      const value = property.Value ?? "";
+      if (/[,;]/.test(value)) continue;
+      for (const code of engineCodes(value)) codes.add(code);
+    }
+  }
+  return [...codes].sort();
+}
+
+/** Whether any product's fit turns on the car's engine code, so it's worth finding out. Pure. */
+export function classicNeedsEngineCode(body: AagQuoteClassicBody | null | undefined): boolean {
+  return (body?.products ?? []).some((product) => conditionKind(product) === "engine");
+}
+
+/**
+ * The classic products that certainly fit, axle by axle (Tasks 76, 77). The
+ * standard quote is NAPA's exact match for the car; classic lists the model's
+ * whole range. An axle's products are kept only when every one of them fits
+ * (no vehicle condition, or only engine codes that include the car's own),
+ * and then the usual rules pick between them. Parts NAPA lists for another
+ * engine don't fit and are left out. Any other condition on even a lone part
+ * ("for vehicles with disc brakes on the rear axle") means it may be for
+ * another version, so that axle is dropped rather than guessed. Pure.
+ */
+export function unambiguousClassic(
+  body: AagQuoteClassicBody | null | undefined,
+  carEngineCodes: readonly string[] = [],
+): AagQuoteClassicBody {
   const byAxle = new Map<string, AagClassicProduct[]>();
   for (const product of body?.products ?? []) {
     const axle = classicAxle(product);
     byAxle.set(axle, [...(byAxle.get(axle) ?? []), product]);
   }
-  const products = [...byAxle.values()].flatMap((list) => (list.some(classicHasVehicleCondition) ? [] : list));
+  const products = [...byAxle.values()].flatMap((list) => {
+    const fits = list.map((product) => classicFit(product, carEngineCodes));
+    if (fits.includes("unsure")) return [];
+    return list.filter((_, i) => fits[i] === "fits");
+  });
   return { ...body, products };
 }
 

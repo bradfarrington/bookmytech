@@ -214,6 +214,31 @@ export async function getRepairNodesByIds(
   return nodes ?? [];
 }
 
+/** A node of HaynesPro's whole repair tree (getFullTree): groups have `nodes`, repairs have none. */
+export interface HpFullTreeNode {
+  id: string;
+  desc: string;
+  nodes: HpFullTreeNode[] | null;
+}
+
+/**
+ * A car type's whole repair tree in ONE call, names and ids only, no times or
+ * part types (Task 77). Pair with getRepairNodesByIds, 200 ids a call, for
+ * those. About 12 calls for a whole car instead of ~360 level-by-level
+ * expansions.
+ */
+export async function getFullRepairTree(vehicle: HpVehicleRef): Promise<HpFullTreeNode[]> {
+  const { carTypeId, repairtimeTypeId } = vehicle;
+  const tree = await memoised(`fulltree:${repairtimeTypeId}`, DATA_TTL_MS, () =>
+    haynesProCall<{ searchTree?: HpFullTreeNode[] | null }>("getFullTree", {
+      descriptionLanguage: "en",
+      repairtimeTypeId,
+      typeCategory: "CAR",
+    }, contentSession(carTypeId)),
+  );
+  return tree?.searchTree ?? [];
+}
+
 /**
  * HaynesPro's basket calculation for several repairs at once (Task 24):
  * each job's time after overlap removal, and the total. Null on any failure

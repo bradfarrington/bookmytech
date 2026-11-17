@@ -3,6 +3,7 @@
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { getRepairNodesByIds } from "@/lib/haynespro/tree";
 import { cacheRegKey, resolveVehicle } from "@/lib/haynespro/vehicle";
+import { engineCodeSource } from "@/lib/parts/engine-codes";
 import { isMissingColumn, isMissingTable, loadPartGroupSettings } from "@/lib/parts/part-group-settings";
 import { partGroupsOnNodes } from "@/lib/parts/part-groups";
 import {
@@ -141,10 +142,11 @@ export async function loadRepairPartsAction(input: {
     .eq("node_id", nodeId);
   const choices = new Map(((choiceRows ?? []) as RepairPartChoiceRow[]).map((r) => [r.genart_id, r]));
 
+  const engineCodes = engineCodeSource(reg, { db });
   const groups = await Promise.all(
     seen.map(async (g): Promise<RepairPartGroupView> => {
       const description = g.description || `Part group ${g.genartId}`;
-      const aag = await lookupAagPanel(reg, { genart: String(g.genartId), label: description });
+      const aag = await lookupAagPanel(reg, { genart: String(g.genartId), label: description }, engineCodes);
       const choice = choices.get(g.genartId) ?? null;
       return {
         genartId: g.genartId,

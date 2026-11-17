@@ -119,6 +119,16 @@ You are working on **Book My Tech**, a UK mobile-mechanic booking platform. This
 
 ## Current task
 
+### 📌 2026-11-17 (evening): Closing NAPA's parts gaps (Task 77), pushed; Parts gaps screen local-only
+
+Read `docs/tasks/77-parts-gaps.md`. Built on the agreed plan below, as Brad revised it: engine-code matches (automatic), code mappings (we propose, Gareth approves on `/admin/parts/gaps`), and **Gareth picks a NAPA part per model** (not a typed price) where NAPA lists nothing for the model. Hiding needs nothing new: global hides on Repairs already do it. Live check on S28BSW: part types 321, 323 and 1217 now price from the catalogue by engine code BF2X; 572 correctly stays unpriced.
+
+**Also fixed (live bugs, see Task 77):** oxygen sensor jobs asked NAPA for an exhaust gas temperature sensor; global hides matched HaynesPro's per-car variant numbers and hid the wrong repairs (418 on 11 cars, e.g. every Fiesta's manual-gearbox starter); a group opened from search stayed hidden behind the search results.
+
+**Pushed 2026-11-17.** The Parts gaps screen (`/admin/parts/gaps`) only shows on `next dev`: Brad hasn't decided how Gareth will use it (`lib/parts/parts-gaps-flag.ts` switches it on). Migration `0090` is applied (Brad); 12 models scanned; three code matches proposed, none approved, no model parts picked, so nothing it feeds changes a price yet.
+
+**Where the thinking got to (for the next session):** measured on 12 scanned models, NAPA prices about 85% of everyday mobile-mechanic jobs on mainstream cars, but only 7–15 of 14–26 on new models (Ranger, Puma, Transit), where NAPA's own website shows the same gaps: NAPA hasn't listed them, so nothing of ours can price them correctly. Brad said no to "typical prices" from other models and no to "price on request". Open questions for Gareth: switch off unwanted repairs for every car (not per model), whether mechanics return exchange units (Bosch reman starters carry a £67.50 core charge we don't charge for), brake fluid bottle size, and whether exhaust mounting kits (part type 519, never priced) should be charged. Open: the default pick takes the 5 litre brake fluid when NAPA lists several bottle sizes.
+
 ### 📌 2026-11-17: AAG live, and NAPA's full catalogue as a fallback (Task 76)
 
 **Live AAG works from Vercel** (no IP allowlist on live; the sandbox notes below are history). The account is Gareth's real trade account: **never send anything but the read-only lookups** (see `AGENTS.md`).

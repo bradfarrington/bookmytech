@@ -10,6 +10,7 @@
 
 import { isAagConfigured } from "@/lib/aag/client";
 import { fetchAagLiveOffers } from "./aag-live-offers";
+import type { EngineCodeSource } from "./engine-codes";
 import type { SupplierPanel } from "./supplier-offer";
 
 /** A TecDoc part group ("GenArt") as HaynesPro names it on a repair. AAG prices by its id directly. */
@@ -21,7 +22,12 @@ export interface AagPartGroup {
 }
 
 /** NAPA's parts for a part group on a registration: the standard quote, then the full catalogue (Task 76). */
-export async function lookupAagPanel(reg: string, group: AagPartGroup): Promise<SupplierPanel> {
+export async function lookupAagPanel(
+  reg: string,
+  group: AagPartGroup,
+  /** The car's engine codes (Task 77); share one across a car's part groups. */
+  engineCodes?: EngineCodeSource,
+): Promise<SupplierPanel> {
   if (!isAagConfigured()) {
     return {
       state: "not_connected",
@@ -33,7 +39,10 @@ export async function lookupAagPanel(reg: string, group: AagPartGroup): Promise<
 
   // This call's own reason, not the shared status row: that row may be another
   // environment's (the sandbox refuses Vercel but answers a local machine).
-  const outcome = await fetchAagLiveOffers(reg, group.genart, { includeVehicleDetails: true });
+  const outcome = await fetchAagLiveOffers(reg, group.genart, {
+    includeVehicleDetails: true,
+    engineCodes,
+  });
   if (outcome.kind === "failed") {
     return {
       state: "not_connected",

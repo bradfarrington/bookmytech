@@ -20,6 +20,7 @@ import {
   Mail,
   MessageSquare,
   Package,
+  PackageSearch,
   PoundSterling,
   Shield,
   Star,
@@ -31,6 +32,7 @@ import {
   Wrench,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { PARTS_GAPS_SCREEN_ENABLED } from "@/lib/parts/parts-gaps-flag";
 import { Icon } from "@/components/ui/icon";
 import { Avatar } from "@/components/ui/avatar";
 import { signOut } from "@/app/actions/sign-out";
@@ -79,6 +81,8 @@ const NAV_GROUPS: readonly NavGroup[] = [
       { label: "Services", href: "/admin/services", icon: ClipboardCheck },
       { label: "Vehicles", href: "/admin/vehicles", icon: Car },
       { label: "Parts supplier", href: "/admin/parts/aag-check", icon: Package },
+      // Local only for now (lib/parts/parts-gaps-flag.ts).
+      ...(PARTS_GAPS_SCREEN_ENABLED ? [{ label: "Parts gaps", href: "/admin/parts/gaps", icon: PackageSearch }] : []),
       { label: "Discounts", href: "/admin/discounts", icon: Ticket },
       { label: "SMS", href: "/admin/sms", icon: MessageSquare },
       { label: "Emails", href: "/admin/emails", icon: Mail },

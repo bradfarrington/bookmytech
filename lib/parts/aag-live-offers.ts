@@ -9,8 +9,9 @@
 //
 // The standard quote is NAPA's exact match for the car. Classic lists the
 // model's whole range, so only its unambiguous answers are used: the parts on
-// the job's axle, when none has a vehicle condition attached
-// (unambiguousClassic). Where NAPA's own data limits a part to some versions
+// the job's axle, when none has a vehicle condition attached, or only engine
+// codes that include the car's own as NAPA reports it (Task 77,
+// engine-codes.ts) (unambiguousClassic). Where NAPA's own data limits a part to some versions
 // ("for vehicles with rear discs", engine codes, trim levels), nothing is
 // guessed: the part
 // group stays unpriced and falls through to estimates as before. Classic
@@ -21,7 +22,14 @@
 // Read-only: only the two quote lookups are ever sent. Never throws.
 
 import { aagQuoteClassicResult, aagQuoteResult } from "@/lib/aag/client";
-import { classicToQuoteBody, flattenQuote, unambiguousClassic } from "@/lib/aag/quote";
+import {
+  classicNeedsEngineCode,
+  classicToQuoteBody,
+  engineCodesOf,
+  flattenQuote,
+  unambiguousClassic,
+} from "@/lib/aag/quote";
+import type { EngineCodeSource } from "./engine-codes";
 import { aagOffers, type SupplierOffer } from "./supplier-offer";
 
 export type AagLiveOffers =
@@ -34,6 +42,18 @@ export type AagLiveOffers =
 export interface AagLiveOptions {
   timeoutMs?: number;
   includeVehicleDetails?: boolean;
+  /**
+   * The car's engine codes (Task 77): learnt from each exact-match answer, and
+   * asked for when a catalogue part is limited to engine codes. Without it,
+   * such parts are never priced, as before Task 77.
+   */
+  engineCodes?: EngineCodeSource;
+  /**
+   * The code NAPA stocks this part type under, when an admin approved a
+   * mapping (Task 77, code-maps.ts). Asked alongside the HaynesPro code; its
+   * answer is used only when the HaynesPro code has no parts.
+   */
+  napaGenart?: number | null;
 }
 
 /** The two lookups, injectable for tests. */
@@ -50,15 +70,44 @@ export async function fetchAagLiveOffers(
   options: AagLiveOptions = {},
   lookups: AagLookups = LIVE,
 ): Promise<AagLiveOffers> {
-  const standard = await safely(() => lookups.quote(reg, genart, options));
+  const { napaGenart, ...rest } = options;
+  if (!napaGenart || String(napaGenart) === String(genart)) return fetchOneCode(reg, genart, rest, lookups);
+
+  // An approved mapping: both codes at once, so a mapped part type costs no
+  // extra time. HaynesPro's own code wins whenever it has parts.
+  const [own, mapped] = await Promise.all([
+    fetchOneCode(reg, genart, rest, lookups),
+    fetchOneCode(reg, napaGenart, rest, lookups),
+  ]);
+  if (own.kind === "ok") return own;
+  if (mapped.kind === "ok") {
+    return { ...mapped, offers: mapped.offers.map((offer) => ({ ...offer, napaGenart: Number(napaGenart) })) };
+  }
+  if (own.kind === "no_parts" || mapped.kind === "no_parts") return { kind: "no_parts" };
+  return own;
+}
+
+/** One part-type code: the standard quote, then the full catalogue. */
+async function fetchOneCode(
+  reg: string,
+  genart: string | number,
+  options: Omit<AagLiveOptions, "napaGenart">,
+  lookups: AagLookups,
+): Promise<AagLiveOffers> {
+  const { engineCodes, ...callOptions } = options;
+  const standard = await safely(() => lookups.quote(reg, genart, callOptions));
   if (standard.kind === "ok") {
+    engineCodes?.seen(engineCodesOf(standard.body));
     const offers = aagOffers(flattenQuote(standard.body));
     if (offers.length > 0) return { kind: "ok", offers, from: "quote" };
   }
 
-  const classic = await safely(() => lookups.classic(reg, genart, { ...options, includeVehicleDetails: false }));
+  const classic = await safely(() => lookups.classic(reg, genart, { ...callOptions, includeVehicleDetails: false }));
   if (classic.kind === "ok") {
-    const offers = aagOffers(flattenQuote(classicToQuoteBody(unambiguousClassic(classic.body)))).map((offer) => ({
+    const carEngineCodes =
+      engineCodes && classicNeedsEngineCode(classic.body) ? await engineCodes.get().catch(() => []) : [];
+    const fitting = unambiguousClassic(classic.body, carEngineCodes);
+    const offers = aagOffers(flattenQuote(classicToQuoteBody(fitting))).map((offer) => ({
       ...offer,
       fromCatalogue: true,
     }));

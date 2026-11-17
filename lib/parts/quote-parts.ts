@@ -30,6 +30,8 @@ import {
 } from "./part-estimates";
 import { isMissingColumn, loadPartGroupSettings, type PartGroupSetPrice } from "./part-group-settings";
 import { alternativePairs } from "./job-charges";
+import { loadModelPartOffers, loadVehicleModel } from "./model-parts";
+import { recordPartGaps } from "./part-gaps";
 import { jobPosition, selectJobParts, type RepairPartChoiceRow } from "./repair-part-choice";
 import type { PartPosition, SupplierId } from "./supplier-offer";
 
@@ -70,6 +72,11 @@ export interface QuotedPart {
   lastKnown: boolean;
   /** ADDITIVE (Task 76). Priced from an unambiguous answer in NAPA's full catalogue. Absent otherwise. */
   fromCatalogue?: true;
+  /**
+   * ADDITIVE (Task 77). NAPA lists nothing for this car, so an admin's pick
+   * for the model, at NAPA's live price (source "chosen"). Absent otherwise.
+   */
+  modelPart?: true;
   /** When the price was given (by AAG, or set by the admin), ISO. */
   pricedAt: string;
 }
@@ -205,10 +212,11 @@ export function priceJobParts(args: {
           quantity,
           unitPence,
           linePence: unitPence * quantity,
-          source: selection.source === "choice" ? "chosen" : "default",
+          source: selection.source === "choice" || offer.modelPart ? "chosen" : "default",
           lastKnown: lookup.lastKnown,
           pricedAt: lookup.pricedAt,
           ...(offer.fromCatalogue ? { fromCatalogue: true as const } : {}),
+          ...(offer.modelPart ? { modelPart: true as const } : {}),
         });
       }
     }
@@ -237,6 +245,16 @@ function alternativesToSkip(
     skip.add(kitPriced ? single : kit);
   }
   return skip;
+}
+
+/** Each gap's HaynesPro name and a repair that needs it. */
+function gapSightings(jobs: readonly PartsJob[], gaps: readonly number[]) {
+  const wanted = new Set(gaps);
+  return jobs.flatMap((job) =>
+    job.groups
+      .filter((group) => wanted.has(group.genartId))
+      .map((group) => ({ genartId: group.genartId, label: group.label, sampleRepair: job.description || null })),
+  );
 }
 
 async function loadChoices(
@@ -280,6 +298,21 @@ export async function quoteJobParts(args: {
     loadChoices(args.db, args.carTypeId, args.jobs.map((job) => job.nodeId)),
   ]);
   if (!offers.enabled) return { ok: true, parts: [] };
+
+  // Part types NAPA has nothing for on this car (Task 77): use the admin's
+  // pick for the model where there is one, and record the gap for the Parts
+  // gaps screen either way.
+  const gaps = charged.filter((id) => offers.byGenart.get(id)?.state !== "ok");
+  if (gaps.length > 0) {
+    const model = await loadVehicleModel(args.db, args.reg);
+    if (model) {
+      const [picked] = await Promise.all([
+        loadModelPartOffers(args.db, model, gaps),
+        recordPartGaps(args.db, model, args.reg, gapSightings(args.jobs, gaps)),
+      ]);
+      for (const [genartId, lookup] of picked) offers.byGenart.set(genartId, lookup);
+    }
+  }
 
   const priced = priceJobParts({
     jobs: args.jobs,

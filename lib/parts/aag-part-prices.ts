@@ -19,6 +19,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { aagRegKey } from "@/lib/aag/client";
 import { fetchAagLiveOffers } from "./aag-live-offers";
+import { loadApprovedCodeMaps } from "./code-maps";
+import { engineCodeSource, type EngineCodeSource } from "./engine-codes";
 import { isMissingTable } from "./part-group-settings";
 import type { SupplierOffer } from "./supplier-offer";
 
@@ -101,8 +103,14 @@ export function settleAagPartOffers(
 }
 
 /** The standard quote, then NAPA's full catalogue when it has nothing (Task 76). */
-async function fetchFromAag(regKey: string, genartId: number): Promise<AagFetchOutcome> {
-  const outcome = await fetchAagLiveOffers(regKey, genartId, { timeoutMs: AAG_CUSTOMER_TIMEOUT_MS });
+async function fetchFromAag(
+  regKey: string,
+  genartId: number,
+  engineCodes?: EngineCodeSource,
+  napaGenart?: number,
+  timeoutMs: number = AAG_CUSTOMER_TIMEOUT_MS,
+): Promise<AagFetchOutcome> {
+  const outcome = await fetchAagLiveOffers(regKey, genartId, { timeoutMs, engineCodes, napaGenart });
   if (outcome.kind === "ok") return { kind: "ok", offers: outcome.offers };
   return outcome.kind === "no_parts" ? { kind: "no_parts" } : { kind: "failed" };
 }
@@ -120,7 +128,12 @@ export async function loadAagPartOffers(
   db: SupabaseClient,
   reg: string,
   genartIds: readonly number[],
-  options: { fetch?: (regKey: string, genartId: number) => Promise<AagFetchOutcome>; now?: number } = {},
+  options: {
+    fetch?: (regKey: string, genartId: number) => Promise<AagFetchOutcome>;
+    now?: number;
+    /** Per NAPA call. Customers' quotes keep the 4 s default; the admin's model scans wait longer. */
+    timeoutMs?: number;
+  } = {},
 ): Promise<AagPartPriceLoad> {
   const regKey = aagRegKey(reg);
   const byGenart = new Map<number, AagPartOffers>();
@@ -141,7 +154,16 @@ export async function loadAagPartOffers(
   }
 
   const now = options.now ?? Date.now();
-  const fetchOne = options.fetch ?? fetchFromAag;
+  // One car, so one set of engine codes shared by every part group asked, and
+  // the approved code mappings for these groups (Task 77). Only read when
+  // NAPA is going to be asked.
+  const timeoutMs = options.timeoutMs ?? AAG_CUSTOMER_TIMEOUT_MS;
+  const engineCodes = engineCodeSource(regKey, { db, timeoutMs });
+  const needAsking = ids.some((id) => !freshAnswer(rows.get(id) ?? null, now));
+  const codeMaps = needAsking && !options.fetch ? await loadApprovedCodeMaps(db, ids) : new Map<number, number>();
+  const fetchOne =
+    options.fetch ??
+    ((key: string, genartId: number) => fetchFromAag(key, genartId, engineCodes, codeMaps.get(genartId), timeoutMs));
   const writes: AagPartPriceRow[] = [];
   await Promise.all(
     ids.map(async (genartId) => {
