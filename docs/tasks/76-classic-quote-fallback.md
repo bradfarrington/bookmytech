@@ -44,8 +44,6 @@ Possible later gain: some conditions can be settled from what we know about the 
 - **Cache:** answers stored as "empty" before this shipped keep being served until they're 12 hours old, then the fallback applies.
 - **Mobile apps:** no API or schema change. More repairs now show a full price instead of "+ parts" in both apps, because the server prices them.
 
-## Next (agreed with Brad 2026-11-17, not started)
+## Next
 
-1. Task 73 (charge only the parts a job replaces): confirm the spec with Brad first.
-2. An admin list of "repairs that don't price", ranked by how many cars each fails on, with hide, set price and "use NAPA's equivalent part" (matching) per repair type.
-3. Email AAG about the 2024 Ranger (S28BSW): bulbs (107), shock absorbers (854) and driveshafts (13) return ISE0011/ISE0006 but price on every older car.
+Task 73 shipped the same day. The plan for the remaining gaps (engine-code match, code mapping, Gareth's model prices, hiding, a "Parts gaps" admin screen) is in `docs/HANDOFF.md` under 2026-11-17. AAG is **not** to be asked to fix gaps (Brad, 2026-11-17).

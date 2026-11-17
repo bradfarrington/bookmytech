@@ -127,7 +127,27 @@ Read `docs/tasks/76-classic-quote-fallback.md`. Parts are now priced from the st
 
 **Task 73 built 2026-11-17** (`docs/tasks/73-charge-only-replaced-parts.md`): jobs that don't renew, replace, fit or repair something charge only their fluids, gaskets, seals and bolt sets. A part listed with its kit, or twice, is charged once. **Review `docs/tasks/73-job-changes.md` (178 jobs) before pushing.**
 
-**Next:** an admin "repairs that don't price" list (hide, set price, or match to NAPA's equivalent part, per repair type), then the AAG email about the 2024 Ranger. Two pages for Gareth (rating per part type vs brand order per part type) are drafted in the session scratchpad, not published.
+**All of the above is pushed and live (2026-11-17, `57f5efb`).**
+
+**Where it stands (end of 2026-11-17).** Waiting on Gareth's answers to a message Brad is sending (draft in `docs/reviews/2026-11-17-ranger-parts/message-to-gareth.md`). Two review pages go with it, self-contained HTML for Brad to host on his own URL, in `docs/reviews/2026-11-17-ranger-parts/`:
+- `labour-only-jobs.html`: the S28BSW jobs Task 73 makes labour only (Brad reviewed and approved these).
+- `napa-gaps.html`: every S28BSW part type NAPA can't price exactly, with the repairs it blocks, NAPA's evidence and a suggested fix. 614 parts repairs; 75 priced; 539 blocked by 291 part types. NAPA prices 36 of HaynesPro's 384 part types for this Ranger.
+
+**Rules Brad set today (follow them):**
+- **Never ask AAG/NAPA to fix catalogue gaps** (link parts to a model, map codes). AAG won't do bespoke work for one customer. Every gap is closed by us or by Gareth.
+- **Nothing Gareth sees may link to claude.ai or mention the AI tooling.** Pages for Gareth are delivered as self-contained files Brad hosts himself, with NAPA trade prices stripped.
+- **Never match parts by similar wording.** Tried and rejected: it offered brake pads for "Brake pedal", tie rod ends for "Tie rod", a timing belt for "Tensioner, timing belt".
+- **Never order from AAG** (see `AGENTS.md`).
+
+**Agreed plan for the gaps (nothing below is built yet):**
+1. **Engine-code match (us, automatic, small).** A full-catalogue part whose only vehicle condition is `TecDoc Engine Number: <code>` is priced when that code is the car's own engine code, as NAPA reports it in its exact-match answer (`ArticleProperties` "Engine Code", e.g. BF2X on S28BSW). Today `unambiguousClassic` drops these. On S28BSW: part types 321, 323, 1217; 572 also needs the job's crankshaft end.
+2. **Code mapping (us, Gareth approves).** For part types NAPA answers "no parts" on every car (131 on S28BSW, e.g. brake fluid 71 vs 3357, wiper arms, tie rods), find the GenArt code NAPA stocks the same named part under, by read-only probing of a well-covered reg (FN60KYP). Map HaynesPro code → NAPA code for the same named part only, never similar wording. Gareth approves each mapping; it applies to every car.
+3. **Model prices (Gareth).** Where NAPA sells a part type on other cars but has nothing listed for a model (87 part types on S28BSW: headlight bulbs, shocks, wheel bearings, glow plugs…), Gareth enters a price (optionally a part number) once per model and part type.
+4. **Hide (Gareth).** Dealer/bodyshop part types (airbags, seat belts, speakers, seats, door panels: 65 on S28BSW). Either hide those repairs for every car, or switch to a curated list of offered repairs (question 1 to Gareth).
+5. **Good/Better/Best per part type (Gareth).** Today the default is always Best, dearest within.
+6. **A "Parts gaps" admin screen** bringing 2–5 together: worst gaps across the regs customers actually look up, with approve-mapping / set-model-price / hide-everywhere / switch-off buttons. Most controls already exist (hides, `part_group_settings` charged + set price, `repair_part_choices`). Model prices and code mappings need new tables.
+
+**Analysis scripts** (read-only, in the session scratchpad, not committed) used `getFullTree` + `getRepairtimeNodesV4` (200 ids per call), which is about 12 HaynesPro calls per car instead of about 360 expansions. `scripts/probe-genart-coverage.mjs` still walks the tree the slow way; worth switching it.
 
 ### 📌 2026-11-13: Search, DPF services, fuel-specific products (Task 74); custom quotes (Task 75)
 
