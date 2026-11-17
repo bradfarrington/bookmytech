@@ -123,7 +123,7 @@ You are working on **Book My Tech**, a UK mobile-mechanic booking platform. This
 
 **Live AAG works from Vercel** (no IP allowlist on live; the sandbox notes below are history). The account is Gareth's real trade account: **never send anything but the read-only lookups** (see `AGENTS.md`).
 
-Read `docs/tasks/76-classic-quote-fallback.md`. Parts are now priced from the standard quote, then `/api/quote/classic` when it has nothing, but only from classic's exact matches: variants are dropped, never guessed (Fiesta: 23% → 33% of parts repairs fully priced). UI copy says "NAPA Auto Parts" everywhere it said Alliance Automotive or AAG. Env var names are unchanged.
+Read `docs/tasks/76-classic-quote-fallback.md`. Parts are now priced from the standard quote, then `/api/quote/classic` when it has nothing, but only from classic's exact matches: variants are dropped, never guessed (Fiesta: 23% → 30% of parts repairs fully priced). UI copy says "NAPA Auto Parts" everywhere it said Alliance Automotive or AAG. Env var names are unchanged.
 
 **Next:** Task 73 (confirm the spec with Brad), then an admin "repairs that don't price" list (hide, set price, or match to NAPA's equivalent part, per repair type), then the AAG email about the 2024 Ranger. Two pages for Gareth (rating per part type vs brand order per part type) are drafted in the session scratchpad, not published.
 

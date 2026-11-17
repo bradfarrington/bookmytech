@@ -221,9 +221,10 @@ export function classicHasVehicleCondition(product: AagClassicProduct): boolean 
 /**
  * The classic products that certainly fit, axle by axle (Task 76). The
  * standard quote is NAPA's exact match for the car; classic lists the model's
- * whole range. An axle's products are kept only when there is one, or when
- * none of them carries a vehicle condition: then every one fits and the usual
- * rules pick between them. When NAPA's own data shows variants, that axle is
+ * whole range. An axle's products are kept only when none of them carries a
+ * vehicle condition: then every one fits and the usual rules pick between
+ * them. A condition on even a lone part ("for vehicles with disc brakes on
+ * the rear axle") means it may be for another version, so that axle is
  * dropped rather than guessed. Pure.
  */
 export function unambiguousClassic(body: AagQuoteClassicBody | null | undefined): AagQuoteClassicBody {
@@ -232,9 +233,7 @@ export function unambiguousClassic(body: AagQuoteClassicBody | null | undefined)
     const axle = classicAxle(product);
     byAxle.set(axle, [...(byAxle.get(axle) ?? []), product]);
   }
-  const products = [...byAxle.values()].flatMap((list) =>
-    list.length === 1 || !list.some(classicHasVehicleCondition) ? list : [],
-  );
+  const products = [...byAxle.values()].flatMap((list) => (list.some(classicHasVehicleCondition) ? [] : list));
   return { ...body, products };
 }
 

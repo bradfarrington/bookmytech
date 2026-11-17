@@ -169,8 +169,13 @@ describe("unambiguousClassic: only parts NAPA's own data says certainly fit", ()
     expect(kept).not.toContain("NPANBD5431");
   });
 
-  it("keeps a single part on an axle, conditions or not", () => {
-    expect(unambiguousClassic(VARIANTS).products!.map((p) => p.productId)).toEqual(["BRE08.4931.21"]);
+  it("drops even a lone part when NAPA marks it for some versions only", () => {
+    expect(unambiguousClassic(VARIANTS).products).toEqual([]);
+  });
+
+  it("keeps a lone part with no vehicle condition", () => {
+    const lone: AagQuoteClassicBody = { products: [{ productId: "AUTAEG1691", fitment: "", productRating: "better" }] };
+    expect(unambiguousClassic(lone).products!.map((p) => p.productId)).toEqual(["AUTAEG1691"]);
   });
 
   it("keeps every part on an axle when none carries a condition", () => {

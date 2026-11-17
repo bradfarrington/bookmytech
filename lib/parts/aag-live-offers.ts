@@ -5,13 +5,14 @@
 // the full catalogue (/api/quote/classic) is asked instead. Each finds parts
 // the other misses (2026-11-17, live: a 2024 Ranger priced 27 part groups on
 // the standard quote, 34 on classic, 42 with both; a 2010 Fiesta's parts
-// repairs went from 23% to 33% fully priced, exact matches only).
+// repairs went from 23% to 30% fully priced, exact matches only).
 //
 // The standard quote is NAPA's exact match for the car. Classic lists the
-// model's whole range, so only its unambiguous answers are used: one part on
-// the job's axle, or several with no vehicle conditions attached
-// (unambiguousClassic). Where NAPA's own data shows variants ("for vehicles
-// with rear discs", engine codes, trim levels), nothing is guessed: the part
+// model's whole range, so only its unambiguous answers are used: the parts on
+// the job's axle, when none has a vehicle condition attached
+// (unambiguousClassic). Where NAPA's own data limits a part to some versions
+// ("for vehicles with rear discs", engine codes, trim levels), nothing is
+// guessed: the part
 // group stays unpriced and falls through to estimates as before. Classic
 // parts carry `fromCatalogue` as a record of where they came from.
 //
