@@ -69,8 +69,15 @@ function OfferSummary({ offer }: { offer: SupplierOffer }) {
         <span className="font-mono text-xs text-text-muted">{offer.partNumber}</span>
         {offer.tier && <Pill tone="neutral">{offer.tier}</Pill>}
         {offer.position && <Pill tone="info">{POSITION_LABEL[offer.position]}</Pill>}
+        {offer.fromCatalogue && <Pill tone="pending">Full catalogue</Pill>}
       </div>
       {offer.description && <p className="mt-0.5 text-xs text-text-muted">{offer.description}</p>}
+      {offer.fromCatalogue && (
+        <p className="mt-0.5 text-xs text-amber-700">
+          NAPA&apos;s exact-car quote had nothing, so this is from their full range for the model. Check it fits this
+          engine before relying on it.
+        </p>
+      )}
     </div>
   );
 }
@@ -126,7 +133,7 @@ function SetPriceField({
       toast.success(
         pence == null
           ? `No set price for “${group.description}” any more.`
-          : `Customers pay ${formatPrice(pence)} for “${group.description}” when Alliance Automotive has no price.`,
+          : `Customers pay ${formatPrice(pence)} for “${group.description}” when NAPA Auto Parts has no price.`,
       );
     });
 
@@ -138,7 +145,7 @@ function SetPriceField({
         save();
       }}
     >
-      <span>When Alliance Automotive has no price, charge £</span>
+      <span>When NAPA Auto Parts has no price, charge £</span>
       <input
         value={value}
         onChange={(e) => setValue(e.target.value)}
@@ -272,7 +279,7 @@ function PartGroupCard({
           >
             {selection.source === "none" ? (
               <p className="text-sm text-text-muted">
-                {position ? `${POSITION_LABEL[position]}: ` : ""}Alliance Automotive didn&apos;t return a part we can buy
+                {position ? `${POSITION_LABEL[position]}: ` : ""}NAPA Auto Parts didn&apos;t return a part we can buy
                 for this vehicle.
               </p>
             ) : (
@@ -293,7 +300,7 @@ function PartGroupCard({
       {missingChoice && (
         <p className="mt-2 flex items-start gap-1.5 text-xs text-amber-700">
           <Info size={12} className="mt-0.5 shrink-0" />
-          The part chosen before ({missingChoice.brand ?? "Alliance Automotive"} {missingChoice.part_number}) isn&apos;t
+          The part chosen before ({missingChoice.brand ?? "NAPA Auto Parts"} {missingChoice.part_number}) isn&apos;t
           in today&apos;s results, so the default is shown.
         </p>
       )}
@@ -302,7 +309,7 @@ function PartGroupCard({
       {group.charged && unpriced && (
         group.setPricePence != null ? (
           <p className="mt-1 text-xs text-text-secondary">
-            With no Alliance Automotive price, customers pay the set price, {formatPrice(group.setPricePence)}.
+            With no NAPA Auto Parts price, customers pay the set price, {formatPrice(group.setPricePence)}.
           </p>
         ) : (
           <p className="mt-1 text-xs text-amber-700">
@@ -407,7 +414,7 @@ export function RepairParts({
         <div className="basis-full space-y-3 rounded-xl border border-border bg-surface p-3">
           {loading && (
             <p className="text-sm text-text-muted">
-              Asking Alliance Automotive for the parts for &ldquo;{repairName}&rdquo;…
+              Asking NAPA Auto Parts for the parts for &ldquo;{repairName}&rdquo;…
             </p>
           )}
 

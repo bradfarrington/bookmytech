@@ -67,6 +67,8 @@ export interface QuotedPart {
   estimate?: { basis: EstimateBasis; samples: number };
   /** True when AAG couldn't answer and its answer from the last 7 days was used. */
   lastKnown: boolean;
+  /** ADDITIVE (Task 76). From NAPA's full catalogue, not the exact-car quote: check it fits. Absent otherwise. */
+  fromCatalogue?: true;
   /** When the price was given (by AAG, or set by the admin), ISO. */
   pricedAt: string;
 }
@@ -204,6 +206,7 @@ export function priceJobParts(args: {
           source: selection.source === "choice" ? "chosen" : "default",
           lastKnown: lookup.lastKnown,
           pricedAt: lookup.pricedAt,
+          ...(offer.fromCatalogue ? { fromCatalogue: true as const } : {}),
         });
       }
     }

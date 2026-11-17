@@ -7,7 +7,8 @@
 //   - under 12 hours old, it is used as it is, so every step, the hold and the
 //     booking see one price;
 //   - older, AAG is asked again, with a short timeout so a slow supplier can't
-//     stall the funnel;
+//     stall the funnel: the standard quote, then the full catalogue when that
+//     has nothing (Task 76, aag-live-offers.ts);
 //   - when AAG can't answer, its last answer is used if at most 7 days old
 //     (owner decision, 2026-09-15); otherwise the part can't be priced.
 //
@@ -16,10 +17,10 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { aagQuoteResult, aagRegKey } from "@/lib/aag/client";
-import { flattenQuote } from "@/lib/aag/quote";
+import { aagRegKey } from "@/lib/aag/client";
+import { fetchAagLiveOffers } from "./aag-live-offers";
 import { isMissingTable } from "./part-group-settings";
-import { aagOffers, type SupplierOffer } from "./supplier-offer";
+import type { SupplierOffer } from "./supplier-offer";
 
 export const AAG_PRICE_FRESH_MS = 12 * 60 * 60 * 1000;
 export const AAG_PRICE_LAST_KNOWN_MS = 7 * 24 * 60 * 60 * 1000;
@@ -99,11 +100,11 @@ export function settleAagPartOffers(
   return { result: { state: "unavailable" }, write: null };
 }
 
+/** The standard quote, then NAPA's full catalogue when it has nothing (Task 76). */
 async function fetchFromAag(regKey: string, genartId: number): Promise<AagFetchOutcome> {
-  const outcome = await aagQuoteResult(regKey, genartId, { timeoutMs: AAG_CUSTOMER_TIMEOUT_MS });
-  if (outcome.kind !== "ok") return outcome;
-  const offers = aagOffers(flattenQuote(outcome.body));
-  return offers.length > 0 ? { kind: "ok", offers } : { kind: "no_parts" };
+  const outcome = await fetchAagLiveOffers(regKey, genartId, { timeoutMs: AAG_CUSTOMER_TIMEOUT_MS });
+  if (outcome.kind === "ok") return { kind: "ok", offers: outcome.offers };
+  return outcome.kind === "no_parts" ? { kind: "no_parts" } : { kind: "failed" };
 }
 
 export type AagPartPriceLoad =

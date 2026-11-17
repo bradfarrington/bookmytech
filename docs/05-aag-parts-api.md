@@ -4,6 +4,8 @@
 
 The integration manual is checked in at `docs/suppliers/aag-sales-api-v2-customer-integration-v1.07.pdf`.
 
+> ⛔ **Never order.** The live credentials are Gareth's real trade account. Only `/api/quote`, `/api/quote/classic` and `/api/product/info` may ever be called, even when testing. `lib/aag/client.ts` and `scripts/lib/aag-rest.mjs` refuse every other path; never bypass them. See `AGENTS.md`.
+
 ---
 
 ## 1. The account
@@ -110,7 +112,9 @@ Each product option lists one or more AAG locations with `Priority` (1 = quickes
 | Live | `POST /api/quote`, `FN60KYP`, GenArt 82 | **HTTP 201, `SuccessFlag: true`.** Resolved as a 2010 Ford Fiesta 1.4 petrol with its VIN. One article (Apec 258mm vented front disc) with three product options (NAPA £31.85, Brembo £45.69, Fahren £26.96 trade), all in stock at NAPA Auto Parts Tamworth (location 326), ETA "Please call branch". |
 | Live | `POST /api/quote/classic`, same | HTTP 201, `SuccessFlag: true`, 0 products. Auth passes; the classic body evidently needs something different, but the app uses `/api/quote`. |
 
-So this morning's ISE0034 was the missing live verification ID, not an inactive key. Still unproven: calls from Vercel (the allowlist has only ever let Brad's IP through).
+So this morning's ISE0034 was the missing live verification ID, not an inactive key. Calls from Vercel were confirmed the same afternoon: live has no IP allowlist.
+
+**Live coverage and the classic fallback (2026-11-17):** see `docs/tasks/76-classic-quote-fallback.md`. In short, the standard quote and classic each find parts the other misses, so the app now asks classic when the standard quote has nothing. Classic answers camelCase, lower-case ratings and real delivery times. It answers ISE0047 when it has nothing, as well as on real errors. The 2024 Ranger (S28BSW) is badly covered on both, unlike every older car tested.
 
 ~~Blocked on AAG: the verification ID.~~ Resolved the same day: AAG sent corrected UAT credentials (a different account number and verification ID, now in `.env.local`).
 

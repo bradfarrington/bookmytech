@@ -125,7 +125,7 @@ export type ParsedAagEnvelope<T> =
  */
 export function parseAagEnvelope<T>(raw: unknown): ParsedAagEnvelope<T> {
   if (raw == null || typeof raw !== "object") {
-    return { ok: false, errorCode: null, message: "AAG returned an empty reply." };
+    return { ok: false, errorCode: null, message: "NAPA Auto Parts returned an empty reply." };
   }
   const env = raw as Record<string, unknown>;
   const rawHeader = env.Header ?? env.header;
@@ -170,30 +170,30 @@ export function isAagNoParts(errorCode: string | null): boolean {
 export function describeAagError(code: string | null): string {
   switch (code) {
     case "ISE0034":
-      return "AAG doesn't recognise our API key or account number.";
+      return "NAPA Auto Parts doesn't recognise our API key or account number.";
     case "ISE0101":
-      return "AAG rejected our verification ID.";
+      return "NAPA Auto Parts rejected our verification ID.";
     case "ISE0005":
-      return "AAG couldn't identify a vehicle from that registration.";
+      return "NAPA Auto Parts couldn't identify a vehicle from that registration.";
     case "ISE0006":
     case "ISE0011":
-      return "AAG has no parts for that vehicle in this product group.";
+      return "NAPA Auto Parts has no parts for that vehicle in this product group.";
     case "ISE0023":
       return "No product group was sent.";
     case "ISE0024":
       return "No registration was sent.";
     case "ISE0002":
-      return "AAG couldn't find one or more of those part numbers.";
+      return "NAPA Auto Parts couldn't find one or more of those part numbers.";
     case "ISE0035":
-      return "AAG's server reported an internal error.";
+      return "NAPA's server reported an internal error.";
     case "ISE0047":
-      return "AAG couldn't create the quote. Try again.";
+      return "NAPA Auto Parts couldn't create the quote. Try again.";
     case "ISE0053":
-      return "AAG couldn't look up product info. Try again.";
+      return "NAPA Auto Parts couldn't look up product info. Try again.";
     case null:
-      return "AAG refused the request without an error code.";
+      return "NAPA Auto Parts refused the request without an error code.";
     default:
-      return `AAG refused the request (${code}).`;
+      return `NAPA Auto Parts refused the request (${code}).`;
   }
 }
 
@@ -255,8 +255,8 @@ export type AagCallResult<T> = { ok: true; body: T } | { ok: false; errorCode: s
 /** Why AAG's gateway (not its API) turned us away with a 401/403. Pure. */
 export function describeAagGatewayRefusal(status: number, sandbox: boolean): string {
   return sandbox
-    ? `AAG's sandbox refused this connection (HTTP ${status}). The sandbox only accepts requests from approved addresses, and this server isn't one of them. AAG's live system doesn't have this restriction.`
-    : `AAG's gateway refused us with HTTP ${status}. Either the API-key header is wrong or our address isn't on their allowlist.`;
+    ? `NAPA's sandbox refused this connection (HTTP ${status}). The sandbox only accepts requests from approved addresses, and this server isn't one of them. NAPA's live system doesn't have this restriction.`
+    : `NAPA's gateway refused us with HTTP ${status}. Either the API-key header is wrong or our address isn't on their allowlist.`;
 }
 
 /**
@@ -281,10 +281,10 @@ export async function aagCallResult<T>(
 ): Promise<AagCallResult<T>> {
   if (!isAagReadOnlyPath(path)) {
     console.error(`[aag] refused to call ${path}: only price and stock lookups are allowed`);
-    return { ok: false, errorCode: null, reason: "Only price and stock lookups may be sent to AAG." };
+    return { ok: false, errorCode: null, reason: "Only price and stock lookups may be sent to NAPA Auto Parts." };
   }
   const config = getAagConfig();
-  if (!config) return { ok: false, errorCode: null, reason: "AAG isn't configured on this environment." };
+  if (!config) return { ok: false, errorCode: null, reason: "NAPA Auto Parts isn't configured on this environment." };
 
   let raw: unknown;
   try {
@@ -304,14 +304,14 @@ export async function aagCallResult<T>(
       const gateway = res.status === 401 || res.status === 403;
       const reason = gateway
         ? describeAagGatewayRefusal(res.status, isAagSandbox(config))
-        : `AAG responded HTTP ${res.status}.`;
+        : `NAPA Auto Parts responded HTTP ${res.status}.`;
       await noteFailure(config, gateway ? "auth_failed" : "unreachable", null, reason);
       return { ok: false, errorCode: null, reason };
     }
     raw = text ? (JSON.parse(text) as unknown) : null;
   } catch (err) {
     console.error(`[aag] ${path} failed:`, err);
-    const reason = "We couldn't reach AAG at all (network error or timeout).";
+    const reason = "We couldn't reach NAPA Auto Parts at all (network error or timeout).";
     await noteFailure(config, "unreachable", null, reason);
     return { ok: false, errorCode: null, reason };
   }
@@ -398,6 +398,37 @@ export async function aagQuoteClassic(
     VRM: vrm,
     IncludeVehicleDetails: options.includeVehicleDetails ?? true,
   });
+}
+
+/** A classic quote that says whether AAG answered "no parts" or couldn't answer at all. */
+export type AagQuoteClassicOutcome =
+  | { kind: "ok"; body: AagQuoteClassicBody }
+  | { kind: "no_parts" }
+  /** `reason` is for the admin pages, never a customer. */
+  | { kind: "failed"; errorCode: string | null; reason: string };
+
+/**
+ * `aagQuoteClassic` for one GenArt, with "no parts" kept apart from a failure.
+ * Classic also answers ISE0047 ("general error") when it has nothing for a
+ * group, so that code comes back as `failed` with its errorCode for the caller
+ * to weigh against the standard quote's answer.
+ */
+export async function aagQuoteClassicResult(
+  reg: string,
+  genart: string | number,
+  options: AagCallOptions & { includeVehicleDetails?: boolean } = {},
+): Promise<AagQuoteClassicOutcome> {
+  const vrm = aagRegKey(reg);
+  if (!vrm) return { kind: "failed", errorCode: null, reason: "No registration was given." };
+  const result = await aagCallResult<AagQuoteClassicBody>(
+    "/api/quote/classic",
+    { ProductGroupCodes: [String(genart)], VRM: vrm, IncludeVehicleDetails: options.includeVehicleDetails ?? false },
+    { timeoutMs: options.timeoutMs },
+  );
+  if (result.ok) return (result.body?.products ?? []).length > 0 ? { kind: "ok", body: result.body } : { kind: "no_parts" };
+  return isAagNoParts(result.errorCode)
+    ? { kind: "no_parts" }
+    : { kind: "failed", errorCode: result.errorCode, reason: result.reason };
 }
 
 /** Price and details for known AAG part numbers. */

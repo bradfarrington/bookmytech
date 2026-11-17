@@ -119,6 +119,14 @@ You are working on **Book My Tech**, a UK mobile-mechanic booking platform. This
 
 ## Current task
 
+### 📌 2026-11-17: AAG live, and NAPA's full catalogue as a fallback (Task 76)
+
+**Live AAG works from Vercel** (no IP allowlist on live; the sandbox notes below are history). The account is Gareth's real trade account: **never send anything but the read-only lookups** (see `AGENTS.md`).
+
+Read `docs/tasks/76-classic-quote-fallback.md`. Parts are now priced from the standard quote, then `/api/quote/classic` when it has nothing (Fiesta: 23% → 41% of visible parts repairs fully priced). Classic parts are flagged "Full catalogue" in the admin Parts panel. UI copy says "NAPA Auto Parts" everywhere it said Alliance Automotive or AAG. Env var names are unchanged.
+
+**Next:** Task 73 (confirm the spec with Brad), then an admin "repairs that don't price" list (hide, set price, or match to NAPA's equivalent part, per repair type), then the AAG email about the 2024 Ranger. Two pages for Gareth (rating per part type vs brand order per part type) are drafted in the session scratchpad, not published.
+
 ### 📌 2026-11-13: Search, DPF services, fuel-specific products (Task 74); custom quotes (Task 75)
 
 Read `docs/tasks/74-search-dpf-and-fuel-products.md` and `docs/tasks/75-custom-quotes.md`. Both built and deployed 2026-11-13; **migrations `0088` and `0089` are applied** to the live database; **not yet verified end to end** in a browser or on a phone.

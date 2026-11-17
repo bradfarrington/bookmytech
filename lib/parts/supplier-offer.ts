@@ -21,7 +21,7 @@ import type { AagQuoteLine } from "@/lib/aag/quote";
 export type SupplierId = "aag";
 
 export const SUPPLIER_LABEL: Record<SupplierId, string> = {
-  aag: "Alliance Automotive",
+  aag: "NAPA Auto Parts",
 };
 
 /** Which axle a part fits. */
@@ -58,6 +58,14 @@ export interface SupplierOffer {
   /** Lockout and similar. */
   notes: string[];
   buyable: boolean;
+  /**
+   * ADDITIVE (Task 76). True when the part came from NAPA's full catalogue
+   * (/api/quote/classic) because the standard quote had nothing. The standard
+   * quote is matched to the exact car; the full catalogue covers the model's
+   * range, so the part may be for another engine version: check it fits.
+   * Absent on offers cached before Task 76.
+   */
+  fromCatalogue?: boolean;
 }
 
 export type SupplierPanel =

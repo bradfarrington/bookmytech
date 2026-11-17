@@ -4,7 +4,14 @@
 // of the codebase uses. No I/O; unit-tested against the manual's example and
 // against captured sandbox replies once those exist.
 
-import type { AagArticle, AagAvailability, AagProductOption, AagQuoteBody } from "./types";
+import type {
+  AagArticle,
+  AagAvailability,
+  AagClassicProduct,
+  AagProductOption,
+  AagQuoteBody,
+  AagQuoteClassicBody,
+} from "./types";
 
 /** "11.21" pounds → 1121 pence. Null for anything that isn't a finite number. */
 export function poundsToPence(value: number | null | undefined): number | null {
@@ -127,4 +134,69 @@ export function cheapestLine(lines: readonly AagQuoteLine[]): AagQuoteLine | nul
     if (best == null || line.costPence < (best.costPence ?? Infinity)) best = line;
   }
   return best;
+}
+
+/** "Front Axle" → "FR", "Rear Axle" → "RR"; anything else as AAG sent it. */
+function classicFitment(fitment: string | null | undefined): string | null {
+  const text = fitment?.trim() ?? "";
+  if (/^front\b/i.test(text)) return "FR";
+  if (/^rear\b/i.test(text)) return "RR";
+  return text || null;
+}
+
+/** "best" → "Best": the standard quote's casing, so ratings compare and display the same. */
+function classicRating(rating: string | null | undefined): string | null {
+  const text = rating?.trim() ?? "";
+  return text ? text.charAt(0).toUpperCase() + text.slice(1).toLowerCase() : null;
+}
+
+function classicArticle(product: AagClassicProduct): AagArticle {
+  // Classic gives no priority; its branches come back quickest first, so the
+  // stocked ones are ranked in that order and an empty branch is never "quickest".
+  let rank = 0;
+  const availability: AagAvailability[] = (product.stock ?? []).map((s) => {
+    const qty = typeof s.count === "number" && s.count > 0 ? s.count : 0;
+    const eta = s.deliveryNotes?.trim();
+    return {
+      AagLocationId: typeof s.aagLocationId === "number" ? s.aagLocationId : null,
+      BranchCode: s.branchCode ?? null,
+      LocationName: s.branchName ?? null,
+      QtyInStock: qty,
+      EstDeliveryTime: eta && eta.toUpperCase() !== "N/A" ? eta : null,
+      Priority: qty > 0 ? ++rank : null,
+    };
+  });
+  return {
+    ArticleProvider: product.supplier?.supplierName ?? null,
+    ArticleDescription: product.description ?? null,
+    CustomerProductGroup: product.customerProductGroup ? [product.customerProductGroup] : null,
+    FittingPosition: classicFitment(product.fitment),
+    ImageUrl: product.imageUrl ?? null,
+    ArticleProperties: (product.productDetails ?? []).map((d) => ({ Name: d.name ?? null, Value: d.value ?? null })),
+    ProductOptions: [
+      {
+        RequestLineId: product.requestLineId ?? null,
+        ProductId: product.productId ?? null,
+        Brand: product.supplier?.supplierName ?? null,
+        BrandRating: classicRating(product.productRating),
+        CustomerPartNumber: product.customerPartNumber ?? null,
+        CustomerLockoutRating: product.customerLockoutRating ?? null,
+        RecMinOrdQty: product.recMinOrdQty ?? null,
+        CostPrice: product.costPrice ?? null,
+        Surcharge: product.surcharge ?? null,
+        Availability: availability,
+      },
+    ],
+  };
+}
+
+/**
+ * A /api/quote/classic reply in /api/quote's shape, one article per product,
+ * so everything downstream (flattenQuote, offers, part choice, the price
+ * cache) handles both. Classic lists NAPA's whole range for the model, both
+ * axles and every engine version; the standard quote has already narrowed to
+ * the exact car. Pure.
+ */
+export function classicToQuoteBody(body: AagQuoteClassicBody | null | undefined): AagQuoteBody {
+  return { Articles: (body?.products ?? []).map(classicArticle) };
 }

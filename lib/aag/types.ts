@@ -124,51 +124,56 @@ export interface AagQuoteClassicRequest {
   IncludeVehicleDetails?: boolean;
 }
 
+// Live and UAT both answer /api/quote/classic in camelCase (captured
+// 2026-09-14 on UAT and 2026-11-17 on live), not the manual's PascalCase, and
+// with no QuoteId. Ratings are lower case ("best"). Every field is optional:
+// read defensively.
+
 export interface AagClassicStock {
-  AAGLocationId?: number | null;
-  BranchCode?: string | null;
-  BranchName?: string | null;
-  Count?: number | null;
-  Notes?: string | null;
-  /** Delivery SLA as a display string ("10:54"). */
-  DeliveryNotes?: string | null;
+  aagLocationId?: number | null;
+  branchCode?: string | null;
+  branchName?: string | null;
+  count?: number | null;
+  notes?: string | null;
+  /** Delivery as a display string: "17:03", "09:45 NWD", "N/A". */
+  deliveryNotes?: string | null;
 }
 
 export interface AagClassicProduct {
-  ProductId?: string | null;
-  Description?: string | null;
-  RequestLineId?: string | null;
-  MfgCode?: string | null;
-  CustomerPartNumber?: string | null;
-  CustomerLockoutRating?: string | null;
-  Supplier?: {
-    SupplierCode?: string | null;
-    SupplierName?: string | null;
-    BrandLogoFileName?: string | null;
+  productId?: string | null;
+  description?: string | null;
+  requestLineId?: string | null;
+  mfgCode?: string | null;
+  customerPartNumber?: string | null;
+  customerLockoutRating?: string | null;
+  /** Unit of issue: 2 for a pair of brake discs priced per disc. */
+  recMinOrdQty?: number | null;
+  supplier?: {
+    supplierCode?: number | string | null;
+    supplierName?: string | null;
+    brandLogoFileName?: string | null;
   } | null;
-  /** Pounds, decimal. */
-  CostPrice?: number | null;
-  PerQuantity?: number | null;
-  Stock?: AagClassicStock[] | null;
-  CustomerProductGroup?: string | null;
-  Fitment?: string | null;
-  ImageUrl?: string | null;
-  IsKit?: boolean | null;
-  /** "Premium" | "Standard" | "Budget". */
-  ProductRating?: string | null;
-  ProductDetails?: AagArticleProperty[] | null;
+  /** Pounds, decimal, per unit. */
+  costPrice?: number | null;
+  /** Core charge, pounds. */
+  surcharge?: number | null;
+  perQuantity?: number | null;
+  /** Branches in AAG's order, quickest first on every reply seen so far. */
+  stock?: AagClassicStock[] | null;
+  customerProductGroup?: string | null;
+  /** "Front Axle", "Rear Axle", or empty. */
+  fitment?: string | null;
+  imageUrl?: string | null;
+  isKit?: boolean | null;
+  /** "good" | "better" | "best". */
+  productRating?: string | null;
+  productDetails?: Array<{ name?: string | null; value?: string | null }> | null;
 }
 
-/**
- * The classic quote's body. The manual lists SuccessFlag / ErrorCode / Message
- * on this body as "not yet available", so a classic reply may have no Header
- * block at all — parseAagEnvelope treats a missing Header as success.
- */
+/** The classic quote's body. Lists every product in the group for the vehicle, flat, both axles. */
 export interface AagQuoteClassicBody {
-  QuoteId?: string | null;
-  CorrelationId?: string | null;
-  Products?: AagClassicProduct[] | null;
-  VehicleDetails?: AagVehicleDetails[] | null;
+  products?: AagClassicProduct[] | null;
+  vehicleDetails?: Array<Record<string, unknown>> | null;
 }
 
 export type AagQuoteClassicResponse = AagEnvelope<AagQuoteClassicBody>;

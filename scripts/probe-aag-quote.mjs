@@ -62,15 +62,17 @@ function printQuote(body) {
   }
 }
 
+// Classic answers camelCase (live and UAT), not the manual's PascalCase.
 function printClassic(body) {
-  console.log(`\nQuoteId ${body?.QuoteId ?? "?"} · ${(body?.Products ?? []).length} products\n`);
+  const products = body?.products ?? [];
+  console.log(`\n${products.length} products\n`);
   console.log(`${col("product", 16)}${col("description", 34)}${col("supplier", 12)}${col("rating", 9)}${col("£ cost", 9)}${col("fitment", 24)}`);
-  for (const p of body?.Products ?? []) {
+  for (const p of products) {
     console.log(
-      `${col(p.ProductId, 16)}${col(p.Description, 34)}${col(p.Supplier?.SupplierName, 12)}${col(p.ProductRating, 9)}${col(p.CostPrice?.toFixed?.(2), 9)}${col(p.Fitment, 24)}`,
+      `${col(p.productId, 16)}${col(p.description, 34)}${col(p.supplier?.supplierName, 12)}${col(p.productRating, 9)}${col(p.costPrice?.toFixed?.(2), 9)}${col(p.fitment, 24)}`,
     );
-    for (const stock of p.Stock ?? []) {
-      console.log(`    ${col(stock.BranchName, 24)}qty ${col(stock.Count, 5)}${stock.DeliveryNotes ?? ""}  (location ${stock.AAGLocationId})`);
+    for (const stock of p.stock ?? []) {
+      console.log(`    ${col(stock.branchName, 24)}qty ${col(stock.count, 5)}${stock.deliveryNotes ?? ""}  (location ${stock.aagLocationId})`);
     }
   }
 }
