@@ -6,5 +6,8 @@
 // recording) runs everywhere, but does nothing until something is approved
 // or picked on this screen.
 //
-// To switch it on for the live site, make this true (or read an env var).
+// It has no sidebar link anywhere (Brad: "we dont want it in the sidebar
+// either"); locally it's reached by typing /admin/parts/gaps. To switch it
+// on for the live site, make this true and add a link in
+// components/admin/sidebar.tsx.
 export const PARTS_GAPS_SCREEN_ENABLED = process.env.NODE_ENV === "development";
