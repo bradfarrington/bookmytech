@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import type { AagQuoteClassicOutcome, AagQuoteOutcome } from "@/lib/aag/client";
-import { classicToQuoteBody, flattenQuote } from "@/lib/aag/quote";
+import { classicHasVehicleCondition, classicToQuoteBody, flattenQuote, unambiguousClassic } from "@/lib/aag/quote";
 import type { AagQuoteBody, AagQuoteClassicBody } from "@/lib/aag/types";
 import { fetchAagLiveOffers, type AagLookups } from "./aag-live-offers";
 import { aagOffers, defaultOffer } from "./supplier-offer";
@@ -104,6 +104,84 @@ describe("classicToQuoteBody", () => {
   });
 });
 
+// NAPA's own conditions on FN60KYP's front discs, live 2026-11-17. The car has
+// rear drums, so C422 (for cars with rear discs) doesn't fit; A968.21 does.
+const VARIANTS: AagQuoteClassicBody = {
+  products: [
+    {
+      productId: "BRE09.C422.11",
+      supplier: { supplierName: "BREMBO" },
+      costPrice: 46.85,
+      fitment: "Front Axle",
+      productRating: "best",
+      productDetails: [
+        { name: "Outer Diameter [mm]", value: "278" },
+        { name: "Braking System", value: "For vehicles with disc brakes on the rear axle" },
+      ],
+    },
+    {
+      productId: "BRE09.A968.21",
+      supplier: { supplierName: "BREMBO" },
+      costPrice: 45.69,
+      fitment: "Front Axle",
+      productRating: "best",
+      productDetails: [
+        { name: "Outer Diameter [mm]", value: "258" },
+        { name: "Braking System", value: "For vehicles with drum brakes on the rear axle" },
+      ],
+    },
+    {
+      productId: "NPANBD5431",
+      supplier: { supplierName: "NAPA" },
+      costPrice: 31.85,
+      fitment: "Front Axle",
+      productRating: "better",
+      productDetails: [
+        { name: "Outer Diameter [mm]", value: "258" },
+        { name: "Only for article number", value: "NBP1602, NBP1350" },
+      ],
+    },
+    {
+      productId: "BRE08.4931.21",
+      supplier: { supplierName: "BREMBO" },
+      costPrice: 30.47,
+      fitment: "Rear Axle",
+      productRating: "best",
+      productDetails: [{ name: "Braking System", value: "For vehicles with disc brakes on the rear axle" }],
+    },
+  ],
+};
+
+describe("unambiguousClassic: only parts NAPA's own data says certainly fit", () => {
+  it("reads NAPA's vehicle conditions, but not a disc's pad pairing", () => {
+    const [c422, a968, napa] = VARIANTS.products!;
+    expect(classicHasVehicleCondition(c422)).toBe(true);
+    expect(classicHasVehicleCondition(a968)).toBe(true);
+    expect(classicHasVehicleCondition(napa)).toBe(false);
+    expect(classicHasVehicleCondition({ productDetails: [{ name: "Left-/right-hand drive vehicles", value: "For right-hand drive vehicles" }] })).toBe(true);
+    expect(classicHasVehicleCondition({ productDetails: [{ name: "Suitable For", value: "TecDoc Engine Number SPJA" }] })).toBe(true);
+  });
+
+  it("drops an axle whose parts are for different versions of the model, never guessing between them", () => {
+    const kept = unambiguousClassic(VARIANTS).products!.map((p) => p.productId);
+    expect(kept).not.toContain("BRE09.C422.11");
+    expect(kept).not.toContain("BRE09.A968.21");
+    expect(kept).not.toContain("NPANBD5431");
+  });
+
+  it("keeps a single part on an axle, conditions or not", () => {
+    expect(unambiguousClassic(VARIANTS).products!.map((p) => p.productId)).toEqual(["BRE08.4931.21"]);
+  });
+
+  it("keeps every part on an axle when none carries a condition", () => {
+    expect(unambiguousClassic(CLASSIC).products).toHaveLength(3);
+  });
+
+  it("is empty for an empty or missing body", () => {
+    expect(unambiguousClassic(null).products).toEqual([]);
+  });
+});
+
 const fixturePath = join(__dirname, "../aag/__fixtures__/quote-classic-82.json");
 describe.skipIf(!existsSync(fixturePath))("classicToQuoteBody on a captured classic reply", () => {
   it("keeps every product and every price", () => {
@@ -160,6 +238,18 @@ describe("fetchAagLiveOffers: the standard quote, then the full catalogue", () =
   it("falls back when the standard quote throws", async () => {
     const { fake } = lookups(new Error("network"), { kind: "ok", body: CLASSIC });
     expect(await fetchAagLiveOffers("S28BSW", 318, {}, fake)).toMatchObject({ kind: "ok", from: "classic" });
+  });
+
+  it("never prices from an ambiguous full catalogue: the variants are dropped, not guessed", async () => {
+    const onlyVariants: AagQuoteClassicBody = { products: VARIANTS.products!.slice(0, 2) };
+    const { fake } = lookups({ kind: "no_parts" }, { kind: "ok", body: onlyVariants });
+    expect(await fetchAagLiveOffers("FN60KYP", 82, {}, fake)).toEqual({ kind: "no_parts" });
+  });
+
+  it("treats an all-variants catalogue answer as an answer, even when the standard quote failed", async () => {
+    const onlyVariants: AagQuoteClassicBody = { products: VARIANTS.products!.slice(0, 2) };
+    const { fake } = lookups({ kind: "failed", reason: "ISE0047" }, { kind: "ok", body: onlyVariants });
+    expect(await fetchAagLiveOffers("FN60KYP", 286, {}, fake)).toEqual({ kind: "no_parts" });
   });
 
   it("is 'no parts' when the standard quote says so and the full catalogue has nothing either", async () => {

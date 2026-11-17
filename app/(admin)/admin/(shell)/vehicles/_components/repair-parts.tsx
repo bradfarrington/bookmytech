@@ -69,15 +69,8 @@ function OfferSummary({ offer }: { offer: SupplierOffer }) {
         <span className="font-mono text-xs text-text-muted">{offer.partNumber}</span>
         {offer.tier && <Pill tone="neutral">{offer.tier}</Pill>}
         {offer.position && <Pill tone="info">{POSITION_LABEL[offer.position]}</Pill>}
-        {offer.fromCatalogue && <Pill tone="pending">Full catalogue</Pill>}
       </div>
       {offer.description && <p className="mt-0.5 text-xs text-text-muted">{offer.description}</p>}
-      {offer.fromCatalogue && (
-        <p className="mt-0.5 text-xs text-amber-700">
-          NAPA&apos;s exact-car quote had nothing, so this is from their full range for the model. Check it fits this
-          engine before relying on it.
-        </p>
-      )}
     </div>
   );
 }

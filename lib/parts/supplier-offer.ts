@@ -60,9 +60,9 @@ export interface SupplierOffer {
   buyable: boolean;
   /**
    * ADDITIVE (Task 76). True when the part came from NAPA's full catalogue
-   * (/api/quote/classic) because the standard quote had nothing. The standard
-   * quote is matched to the exact car; the full catalogue covers the model's
-   * range, so the part may be for another engine version: check it fits.
+   * (/api/quote/classic) because the standard quote had nothing. Only
+   * unambiguous catalogue answers are used (see unambiguousClassic), so it
+   * fits like any other offer; this records where it came from.
    * Absent on offers cached before Task 76.
    */
   fromCatalogue?: boolean;

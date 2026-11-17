@@ -190,6 +190,54 @@ function classicArticle(product: AagClassicProduct): AagArticle {
   };
 }
 
+/** Which axle a classic product is listed for. */
+function classicAxle(product: AagClassicProduct): "front" | "rear" | "any" {
+  const position = classicFitment(product.fitment);
+  return position === "FR" ? "front" : position === "RR" ? "rear" : "any";
+}
+
+/**
+ * Detail names and values that restrict a part to some versions of the model:
+ * "For vehicles with disc brakes on the rear axle", "TecDoc Engine Number",
+ * "For right-hand drive vehicles", "Not for vehicle equipment line: Sport",
+ * "Version: New fixing system"… Deliberately broad: a false alarm only means
+ * the part isn't priced from the catalogue, never that a wrong part is.
+ */
+const VEHICLE_CONDITION =
+  /for vehicles|braking system|equipment|engine code|engine number|chassis|production|model year|vehicle|from year|to year|transmission|left-hand|right-hand|steering|version|suitable for/i;
+
+/** "Only for article number" pairs a disc with its pads; it says nothing about the car. */
+const NOT_A_VEHICLE_CONDITION = /^only for article number$/i;
+
+/** Whether NAPA says a product is only for some versions of the model. */
+export function classicHasVehicleCondition(product: AagClassicProduct): boolean {
+  return (product.productDetails ?? []).some((detail) => {
+    const name = detail.name?.trim() ?? "";
+    if (NOT_A_VEHICLE_CONDITION.test(name)) return false;
+    return VEHICLE_CONDITION.test(name) || VEHICLE_CONDITION.test(detail.value ?? "");
+  });
+}
+
+/**
+ * The classic products that certainly fit, axle by axle (Task 76). The
+ * standard quote is NAPA's exact match for the car; classic lists the model's
+ * whole range. An axle's products are kept only when there is one, or when
+ * none of them carries a vehicle condition: then every one fits and the usual
+ * rules pick between them. When NAPA's own data shows variants, that axle is
+ * dropped rather than guessed. Pure.
+ */
+export function unambiguousClassic(body: AagQuoteClassicBody | null | undefined): AagQuoteClassicBody {
+  const byAxle = new Map<string, AagClassicProduct[]>();
+  for (const product of body?.products ?? []) {
+    const axle = classicAxle(product);
+    byAxle.set(axle, [...(byAxle.get(axle) ?? []), product]);
+  }
+  const products = [...byAxle.values()].flatMap((list) =>
+    list.length === 1 || !list.some(classicHasVehicleCondition) ? list : [],
+  );
+  return { ...body, products };
+}
+
 /**
  * A /api/quote/classic reply in /api/quote's shape, one article per product,
  * so everything downstream (flattenQuote, offers, part choice, the price

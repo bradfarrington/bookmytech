@@ -67,7 +67,7 @@ export interface QuotedPart {
   estimate?: { basis: EstimateBasis; samples: number };
   /** True when AAG couldn't answer and its answer from the last 7 days was used. */
   lastKnown: boolean;
-  /** ADDITIVE (Task 76). From NAPA's full catalogue, not the exact-car quote: check it fits. Absent otherwise. */
+  /** ADDITIVE (Task 76). Priced from an unambiguous answer in NAPA's full catalogue. Absent otherwise. */
   fromCatalogue?: true;
   /** When the price was given (by AAG, or set by the admin), ISO. */
   pricedAt: string;
