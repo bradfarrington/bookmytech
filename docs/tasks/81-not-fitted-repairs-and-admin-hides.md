@@ -15,6 +15,10 @@ Brad: "if that vehicle doesn't have rear discs - shouldn't the repair not show?"
 
 Live: FN60KYP "pads discs" now finds only Front Brake Pads and Discs (£289.17). Its Brake pad group lists only the front pads, and its rear brake shoes (£139.96) still show. LP17BJY still lists both Pads and Discs (£393.39 / £309.46).
 
+## 1b. Our categories with nothing for the car
+
+Brad: "if a created group by us returns nothing for a vehicle it shouldn't show in the list." `getRepairCatalogueLevel` (`withoutEmptyCategories`, `categoryHasContent`) opens each of our categories on the level as the customer would: jobs with a time on this car, not hidden, and, with parts priced, not for a part the car doesn't have. A category with nothing is left out. A HaynesPro group inside counts as something; a category inside is checked the same way, 4 deep. Live: FN60KYP's top level no longer lists "Rear Pads and Discs" (its only repair is for rear discs; the car has drums). LP17BJY lists both.
+
 ## 2. Switched-off repairs hidden in the admin
 
 Brad: "gareth has turn off loads of repairs globally that they wont be doing - rather than deleting them totally can we hide them from the admin UI please?"
@@ -25,5 +29,6 @@ Brad: "gareth has turn off loads of repairs globally that they wont be doing - r
 
 - [x] A repair for brake parts a car doesn't have isn't listed, on NAPA's evidence only
 - [x] A gap in NAPA's range still goes to a quote
+- [x] Our categories with nothing for the car aren't listed
 - [x] Switched-off repairs hidden in the admin Repairs and model screens, with a link to show them
 - [x] Tests: `brake-layout.test.ts`. 886 pass; `next build` passes; checked live on FN60KYP and LP17BJY

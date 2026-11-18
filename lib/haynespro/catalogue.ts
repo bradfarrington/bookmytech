@@ -587,11 +587,61 @@ export async function getRepairCatalogueLevel(
   }
 
   const { nodes, rawById } = await composeLevelFor(context, level, raw);
+  const priced = options.priceParts ? await withLevelParts(context, nodes, rawById, reg, db) : nodes;
   return {
     ok: true,
     vehicle: context.vehicle,
-    nodes: options.priceParts ? await withLevelParts(context, nodes, rawById, reg, db) : nodes,
+    nodes: await withoutEmptyCategories(context, priced, reg, db, options.priceParts === true),
   };
+}
+
+/** How deep a category inside a category is followed when checking it has something. */
+const CATEGORY_DEPTH = 4;
+
+/**
+ * Whether one of our categories has anything for this car (Brad, 2026-11-18:
+ * "if a created group by us returns nothing for a vehicle it shouldn't show
+ * in the list"). The category's own level is composed as the customer would
+ * open it: jobs this car has a time for, not hidden, and (with parts priced)
+ * not for a part the car doesn't have (Task 81, a "Rear Pads and Discs" on a
+ * car with rear drums). A HaynesPro group inside counts as something; a
+ * category inside is checked the same way.
+ */
+async function categoryHasContent(
+  context: CatalogueContext,
+  groupId: string,
+  reg: string,
+  db: SupabaseClient,
+  priceParts: boolean,
+  depth = 0,
+): Promise<boolean> {
+  if (depth >= CATEGORY_DEPTH) return true;
+  const { nodes, rawById } = await composeLevelFor(context, groupId, []);
+  const shown = priceParts ? await withLevelParts(context, nodes, rawById, reg, db) : nodes;
+  for (const node of shown) {
+    if (node.kind !== "group" || !node.custom) return true;
+  }
+  for (const node of shown) {
+    if (await categoryHasContent(context, node.id, reg, db, priceParts, depth + 1)) return true;
+  }
+  return false;
+}
+
+/** A level without the categories of ours that have nothing for this car. */
+async function withoutEmptyCategories(
+  context: CatalogueContext,
+  nodes: CatalogueNode[],
+  reg: string,
+  db: SupabaseClient,
+  priceParts: boolean,
+): Promise<CatalogueNode[]> {
+  const categories = nodes.filter((node) => node.kind === "group" && node.custom);
+  if (categories.length === 0) return nodes;
+  const hasContent = await Promise.all(
+    categories.map((node) => categoryHasContent(context, node.id, reg, db, priceParts).catch(() => true)),
+  );
+  const empty = new Set(categories.filter((_, i) => !hasContent[i]).map((node) => node.id));
+  return empty.size === 0 ? nodes : nodes.filter((node) => !empty.has(node.id));
 }
 
 // ---------------------------------------------------------------------------
