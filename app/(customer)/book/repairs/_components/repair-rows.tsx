@@ -51,8 +51,9 @@ function includesParts(node: CatalogueNode): boolean {
  * The caption's parts note: whether the price includes parts, and whether any
  * of them is estimated for this car because no supplier listed it (Task 72).
  */
-function partsNote(node: CatalogueNode): string {
+function partsNote(node: CatalogueNode, pricingParts = false): string {
   if (node.needsQuote) return " · parts priced by our team";
+  if (pricingParts && node.totalPence == null && (node.genartIds?.length ?? 0) > 0) return " · pricing parts…";
   if (!includesParts(node)) return "";
   return node.partsEstimated ? " · includes estimated parts" : " · parts included";
 }
@@ -76,6 +77,12 @@ export interface RepairRowsProps {
    * for this car). Without it such a job reads "+ parts" as before.
    */
   quoteHref?: (node: CatalogueNode) => string;
+  /**
+   * True while the parts are still being priced (the website streams them in
+   * after the rows, 2026-11-18): a job with parts reads "pricing parts…", not
+   * "+ parts", and its price waits.
+   */
+  pricingParts?: boolean;
 }
 
 export function RepairRows({
@@ -88,6 +95,7 @@ export function RepairRows({
   emptyLabel = "Nothing under this group.",
   groupCaption,
   quoteHref,
+  pricingParts = false,
 }: RepairRowsProps) {
   const rows = toRows(nodes);
 
@@ -110,6 +118,15 @@ export function RepairRows({
     // "+ parts" after it, as it read before — see `partsPence` on CatalogueNode.
     const price = formatPrice(node.totalPence ?? node.pricePence ?? 0);
     const withParts = node.totalPence == null && (node.genartIds?.length ?? 0) > 0;
+    if (withParts && pricingParts) {
+      return (
+        <span className="flex shrink-0 items-center gap-2 rounded-lg bg-surface px-3.5 py-2 text-sm font-semibold text-text-muted">
+          {label && <span className="text-xs">{label}</span>}
+          <span className="h-3 w-3 animate-spin rounded-full border-2 border-text-muted/40 border-t-text-muted" aria-hidden />
+          Pricing
+        </span>
+      );
+    }
     if (atCap) {
       return (
         <span className="shrink-0 text-sm font-semibold text-text-muted">
@@ -179,7 +196,7 @@ export function RepairRows({
                     </p>
                     <p className="mt-0.5 text-xs text-text-muted">
                       {single
-                        ? `Combined repair · estimated ${row.options[0].billedHours} hour${row.options[0].billedHours === 1 ? "" : "s"} on your car${partsNote(row.options[0])}`
+                        ? `Combined repair · estimated ${row.options[0].billedHours} hour${row.options[0].billedHours === 1 ? "" : "s"} on your car${partsNote(row.options[0], pricingParts)}`
                         : "Combined repair · choose an option"}
                     </p>
                   </div>
@@ -229,7 +246,7 @@ export function RepairRows({
                 <p className="mt-0.5 text-xs text-text-muted">
                   Estimated {row.node.billedHours} hour
                   {row.node.billedHours === 1 ? "" : "s"} on your car
-                  {partsNote(row.node)}
+                  {partsNote(row.node, pricingParts)}
                 </p>
               </div>
               {bookButton(row.node)}

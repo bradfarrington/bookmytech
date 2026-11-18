@@ -237,7 +237,7 @@ describe("fetchAagLiveOffers prices engine-limited catalogue parts (Task 77)", (
       "S28BSW",
       1217,
       {},
-      lookups({ kind: "failed", reason: "ISE0047" }, { kind: "ok", body: { products: [HEAD_BOLTS] } }),
+      lookups({ kind: "failed", reason: "ISE0047", answered: true }, { kind: "ok", body: { products: [HEAD_BOLTS] } }),
     );
     expect(result).toEqual({ kind: "no_parts" });
   });

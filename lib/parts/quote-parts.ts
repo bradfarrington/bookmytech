@@ -218,8 +218,9 @@ export function priceJobParts(args: {
       }
       const choice = args.choices?.get(choiceKey(job.nodeId, group.genartId)) ?? null;
       for (const { position, side, selection, quantity: wanted } of selectJobParts(job.description, lookup.offers, choice)) {
-        if (selection.source === "none" || selection.offer.costPence == null) {
-          // NAPA listed the part type for this car, but nothing that fits.
+        // NAPA listed the part type for this car, but nothing that fits, or
+        // not how many a job renewing every one of them needs.
+        if (selection.source === "none" || selection.offer.costPence == null || wanted === null) {
           unpriced(job, group, position, "not_listed");
           continue;
         }
@@ -313,6 +314,8 @@ export async function quoteJobParts(args: {
   reg: string;
   carTypeId: number;
   jobs: readonly PartsJob[];
+  /** Per NAPA call. Customer quotes keep the 4 s default; a streamed level can wait longer. */
+  timeoutMs?: number;
 }): Promise<JobPartsResult> {
   const genartIds = [...new Set(args.jobs.flatMap((job) => job.groups.map((g) => g.genartId)))];
   if (genartIds.length === 0) return { ok: true, parts: [] };
@@ -323,7 +326,7 @@ export async function quoteJobParts(args: {
   if (charged.length === 0) return { ok: true, parts: [] };
 
   const [offers, choices] = await Promise.all([
-    loadAagPartOffers(args.db, args.reg, charged),
+    loadAagPartOffers(args.db, args.reg, charged, args.timeoutMs ? { timeoutMs: args.timeoutMs } : {}),
     loadChoices(args.db, args.carTypeId, args.jobs.map((job) => job.nodeId)),
   ]);
   if (!offers.enabled) return { ok: true, parts: [] };

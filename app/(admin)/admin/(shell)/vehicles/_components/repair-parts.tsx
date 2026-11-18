@@ -78,8 +78,12 @@ function OfferSummary({ offer }: { offer: SupplierOffer }) {
   );
 }
 
-/** `quantity`: how many this repair buys (Task 78); else the supplier's unit of issue. */
-function Cost({ offer, quantity }: { offer: SupplierOffer; quantity?: number }) {
+/**
+ * `quantity`: how many this repair buys (Task 78); else the supplier's unit
+ * of issue. Null: the repair renews every one the engine has and NAPA doesn't
+ * say how many, so customers are asked for a quote.
+ */
+function Cost({ offer, quantity }: { offer: SupplierOffer; quantity?: number | null }) {
   const needs = quantity ?? offer.quantityOfFit ?? 1;
   return (
     <div className="shrink-0 text-right">
@@ -90,6 +94,9 @@ function Cost({ offer, quantity }: { offer: SupplierOffer; quantity?: number }) 
         <div className="whitespace-nowrap text-xs text-text-muted">
           needs {needs} · {formatPrice(offer.costPence * needs)}
         </div>
+      )}
+      {quantity === null && (
+        <div className="whitespace-nowrap text-xs text-amber-700">NAPA doesn&apos;t say how many: priced by quote</div>
       )}
       {offer.surchargePence != null && (
         <div className="whitespace-nowrap text-xs text-amber-700">+ {formatPrice(offer.surchargePence)} core charge</div>

@@ -51,7 +51,8 @@ export async function searchRepairsAction(input: {
   );
   if (!verdict.allowed) return { ok: false, error: catalogueLimitMessage(verdict.key) };
 
-  const result = await searchRepairCatalogue(reg, query, createAdminClient());
+  // Hits show labour + parts, as a browsed level does (2026-11-18).
+  const result = await searchRepairCatalogue(reg, query, createAdminClient(), { priceParts: true });
   if (!result.ok) return { ok: false, error: result.message };
   return { ok: true, hits: result.hits, truncated: result.truncated };
 }

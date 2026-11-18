@@ -9,7 +9,7 @@ import { flattenQuote } from "@/lib/aag/quote";
 import type { AagArticle, AagQuoteBody } from "@/lib/aag/types";
 import type { AagPartOffers } from "./aag-part-prices";
 import { priceJobParts, type PartsJob } from "./quote-parts";
-import { jobNeeds, selectJobParts } from "./repair-part-choice";
+import { jobNeeds, jobPosition, packLitres, selectJobParts, sensiblePacks } from "./repair-part-choice";
 import { aagOffers, cylinderOf, perVehicleOf, positionOf, sideOf, type SupplierOffer } from "./supplier-offer";
 
 const PRICED_AT = "2026-11-18T10:00:00.000Z";
@@ -243,5 +243,95 @@ describe("priceJobParts", () => {
       { side: "left", position: "front", linePence: 7946 },
       { side: "right", position: "front", linePence: 7946 },
     ]);
+  });
+});
+
+// LP17BJY (Toyota ProAce), 2026-11-18: the catalogue offered antifreeze in
+// workshop drums, and "Best, dearest" charged £611.69 for a 199 litre one.
+describe("fluid packs", () => {
+  const fluid = (id: string, description: string, pounds: number, rating = "Better") =>
+    offersOf(article(description, "", {}, [{ id, brand: "NAPA", rating, pounds }]))[0];
+
+  it("reads a pack's size", () => {
+    expect(packLitres("LONGLIFE UNIVERSAL (199L)")).toBe(199);
+    expect(packLitres("XSTREAM G30 CONC ANTIFREEZE 5L")).toBe(5);
+    expect(packLitres("(823447A) 1LTR MOBIL SPR 3000 X1 FORM FE 5W30")).toBe(1);
+    expect(packLitres("BRAKE FLUID DOT 4 500ML")).toBe(0.5);
+    expect(packLitres("MOBIL SUP 3000 X1 FORM FE 5W30 5L")).toBe(5);
+    expect(packLitres("12V 55W H11 PGJ19-2 HALOGEN H/LAMP")).toBeNull();
+    expect(packLitres("NAPA Battery EFB STOP START 12V 60AH 560CCA")).toBeNull();
+  });
+
+  it("never charges a workshop drum, and takes up to 5 litres of antifreeze", () => {
+    const offers = [
+      fluid("1L", "LONGLIFE UNIVERSAL (1L)", 8.27),
+      fluid("5L", "LONGLIFE UNIVERSAL (5L)", 22.37),
+      fluid("20L", "LONGLIFE UNIVERSAL (20L)", 72.6),
+      fluid("199L", "LONGLIFE UNIVERSAL (199L)", 611.69, "Best"),
+      fluid("DRUM", "ANTI FREEZE MULTI VEHICLE RED CON", 434, "Best"),
+    ];
+    expect(sensiblePacks(offers).map((o) => o.partNumber)).toEqual(["5L"]);
+    expect(bought("Drain/refill the cooling system", offers)).toEqual(["5L×1"]);
+  });
+
+  it("takes the 5 litres over a better-rated 1 litre bottle", () => {
+    const offers = [fluid("1L", "ANTIFREEZE (1L)", 8, "Best"), fluid("5L", "ANTIFREEZE (5L)", 22, "Better")];
+    expect(bought("Drain/refill the cooling system", offers)).toEqual(["5L×1"]);
+  });
+
+  it("takes a 1 litre bottle of brake fluid", () => {
+    const offers = [fluid("1L", "BRAKE FLUID DOT 4 (1L)", 6), fluid("5L", "BRAKE FLUID DOT 4 (5L)", 22)];
+    expect(bought("Bleed the brake system", offers)).toEqual(["1L×1"]);
+  });
+
+  it("takes the smallest pack when every one is over the cap, and nothing when all are drums", () => {
+    expect(bought("Drain/refill the cooling system", [fluid("20L", "COOLANT (20L)", 70), fluid("199L", "COOLANT (199L)", 500)])).toEqual(["20L×1"]);
+    expect(bought("Drain/refill the cooling system", [fluid("199L", "COOLANT (199L)", 500), fluid("208L", "COOLANT (208L)", 900)])).toEqual(["none"]);
+  });
+
+  it("leaves parts that aren't sold by the litre alone", () => {
+    const offers = [fluid("A", "TIMING BELT KIT 1.6L", 60, "Best"), fluid("B", "TIMING BELT KIT", 80, "Best")];
+    expect(bought("Renew the timing belt kit", offers)).toEqual(["B×1"]);
+  });
+});
+
+describe("windscreen", () => {
+  it("is the front", () => {
+    expect(jobPosition("Renew the windscreen wiper blades")).toBe("front");
+    expect(jobPosition("Renew the rear windscreen wiper blade")).toBe("rear");
+    const wipers = offersOf(
+      article("FRONT BLADE 600", "FR DS", {}, [{ id: "DS", brand: "B", rating: "Best", pounds: 17.38 }]),
+      article("FRONT BLADE 400", "FR PS", {}, [{ id: "PS", brand: "B", rating: "Best", pounds: 12.37 }]),
+      article("SUPERPLUS STD BLADE REAR 340", "RR", {}, [{ id: "REAR", brand: "B", rating: "Best", pounds: 6.99 }]),
+    );
+    expect(bought("Renew the windscreen wiper blades", wipers)).toEqual(["DS×1", "PS×1"]);
+  });
+});
+
+describe("injectors", () => {
+  // DN23HFL, from the catalogue: "Quantity" 4. CX16NYL's says nothing.
+  const counted = offersOf(
+    article("NEW COMMON RAIL INJECTOR", "", { Quantity: "4" }, [{ id: "INJ", brand: "DELPHI", rating: "Best", pounds: 180.92 }]),
+  );
+  const uncounted = offersOf(
+    article("NEW COMMON RAIL INJECTOR", "", {}, [{ id: "INJ", brand: "BOSCH", rating: "Best", pounds: 239.62 }]),
+  );
+
+  it("buys every injector when NAPA says how many", () => {
+    expect(bought("Renew all the injectors", counted)).toEqual(["INJ×4"]);
+    expect(bought("Renew the injector", counted)).toEqual(["INJ×1"]);
+  });
+
+  it("doesn't read Quantity as a count on other parts", () => {
+    expect(perVehicleOf([{ name: "Quantity", value: "2" }], "WIPER BLADE")).toBeNull();
+  });
+
+  it("sends a job renewing every injector to a quote when NAPA doesn't say how many", () => {
+    const result = priceJobParts({
+      jobs: [{ nodeId: "all", description: "Renew all the injectors", groups: [{ genartId: 3905, label: "Injector" }] }],
+      offers: new Map<number, AagPartOffers>([[3905, { state: "ok", offers: uncounted, pricedAt: PRICED_AT, lastKnown: false }]]),
+    });
+    expect(result).toMatchObject({ ok: false, missing: [{ genartId: 3905, reason: "not_listed" }] });
+    expect(bought("Renew the injector", uncounted)).toEqual(["INJ×1"]);
   });
 });

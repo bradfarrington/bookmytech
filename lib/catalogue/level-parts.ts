@@ -127,8 +127,10 @@ export async function priceLevelParts(args: {
   reg: string;
   carTypeId: number;
   rows: readonly PartsRow[];
-  /** Overridable for tests. */
+  /** How long to wait for every price. Overridable for tests and for a streamed level. */
   budgetMs?: number;
+  /** Per NAPA call; the 4 s customer default when absent. */
+  timeoutMs?: number;
 }): Promise<LevelParts> {
   // A row whose jobs name no part group needs nothing priced: its labour is
   // already the whole price, and asking about it would be a wasted lookup.
@@ -151,7 +153,7 @@ export async function priceLevelParts(args: {
   });
   try {
     const result = await Promise.race([
-      quoteJobParts({ db: args.db, reg: args.reg, carTypeId: args.carTypeId, jobs: [...jobs.values()] }),
+      quoteJobParts({ db: args.db, reg: args.reg, carTypeId: args.carTypeId, jobs: [...jobs.values()], timeoutMs: args.timeoutMs }),
       timeout,
     ]);
     if (!result) return EMPTY;

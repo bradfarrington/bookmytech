@@ -1,15 +1,16 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { ChevronRight } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatPrice } from "@/lib/utils";
-import { getRepairCatalogueLevel } from "@/lib/haynespro/catalogue";
+import { getRepairCatalogueLevel, type PartsWait } from "@/lib/haynespro/catalogue";
 import { quoteRepairs } from "@/lib/haynespro/repair-booking";
 import { MAX_REPAIRS_PER_BOOKING } from "@/lib/bookings/repair-ids";
 import { buildRepairHrefs, parseCrumbs } from "@/lib/bookings/repair-hrefs";
 import { lookupVehicleAction } from "@/app/actions/lookup-vehicle";
 import { VehiclePicker } from "@/components/customer/vehicle-picker";
 import { VehicleBanner } from "./vehicle-banner";
-import { RepairRows } from "./repair-rows";
+import { RepairRows, type RepairRowsProps } from "./repair-rows";
 import { RepairSearch } from "./repair-search";
 import { quoteRequestHref } from "@/lib/custom-quotes/href";
 
@@ -60,10 +61,9 @@ export async function RepairBrowser({
 }: RepairBrowserProps) {
   const admin = createAdminClient();
   const [result, trolley] = await Promise.all([
-    // `priceParts`: each row shows labour + the parts that job needs on this
-    // car, not "£60 + parts" (Task 63). Bounded, and falls back to the old
-    // label when the supplier can't price something — lib/catalogue/level-parts.ts.
-    getRepairCatalogueLevel(reg, nodeId, admin, { priceParts: true }),
+    // The rows first, labour only; their parts are priced in PricedRows and
+    // streamed in after (2026-11-18). See STREAMED_PARTS_WAIT.
+    getRepairCatalogueLevel(reg, nodeId, admin),
     // Memo hit — the price page just priced the same set.
     selectedIds.length ? quoteRepairs(reg, selectedIds, admin) : Promise.resolve(null),
   ]);
@@ -167,17 +167,15 @@ export async function RepairBrowser({
           ))}
         </nav>
 
-        <RepairRows
-          nodes={nodes}
-          selectedIds={selectedIds}
-          adding={adding}
-          atCap={atCap}
-          groupHref={hrefs.groupHref}
-          bookHref={hrefs.bookHref}
-          quoteHref={(node) =>
-            quoteRequestHref({ reg, make, model, postcode, q: node.bundleName ?? node.description, reason: "parts" })
-          }
-        />
+        {/* Each row shows labour + the parts that job needs on this car, not
+            "£60 + parts" (Task 63). NAPA can take several seconds on a car's
+            first visit, so the rows show at once and their prices follow. */}
+        <Suspense
+          key={nodeId ?? "root"}
+          fallback={<RepairRows nodes={nodes} pricingParts {...rowProps(reg, make, model, postcode, selectedIds, adding, atCap, hrefs)} />}
+        >
+          <PricedRows reg={reg} nodeId={nodeId} unpriced={nodes} {...rowProps(reg, make, model, postcode, selectedIds, adding, atCap, hrefs)} />
+        </Suspense>
       </RepairSearch>
 
       <p className="text-xs text-text-muted">
@@ -227,6 +225,54 @@ export async function RepairBrowser({
       )}
     </div>
   );
+}
+
+/**
+ * How long the streamed list waits for NAPA (2026-11-18). On a car's first
+ * visit NAPA can take more than the funnel's 4 s per lookup, and a level that
+ * runs out of time reads "+ parts" throughout: FN60KYP's timing belt kits and
+ * starter motor did, then priced on a reload once NAPA's answers were stored.
+ * The rows are already on screen, so waiting longer costs the customer nothing.
+ */
+const STREAMED_PARTS_WAIT: PartsWait = { budgetMs: 15_000, timeoutMs: 8_000 };
+
+type SharedRowProps = Omit<RepairRowsProps, "nodes" | "pricingParts">;
+
+function rowProps(
+  reg: string,
+  make: string | undefined,
+  model: string | undefined,
+  postcode: string | undefined,
+  selectedIds: string[],
+  adding: boolean,
+  atCap: boolean,
+  hrefs: ReturnType<typeof buildRepairHrefs>,
+): SharedRowProps {
+  return {
+    selectedIds,
+    adding,
+    atCap,
+    groupHref: hrefs.groupHref,
+    bookHref: hrefs.bookHref,
+    quoteHref: (node) =>
+      quoteRequestHref({ reg, make, model, postcode, q: node.bundleName ?? node.description, reason: "parts" }),
+  };
+}
+
+/** The level again with its parts priced: the same call, so a memo hit apart from NAPA. */
+async function PricedRows({
+  reg,
+  nodeId,
+  unpriced,
+  ...props
+}: SharedRowProps & { reg: string; nodeId?: string; unpriced: RepairRowsProps["nodes"] }) {
+  const priced = await getRepairCatalogueLevel(reg, nodeId, createAdminClient(), {
+    priceParts: true,
+    partsWait: STREAMED_PARTS_WAIT,
+  });
+  // The level loaded a moment ago, so a failure now is a blip: keep the labour-only rows.
+  if (!priced.ok) return <RepairRows nodes={unpriced} {...props} />;
+  return <RepairRows nodes={priced.nodes} {...props} />;
 }
 
 function Empty({ children }: { children: React.ReactNode }) {

@@ -69,15 +69,72 @@ export function selectRepairPart(panels: readonly SupplierPanel[], choice: Missi
         description: choice.description,
       }
     : null;
-  const best = defaultOffer(offers);
+  const best = defaultOffer(sensiblePacks(offers));
   return best ? { source: "default", offer: best, missingChoice } : { source: "none", missingChoice };
 }
 
-/** The axle a HaynesPro job names, or null when it names neither or both. */
+/** A pack's size in litres from NAPA's description: "LONGLIFE RED (199L)", "1LTR MOBIL…", "500ML". Pure. */
+export function packLitres(description: string | null | undefined): number | null {
+  const text = String(description ?? "");
+  const ml = /(\d+(?:[.,]\d+)?)\s*ml\b/i.exec(text);
+  if (ml) return Number(ml[1].replace(",", ".")) / 1000;
+  const l = /(\d+(?:[.,]\d+)?)\s*(?:l|ltrs?|litres?|liters?)\b/i.exec(text);
+  return l ? Number(l[1].replace(",", ".")) : null;
+}
+
+/**
+ * The biggest pack a job is charged for by default (2026-11-18). NAPA sells
+ * fluids from 1 litre bottles to 199 litre workshop drums, and "Best, dearest"
+ * took the drum: £611.69 of antifreeze to refill a Toyota ProAce. Brake fluid
+ * comes in a 1 litre bottle (a bleed uses well under that); anything else
+ * (antifreeze, gear and transmission oil) in up to 5 litres.
+ */
+function packCapLitres(offers: readonly SupplierOffer[]): number {
+  return offers.some((o) => /\bbrake fluid\b|\bdot\s?[345]/i.test(o.description ?? "")) ? 1 : 5;
+}
+
+/** Bigger than this is a workshop drum (20 litres is the biggest pack sold for one car). */
+const DRUM_LITRES = 25;
+
+/**
+ * The offers the default is picked from. Workshop drums (199 and 208 litres)
+ * are never charged to one car. When NAPA lists a fluid in several pack
+ * sizes, only the biggest pack up to the cap (or, with none that small, the
+ * smallest), and never one of unknown size beside them (a drum NAPA didn't
+ * label). Anything not sold by the litre is left alone. An admin's choice is
+ * still honoured whatever its size. Pure.
+ */
+export function sensiblePacks(offers: readonly SupplierOffer[]): readonly SupplierOffer[] {
+  const sized = offers.map((offer) => ({ offer, litres: packLitres(offer.description) }));
+  const labelled = sized.filter((s) => s.litres != null);
+  // One size mentioned among other parts ("…1.6L"?) isn't a range of packs.
+  if (labelled.length === 0) return offers;
+  if (labelled.length === 1 && (labelled[0].litres as number) <= DRUM_LITRES) return offers;
+  if (labelled.length === 1) return sized.filter((s) => s.litres == null).map((s) => s.offer);
+  const packs = sized.filter((s) => s.litres != null && s.litres <= DRUM_LITRES);
+  const sizes = new Set(packs.map((s) => s.litres as number));
+  if (sizes.size < 2) return packs.map((s) => s.offer);
+  const cap = packCapLitres(offers);
+  const fits = packs.filter((s) => (s.litres as number) <= cap);
+  if (fits.length > 0) {
+    // The biggest pack up to the cap: a refill needs the 5 litres, not the
+    // 1 litre bottle that happens to be rated higher.
+    const biggest = Math.max(...fits.map((s) => s.litres as number));
+    return fits.filter((s) => s.litres === biggest).map((s) => s.offer);
+  }
+  const smallest = Math.min(...sizes);
+  return packs.filter((s) => s.litres === smallest).map((s) => s.offer);
+}
+
+/**
+ * The axle a HaynesPro job names, or null when it names neither or both. The
+ * windscreen is the front ("Renew the windscreen wiper blades" took the rear
+ * blade too, 2026-11-18); a "rear windscreen" is the rear.
+ */
 export function jobPosition(description: string | null | undefined): PartPosition | null {
   const text = String(description ?? "");
-  const front = /\bfront\b/i.test(text);
   const rear = /\brear\b/i.test(text);
+  const front = /\bfront\b/i.test(text) || (!rear && /\bwindscreen\b/i.test(text));
   return front === rear ? null : front ? "front" : "rear";
 }
 
@@ -204,17 +261,29 @@ function byCylinder(slot: PartSlot, needs: JobNeeds): PartSlot[] {
   ];
 }
 
+/** One per cylinder: a job renewing all of them needs the count, and can't guess it. */
+const PER_CYLINDER = /\b(spark plugs|glow plugs|injectors|ignition coils)\b/i;
+
 /**
  * How many of the chosen part a job buys (Task 78). Pure.
  *   - NAPA says how many the car has (plugs): all of them when the job wants
  *     the set, otherwise one.
+ *   - A job renewing every plug, injector or coil when NAPA doesn't say how
+ *     many: null, unknown. The part is priced by hand rather than charged
+ *     once (2026-11-18: injectors).
  *   - Otherwise the supplier's unit of issue (2 for a pair of discs), and at
  *     least 2 on a "both" job whose part NAPA lists once, for either side
  *     (a rear shock absorber): Brad, 2026-11-18.
  */
-export function slotQuantity(jobDescription: string | null | undefined, slot: Pick<PartSlot, "side">, offer: SupplierOffer, slotsOnAxle: number): number {
+export function slotQuantity(
+  jobDescription: string | null | undefined,
+  slot: Pick<PartSlot, "side">,
+  offer: SupplierOffer,
+  slotsOnAxle: number,
+): number | null {
   const needs = jobNeeds(jobDescription);
   if (offer.perVehicle && offer.perVehicle > 0) return wantsSet(needs) ? offer.perVehicle : 1;
+  if (wantsSet(needs) && PER_CYLINDER.test(String(jobDescription ?? ""))) return null;
   const unit = offer.quantityOfFit && offer.quantityOfFit > 0 ? offer.quantityOfFit : 1;
   if (needs.count === "both" && !needs.side && !slot.side && slotsOnAxle === 1) return Math.max(unit, 2);
   return unit;
@@ -225,8 +294,12 @@ export interface JobPartSelection {
   /** ADDITIVE (Task 78). The side, when the job takes one part per side. */
   side?: PartSide | null;
   selection: PartSelection;
-  /** ADDITIVE (Task 78). How many of the chosen part the job buys. 1 when nothing was chosen. */
-  quantity?: number;
+  /**
+   * ADDITIVE (Task 78). How many of the chosen part the job buys. 1 when
+   * nothing was chosen; null when the job needs every one the engine has and
+   * NAPA doesn't say how many.
+   */
+  quantity?: number | null;
 }
 
 /**

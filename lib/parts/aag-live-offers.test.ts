@@ -253,8 +253,16 @@ describe("fetchAagLiveOffers: the standard quote, then the full catalogue", () =
 
   it("treats an all-variants catalogue answer as an answer, even when the standard quote failed", async () => {
     const onlyVariants: AagQuoteClassicBody = { products: VARIANTS.products!.slice(0, 2) };
-    const { fake } = lookups({ kind: "failed", reason: "ISE0047" }, { kind: "ok", body: onlyVariants });
+    const { fake } = lookups({ kind: "failed", reason: "ISE0047", answered: true }, { kind: "ok", body: onlyVariants });
     expect(await fetchAagLiveOffers("FN60KYP", 286, {}, fake)).toEqual({ kind: "no_parts" });
+  });
+
+  it("stays a failure when the standard quote timed out and the catalogue only has variants", async () => {
+    // FN60KYP's coil springs, 2026-11-18: standard and sports-suspension springs in
+    // the catalogue, the standard quote too slow. Asked again next time, not stored as "no parts".
+    const onlyVariants: AagQuoteClassicBody = { products: VARIANTS.products!.slice(0, 2) };
+    const { fake } = lookups({ kind: "failed", reason: "timed out" }, { kind: "ok", body: onlyVariants });
+    expect(await fetchAagLiveOffers("FN60KYP", 188, {}, fake)).toEqual({ kind: "failed", reason: "timed out" });
   });
 
   it("is 'no parts' when the standard quote says so and the full catalogue has nothing either", async () => {

@@ -119,6 +119,10 @@ You are working on **Book My Tech**, a UK mobile-mechanic booking platform. This
 
 ## Current task
 
+### 📌 2026-11-18 (later): Gareth's screenshot queries (Task 79), committed, not pushed
+
+Read `docs/tasks/79-gareth-fn60kyp-queries.md`. Search now prices parts. The website's repair list streams prices in (15 s wait) instead of "+ parts" on a cold car. Workshop drums of antifreeze (£611.69) are never charged; antifreeze takes up to 5 L, brake fluid 1 L. A timed-out NAPA lookup is no longer stored as "no parts" for 12 h (FN60KYP's coil springs). Injectors are counted or quoted. Windscreen wipers are the front only. Open for Brad/Gareth: charge "Bolt, brake disc" (54)? Standard vs sports springs. The app's tree still has the 4.5 s budget.
+
 ### 📌 2026-11-18: Part quantities (Task 78), committed, not pushed
 
 Read `docs/tasks/78-part-quantities.md`. Gareth's two points: repairs listing several parts charged one, and spark/glow plugs charged one plug. Jobs now buy one part per side when NAPA lists left and right, every plug when NAPA gives "No of Plugs" (the Leon: 3 ordinary + 1 pressure-sensor plug), and 2 of a part listed once on a "both" job. No migration. `side` is added (optional) to the mobile quote's part lines; the customer app could show it (optional). Brad has more of Gareth's queries as screenshots: next.

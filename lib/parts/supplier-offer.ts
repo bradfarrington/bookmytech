@@ -194,10 +194,21 @@ export function sideOf(fittingPosition: string | null | undefined, description: 
 /** "No of Plugs" (standard quote) or "Required quantity" (catalogue): how many the car has. */
 const PER_VEHICLE = /^(no\.?\s+of\s+plugs|required\s+quantity)$/i;
 
+/**
+ * "Quantity" on an injector (the catalogue's "Quantity: 4" on DN23HFL's
+ * injectors). On other parts it can mean the pack, so it only counts here.
+ */
+const INJECTOR = /\binjector\b/i;
+
 /** How many of a part the car has, when NAPA says. Pure. */
-export function perVehicleOf(properties: ReadonlyArray<{ name: string; value: string }> | undefined): number | null {
+export function perVehicleOf(
+  properties: ReadonlyArray<{ name: string; value: string }> | undefined,
+  description?: string | null,
+): number | null {
+  const injector = INJECTOR.test(description ?? "");
   for (const { name, value } of properties ?? []) {
-    if (!PER_VEHICLE.test(name) || !/^\d+$/.test(value)) continue;
+    const counts = PER_VEHICLE.test(name) || (injector && /^quantity$/i.test(name));
+    if (!counts || !/^\d+$/.test(value)) continue;
     const n = Number(value);
     if (n >= 1 && n <= 16) return n;
   }
@@ -244,7 +255,7 @@ export function aagOffers(lines: readonly AagQuoteLine[]): SupplierOffer[] {
       notes,
       buyable: line.sellable && line.costPence != null,
       side: sideOf(line.fittingPosition, line.article),
-      perVehicle: perVehicleOf(line.properties),
+      perVehicle: perVehicleOf(line.properties, line.article),
       cylinder: cylinderOf(line.properties),
       fitRead: true as const,
     };

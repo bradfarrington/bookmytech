@@ -362,8 +362,12 @@ export async function aagQuote(
 export type AagQuoteOutcome =
   | { kind: "ok"; body: AagQuoteBody }
   | { kind: "no_parts" }
-  /** `reason` is for the admin pages, never a customer. */
-  | { kind: "failed"; reason: string };
+  /**
+   * `reason` is for the admin pages, never a customer. ADDITIVE (2026-11-18)
+   * `answered`: NAPA replied with an error code (ISE0047…), rather than
+   * timing out or not being reached.
+   */
+  | { kind: "failed"; reason: string; answered?: boolean };
 
 /**
  * `aagQuote` with "no parts" kept apart from a failure. Customer pricing passes
@@ -382,7 +386,8 @@ export async function aagQuoteResult(
     { timeoutMs: options.timeoutMs },
   );
   if (result.ok) return { kind: "ok", body: result.body };
-  return isAagNoParts(result.errorCode) ? { kind: "no_parts" } : { kind: "failed", reason: result.reason };
+  if (isAagNoParts(result.errorCode)) return { kind: "no_parts" };
+  return { kind: "failed", reason: result.reason, ...(result.errorCode ? { answered: true } : {}) };
 }
 
 /** The older flat quote: several GenArts at once (slower, per the manual). */

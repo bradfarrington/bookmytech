@@ -455,6 +455,17 @@ async function composeLevelFor(
 }
 
 /**
+ * How long part pricing may wait. Absent: the funnel's defaults (4.5 s for
+ * the level, 4 s per NAPA call), so a page that can't show anything until
+ * prices arrive isn't held up. A page that streams prices in after the rows
+ * (the website's repair list, 2026-11-18) can afford longer.
+ */
+export interface PartsWait {
+  budgetMs?: number;
+  timeoutMs?: number;
+}
+
+/**
  * Fill in `partsPence` / `totalPence` on a level's bookable rows (Task 63).
  * Returns the same nodes when nothing could be priced, so a supplier that is
  * down or unconfigured leaves the level exactly as it was.
@@ -465,6 +476,7 @@ async function withLevelParts(
   rawById: ReadonlyMap<string, HpRepairtimeNode>,
   reg: string,
   db: SupabaseClient,
+  wait: PartsWait = {},
 ): Promise<CatalogueNode[]> {
   // A product already shows its whole price (its own, plus any engine oil);
   // only HaynesPro-backed repairs have parts on top of labour.
@@ -484,7 +496,7 @@ async function withLevelParts(
     if (jobs.length === item.nodeIds.length) rows.push({ rowId: item.id, nodes: jobs });
   }
 
-  const parts = await priceLevelParts({ db, reg, carTypeId: context.carTypeId, rows });
+  const parts = await priceLevelParts({ db, reg, carTypeId: context.carTypeId, rows, ...wait });
   if (parts.totals.size === 0 && parts.needsQuote.size === 0) return nodes;
 
   return nodes.map((node) => {
@@ -551,7 +563,7 @@ export async function getRepairCatalogueLevel(
   reg: string,
   nodeId: string | null | undefined,
   db: SupabaseClient,
-  options: { priceParts?: boolean } = {},
+  options: { priceParts?: boolean; partsWait?: PartsWait } = {},
 ): Promise<CatalogueLevel> {
   const loaded = await loadContext(reg, db);
   if (!loaded.ok) return loaded;
@@ -589,7 +601,7 @@ export async function getRepairCatalogueLevel(
   return {
     ok: true,
     vehicle: context.vehicle,
-    nodes: options.priceParts ? await withLevelParts(context, nodes, rawById, reg, db) : nodes,
+    nodes: options.priceParts ? await withLevelParts(context, nodes, rawById, reg, db, options.partsWait) : nodes,
   };
 }
 
@@ -652,14 +664,23 @@ interface PendingGroup {
   seq: number;
 }
 
+/**
+ * `priceParts` (2026-11-18): price each bookable hit's parts as a browsed
+ * level does (withLevelParts), so a search for "pads" shows what the job
+ * costs, not "£100 + parts". Opt-in, like the level's.
+ */
 export async function searchRepairCatalogue(
   reg: string,
   query: string,
   db: SupabaseClient,
+  options: { priceParts?: boolean; partsWait?: PartsWait } = {},
 ): Promise<CatalogueSearch> {
   const loaded = await loadContext(reg, db);
   if (!loaded.ok) return loaded;
-  return runSearch(loaded.context, query, { bundles: true });
+  const rawById = new Map<string, HpRepairtimeNode>();
+  const result = await runSearch(loaded.context, query, { bundles: true, rawById });
+  if (!result.ok || !options.priceParts) return result;
+  return { ...result, hits: await withLevelParts(loaded.context, result.hits, rawById, reg, db, options.partsWait) };
 }
 
 /**
@@ -716,7 +737,11 @@ async function productSearchHits(context: CatalogueContext, query: SearchQuery):
 async function runSearch(
   context: CatalogueContext,
   query: string,
-  options: { bundles: boolean },
+  options: {
+    bundles: boolean;
+    /** Filled with every HaynesPro job the hits book, for pricing their parts. */
+    rawById?: Map<string, HpRepairtimeNode>;
+  },
 ): Promise<CatalogueSearch> {
   const parsed = parseSearchQuery(query);
   if (parsed.terms.length === 0) {
@@ -740,7 +765,7 @@ async function runSearch(
   // typing "pads discs" is after.
   if (options.bundles) {
     const [bundleHits, productHits] = await Promise.all([
-      bundleSearchHits(context, parsed),
+      bundleSearchHits(context, parsed, options.rawById),
       productSearchHits(context, parsed),
     ]);
     for (const node of [...productHits, ...bundleHits]) {
@@ -821,6 +846,7 @@ async function runSearch(
 
         seen.add(key);
         hits.push({ node, rank, order: seq++ });
+        if (node.kind === "repair") options.rawById?.set(node.id, hpNode);
         if (hits.length >= SEARCH_MAX_HITS) {
           return finish(context, hits, true);
         }
@@ -838,6 +864,7 @@ async function runSearch(
 async function bundleSearchHits(
   context: CatalogueContext,
   query: SearchQuery,
+  rawById?: Map<string, HpRepairtimeNode>,
 ): Promise<CatalogueNode[]> {
   const candidates: Array<{ bundle: (typeof context.overlay.bundles)[number]; options: ReturnType<typeof bundlesAt>[number]["options"] }> = [];
   for (const bundle of context.overlay.bundles) {
@@ -852,6 +879,7 @@ async function bundleSearchHits(
 
   const ids = [...new Set(candidates.flatMap((c) => c.options.flatMap((o) => o.node_ids)))];
   const { hours: nodeHours, raw: rawNodes } = await fetchNodes(context, ids);
+  for (const [id, node] of rawNodes) rawById?.set(id, node);
   const nodeGenarts = genartIdsByNode(rawNodes);
   const out: CatalogueNode[] = [];
   for (const { bundle, options } of candidates) {

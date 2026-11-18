@@ -60,6 +60,5 @@ A job buying two of the same part type now has two lines: `QuotedPart.side`, nam
 
 ## Not done / noticed
 
-- **Injectors:** "Renew all the injectors" still buys NAPA's unit of issue. Unchecked whether NAPA gives a count for them.
-- **"Windscreen" wiper jobs** name no axle, so they also buy the rear blade (BA18MVO: + £6.99). That was true before this task. "Windscreen" could be read as front.
+- ~~Injectors~~ and ~~"windscreen" wiper jobs~~: done in Task 79 (2026-11-18).
 - Gareth's own example for point 1 wasn't known; the fix covers every case found in the stored answers (87 part types list several parts on one axle).

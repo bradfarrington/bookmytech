@@ -7,8 +7,12 @@ import { enforceCatalogueLimits } from "@/lib/mobile/catalogue-limits";
 import { apiError, apiOk } from "@/lib/mobile/respond";
 import { createAdminClient } from "@/lib/supabase/admin";
 
-// GET /api/mobile/v1/repairs/search?reg=…&q=… — keyword search across a
-// vehicle's repair catalogue. Unauthenticated.
+// GET /api/mobile/v1/repairs/search?reg=…&q=…[&parts=1] — keyword search
+// across a vehicle's repair catalogue. Unauthenticated.
+//
+// ADDITIVE (2026-11-18): `parts=1` prices each hit's parts exactly as
+// `/repairs/tree?parts=1` does (`partsPence`, `totalPence`, `partsEstimated`,
+// `needsQuote` on the hits). Without it the hits are labour only, as before.
 //
 // 200: the CatalogueSearch union from lib/haynespro/catalogue.ts, UNCHANGED,
 //      including the `{ ok: false, code, message }` arm and `truncated`.
@@ -29,6 +33,8 @@ export async function GET(request: Request): Promise<Response> {
   const url = new URL(request.url);
   const reg = url.searchParams.get("reg")?.trim() ?? "";
   const q = url.searchParams.get("q")?.trim() ?? "";
+  const parts = url.searchParams.get("parts")?.trim();
+  const priceParts = parts === "1" || parts === "true";
 
   if (!reg) {
     return apiError("Enter your registration number.", 400);
@@ -44,6 +50,7 @@ export async function GET(request: Request): Promise<Response> {
     reg,
     q,
     createAdminClient(),
+    { priceParts },
   );
   return apiOk(result);
 }

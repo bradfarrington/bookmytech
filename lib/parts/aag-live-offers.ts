@@ -116,10 +116,18 @@ async function fetchOneCode(
 
   // Neither had a usable part. "No parts" when either answered: the standard
   // quote with nothing, or classic with nothing or only variants we won't
-  // guess between. Otherwise a failure, so the price cache keeps its last
-  // known answer. Classic's ISE0047 is ambiguous (it also means "nothing"),
-  // so it never turns the standard quote's failure into "no parts" on its own.
-  if (standard.kind !== "failed" || classic.kind !== "failed") return { kind: "no_parts" };
+  // guess between. Except: when the standard quote timed out or couldn't be
+  // reached, classic's variants say nothing about this car (it may well be
+  // one the standard quote matches exactly), so that is a failure and the
+  // price cache asks again next time. FN60KYP's coil springs were stored as
+  // "no parts" for 12 hours after one slow standard quote (2026-11-18). A
+  // standard quote that answered with an error (ISE0047 on some part types,
+  // every time) still lets classic's answer stand. Classic's own ISE0047 is
+  // ambiguous (it also means "nothing"), so it never turns the standard
+  // quote's failure into "no parts" on its own.
+  if (standard.kind !== "failed") return { kind: "no_parts" };
+  if (classic.kind === "no_parts") return { kind: "no_parts" };
+  if (classic.kind === "ok" && "answered" in standard && standard.answered) return { kind: "no_parts" };
   return { kind: "failed", reason: standard.kind === "failed" ? standard.reason : "NAPA Auto Parts didn't answer." };
 }
 
