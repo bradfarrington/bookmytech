@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronRight, FolderOpen, Layers, Lock, MoveRight } from "lucide-react";
+import { ChevronRight, Eye, EyeOff, FolderOpen, Layers, Lock, MoveRight } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { cn } from "@/lib/utils";
@@ -68,6 +68,15 @@ export interface RepairTreePanelProps {
   /** "id~label|id~label" trail down to the current node. */
   crumbs: string;
   editing?: CatalogueEditing;
+  /**
+   * Show repairs and groups switched off for every vehicle (2026-11-18).
+   * Off by default: Gareth switched off many repairs Book My Tech won't do,
+   * and they crowded the admin screens. They're hidden, never deleted, and
+   * still listed on Repairs → Hidden repairs.
+   */
+  showSwitchedOff?: boolean;
+  /** This page with `showSwitchedOff` flipped, at the same level. */
+  switchedOffHref?: string;
 }
 
 interface GroupRow {
@@ -121,6 +130,8 @@ export async function RepairTreePanel({
   nodeId,
   crumbs,
   editing,
+  showSwitchedOff = false,
+  switchedOffHref,
 }: RepairTreePanelProps) {
   const repairtimeTypeId = await getRepairtimeTypeId(carTypeId);
   if (repairtimeTypeId == null) {
@@ -255,6 +266,22 @@ export async function RepairTreePanel({
     return `${linkBase}&node=${encodeURIComponent(upto[index].id)}&crumbs=${encodeURIComponent(upto.map((c) => `${c.id}~${c.label}`).join("|"))}`;
   };
 
+  // Switched off for every vehicle: left out unless asked for. On a model's
+  // page, a job that model switched back on is shown as usual.
+  const switchedOff = (id: string, original: string | null) =>
+    global ? state.globalHidden.has(id, original) : nodeAvailability(id, original, state) === "hidden_global";
+  const hiddenHere =
+    groups.filter((g) => g.source !== "custom" && switchedOff(g.id, g.original)).length +
+    leaves.filter((l) => switchedOff(l.id, l.original)).length;
+  if (!showSwitchedOff) {
+    for (let i = groups.length - 1; i >= 0; i--) {
+      if (groups[i].source !== "custom" && switchedOff(groups[i].id, groups[i].original)) groups.splice(i, 1);
+    }
+    for (let i = leaves.length - 1; i >= 0; i--) {
+      if (switchedOff(leaves[i].id, leaves[i].original)) leaves.splice(i, 1);
+    }
+  }
+
   const sourceCaption = (source: GroupRow["source"] | LeafRow["source"]) =>
     source === "moved" ? "Moved here" : source === "custom" ? "Your category" : null;
 
@@ -282,6 +309,18 @@ export async function RepairTreePanel({
         </nav>
         {editing && <NewCategoryForm parentId={nodeId} />}
       </div>
+
+      {hiddenHere > 0 && switchedOffHref && (
+        <Link
+          href={switchedOffHref}
+          className="flex w-fit items-center gap-1.5 text-xs font-semibold text-text-muted hover:text-brand-blue"
+        >
+          {showSwitchedOff ? <EyeOff size={13} /> : <Eye size={13} />}
+          {showSwitchedOff
+            ? `Hide the ${hiddenHere} switched off for every vehicle`
+            : `${hiddenHere} switched off for every vehicle ${hiddenHere === 1 ? "is" : "are"} hidden here · Show`}
+        </Link>
+      )}
 
       {empty && (
         <p className="rounded-2xl border border-border bg-surface-card px-4 py-8 text-center text-sm text-text-muted shadow-card">

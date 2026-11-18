@@ -37,6 +37,8 @@ interface ModelPageProps {
     node?: string;
     crumbs?: string;
     story?: string;
+    /** "1": also list repairs switched off for every vehicle (hidden by default, 2026-11-18). */
+    off?: string;
   }>;
 }
 
@@ -144,9 +146,17 @@ export default async function AdminVehicleModelPage({
         <RepairTreePanel
           carTypeId={selectedType.id}
           target={{ scope: "model", makeName, modelName }}
-          linkBase={`${base}?tab=repairs&type=${selectedType.id}`}
+          linkBase={`${base}?tab=repairs&type=${selectedType.id}${query.off === "1" ? "&off=1" : ""}`}
           nodeId={query.node ?? "root"}
           crumbs={query.crumbs ?? ""}
+          showSwitchedOff={query.off === "1"}
+          switchedOffHref={`${base}?${new URLSearchParams({
+            tab: "repairs",
+            type: String(selectedType.id),
+            ...(query.off === "1" ? {} : { off: "1" }),
+            ...(query.node ? { node: query.node } : {}),
+            ...(query.crumbs ? { crumbs: query.crumbs } : {}),
+          }).toString()}`}
         />
       ) : tab === "manuals" ? (
         <ManualsPanel

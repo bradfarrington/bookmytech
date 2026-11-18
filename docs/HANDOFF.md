@@ -119,6 +119,10 @@ You are working on **Book My Tech**, a UK mobile-mechanic booking platform. This
 
 ## Current task
 
+### 📌 2026-11-18 (late): Not-fitted repairs hidden; switched-off repairs hidden in the admin (Task 81), committed, not pushed
+
+Read `docs/tasks/81-not-fitted-repairs-and-admin-hides.md`. A car with rear drums (FN60KYP) no longer lists rear pads/discs repairs (`brake-layout.ts`, NAPA evidence both ways). The admin Repairs and model screens leave out repairs switched off for every vehicle, with a link to show them. **Don't push until Brad says.**
+
 ### 📌 2026-11-18 (evening): Wait for NAPA, warm it early, fluids by the litre (Task 80), committed, not pushed
 
 Read `docs/tasks/80-wait-for-napa.md`. Brad's rules: NAPA lookups never time out (60 s dead-connection ceiling only) and a timed-out answer is never saved. Buttons show a price or "Get a quote", never "Pricing" / "+ parts". A car's parts are priced in the background from the reg lookup (`warm-parts.ts`). Coolant and brake fluid are bought by HaynesPro's capacity (antifreeze assumed 50/50). The website shows an animated logo until a level is fully priced. Standard suspension parts unless a sports model. "Bolt, brake disc" (54) is no longer charged (live DB), so Pads and Discs price. Today's 22 false "no parts" answers were re-asked. **Don't push until Brad says.**

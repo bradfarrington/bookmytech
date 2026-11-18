@@ -41,6 +41,7 @@ import {
   type RepairPartChoiceRow,
 } from "./repair-part-choice";
 import { fluidCapacitiesFor, type FluidCapacities } from "@/lib/haynespro/fluid-capacity";
+import { BRAKE_PART_TYPES, brakeLayout, notFittedOnCar, type BrakeLayout } from "./brake-layout";
 import type { PartPosition, PartSide, SupplierId } from "./supplier-offer";
 
 /** One part priced into a quote. Serialisable: it is snapshotted onto bookings and revisions. */
@@ -108,11 +109,14 @@ export interface MissingPart {
    * use for this car (lists nothing, or nothing that fits). "unavailable":
    * NAPA didn't answer (down, slow, blocked). Either way the job goes to a
    * manual quote (Brad, 2026-11-17); the reason is kept for the logs.
+   * "not_fitted" (2026-11-18): the car doesn't have this part on that axle
+   * (rear discs on a car with rear drums, brake-layout.ts). The repair is
+   * hidden from the car's repair list rather than quoted.
    */
   reason: MissingReason;
 }
 
-export type MissingReason = "not_listed" | "unavailable";
+export type MissingReason = "not_listed" | "unavailable" | "not_fitted";
 
 /**
  * Whether a job set's missing parts need pricing by hand: any part with no
@@ -173,6 +177,8 @@ export function priceJobParts(args: {
   fluids?: FluidCapacities | null;
   /** Standard or sports suspension parts (standard when absent). */
   car?: CarTraits | null;
+  /** Discs or drums on each axle, when NAPA's answers settle it. */
+  brakes?: BrakeLayout | null;
 }): JobPartsResult {
   const parts: QuotedPart[] = [];
   const missing: MissingPart[] = [];
@@ -183,6 +189,10 @@ export function priceJobParts(args: {
     position: PartPosition | null,
     reason: MissingReason,
   ) => {
+    if (notFittedOnCar(group.genartId, position, args.brakes)) {
+      missing.push({ nodeId: job.nodeId, genartId: group.genartId, label: group.label, position, reason: "not_fitted" });
+      return;
+    }
     const estimate = args.estimates
       ? estimatePart({
           jobDescription: job.description,
@@ -390,7 +400,7 @@ export async function quoteJobParts(args: {
     }
   }
 
-  const priced = priceJobParts({
+  const first = priceJobParts({
     jobs: args.jobs,
     offers: offers.byGenart,
     choices,
@@ -399,14 +409,41 @@ export async function quoteJobParts(args: {
     fluids,
     car,
   });
+  if (first.ok) return first;
+
+  // A brake part NAPA has nothing for on one axle: does the car have discs or
+  // drums there? Only then is the brake layout read (brake-layout.ts).
+  let brakes: BrakeLayout | null = null;
+  if (first.missing.some((m) => m.position && BRAKE_PART_TYPES.includes(m.genartId))) {
+    const extra = BRAKE_PART_TYPES.filter((id) => !offers.byGenart.has(id));
+    const more = extra.length > 0 ? await loadAagPartOffers(args.db, args.reg, extra) : null;
+    const answers = new Map(offers.byGenart);
+    if (more?.enabled) for (const [id, answer] of more.byGenart) answers.set(id, answer);
+    brakes = brakeLayout(answers);
+  }
+  const priced = brakes
+    ? priceJobParts({
+        jobs: args.jobs,
+        offers: offers.byGenart,
+        choices,
+        uncharged: settings.uncharged,
+        setPrices: settings.setPrices,
+        fluids,
+        car,
+        brakes,
+      })
+    : first;
   if (priced.ok) return priced;
 
   // Something AAG couldn't price on this car: estimate it from other cars of the same model
   // (Task 72). Only the groups that need it are read.
+  // A part the car doesn't have isn't estimated: its repair is hidden.
+  const toEstimate = priced.missing.filter((m) => m.reason !== "not_fitted");
+  if (toEstimate.length === 0) return priced;
   const estimates = await loadPartEstimates(
     args.db,
     aagRegKey(args.reg),
-    priced.missing.map((m) => m.genartId),
+    toEstimate.map((m) => m.genartId),
   );
   if (!estimates) return priced;
   return priceJobParts({
@@ -418,6 +455,7 @@ export async function quoteJobParts(args: {
     estimates,
     fluids,
     car,
+    brakes,
   });
 }
 

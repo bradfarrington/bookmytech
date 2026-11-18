@@ -52,9 +52,15 @@ export interface LevelParts {
    * and every row reads "+ parts" as before.
    */
   needsQuote: Set<string>;
+  /**
+   * Rows (never among the others) with a part this car doesn't have on that
+   * axle: rear discs on a car with rear drums (brake-layout.ts, 2026-11-18).
+   * The level leaves them out.
+   */
+  notFitted: Set<string>;
 }
 
-const EMPTY: LevelParts = { totals: new Map(), estimated: new Set(), needsQuote: new Set() };
+const EMPTY: LevelParts = { totals: new Map(), estimated: new Set(), needsQuote: new Set(), notFitted: new Set() };
 
 /** The job description parts pricing reads — the same one `quoteRepairsResult` passes. */
 function jobDescription(node: HpRepairtimeNode): string {
@@ -101,12 +107,22 @@ export function estimatedLevelRows(rows: readonly PartsRow[], result: JobPartsRe
   );
 }
 
-/** The rows with a part NAPA gave no usable price for on this car. Pure. */
+/** The rows with a part this car doesn't have. Pure. */
+export function notFittedLevelRows(rows: readonly PartsRow[], result: JobPartsResult): Set<string> {
+  if (result.ok) return new Set();
+  const absent = new Set(result.missing.filter((m) => m.reason === "not_fitted").map((m) => m.nodeId));
+  return new Set(rows.filter((row) => row.nodes.some((n) => n.id != null && absent.has(n.id))).map((row) => row.rowId));
+}
+
+/** The rows with a part NAPA gave no usable price for on this car (and none it doesn't have). Pure. */
 export function quoteOnlyLevelRows(rows: readonly PartsRow[], result: JobPartsResult): Set<string> {
   if (result.ok) return new Set();
   const unpriced = new Set(result.missing.map((m) => m.nodeId));
+  const absent = notFittedLevelRows(rows, result);
   return new Set(
-    rows.filter((row) => row.nodes.some((n) => n.id != null && unpriced.has(n.id))).map((row) => row.rowId),
+    rows
+      .filter((row) => !absent.has(row.rowId) && row.nodes.some((n) => n.id != null && unpriced.has(n.id)))
+      .map((row) => row.rowId),
   );
 }
 
@@ -143,6 +159,7 @@ export async function priceLevelParts(args: {
       totals,
       estimated: estimatedLevelRows(rows, result, totals),
       needsQuote: quoteOnlyLevelRows(rows, result),
+      notFitted: notFittedLevelRows(rows, result),
     };
   } catch (err) {
     console.error("[catalogue] pricing a level's parts failed:", err);

@@ -485,9 +485,10 @@ async function withLevelParts(
   }
 
   const parts = await priceLevelParts({ db, reg, carTypeId: context.carTypeId, rows });
-  if (parts.totals.size === 0 && parts.needsQuote.size === 0) return nodes;
+  if (parts.totals.size === 0 && parts.needsQuote.size === 0 && parts.notFitted.size === 0) return nodes;
 
-  return nodes.map((node) => {
+  // A repair for a part this car doesn't have (rear discs on rear drums) isn't listed.
+  return nodes.filter((node) => !parts.notFitted.has(node.id)).map((node) => {
     if (parts.needsQuote.has(node.id)) return { ...node, needsQuote: true as const };
     const partsPence = parts.totals.get(node.id);
     if (partsPence == null || node.pricePence == null) return node;

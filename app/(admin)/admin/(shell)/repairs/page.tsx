@@ -28,6 +28,8 @@ interface RepairsPageProps {
   searchParams: Promise<{
     node?: string;
     crumbs?: string;
+    /** "1": also list repairs switched off for every vehicle (hidden by default, 2026-11-18). */
+    off?: string;
   }>;
 }
 
@@ -46,6 +48,15 @@ export default async function AdminRepairsPage({ searchParams }: RepairsPageProp
       .eq("model_name", GLOBAL_SCOPE),
   ]);
   const hiddenCount = hidden.count ?? 0;
+  const showSwitchedOff = query.off === "1";
+  const levelHref = (off: boolean) => {
+    const params = new URLSearchParams();
+    if (off) params.set("off", "1");
+    if (query.node) params.set("node", query.node);
+    if (query.crumbs) params.set("crumbs", query.crumbs);
+    const qs = params.toString();
+    return qs ? `/admin/repairs?${qs}` : "/admin/repairs";
+  };
 
   // Where things can be moved to: the top level, HaynesPro's root groups (by
   // our names), and every category we created. Combined repairs a job can be
@@ -111,10 +122,12 @@ export default async function AdminRepairsPage({ searchParams }: RepairsPageProp
         <RepairTreePanel
           carTypeId={reference.carTypeId}
           target={{ scope: "global" }}
-          linkBase="/admin/repairs?"
+          linkBase={showSwitchedOff ? "/admin/repairs?off=1" : "/admin/repairs?"}
           nodeId={query.node ?? "root"}
           crumbs={query.crumbs ?? ""}
           editing={editing}
+          showSwitchedOff={showSwitchedOff}
+          switchedOffHref={levelHref(!showSwitchedOff)}
         />
       )}
     </div>
