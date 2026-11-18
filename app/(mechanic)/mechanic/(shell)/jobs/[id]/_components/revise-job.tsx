@@ -385,7 +385,9 @@ export function ReviseJob({ bookingId, status, lines, parts, revisions, fees }: 
                       {(preview.result.after.catalogueParts ?? []).map((part, i) => (
                         <li key={`cp-${i}`} className="flex justify-between gap-3">
                           <span className="min-w-0">
-                            {part.position ? `${part.groupLabel} (${part.position})` : part.groupLabel}
+                            {part.position || part.side
+                              ? `${part.groupLabel} (${[part.position, part.side].filter(Boolean).join(" ")})`
+                              : part.groupLabel}
                             {part.brand ? ` · ${part.brand}` : ""}
                             {part.partNumber ? ` · ${part.partNumber}` : " · set price"}
                           </span>

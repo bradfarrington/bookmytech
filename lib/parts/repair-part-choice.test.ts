@@ -110,7 +110,7 @@ describe("selectJobParts", () => {
 
   it("finds nothing when the named axle has no part", () => {
     expect(selectJobParts("Renew the front brake pads", [offer("REAR", 2107, at("rear"))], null)).toEqual([
-      { position: "front", selection: { source: "none", missingChoice: null } },
+      { position: "front", side: null, selection: { source: "none", missingChoice: null }, quantity: 1 },
     ]);
   });
 });

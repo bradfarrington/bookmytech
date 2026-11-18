@@ -119,6 +119,10 @@ You are working on **Book My Tech**, a UK mobile-mechanic booking platform. This
 
 ## Current task
 
+### 📌 2026-11-18: Part quantities (Task 78), committed, not pushed
+
+Read `docs/tasks/78-part-quantities.md`. Gareth's two points: repairs listing several parts charged one, and spark/glow plugs charged one plug. Jobs now buy one part per side when NAPA lists left and right, every plug when NAPA gives "No of Plugs" (the Leon: 3 ordinary + 1 pressure-sensor plug), and 2 of a part listed once on a "both" job. No migration. `side` is added (optional) to the mobile quote's part lines; the customer app could show it (optional). Brad has more of Gareth's queries as screenshots: next.
+
 ### 📌 2026-11-17 (evening): Closing NAPA's parts gaps (Task 77), pushed; Parts gaps screen local-only
 
 Read `docs/tasks/77-parts-gaps.md`. Built on the agreed plan below, as Brad revised it: engine-code matches (automatic), code mappings (we propose, Gareth approves on `/admin/parts/gaps`), and **Gareth picks a NAPA part per model** (not a typed price) where NAPA lists nothing for the model. Hiding needs nothing new: global hides on Repairs already do it. Live check on S28BSW: part types 321, 323 and 1217 now price from the catalogue by engine code BF2X; 572 correctly stays unpriced.

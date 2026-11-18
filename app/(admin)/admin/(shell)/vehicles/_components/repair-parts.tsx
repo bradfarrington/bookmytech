@@ -40,6 +40,7 @@ import { cn, formatPrice } from "@/lib/utils";
 // cost; an unpriced part says "Not priced", never £0.00.
 
 const POSITION_LABEL = { front: "Front", rear: "Rear" } as const;
+const SIDE_LABEL = { left: "Left", right: "Right", driver: "Driver", passenger: "Passenger" } as const;
 
 function panelOffers(panel: SupplierPanel): SupplierOffer[] {
   return panel.state === "ok" ? panel.offers : [];
@@ -69,21 +70,25 @@ function OfferSummary({ offer }: { offer: SupplierOffer }) {
         <span className="font-mono text-xs text-text-muted">{offer.partNumber}</span>
         {offer.tier && <Pill tone="neutral">{offer.tier}</Pill>}
         {offer.position && <Pill tone="info">{POSITION_LABEL[offer.position]}</Pill>}
+        {offer.side && <Pill tone="info">{SIDE_LABEL[offer.side]}</Pill>}
+        {offer.cylinder && <Pill tone="info">{offer.cylinder}</Pill>}
       </div>
       {offer.description && <p className="mt-0.5 text-xs text-text-muted">{offer.description}</p>}
     </div>
   );
 }
 
-function Cost({ offer }: { offer: SupplierOffer }) {
+/** `quantity`: how many this repair buys (Task 78); else the supplier's unit of issue. */
+function Cost({ offer, quantity }: { offer: SupplierOffer; quantity?: number }) {
+  const needs = quantity ?? offer.quantityOfFit ?? 1;
   return (
     <div className="shrink-0 text-right">
       <div className={cn("text-sm font-semibold", offer.costPence == null && "text-text-muted")}>
         {offer.costPence == null ? "Not priced" : formatPrice(offer.costPence)}
       </div>
-      {offer.quantityOfFit && offer.quantityOfFit > 1 && offer.costPence != null && (
+      {needs > 1 && offer.costPence != null && (
         <div className="whitespace-nowrap text-xs text-text-muted">
-          needs {offer.quantityOfFit} · {formatPrice(offer.costPence * offer.quantityOfFit)}
+          needs {needs} · {formatPrice(offer.costPence * needs)}
         </div>
       )}
       {offer.surchargePence != null && (
@@ -265,14 +270,14 @@ function PartGroupCard({
       </div>
 
       <div className="mt-2 space-y-2">
-        {group.selections.map(({ position, selection }) => (
+        {group.selections.map(({ position, side, selection, quantity }, index) => (
           <div
-            key={position ?? "any"}
+            key={`${position ?? "any"}:${side ?? "any"}:${index}`}
             className="flex flex-col gap-2 rounded-lg bg-surface px-3 py-2 sm:flex-row sm:items-center sm:justify-between"
           >
             {selection.source === "none" ? (
               <p className="text-sm text-text-muted">
-                {position ? `${POSITION_LABEL[position]}: ` : ""}NAPA Auto Parts didn&apos;t return a part we can buy
+                {position ? `${POSITION_LABEL[position]}${side ? ` ${side}` : ""}: ` : side ? `${SIDE_LABEL[side]}: ` : ""}NAPA Auto Parts didn&apos;t return a part we can buy
                 for this vehicle.
               </p>
             ) : (
@@ -283,7 +288,7 @@ function PartGroupCard({
                   </Pill>
                   <OfferSummary offer={selection.offer} />
                 </div>
-                <Cost offer={selection.offer} />
+                <Cost offer={selection.offer} quantity={quantity} />
               </>
             )}
           </div>

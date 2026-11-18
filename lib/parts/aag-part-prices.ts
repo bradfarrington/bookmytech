@@ -64,9 +64,18 @@ function fromRow(row: AagPartPriceRow, lastKnown: boolean): AagPartOffers {
     : { state: "empty", pricedAt: row.fetched_at };
 }
 
+/**
+ * Offers stored before Task 78 lack the side and plug count NAPA sends, so
+ * they would price one plug or one shock absorber. They still serve as a last
+ * known answer, but never as a fresh one.
+ */
+function readForFit(row: AagPartPriceRow): boolean {
+  return row.state !== "ok" || (row.offers ?? []).every((offer) => offer.fitRead || offer.modelPart);
+}
+
 /** A stored answer young enough to use without asking AAG. Pure. */
 export function freshAnswer(row: AagPartPriceRow | null, now: number): AagPartOffers | null {
-  if (!row || ageMs(row.fetched_at, now) >= AAG_PRICE_FRESH_MS) return null;
+  if (!row || ageMs(row.fetched_at, now) >= AAG_PRICE_FRESH_MS || !readForFit(row)) return null;
   return fromRow(row, false);
 }
 

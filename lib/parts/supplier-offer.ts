@@ -27,6 +27,13 @@ export const SUPPLIER_LABEL: Record<SupplierId, string> = {
 /** Which axle a part fits. */
 export type PartPosition = "front" | "rear";
 
+/**
+ * Which side of the car a part fits, when NAPA says (Task 78): "FR LH" and
+ * "FR RH" shock absorbers, "FR DS" and "FR PS" wiper blades. A car needing
+ * both sides lists two parts, and a job on both sides buys one of each.
+ */
+export type PartSide = "left" | "right" | "driver" | "passenger";
+
 export interface SupplierStockLine {
   label: string;
   qty: number | null;
@@ -77,6 +84,21 @@ export interface SupplierOffer {
    * from NAPA by part number. Absent otherwise.
    */
   modelPart?: boolean;
+  /** ADDITIVE (Task 78). The side NAPA lists the part for. Absent when it names none, or both. */
+  side?: PartSide | null;
+  /**
+   * ADDITIVE (Task 78). How many the car has, when NAPA says: "No of Plugs" on
+   * the standard quote, "Required quantity" on the catalogue. 4 spark plugs on
+   * a 4-cylinder engine; 3 ordinary glow plugs beside 1 pressure-sensor plug.
+   */
+  perVehicle?: number | null;
+  /** ADDITIVE (Task 78). The one cylinder a part is for ("Cyl. 3"): a pressure-sensor glow plug. */
+  cylinder?: string | null;
+  /**
+   * ADDITIVE (Task 78). Set on offers read with side, perVehicle and cylinder.
+   * A cached answer without it predates them, so it is asked again.
+   */
+  fitRead?: true;
 }
 
 export type SupplierPanel =
@@ -127,13 +149,65 @@ export function defaultOffer(offers: readonly SupplierOffer[]): SupplierOffer | 
 
 /** The axle a fitting-position code ("FR", "RR") or a description ("… - FRONT") names. */
 export function positionOf(fittingPosition: string | null | undefined, description: string | null | undefined): PartPosition | null {
-  const code = String(fittingPosition ?? "").trim().toUpperCase();
+  // "FR LH", "FR DS": the axle comes first, the side after it.
+  const code = String(fittingPosition ?? "").trim().toUpperCase().split(/\s+/)[0] ?? "";
   if (code === "FR" || code === "F" || code === "FRONT") return "front";
   if (code === "RR" || code === "R" || code === "REAR") return "rear";
   const text = String(description ?? "");
   const front = /\bfront\b/i.test(text);
   const rear = /\brear\b/i.test(text);
   return front === rear ? null : front ? "front" : "rear";
+}
+
+/** Side words in a description. Short codes only count in the fitting position ("PS" is also power steering). */
+const SIDE_WORDS: ReadonlyArray<{ side: PartSide; pattern: RegExp }> = [
+  { side: "left", pattern: /\b(lh|l\/h|left)\b/i },
+  { side: "right", pattern: /\b(rh|r\/h|right)\b/i },
+  { side: "driver", pattern: /\bdriver'?s?\b/i },
+  { side: "passenger", pattern: /\bpassenger'?s?\b/i },
+];
+const SIDE_CODES: ReadonlyArray<{ side: PartSide; pattern: RegExp }> = [
+  ...SIDE_WORDS,
+  { side: "driver", pattern: /\bds\b/i },
+  { side: "passenger", pattern: /\bps\b/i },
+];
+
+function oneSide(text: string | null | undefined, patterns: typeof SIDE_WORDS): PartSide | null | "several" {
+  const found = [...new Set(patterns.filter(({ pattern }) => pattern.test(text ?? "")).map(({ side }) => side))];
+  return found.length === 0 ? null : found.length === 1 ? found[0] : "several";
+}
+
+/**
+ * The side of the car a part is for, from NAPA's fitting position ("FR LH",
+ * "FR DS") or else its description ("SHOCK ABS GAS FRONT (LH)", "Tie Rod End
+ * Front Axle Left", "(Rear L/H)"). Null when it names none, or more than one
+ * ("Bump Stop Front Axle Left, Front Axle Right" fits either). Pure.
+ */
+export function sideOf(fittingPosition: string | null | undefined, description: string | null | undefined): PartSide | null {
+  const fromPosition = oneSide(fittingPosition, SIDE_CODES);
+  if (fromPosition === "several") return null;
+  if (fromPosition) return fromPosition;
+  const fromDescription = oneSide(description, SIDE_WORDS);
+  return fromDescription === "several" ? null : fromDescription;
+}
+
+/** "No of Plugs" (standard quote) or "Required quantity" (catalogue): how many the car has. */
+const PER_VEHICLE = /^(no\.?\s+of\s+plugs|required\s+quantity)$/i;
+
+/** How many of a part the car has, when NAPA says. Pure. */
+export function perVehicleOf(properties: ReadonlyArray<{ name: string; value: string }> | undefined): number | null {
+  for (const { name, value } of properties ?? []) {
+    if (!PER_VEHICLE.test(name) || !/^\d+$/.test(value)) continue;
+    const n = Number(value);
+    if (n >= 1 && n <= 16) return n;
+  }
+  return null;
+}
+
+/** The one cylinder a part is for ("Position": "Cyl. 3"), or null. Pure. */
+export function cylinderOf(properties: ReadonlyArray<{ name: string; value: string }> | undefined): string | null {
+  const position = (properties ?? []).find((p) => /^position$/i.test(p.name))?.value ?? "";
+  return /\bcyl/i.test(position) ? position : null;
 }
 
 /** Map AAG's already-flattened quote lines into the offer shape. */
@@ -169,6 +243,10 @@ export function aagOffers(lines: readonly AagQuoteLine[]): SupplierOffer[] {
       imageUrl: line.imageUrl,
       notes,
       buyable: line.sellable && line.costPence != null,
+      side: sideOf(line.fittingPosition, line.article),
+      perVehicle: perVehicleOf(line.properties),
+      cylinder: cylinderOf(line.properties),
+      fitRead: true as const,
     };
   });
 }

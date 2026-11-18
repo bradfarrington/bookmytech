@@ -55,6 +55,12 @@ export interface AagQuoteLine {
   totalQty: number;
   /** The location AAG ranks quickest (lowest Priority), if any. */
   quickest: AagStockLine | null;
+  /**
+   * The article's details with a value ("No of Plugs" 4, "Position" "Cyl. 3",
+   * "Required quantity" 3 on the catalogue). Every product option for the
+   * article shares them.
+   */
+  properties: Array<{ name: string; value: string }>;
 }
 
 function toStock(a: AagAvailability): AagStockLine {
@@ -77,6 +83,13 @@ function toStock(a: AagAvailability): AagStockLine {
 export function isSellable(lockout: string | null | undefined): boolean {
   const v = (lockout ?? "").trim().toUpperCase();
   return !(v.includes("LOCK") || v.includes("NOT FOR SUPPLY") || v.includes("NO SUPPLY"));
+}
+
+/** An article's details that carry a value, trimmed. */
+function articleProperties(article: AagArticle): Array<{ name: string; value: string }> {
+  return (article.ArticleProperties ?? [])
+    .map((p) => ({ name: p.Name?.trim() ?? "", value: p.Value?.trim() ?? "" }))
+    .filter((p) => p.name !== "" && p.value !== "");
 }
 
 function toLine(article: AagArticle, option: AagProductOption): AagQuoteLine | null {
@@ -105,6 +118,7 @@ function toLine(article: AagArticle, option: AagProductOption): AagQuoteLine | n
     stock,
     totalQty: stock.reduce((n, s) => n + s.qty, 0),
     quickest,
+    properties: articleProperties(article),
   };
 }
 

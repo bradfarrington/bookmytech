@@ -114,10 +114,10 @@ export function rowLine(
 ): { unitPence: number; quantity: number } | null {
   const wanted = position ?? jobPosition(jobDescription);
   let best: { unitPence: number; quantity: number } | null = null;
-  for (const { position: at, selection } of selectJobParts(jobDescription, offers, null)) {
+  for (const { position: at, selection, quantity: wantedQty } of selectJobParts(jobDescription, offers, null)) {
     if (wanted && at && at !== wanted) continue;
     if (selection.source === "none" || selection.offer.costPence == null) continue;
-    const quantity = selection.offer.quantityOfFit && selection.offer.quantityOfFit > 0 ? selection.offer.quantityOfFit : 1;
+    const quantity = wantedQty && wantedQty > 0 ? wantedQty : 1;
     const unitPence = selection.offer.costPence;
     if (!best || unitPence * quantity > best.unitPence * best.quantity) best = { unitPence, quantity };
   }

@@ -33,7 +33,7 @@ import { alternativePairs } from "./job-charges";
 import { loadModelPartOffers, loadVehicleModel } from "./model-parts";
 import { recordPartGaps } from "./part-gaps";
 import { jobPosition, selectJobParts, type RepairPartChoiceRow } from "./repair-part-choice";
-import type { PartPosition, SupplierId } from "./supplier-offer";
+import type { PartPosition, PartSide, SupplierId } from "./supplier-offer";
 
 /** One part priced into a quote. Serialisable: it is snapshotted onto bookings and revisions. */
 export interface QuotedPart {
@@ -50,6 +50,8 @@ export interface QuotedPart {
   description: string | null;
   imageUrl: string | null;
   position: PartPosition | null;
+  /** ADDITIVE (Task 78). The side, when the job buys one part per side (left and right shock absorbers). */
+  side?: PartSide | null;
   /** AAG's rating: "Good", "Better", "Best". */
   rating: string | null;
   /** Units bought, in the supplier's unit of issue: 2 for brake discs. */
@@ -180,7 +182,9 @@ export function priceJobParts(args: {
     }
     const set = args.setPrices?.get(group.genartId);
     if (!set) {
-      missing.push({ nodeId: job.nodeId, genartId: group.genartId, label: group.label, position, reason });
+      // Left and right can both be missing: the gap is one part type on one axle.
+      const known = missing.some((m) => m.nodeId === job.nodeId && m.genartId === group.genartId && m.position === position);
+      if (!known) missing.push({ nodeId: job.nodeId, genartId: group.genartId, label: group.label, position, reason });
       return;
     }
     parts.push({
@@ -213,7 +217,7 @@ export function priceJobParts(args: {
         continue;
       }
       const choice = args.choices?.get(choiceKey(job.nodeId, group.genartId)) ?? null;
-      for (const { position, selection } of selectJobParts(job.description, lookup.offers, choice)) {
+      for (const { position, side, selection, quantity: wanted } of selectJobParts(job.description, lookup.offers, choice)) {
         if (selection.source === "none" || selection.offer.costPence == null) {
           // NAPA listed the part type for this car, but nothing that fits.
           unpriced(job, group, position, "not_listed");
@@ -221,7 +225,7 @@ export function priceJobParts(args: {
         }
         const offer = selection.offer;
         const unitPence = offer.costPence as number;
-        const quantity = offer.quantityOfFit && offer.quantityOfFit > 0 ? offer.quantityOfFit : 1;
+        const quantity = wanted && wanted > 0 ? wanted : 1;
         parts.push({
           nodeId: job.nodeId,
           genartId: group.genartId,
@@ -232,6 +236,7 @@ export function priceJobParts(args: {
           description: offer.description,
           imageUrl: offer.imageUrl,
           position: offer.position ?? position,
+          ...(side ? { side } : {}),
           rating: offer.tier,
           quantity,
           unitPence,
@@ -365,9 +370,10 @@ export async function quoteJobParts(args: {
   });
 }
 
-/** "Brake disc (front)": the part group, and the axle when there is one. */
-export function partGroupName(part: Pick<QuotedPart, "groupLabel" | "position">): string {
-  return part.position ? `${part.groupLabel} (${part.position})` : part.groupLabel;
+/** "Brake disc (front)", "Shock absorber (front left)": the part group, with its axle and side when there are. */
+export function partGroupName(part: Pick<QuotedPart, "groupLabel" | "position" | "side">): string {
+  const where = [part.position, part.side].filter(Boolean).join(" ");
+  return where ? `${part.groupLabel} (${where})` : part.groupLabel;
 }
 
 /**
@@ -432,6 +438,11 @@ export interface CustomerPartLine {
   /** Null for a set price or an estimate. */
   brand: string | null;
   position: PartPosition | null;
+  /**
+   * ADDITIVE (Task 78). The side, when the job buys one part per side: a
+   * front-shocks job has a "left" and a "right" line of the same name. Absent otherwise.
+   */
+  side?: PartSide;
   quantity: number;
   unitPence: number;
   linePence: number;
@@ -448,6 +459,7 @@ export function customerPartLines(parts: readonly QuotedPart[]): CustomerPartLin
     name: part.groupLabel,
     brand: part.brand,
     position: part.position,
+    ...(part.side ? { side: part.side } : {}),
     quantity: part.quantity,
     unitPence: part.unitPence,
     linePence: part.linePence,

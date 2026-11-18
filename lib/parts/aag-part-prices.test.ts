@@ -32,6 +32,7 @@ const filter: SupplierOffer = {
   imageUrl: null,
   notes: [],
   buyable: true,
+  fitRead: true,
 };
 
 const row = (over: Partial<AagPartPriceRow> = {}): AagPartPriceRow => ({
@@ -48,6 +49,17 @@ const at = { reg: "S28BSW", genartId: 8, now: NOW };
 describe("freshAnswer", () => {
   it("uses an answer under 12 hours old as it is", () => {
     expect(freshAnswer(row(), NOW)).toEqual({ state: "ok", offers: [filter], pricedAt: ago(HOUR), lastKnown: false });
+  });
+
+  it("asks again when the stored offers predate sides and plug counts (Task 78)", () => {
+    const old = { ...filter };
+    delete old.fitRead;
+    expect(freshAnswer(row({ offers: [old] }), NOW)).toBeNull();
+    // Still good as a last known answer when NAPA can't be reached.
+    expect(settleAagPartOffers(row({ offers: [old] }), { kind: "failed" }, at).result).toMatchObject({
+      state: "ok",
+      lastKnown: true,
+    });
     expect(freshAnswer(row({ state: "empty", offers: [] }), NOW)).toEqual({ state: "empty", pricedAt: ago(HOUR) });
   });
 
