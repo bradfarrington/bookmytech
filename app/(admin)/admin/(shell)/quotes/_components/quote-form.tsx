@@ -9,6 +9,16 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import type { CustomQuoteRow } from "@/lib/custom-quotes/model";
 import { saveCustomQuoteAction, withdrawCustomQuoteAction } from "@/app/actions/admin-custom-quotes";
+import { lookupVehicleAction } from "@/app/actions/lookup-vehicle";
+
+/** "FORD" → "Ford", "3 SERIES" → "3 Series"; short words stay as DVLA sends them ("BMW", "KIA"). */
+function dvlaName(text: string | undefined): string {
+  return (text ?? "")
+    .trim()
+    .split(/\s+/)
+    .map((word) => (word.length > 3 ? word.charAt(0) + word.slice(1).toLowerCase() : word))
+    .join(" ");
+}
 
 const FIELD_LABEL = "flex flex-col gap-1.5 text-sm font-semibold text-text-primary";
 const FIELD_INPUT =
@@ -42,6 +52,33 @@ export function QuoteForm({ quote }: { quote?: CustomQuoteRow }) {
     total: quote?.total_pence != null ? (quote.total_pence / 100).toFixed(2) : "",
     visitHours: String(Number(quote?.visit_hours ?? 1)),
   });
+  // DVLA lookup on the registration (2026-11-18): fills Make and Model, never
+  // over something the admin typed. `filled` is what the last lookup put in.
+  const [lookup, setLookup] = useState<{ state: "idle" | "looking" | "found" | "failed"; text: string }>({ state: "idle", text: "" });
+  const [filled, setFilled] = useState<{ reg: string; make: string; model: string } | null>(null);
+  function lookUpReg() {
+    const reg = v.reg.replace(/\s+/g, "");
+    if (reg.length < 2 || filled?.reg === reg) return;
+    setLookup({ state: "looking", text: "Looking up the registration with DVLA…" });
+    lookupVehicleAction(reg)
+      .then((result) => {
+        if (!result.ok) {
+          setLookup({ state: "failed", text: result.message });
+          return;
+        }
+        const make = dvlaName(result.details.make);
+        const model = dvlaName(result.details.model);
+        setV((prev) => ({
+          ...prev,
+          make: !prev.make || prev.make === filled?.make ? make : prev.make,
+          model: !prev.model || prev.model === filled?.model ? model : prev.model,
+        }));
+        setFilled({ reg, make, model });
+        const extra = [result.details.yearOfManufacture, dvlaName(result.details.fuelType), dvlaName(result.details.colour)].filter(Boolean);
+        setLookup({ state: "found", text: [`${make} ${model}`.trim(), ...extra].join(" · ") });
+      })
+      .catch(() => setLookup({ state: "failed", text: "DVLA didn't answer. Type the make and model in." }));
+  }
   const set = (key: keyof typeof v) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
     setV((prev) => ({ ...prev, [key]: e.target.value }));
   const sent = quote?.status === "sent";
@@ -125,10 +162,27 @@ export function QuoteForm({ quote }: { quote?: CustomQuoteRow }) {
         <h2 className="text-sm font-bold uppercase tracking-wide text-text-muted">Vehicle</h2>
         <div className="grid gap-5 sm:grid-cols-4">
           <label className={FIELD_LABEL}>
-            <span>Registration</span>
+            <span className="flex items-center justify-between gap-2">
+              Registration
+              <button
+                type="button"
+                onClick={lookUpReg}
+                disabled={pending || lookup.state === "looking" || v.reg.trim().length < 2}
+                className="text-xs font-semibold text-brand-blue hover:underline disabled:text-text-muted disabled:no-underline"
+              >
+                Look up
+              </button>
+            </span>
             <input
               value={v.reg}
               onChange={(e) => setV((p) => ({ ...p, reg: e.target.value.toUpperCase() }))}
+              onBlur={lookUpReg}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  lookUpReg();
+                }
+              }}
               disabled={pending}
               required
               className={`${FIELD_INPUT} font-bold uppercase`}
@@ -152,6 +206,14 @@ export function QuoteForm({ quote }: { quote?: CustomQuoteRow }) {
             />
           </label>
         </div>
+        {lookup.state !== "idle" && (
+          <p
+            role="status"
+            className={`text-xs ${lookup.state === "failed" ? "text-amber-700" : lookup.state === "found" ? "font-semibold text-success" : "text-text-muted"}`}
+          >
+            {lookup.state === "found" ? `DVLA: ${lookup.text}` : lookup.text}
+          </p>
+        )}
       </Card>
 
       <Card className="space-y-5 p-6">

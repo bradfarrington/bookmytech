@@ -42,6 +42,8 @@
 
 Three lists: **To price**, **Sent**, **Closed**. **New quote** starts one from scratch (for a customer who rang). A quote's page shows the customer's words and the form: customer, vehicle, "What's the work?", details, total, visit length. Buttons: **Save draft**, **Send to customer** (emails, plus a text when there's a mobile number), **Send updated quote** (corrects a sent one), and **Withdraw**. A booked quote links to its job.
 
+**Added 2026-11-18:** the quote form's Vehicle section looks the registration up with DVLA (on leaving the box, Enter, or "Look up"). It fills Make and Model without overwriting what the admin typed, and shows "DVLA: Ford Ranger Wildtrak Ecoblue 4X4 A · 2024 · Diesel · Grey" under the fields. It doesn't warm NAPA parts.
+
 ### Notifications
 
 Email templates (editable in `/admin/emails`): `custom_quote_request_received`, `custom_quote_sent`, `custom_quote_request_admin`, `custom_quote_declined_admin`. SMS: `custom_quote_sent`. **Push** when a quote is sent to an account: "Your quote is ready" / "£145 for <title>. Tap to view and book.", with `data: { customQuoteId, url }`. Current app builds only deep-link on `bookingId`, so until the app handles `customQuoteId` the push just opens the app.
