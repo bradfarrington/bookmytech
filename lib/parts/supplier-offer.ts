@@ -95,11 +95,27 @@ export interface SupplierOffer {
   /** ADDITIVE (Task 78). The one cylinder a part is for ("Cyl. 3"): a pressure-sensor glow plug. */
   cylinder?: string | null;
   /**
+   * ADDITIVE (2026-11-18). The suspension NAPA lists the part for: "Suspension
+   * Note: Standard" / "Sport" on springs, "Standard/Heavy Duty/Sports" on
+   * shock absorbers, a named sports trim ("FR Models"). Null when it fits
+   * either ("Standard / Sport") or doesn't say.
+   */
+  suspension?: Suspension | null;
+  /**
    * ADDITIVE (Task 78). Set on offers read with side, perVehicle and cylinder.
-   * A cached answer without it predates them, so it is asked again.
    */
   fitRead?: true;
+  /**
+   * ADDITIVE (2026-11-18). Which reading of NAPA's details made this offer
+   * (OFFER_READ_VERSION). A stored answer from an older reading lacks
+   * something pricing now uses (sides, plug counts, suspension), so it is
+   * asked again rather than used as fresh.
+   */
+  readVersion?: number;
 }
+
+/** Bump when aagOffers reads something new from NAPA's details. 2: suspension (2026-11-18). */
+export const OFFER_READ_VERSION = 2;
 
 export type SupplierPanel =
   | { state: "ok"; offers: SupplierOffer[] }
@@ -191,6 +207,23 @@ export function sideOf(fittingPosition: string | null | undefined, description: 
   return fromDescription === "several" ? null : fromDescription;
 }
 
+export type Suspension = "standard" | "sport" | "heavy_duty";
+
+const SUSPENSION_FIELD = /^(suspension note|standard\/heavy duty\/sports)$/i;
+/** A sports trim NAPA names in place of "Sport": Leon "FR Models", Fiesta "ST". */
+const SPORTS_TRIM = /\b(sports?|fr|st|rs|gti|gtd|vxr|opc|cupra|amg|type r|m sport)\b/i;
+
+/** The suspension a part is for, from NAPA's article details. Pure. */
+export function suspensionOf(properties: ReadonlyArray<{ name: string; value: string }> | undefined): Suspension | null {
+  const value = (properties ?? []).find((p) => SUSPENSION_FIELD.test(p.name))?.value.trim() ?? "";
+  if (!value) return null;
+  const standard = /\bstandard\b/i.test(value);
+  const heavy = /\bheavy\b/i.test(value);
+  const sport = SPORTS_TRIM.test(value);
+  if ([standard, heavy, sport].filter(Boolean).length !== 1) return null;
+  return standard ? "standard" : heavy ? "heavy_duty" : "sport";
+}
+
 /** "No of Plugs" (standard quote) or "Required quantity" (catalogue): how many the car has. */
 const PER_VEHICLE = /^(no\.?\s+of\s+plugs|required\s+quantity)$/i;
 
@@ -257,7 +290,9 @@ export function aagOffers(lines: readonly AagQuoteLine[]): SupplierOffer[] {
       side: sideOf(line.fittingPosition, line.article),
       perVehicle: perVehicleOf(line.properties, line.article),
       cylinder: cylinderOf(line.properties),
+      suspension: suspensionOf(line.properties),
       fitRead: true as const,
+      readVersion: OFFER_READ_VERSION,
     };
   });
 }

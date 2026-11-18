@@ -22,7 +22,7 @@ import { fetchAagLiveOffers } from "./aag-live-offers";
 import { loadApprovedCodeMaps } from "./code-maps";
 import { engineCodeSource, type EngineCodeSource } from "./engine-codes";
 import { isMissingTable } from "./part-group-settings";
-import type { SupplierOffer } from "./supplier-offer";
+import { OFFER_READ_VERSION, type SupplierOffer } from "./supplier-offer";
 
 export const AAG_PRICE_FRESH_MS = 12 * 60 * 60 * 1000;
 export const AAG_PRICE_LAST_KNOWN_MS = 7 * 24 * 60 * 60 * 1000;
@@ -72,12 +72,16 @@ function fromRow(row: AagPartPriceRow, lastKnown: boolean): AagPartOffers {
 }
 
 /**
- * Offers stored before Task 78 lack the side and plug count NAPA sends, so
- * they would price one plug or one shock absorber. They still serve as a last
- * known answer, but never as a fresh one.
+ * Offers stored by an older reading of NAPA's answer lack something pricing
+ * now uses (Task 78's sides and plug counts; the suspension type): they would
+ * price one plug, one shock absorber or a sports spring. They still serve as
+ * a last known answer, but never as a fresh one.
  */
 function readForFit(row: AagPartPriceRow): boolean {
-  return row.state !== "ok" || (row.offers ?? []).every((offer) => offer.fitRead || offer.modelPart);
+  return (
+    row.state !== "ok" ||
+    (row.offers ?? []).every((offer) => offer.modelPart || (offer.readVersion ?? 0) >= OFFER_READ_VERSION)
+  );
 }
 
 /** A stored answer young enough to use without asking AAG. Pure. */

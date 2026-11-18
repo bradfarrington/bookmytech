@@ -1,6 +1,6 @@
 # Task 80: Wait for NAPA, warm it early, and buy fluids by the litre
 
-**Status:** ✅ Complete (2026-11-18), except the brake disc bolt (see 1). NAPA lookups no longer time out. A car's parts are priced as soon as its reg is looked up. A repair button only ever shows a price or "Get a quote". Coolant and brake fluid are bought by the litres the car holds. No migration. No API shape change.
+**Status:** ✅ Complete (2026-11-18). NAPA lookups no longer time out. A car's parts are priced as soon as its reg is looked up. A repair button only ever shows a price or "Get a quote". Coolant and brake fluid are bought by the litres the car holds. No migration. No API shape change.
 
 Brad's follow-ups to Task 79, 2026-11-18.
 
@@ -8,7 +8,7 @@ Brad's follow-ups to Task 79, 2026-11-18.
 
 They went to a quote only because the disc jobs also list part type 54, "Bolt, brake disc" (the disc retaining screw), which NAPA doesn't sell. The fix is to stop charging part type 54. Its job's pads and discs then price as one combined repair, as they already sum (`foldLevelParts`).
 
-**Not done: needs Brad or Gareth.** Writing `part_group_settings` (54, charged = false) was blocked by the session's permission check, because it changes every customer's price. Do it on any vehicle's Parts panel: a disc repair → "Bolt, brake disc" → switch off "Charge customers".
+**Done (Brad approved, 2026-11-18: "i dont think we have them as separates anyway"):** `part_group_settings` 54 set to charged = false in the live database. LP17BJY: Front Pads and Discs £393.39, Rear £309.46.
 
 ## 2. Never time out, never save a timed-out answer
 
@@ -26,13 +26,13 @@ Brad: "we should never save timed answers and should never timeout cause this ca
 
 Measured live: DN23HFL, 133 part types in 56 s. Its starter motor list then priced in 0.45 s and its timing list in 1.6 s.
 
-## 4. Buttons only show a price
+## 4. Repairs only appear once priced; buttons only show a price
 
 Brad: "the buttons should only ever show the price and never the words pricing or + parts."
 
-- While the website's list streams its prices in, a row with parts shows a blank placeholder where its button goes (`aria-label` "Getting the price for …"). There is no text and no labour-only price.
+- Brad (later): "i dont think we should show the repairs until everything is priced - maybe an animated version of our logo". The website's list shows **`components/ui/logo-loader.tsx`** (the logo, a blue line tracing its hexagon, the mechanic breathing; still under reduced motion) until every row on the level is priced, then the rows. The search box shows the same loader while it searches. Keyframes `logo-trace` / `logo-breathe` are in `app/globals.css`, outside the design tokens.
 - A row with parts and no price, and no flag saying why, gets **Get a quote**, never "£100 + parts". The search box now passes `quoteHref` too.
-- Measured on a dev server: FN60KYP's timing list, warm, swaps placeholders for prices after about 0.8 s. KR65MHX, unwarmed, after about 4 s.
+- Checked in a browser (390 px): KR65MHX's starter motor showed the loader, then "Renew the starter motor £408.76 · parts included" at about 5 s, unwarmed. No "+ parts" or "Pricing" anywhere.
 
 ## 5. Coolant and brake fluid by what the car holds
 
@@ -47,11 +47,24 @@ Brad: "shouldn't this calculate the amount of litres needed and then choose the 
 
 **For Brad/Gareth:** the 50/50 mix is an assumption. Say if mechanics use ready-mixed or a different ratio.
 
+## 6. Standard, not sports, suspension parts
+
+Brad: "use the standard unless the car is a sports model". NAPA marks springs "Suspension Note: Standard / Sport" (or a sports trim, "FR Models") and shocks "Standard/Heavy Duty/Sports". `suspensionOf` reads it onto the offer. `forSuspension` keeps the car's kind, plus parts that fit either. `isSportsModel` reads HaynesPro's name for the car: ST, RS, GTI, GTD, VXR, OPC, Cupra, AMG, Type R, JCW, Abarth, Nismo, M Competition, BMW M2–M8, Audi S1–S8 / SQ. Chassis codes in brackets are ignored. HaynesPro lists cars by engine, not trim, so a Leon FR reads as standard. An admin's chosen part stands whatever its suspension. FN60KYP: front springs 2 × £19.87 = £39.74 (were 2 × £27.30), rear 2 × £25.74.
+
+Stored NAPA answers now carry `readVersion` (`OFFER_READ_VERSION` = 2). An answer read before suspension was read is asked again, not used as fresh. So every car's first visit after this deploy re-asks NAPA; the reg lookup's warm-up covers it.
+
+## 7. Today's false "no parts" answers re-asked (Brad: "needs to be updated now")
+
+All 178 "no parts" answers stored in the 12 hours before the fix were re-asked of NAPA and replaced. 22 were false and now price, across LP17BJY, FE19AHV and FN60KYP. Among them FN60KYP's coil springs (188) and four other Fiesta part types (10, 236, 258, 305). The other 156 were genuine.
+
 ## Acceptance criteria
 
-- [ ] Pads and Discs combined repairs price on pads and discs. Needs part type 54 switched off (1)
+- [x] Pads and Discs combined repairs price on pads and discs (part type 54 not charged)
 - [x] No short timeouts; a timed-out lookup is never saved or priced from
 - [x] A car's parts are asked of NAPA when its reg is looked up, on the website and in the app
 - [x] Buttons show a price or "Get a quote", never "Pricing" or "+ parts" (website)
 - [x] Coolant and brake fluid bought by the litres HaynesPro says the car holds
-- [x] Tests: `fluid-capacity.test.ts`, `part-quantities.test.ts`. 873 pass; `next build` passes; checked live on FN60KYP, LP17BJY, DN23HFL, KR65MHX
+- [x] The website shows the animated logo until a level is fully priced
+- [x] Standard suspension parts unless the car is a sports model
+- [x] Today's false "no parts" answers re-asked and corrected
+- [x] Tests: `fluid-capacity.test.ts`, `part-quantities.test.ts`. 878 pass; `next build` passes; checked live on FN60KYP, LP17BJY, DN23HFL, KR65MHX

@@ -9,9 +9,9 @@ import { flattenQuote } from "@/lib/aag/quote";
 import type { AagArticle, AagQuoteBody } from "@/lib/aag/types";
 import type { AagPartOffers } from "./aag-part-prices";
 import { fluidKind, fluidNeedFor, priceJobParts, type PartsJob } from "./quote-parts";
-import { fluidPick, jobNeeds, jobPosition, litresOfProduct, packLitres, selectJobParts, sensiblePacks } from "./repair-part-choice";
+import { fluidPick, isSportsModel, jobNeeds, jobPosition, litresOfProduct, packLitres, selectJobParts, sensiblePacks } from "./repair-part-choice";
 import { partTypesToWarm } from "./warm-parts";
-import { aagOffers, cylinderOf, perVehicleOf, positionOf, sideOf, type SupplierOffer } from "./supplier-offer";
+import { aagOffers, cylinderOf, perVehicleOf, positionOf, sideOf, suspensionOf, type SupplierOffer } from "./supplier-offer";
 
 const PRICED_AT = "2026-11-18T10:00:00.000Z";
 
@@ -405,5 +405,59 @@ describe("partTypesToWarm", () => {
     expect(
       partTypesToWarm([repair("a", "1B00000000G", [307, 82]), repair("b", "1E00000000GCJ", [82, 402]), repair("c", "1B00000000G", [307])]),
     ).toEqual([82, 402, 307]);
+  });
+});
+
+// Brad, 2026-11-18: "use the standard unless the car is a sports model".
+describe("standard or sports suspension", () => {
+  // FN60KYP's front springs, live: KYB RH2825 "Standard", RH2826 "Sport".
+  const springs = offersOf(
+    article("COIL SPRING FRONT (KYBRH2825)", "FR", { "Suspension Note": "Standard" }, [
+      { id: "NPANCS1082", brand: "NAPA", rating: "Better", pounds: 17.5 },
+      { id: "KYBRH2825", brand: "KYB", rating: "Best", pounds: 19.87 },
+    ]),
+    article("COIL SPRING FRONT (KYBRH2826)", "FR", { "Suspension Note": "Sport" }, [
+      { id: "NPANCS1182", brand: "NAPA", rating: "Better", pounds: 25.53 },
+      { id: "KYBRH2826", brand: "KYB", rating: "Best", pounds: 27.3 },
+    ]),
+  );
+  const pick = (car: { sports: boolean } | null) =>
+    selectJobParts("Renew both front coil springs", springs, null, null, car).map(({ selection, quantity }) =>
+      selection.source === "none" ? "none" : `${selection.offer.partNumber}×${quantity}`,
+    );
+
+  it("reads NAPA's suspension notes", () => {
+    expect(suspensionOf([{ name: "Suspension Note", value: "Standard" }])).toBe("standard");
+    expect(suspensionOf([{ name: "Suspension Note", value: "Sport" }])).toBe("sport");
+    expect(suspensionOf([{ name: "Suspension Note", value: "FR Models" }])).toBe("sport");
+    expect(suspensionOf([{ name: "Standard/Heavy Duty/Sports", value: "Standard / Sport" }])).toBeNull();
+    expect(suspensionOf([{ name: "Standard/Heavy Duty/Sports", value: "Heavy Duty" }])).toBe("heavy_duty");
+    expect(suspensionOf([])).toBeNull();
+  });
+
+  it("knows a sports model by HaynesPro's name for it", () => {
+    expect(isSportsModel("FORD Fiesta Mk VI 1.6 ST")).toBe(true);
+    expect(isSportsModel("BMW X3 (G01) M Competition")).toBe(true);
+    expect(isSportsModel("AUDI TT RS (8J) 2.5")).toBe(true);
+    expect(isSportsModel("FORD Fiesta Mk VI 1.4 (Duratec)")).toBe(false);
+    expect(isSportsModel("VAUXHALL Adam (M13) 1.0 12V Turbo")).toBe(false);
+    expect(isSportsModel("VAUXHALL Corsa D (S07) 1.2 16V")).toBe(false);
+    expect(isSportsModel(null)).toBe(false);
+  });
+
+  it("buys the standard spring for an ordinary car, and when unknown", () => {
+    expect(pick({ sports: false })).toEqual(["KYBRH2825×2"]);
+    expect(pick(null)).toEqual(["KYBRH2825×2"]);
+  });
+
+  it("buys the sports spring for a sports model", () => {
+    expect(pick({ sports: true })).toEqual(["KYBRH2826×2"]);
+  });
+
+  it("keeps an admin's chosen spring whatever its suspension", () => {
+    const choice = { supplier: "aag" as const, part_number: "KYBRH2826", brand: null, description: null };
+    expect(selectJobParts("Renew both front coil springs", springs, choice, null, { sports: false })[0]).toMatchObject({
+      selection: { source: "choice", offer: { partNumber: "KYBRH2826" } },
+    });
   });
 });

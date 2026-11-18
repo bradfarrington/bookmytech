@@ -56,6 +56,38 @@ export function offersFrom(panels: readonly SupplierPanel[]): SupplierOffer[] {
   return panels.flatMap((panel) => (panel.state === "ok" ? panel.offers : []));
 }
 
+/**
+ * What we know about the car that decides between NAPA's alternatives
+ * (2026-11-18): a sports model takes sports suspension parts, any other car
+ * the standard ones.
+ */
+export interface CarTraits {
+  sports: boolean;
+}
+
+/**
+ * HaynesPro's name for the car says it's a sports model: "FORD Fiesta Mk VI
+ * 1.6 ST", "BMW X3 (G01) M Competition", "AUDI TT RS", "VW Golf GTI". Chassis
+ * codes in brackets are ignored (the Vauxhall Adam is "(M13)"). HaynesPro
+ * lists cars by engine, not trim, so a Leon FR reads as a standard Leon. Pure.
+ */
+export function isSportsModel(description: string | null | undefined): boolean {
+  const text = String(description ?? "").replace(/\([^)]*\)/g, " ");
+  return /\b(ST|ST-?\d|RS|RS\s?\d|GTI|GTD|VXR|OPC|Cupra|AMG|Type R|JCW|John Cooper Works|Abarth|Nismo|M Competition|M Performance|M[2-8]|S[1-8]|SQ[2-8])\b/.test(text);
+}
+
+/**
+ * NAPA's standard and sports suspension parts for the same job are
+ * alternatives (FN60KYP: a KYB "Standard" spring at £19.87 beside a "Sport"
+ * one at £27.30), and "Best, dearest" took the sports one. Keep the ones for
+ * this car's suspension, and any that fit either. Pure.
+ */
+export function forSuspension(offers: readonly SupplierOffer[], car: CarTraits | null | undefined): readonly SupplierOffer[] {
+  const wanted = car?.sports ? "sport" : "standard";
+  if (!offers.some((o) => o.suspension === wanted)) return offers;
+  return offers.filter((o) => !o.suspension || o.suspension === wanted);
+}
+
 export function selectRepairPart(panels: readonly SupplierPanel[], choice: MissingChoice | null): PartSelection {
   const offers = offersFrom(panels);
   if (choice) {
@@ -362,8 +394,14 @@ export function selectJobParts(
   choice: MissingChoice | null,
   /** The fluid's need in litres, when this part type is one and HaynesPro gave the car's capacity. */
   fluid?: FluidNeed | null,
+  /** Standard or sports suspension parts. Standard when unknown. */
+  car?: CarTraits | null,
 ): JobPartSelection[] {
-  const slots = partSlots(jobDescription, offers);
+  const chosen = (o: SupplierOffer) => !!choice && o.supplier === choice.supplier && o.partNumber === choice.part_number;
+  // An admin's pick stands whatever its suspension: only the default is narrowed.
+  const slots = partSlots(jobDescription, offers).map((slot) =>
+    slot.offers.some(chosen) ? slot : { ...slot, offers: [...forSuspension(slot.offers, car)] },
+  );
   const home = choice
     ? slots.findIndex((b) => b.offers.some((o) => o.supplier === choice.supplier && o.partNumber === choice.part_number))
     : -1;

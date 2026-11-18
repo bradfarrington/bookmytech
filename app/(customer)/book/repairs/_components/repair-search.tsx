@@ -7,6 +7,7 @@ import { MIN_SEARCH_QUERY_LENGTH } from "@/lib/haynespro/search-query";
 import { buildRepairHrefs } from "@/lib/bookings/repair-hrefs";
 import { searchRepairsAction } from "@/app/actions/repair-search";
 import { RepairRows } from "./repair-rows";
+import { LogoLoader } from "@/components/ui/logo-loader";
 import Link from "next/link";
 import { quoteRequestHref } from "@/lib/custom-quotes/href";
 
@@ -175,9 +176,7 @@ export function RepairSearch({
               {error}
             </p>
           ) : searching && hits.length === 0 ? (
-            <div className="rounded-2xl border border-border bg-surface-card px-4 py-8 text-center text-sm text-text-muted">
-              Looking through every repair for your car…
-            </div>
+            <LogoLoader label="Finding the repairs for your car…" />
           ) : (
             <RepairRows
               nodes={hits}

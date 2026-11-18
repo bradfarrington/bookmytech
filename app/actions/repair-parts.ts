@@ -3,7 +3,7 @@
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { fluidCapacitiesFor } from "@/lib/haynespro/fluid-capacity";
 import { getRepairNodesByIds } from "@/lib/haynespro/tree";
-import { fluidNeedFor } from "@/lib/parts/quote-parts";
+import { fluidNeedFor, loadCarTraits } from "@/lib/parts/quote-parts";
 import { cacheRegKey, resolveVehicle } from "@/lib/haynespro/vehicle";
 import { engineCodeSource } from "@/lib/parts/engine-codes";
 import { isMissingColumn, isMissingTable, loadPartGroupSettings } from "@/lib/parts/part-group-settings";
@@ -12,6 +12,7 @@ import {
   jobPosition,
   selectJobParts,
   selectRepairPart,
+  type CarTraits,
   type FluidNeed,
   type JobPartSelection,
   type RepairPartChoiceRow,
@@ -52,6 +53,8 @@ export interface RepairPartGroupView {
   selections: JobPartSelection[];
   /** ADDITIVE (2026-11-18). A fluid's need on this car, so a re-pick buys the same bottles customers are charged for. */
   fluid?: FluidNeed | null;
+  /** ADDITIVE (2026-11-18). Standard or sports suspension, so a re-pick defaults as customers' prices do. */
+  car?: CarTraits | null;
 }
 
 export type RepairPartsResult =
@@ -148,6 +151,7 @@ export async function loadRepairPartsAction(input: {
   const choices = new Map(((choiceRows ?? []) as RepairPartChoiceRow[]).map((r) => [r.genart_id, r]));
 
   const engineCodes = engineCodeSource(reg, { db });
+  const car = await loadCarTraits(db, reg);
   const fluids = seen.some((g) => fluidNeedFor(g.description, { coolantLitres: 1, brakeFluidLitres: 1 }))
     ? await fluidCapacitiesFor(carTypeId)
     : null;
@@ -159,6 +163,7 @@ export async function loadRepairPartsAction(input: {
       const fluid = fluidNeedFor(description, fluids);
       return {
         fluid,
+        car,
         genartId: g.genartId,
         description,
         charged: !(settings.enabled && settings.uncharged.has(g.genartId)),
@@ -166,7 +171,7 @@ export async function loadRepairPartsAction(input: {
         aag,
         selections:
           aag.state === "ok"
-            ? selectJobParts(repairName, aag.offers, choice, fluid)
+            ? selectJobParts(repairName, aag.offers, choice, fluid, car)
             : [{ position: jobPosition(repairName), selection: selectRepairPart([aag], choice) }],
       };
     }),

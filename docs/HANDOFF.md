@@ -121,7 +121,7 @@ You are working on **Book My Tech**, a UK mobile-mechanic booking platform. This
 
 ### 📌 2026-11-18 (evening): Wait for NAPA, warm it early, fluids by the litre (Task 80), committed, not pushed
 
-Read `docs/tasks/80-wait-for-napa.md`. Brad's rules: NAPA lookups never time out (60 s dead-connection ceiling only) and a timed-out answer is never saved. Buttons show a price or "Get a quote", never "Pricing" / "+ parts". A car's parts are priced in the background from the reg lookup (`warm-parts.ts`). Coolant and brake fluid are bought by HaynesPro's capacity (antifreeze assumed 50/50). **Brad/Gareth to do:** switch off "Bolt, brake disc" (54) on the Parts panel so the Pads and Discs combined repairs price. **Don't push until Brad says.**
+Read `docs/tasks/80-wait-for-napa.md`. Brad's rules: NAPA lookups never time out (60 s dead-connection ceiling only) and a timed-out answer is never saved. Buttons show a price or "Get a quote", never "Pricing" / "+ parts". A car's parts are priced in the background from the reg lookup (`warm-parts.ts`). Coolant and brake fluid are bought by HaynesPro's capacity (antifreeze assumed 50/50). The website shows an animated logo until a level is fully priced. Standard suspension parts unless a sports model. "Bolt, brake disc" (54) is no longer charged (live DB), so Pads and Discs price. Today's 22 false "no parts" answers were re-asked. **Don't push until Brad says.**
 
 ### 📌 2026-11-18 (later): Gareth's screenshot queries (Task 79), committed, not pushed
 

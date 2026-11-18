@@ -12,6 +12,7 @@ import { VehiclePicker } from "@/components/customer/vehicle-picker";
 import { VehicleBanner } from "./vehicle-banner";
 import { RepairRows, type RepairRowsProps } from "./repair-rows";
 import { RepairSearch } from "./repair-search";
+import { LogoLoader } from "@/components/ui/logo-loader";
 import { quoteRequestHref } from "@/lib/custom-quotes/href";
 
 // Customer-facing browse of the repair catalogue for THEIR car (Task 16
@@ -168,12 +169,13 @@ export async function RepairBrowser({
         </nav>
 
         {/* Each row shows labour + the parts that job needs on this car, not
-            "£60 + parts" (Task 63). On a car's first visit NAPA can take
-            several seconds, so the rows show at once and a job with parts
-            gets its button when its price is known (2026-11-18). */}
+            "£60 + parts" (Task 63). The repairs only appear once every price
+            is known (Brad, 2026-11-18); until then, our logo. The car's parts
+            were asked of NAPA when its reg was looked up (warm-parts.ts), so
+            the wait is usually a moment. */}
         <Suspense
           key={nodeId ?? "root"}
-          fallback={<RepairRows nodes={nodes} pricingParts {...rowProps(reg, make, model, postcode, selectedIds, adding, atCap, hrefs)} />}
+          fallback={<LogoLoader label="Getting today's prices for your car…" />}
         >
           <PricedRows reg={reg} nodeId={nodeId} unpriced={nodes} {...rowProps(reg, make, model, postcode, selectedIds, adding, atCap, hrefs)} />
         </Suspense>
@@ -228,7 +230,7 @@ export async function RepairBrowser({
   );
 }
 
-type SharedRowProps = Omit<RepairRowsProps, "nodes" | "pricingParts">;
+type SharedRowProps = Omit<RepairRowsProps, "nodes">;
 
 function rowProps(
   reg: string,

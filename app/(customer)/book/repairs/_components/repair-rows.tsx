@@ -77,13 +77,6 @@ export interface RepairRowsProps {
    * for this car). Without it such a job reads "+ parts" as before.
    */
   quoteHref?: (node: CatalogueNode) => string;
-  /**
-   * True while the parts are still being priced (the website streams them in
-   * after the rows, 2026-11-18): a job with parts shows a placeholder where
-   * its button goes, never a labour-only price. A button only ever shows the
-   * whole price (Brad, 2026-11-18).
-   */
-  pricingParts?: boolean;
 }
 
 export function RepairRows({
@@ -96,7 +89,6 @@ export function RepairRows({
   emptyLabel = "Nothing under this group.",
   groupCaption,
   quoteHref,
-  pricingParts = false,
 }: RepairRowsProps) {
   const rows = toRows(nodes);
 
@@ -119,15 +111,6 @@ export function RepairRows({
     // "+ parts" after it, as it read before — see `partsPence` on CatalogueNode.
     const price = formatPrice(node.totalPence ?? node.pricePence ?? 0);
     const withParts = node.totalPence == null && (node.genartIds?.length ?? 0) > 0;
-    if (withParts && pricingParts) {
-      return (
-        <span
-          className="block h-9 w-24 shrink-0 animate-pulse rounded-lg bg-surface"
-          role="status"
-          aria-label={`Getting the price for ${label ?? node.description}`}
-        />
-      );
-    }
     // Parts we have no price for, and no flag saying why (NAPA's lookup
     // failed outright, or this list wasn't priced): never a labour-only
     // price with "+ parts" after it (Brad, 2026-11-18). Ask for a quote.

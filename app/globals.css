@@ -117,3 +117,22 @@ body {
     cursor: pointer;
   }
 }
+
+/* The logo loader (components/ui/logo-loader.tsx): a line tracing the
+   hexagon, and the mechanic breathing. Page decoration, not tokens; both are
+   switched off under prefers-reduced-motion in the component. */
+@keyframes logo-trace {
+  to {
+    stroke-dashoffset: -300;
+  }
+}
+
+@keyframes logo-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.06);
+  }
+}

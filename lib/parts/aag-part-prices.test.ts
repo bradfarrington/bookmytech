@@ -9,7 +9,7 @@ import {
   settleAagPartOffers,
   type AagPartPriceRow,
 } from "./aag-part-prices";
-import type { SupplierOffer } from "./supplier-offer";
+import { OFFER_READ_VERSION, type SupplierOffer } from "./supplier-offer";
 
 const NOW = Date.parse("2026-09-15T12:00:00Z");
 const HOUR = 60 * 60 * 1000;
@@ -33,6 +33,7 @@ const filter: SupplierOffer = {
   notes: [],
   buyable: true,
   fitRead: true,
+  readVersion: OFFER_READ_VERSION,
 };
 
 const row = (over: Partial<AagPartPriceRow> = {}): AagPartPriceRow => ({
@@ -53,7 +54,7 @@ describe("freshAnswer", () => {
 
   it("asks again when the stored offers predate sides and plug counts (Task 78)", () => {
     const old = { ...filter };
-    delete old.fitRead;
+    delete old.readVersion;
     expect(freshAnswer(row({ offers: [old] }), NOW)).toBeNull();
     // Still good as a last known answer when NAPA can't be reached.
     expect(settleAagPartOffers(row({ offers: [old] }), { kind: "failed" }, at).result).toMatchObject({

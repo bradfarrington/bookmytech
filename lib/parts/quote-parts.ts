@@ -32,7 +32,14 @@ import { isMissingColumn, loadPartGroupSettings, type PartGroupSetPrice } from "
 import { alternativePairs } from "./job-charges";
 import { loadModelPartOffers, loadVehicleModel } from "./model-parts";
 import { recordPartGaps } from "./part-gaps";
-import { jobPosition, selectJobParts, type FluidNeed, type RepairPartChoiceRow } from "./repair-part-choice";
+import {
+  isSportsModel,
+  jobPosition,
+  selectJobParts,
+  type CarTraits,
+  type FluidNeed,
+  type RepairPartChoiceRow,
+} from "./repair-part-choice";
 import { fluidCapacitiesFor, type FluidCapacities } from "@/lib/haynespro/fluid-capacity";
 import type { PartPosition, PartSide, SupplierId } from "./supplier-offer";
 
@@ -164,6 +171,8 @@ export function priceJobParts(args: {
   now?: string;
   /** The car's coolant and brake fluid capacities, so a fluid is bought by the litres it needs. */
   fluids?: FluidCapacities | null;
+  /** Standard or sports suspension parts (standard when absent). */
+  car?: CarTraits | null;
 }): JobPartsResult {
   const parts: QuotedPart[] = [];
   const missing: MissingPart[] = [];
@@ -241,7 +250,7 @@ export function priceJobParts(args: {
         continue;
       }
       const choice = args.choices?.get(choiceKey(job.nodeId, group.genartId)) ?? null;
-      for (const { position, side, selection, quantity: wanted } of selectJobParts(job.description, lookup.offers, choice, fluidNeedFor(group.label, args.fluids))) {
+      for (const { position, side, selection, quantity: wanted } of selectJobParts(job.description, lookup.offers, choice, fluidNeedFor(group.label, args.fluids), args.car)) {
         // NAPA listed the part type for this car, but nothing that fits, or
         // not how many a job renewing every one of them needs.
         if (selection.source === "none" || selection.offer.costPence == null || wanted === null) {
@@ -311,6 +320,16 @@ function gapSightings(jobs: readonly PartsJob[], gaps: readonly number[]) {
   );
 }
 
+/** Whether the car is a sports model, from HaynesPro's name for it. Standard when unknown. Never throws. */
+export async function loadCarTraits(db: SupabaseClient, reg: string): Promise<CarTraits> {
+  try {
+    const { data } = await db.from("haynespro_vehicle_cache").select("description").eq("reg", aagRegKey(reg)).maybeSingle();
+    return { sports: isSportsModel((data as { description?: string | null } | null)?.description) };
+  } catch {
+    return { sports: false };
+  }
+}
+
 async function loadChoices(
   db: SupabaseClient,
   carTypeId: number,
@@ -348,10 +367,11 @@ export async function quoteJobParts(args: {
   if (charged.length === 0) return { ok: true, parts: [] };
 
   const hasFluid = args.jobs.some((job) => job.groups.some((g) => !settings.uncharged.has(g.genartId) && fluidKind(g.label)));
-  const [offers, choices, fluids] = await Promise.all([
+  const [offers, choices, fluids, car] = await Promise.all([
     loadAagPartOffers(args.db, args.reg, charged),
     loadChoices(args.db, args.carTypeId, args.jobs.map((job) => job.nodeId)),
     hasFluid ? fluidCapacitiesFor(args.carTypeId) : Promise.resolve(null),
+    loadCarTraits(args.db, args.reg),
   ]);
   if (!offers.enabled) return { ok: true, parts: [] };
 
@@ -377,6 +397,7 @@ export async function quoteJobParts(args: {
     uncharged: settings.uncharged,
     setPrices: settings.setPrices,
     fluids,
+    car,
   });
   if (priced.ok) return priced;
 
@@ -396,6 +417,7 @@ export async function quoteJobParts(args: {
     setPrices: settings.setPrices,
     estimates,
     fluids,
+    car,
   });
 }
 
