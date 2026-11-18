@@ -166,11 +166,11 @@ export function PlatformDefaultsSection({ settings }: { settings: PlatformSettin
           </Row>
           <Row
             label="Mark up parts"
-            hint="On: every part in a repair's price is marked up by the percentage below. Off: parts are charged at NAPA's cost"
+            hint="On: every NAPA part in a repair's price is marked up by the percentage below (not estimates or set prices). Off: NAPA's cost"
           >
             <PartsMarkupSwitch initial={settings.parts_markup_enabled === 1} />
           </Row>
-          <Row label="Parts markup" hint="Added to each part's cost when the switch above is on, e.g. 20% makes a £50 part £60">
+          <Row label="Parts markup" hint="Added to each NAPA part's cost when the switch above is on, e.g. 20% makes a £50 part £60">
             <InlineNumber
               value={settings.parts_markup_rate}
               {...markupPercent}

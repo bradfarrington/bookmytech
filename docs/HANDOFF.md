@@ -121,7 +121,7 @@ You are working on **Book My Tech**, a UK mobile-mechanic booking platform. This
 
 ### 📌 2026-11-18 (late): Parts markup switch (Task 82), committed, not pushed
 
-Read `docs/tasks/82-parts-markup.md`. Pricing has "Mark up parts" (on/off) and a percentage. Off by default. Applied in `quoteJobParts`, so every customer price follows. Open: whether Book My Tech keeps the whole markup (today the commission splits it like the rest of the total). **Don't push until Brad says.**
+Read `docs/tasks/82-parts-markup.md`. Pricing has "Mark up parts" (on/off) and a percentage. Off by default. Applied in `quoteJobParts` to NAPA-priced parts only (not estimates or set prices), so every customer price follows. The commission splits it like the rest of the total (Brad: keep the calculation as it is). **Don't push until Brad says.**
 
 ### 📌 2026-11-18 (late): Not-fitted repairs hidden; switched-off repairs hidden in the admin (Task 81), committed, not pushed
 

@@ -9,13 +9,16 @@
 //
 // Applied once, where every customer price gets its parts
 // (quoteJobParts): the repair list and search, the price step, the booking,
-// the app's quote and checkout, a mechanic's suggested extra parts. Every
-// part line is marked up: NAPA's price, an estimate and a set price alike.
-// Engine oil on a service is priced per litre separately and isn't a part.
-// The supplier's cost stays on the line (`costUnitPence`).
+// the app's quote and checkout, a mechanic's suggested extra parts. Only
+// parts NAPA priced are marked up (Brad, 2026-11-18: "markup will only be on
+// napa parts"): NAPA's own answer for the car, or an admin's pick priced live
+// by NAPA. An estimate from other cars and an admin's set price are charged
+// as they are. Engine oil on a service is priced per litre separately and
+// isn't a part. The supplier's cost stays on the line (`costUnitPence`).
 //
 // The markup is part of the booking's total, so the commission and the
-// mechanic's share split it as they split everything else (lib/earnings.ts).
+// mechanic's share split it as they split everything else (lib/earnings.ts;
+// Brad, 2026-11-18: "keep the calculation as it is").
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -48,14 +51,20 @@ export async function loadPartsMarkupRate(db: SupabaseClient): Promise<number> {
   }
 }
 
+/** A part NAPA priced: its answer for this car, or an admin's pick priced live by NAPA. Pure. */
+export function isNapaPriced(part: Pick<QuotedPart, "supplier" | "source">): boolean {
+  return part.supplier === "aag" && (part.source === "default" || part.source === "chosen");
+}
+
 /**
- * The customer's price for each part: the cost per unit marked up and
- * rounded to the penny, times the quantity. Off (0), the parts come back
- * exactly as they were. Pure.
+ * The customer's price for each NAPA-priced part: the cost per unit marked up
+ * and rounded to the penny, times the quantity. Estimates and set prices, and
+ * everything when the markup is off (0), come back as they were. Pure.
  */
 export function applyPartsMarkup(parts: readonly QuotedPart[], rate: number): QuotedPart[] {
   if (!(rate > 0)) return [...parts];
   return parts.map((part) => {
+    if (!isNapaPriced(part)) return part;
     const cost = part.costUnitPence ?? part.unitPence;
     const unitPence = Math.round(cost * (1 + rate));
     return { ...part, costUnitPence: cost, markupRate: rate, unitPence, linePence: unitPence * part.quantity };

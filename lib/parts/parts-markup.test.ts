@@ -48,9 +48,18 @@ describe("applyPartsMarkup", () => {
     expect(applyPartsMarkup(parts, 0)).toEqual(parts);
   });
 
-  it("marks up estimates and set prices too", () => {
-    const out = applyPartsMarkup([part(1000, 1, { source: "estimate" }), part(500, 1, { source: "set_price", supplier: null })], 0.1);
-    expect(out.map((p) => p.linePence)).toEqual([1100, 550]);
+  it("marks up NAPA's parts only, never an estimate or a set price", () => {
+    const out = applyPartsMarkup(
+      [
+        part(1000),
+        part(1000, 1, { source: "chosen", modelPart: true }),
+        part(1000, 1, { source: "estimate", supplier: null }),
+        part(500, 1, { source: "set_price", supplier: null }),
+      ],
+      0.1,
+    );
+    expect(out.map((p) => p.linePence)).toEqual([1100, 1100, 1000, 500]);
+    expect(out[2].costUnitPence).toBeUndefined();
   });
 
   it("never marks up twice", () => {
