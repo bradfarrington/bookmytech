@@ -231,7 +231,8 @@ export function buildRepairsQuote(args: {
   const fixedPence = fixedProducts.reduce((sum, p) => sum + (p.pricePence ?? 0), 0);
   const oil = products.some((p) => p.includesEngineOil) && args.oil && args.oil.pence > 0 ? args.oil : null;
   const oilPence = oil?.pence ?? 0;
-  // Supplier parts (Task 43): supplier cost, no mark-up, on top of labour like oil.
+  // Supplier parts (Task 43): at the customer's price (cost, plus the parts
+  // markup when it's on: parts-markup.ts), on top of labour like oil.
   const parts = (args.parts ?? []).map((part) => ({ ...part }));
   const repairPartsPence = parts.reduce((sum, part) => sum + part.linePence, 0);
   const labourPence = Math.round(billedHours * hourlyRatePence);

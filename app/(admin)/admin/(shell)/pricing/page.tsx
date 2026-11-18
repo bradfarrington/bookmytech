@@ -24,6 +24,8 @@ const SETTING_DEFAULTS: PlatformSettings = {
   engine_oil_price_per_litre_pence: 1500,
   engine_oil_default_litres: 5,
   on_site_diagnostic_fee_pence: 5999,
+  parts_markup_enabled: 0,
+  parts_markup_rate: 0,
 };
 
 export default async function AdminPricingPage() {

@@ -119,6 +119,10 @@ You are working on **Book My Tech**, a UK mobile-mechanic booking platform. This
 
 ## Current task
 
+### 📌 2026-11-18 (late): Parts markup switch (Task 82), committed, not pushed
+
+Read `docs/tasks/82-parts-markup.md`. Pricing has "Mark up parts" (on/off) and a percentage. Off by default. Applied in `quoteJobParts`, so every customer price follows. Open: whether Book My Tech keeps the whole markup (today the commission splits it like the rest of the total). **Don't push until Brad says.**
+
 ### 📌 2026-11-18 (late): Not-fitted repairs hidden; switched-off repairs hidden in the admin (Task 81), committed, not pushed
 
 Read `docs/tasks/81-not-fitted-repairs-and-admin-hides.md`. A car with rear drums (FN60KYP) no longer lists rear pads/discs repairs (`brake-layout.ts`, NAPA evidence both ways). The admin Repairs and model screens leave out repairs switched off for every vehicle, with a link to show them. **Don't push until Brad says.**

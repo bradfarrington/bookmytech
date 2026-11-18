@@ -42,6 +42,7 @@ import {
 } from "./repair-part-choice";
 import { fluidCapacitiesFor, type FluidCapacities } from "@/lib/haynespro/fluid-capacity";
 import { BRAKE_PART_TYPES, brakeLayout, notFittedOnCar, type BrakeLayout } from "./brake-layout";
+import { applyPartsMarkup, loadPartsMarkupRate } from "./parts-markup";
 import type { PartPosition, PartSide, SupplierId } from "./supplier-offer";
 
 /** One part priced into a quote. Serialisable: it is snapshotted onto bookings and revisions. */
@@ -65,10 +66,17 @@ export interface QuotedPart {
   rating: string | null;
   /** Units bought, in the supplier's unit of issue: 2 for brake discs. */
   quantity: number;
-  /** Supplier cost per unit, no mark-up; or the set price. */
+  /**
+   * What the customer pays per unit: supplier cost (or the set price), with
+   * the admin's parts markup when it's on (parts-markup.ts, 2026-11-18).
+   */
   unitPence: number;
   /** unitPence × quantity. */
   linePence: number;
+  /** ADDITIVE (2026-11-18). The supplier's cost per unit, before the markup. Only when a markup was applied. */
+  costUnitPence?: number;
+  /** ADDITIVE (2026-11-18). The markup applied (0.2 = 20%). Only when one was. */
+  markupRate?: number;
   /**
    * "chosen": an admin picked it for this engine variant. "default": AAG's
    * best-rated, dearest within. "estimate": AAG had no price for this car, so
@@ -358,11 +366,23 @@ async function loadChoices(
 }
 
 /**
- * The AAG parts a set of jobs on one vehicle needs. Parts pricing is off (an
- * empty list, labour-only as before) while migration 0070 is missing. Never
- * throws.
+ * The AAG parts a set of jobs on one vehicle needs, at the customer's price:
+ * with the admin's parts markup when it's on (parts-markup.ts). Parts pricing
+ * is off (an empty list, labour-only as before) while migration 0070 is
+ * missing. Never throws.
  */
 export async function quoteJobParts(args: {
+  db: SupabaseClient;
+  reg: string;
+  carTypeId: number;
+  jobs: readonly PartsJob[];
+}): Promise<JobPartsResult> {
+  const [result, markup] = await Promise.all([quoteJobPartsAtCost(args), loadPartsMarkupRate(args.db)]);
+  return { ...result, parts: applyPartsMarkup(result.parts, markup) };
+}
+
+/** quoteJobParts at the supplier's cost, before any markup. */
+async function quoteJobPartsAtCost(args: {
   db: SupabaseClient;
   reg: string;
   carTypeId: number;

@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { updatePlatformSetting, updateRepairCombineMode } from "@/app/actions/pricing";
 import { Select, type SelectOption } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import type { RepairCombineMode } from "@/lib/pricing/calculate";
 import { InlineNumber } from "./inline-edit";
 import { pounds, percent } from "./converters";
@@ -22,6 +23,45 @@ export interface PlatformSettings {
   engine_oil_default_litres: number;
   /** What a mechanic may charge when the customer declines the revised job on site (Task 37). */
   on_site_diagnostic_fee_pence: number;
+  /** A markup on every part priced into a repair (2026-11-18): 1 on, 0 off. */
+  parts_markup_enabled: number;
+  /** The markup as a decimal: 0.2 = 20%. */
+  parts_markup_rate: number;
+}
+
+/** A markup percentage: 0–100%, stored as a decimal. */
+const markupPercent = {
+  toInput: (rate: number) => String(Math.round(rate * 1000) / 10),
+  toDisplay: (rate: number | null) => (rate == null ? "Not set" : `${Math.round(rate * 1000) / 10}%`),
+  parse: (raw: string): number | null => {
+    const n = Number(raw.replace("%", "").trim());
+    if (!Number.isFinite(n) || n < 0 || n > 100) return null;
+    return Math.round(n * 10) / 1000;
+  },
+};
+
+function PartsMarkupSwitch({ initial }: { initial: boolean }) {
+  const [on, setOn] = useState(initial);
+  const [pending, startTransition] = useTransition();
+  return (
+    <Switch
+      checked={on}
+      disabled={pending}
+      label="Mark up parts"
+      onChange={(next) => {
+        setOn(next);
+        startTransition(async () => {
+          const result = await updatePlatformSetting("parts_markup_enabled", next ? 1 : 0);
+          if (!result.ok) {
+            setOn(!next);
+            toast.error(result.error);
+            return;
+          }
+          toast.success(next ? "Parts markup on. Applies to new quotes." : "Parts markup off. Parts are charged at cost.");
+        });
+      }}
+    />
+  );
 }
 
 const litres = {
@@ -122,6 +162,20 @@ export function PlatformDefaultsSection({ settings }: { settings: PlatformSettin
               {...percent}
               ariaLabel="Pro take rate"
               onSave={(v) => updatePlatformSetting("take_rate_pro", v ?? 0)}
+            />
+          </Row>
+          <Row
+            label="Mark up parts"
+            hint="On: every part in a repair's price is marked up by the percentage below. Off: parts are charged at NAPA's cost"
+          >
+            <PartsMarkupSwitch initial={settings.parts_markup_enabled === 1} />
+          </Row>
+          <Row label="Parts markup" hint="Added to each part's cost when the switch above is on, e.g. 20% makes a £50 part £60">
+            <InlineNumber
+              value={settings.parts_markup_rate}
+              {...markupPercent}
+              ariaLabel="Parts markup percentage"
+              onSave={(v) => updatePlatformSetting("parts_markup_rate", v ?? 0)}
             />
           </Row>
           <Row

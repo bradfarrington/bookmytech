@@ -205,6 +205,9 @@ const SETTING_KEYS = [
   "engine_oil_default_litres",
   // What a mechanic may charge when the customer declines the revised job on site (Task 37).
   "on_site_diagnostic_fee_pence",
+  // A markup on every part priced into a repair (2026-11-18, lib/parts/parts-markup.ts).
+  "parts_markup_enabled",
+  "parts_markup_rate",
 ] as const;
 type SettingKey = (typeof SETTING_KEYS)[number];
 
@@ -224,6 +227,12 @@ export async function updatePlatformSetting(
     const r = parseRate(value, 0, 0.9);
     if (!r.ok) return { ok: false, error: "Rate must be between 0% and 90%." };
     value = r.value;
+  } else if (key === "parts_markup_enabled") {
+    value = value ? 1 : 0;
+  } else if (key === "parts_markup_rate") {
+    const r = parseRate(value, 0, 1);
+    if (!r.ok) return { ok: false, error: "Enter a markup between 0% and 100%." };
+    value = Math.round(r.value * 1000) / 1000;
   } else if (key === "engine_oil_default_litres") {
     if (!Number.isFinite(value) || value < 0 || value > 30)
       return { ok: false, error: "Enter the litres as a number between 0 and 30." };

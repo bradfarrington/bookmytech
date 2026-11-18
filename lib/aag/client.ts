@@ -319,7 +319,14 @@ export async function aagCallResult<T>(
 
   const parsed = parseAagEnvelope<T>(raw);
   if (!parsed.ok) {
-    if (!isAagNoParts(parsed.errorCode)) {
+    // ISE0047 is NAPA's answer for part types it never prices on some cars
+    // (injectors, every time) and the catalogue's "nothing": expected, and
+    // handled (aag-live-offers.ts). A warning, so it isn't mistaken for a
+    // fault (2026-11-18: it opened Next's error overlay in development).
+    // Anything else NAPA refuses is still an error.
+    if (parsed.errorCode === "ISE0047") {
+      console.warn(`[aag] ${path}: NAPA answered ISE0047 (no quote for this part type)`);
+    } else if (!isAagNoParts(parsed.errorCode)) {
       console.error(`[aag] ${path} refused: ${parsed.errorCode ?? "?"} ${parsed.message}`);
     }
     if (isAagAuthFailure(parsed.errorCode)) {

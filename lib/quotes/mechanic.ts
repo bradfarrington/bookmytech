@@ -358,7 +358,7 @@ export interface QuotePartSuggestion {
   /** "Brake pads (rear) · BREMBO · BREP59038": what the part line is called. */
   description: string;
   quantity: number;
-  /** What the customer pays per unit: AAG's price with no mark-up, or the admin's set price. */
+  /** What the customer pays per unit: NAPA's price or the admin's set price, plus the parts markup when it's on. */
   unitPence: number;
   source: QuotedPart["source"];
 }

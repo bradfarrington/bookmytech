@@ -8,8 +8,9 @@
 //
 // MONEY RULES:
 //   - Integer pence everywhere. No floats reach a screen.
-//   - costPence is the SUPPLIER COST per unit, passed through. No BMT markup is
-//     applied anywhere (owner decision, 2026-09-11).
+//   - costPence is the SUPPLIER COST per unit, passed through. The customer's
+//     price adds the admin's parts markup when it's switched on (Pricing;
+//     lib/parts/parts-markup.ts, 2026-11-18), applied in quoteJobParts only.
 //   - A part is bought in the supplier's unit of issue: AAG prices brake discs
 //     PER DISC and sells them in twos ("BRAKE DISC PAIR (PRICE PER DISC)",
 //     RecMinOrdQty 2). quantityOfFit carries that, so a pair costs 2 × cost.

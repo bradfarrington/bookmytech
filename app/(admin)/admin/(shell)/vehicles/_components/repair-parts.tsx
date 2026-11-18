@@ -36,7 +36,7 @@ import { cn, formatPrice } from "@/lib/utils";
 // stops customers being charged (a tool, not a part), and a set price is what
 // customers pay when AAG has no price (antifreeze, screenwash).
 //
-// Money rules: supplier cost, no mark-up; a core charge is never added to the
+// Money rules: supplier cost (customers pay it plus the parts markup when that's on, under Pricing); a core charge is never added to the
 // cost; an unpriced part says "Not priced", never £0.00.
 
 const POSITION_LABEL = { front: "Front", rear: "Rear" } as const;
@@ -484,7 +484,7 @@ export function RepairParts({
                 ))
               )}
               <p className="text-xs text-text-muted">
-                Supplier cost, no mark-up. Customers are charged the part shown unless the group is switched off; a
+                Prices are NAPA&apos;s trade cost; customers pay that plus the parts markup when it&apos;s switched on under Pricing. Customers are charged the part shown unless the group is switched off; a
                 change applies to this engine variant only. The switch and the set price apply to every repair.
                 {!result.settingsReady && " Part group settings appear once migration 0070 is applied."}
               </p>
