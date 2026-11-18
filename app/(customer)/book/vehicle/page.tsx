@@ -36,7 +36,7 @@ export default async function VehiclePage({ searchParams }: VehiclePageProps) {
   const nextHref = `/book/repairs?reg=${encodeURIComponent(reg)}${postcodeSuffix}${startSuffix}`;
   const retryHref = start ? `/book?node=${encodeURIComponent(start.id)}` : "/book";
 
-  const result = await lookupVehicleAction(reg);
+  const result = await lookupVehicleAction(reg, { warmParts: true });
 
   if (!result.ok) {
     return (

@@ -32,7 +32,8 @@ import { isMissingColumn, loadPartGroupSettings, type PartGroupSetPrice } from "
 import { alternativePairs } from "./job-charges";
 import { loadModelPartOffers, loadVehicleModel } from "./model-parts";
 import { recordPartGaps } from "./part-gaps";
-import { jobPosition, selectJobParts, type RepairPartChoiceRow } from "./repair-part-choice";
+import { jobPosition, selectJobParts, type FluidNeed, type RepairPartChoiceRow } from "./repair-part-choice";
+import { fluidCapacitiesFor, type FluidCapacities } from "@/lib/haynespro/fluid-capacity";
 import type { PartPosition, PartSide, SupplierId } from "./supplier-offer";
 
 /** One part priced into a quote. Serialisable: it is snapshotted onto bookings and revisions. */
@@ -129,6 +130,27 @@ export function choiceKey(nodeId: string, genartId: number): string {
   return `${nodeId}:${genartId}`;
 }
 
+/**
+ * Which fluid a part type is, by HaynesPro's label: "Antifreeze", "Coolant",
+ * "Brake fluid". Not "Coolant pump" or "Sensor, coolant temperature". Pure.
+ */
+export function fluidKind(label: string | null | undefined): FluidNeed["kind"] | null {
+  const text = label?.trim() ?? "";
+  if (/^brake fluid\b/i.test(text)) return "brake_fluid";
+  if (/^(antifreeze|coolant)\b/i.test(text) && !/pump|sensor|hose|tank|thermostat|radiator|pipe|flange|cap|switch|valve/i.test(text)) {
+    return "coolant";
+  }
+  return null;
+}
+
+/** The litres a part type needs on this car, when it's a fluid and HaynesPro says how much the car holds. Pure. */
+export function fluidNeedFor(label: string, fluids: FluidCapacities | null | undefined): FluidNeed | null {
+  const kind = fluidKind(label);
+  if (!kind || !fluids) return null;
+  const litres = kind === "coolant" ? fluids.coolantLitres : fluids.brakeFluidLitres;
+  return litres ? { kind, litres } : null;
+}
+
 /** Price every job's parts from the offers already loaded. Pure, unit-tested. */
 export function priceJobParts(args: {
   jobs: readonly PartsJob[];
@@ -140,6 +162,8 @@ export function priceJobParts(args: {
   estimates?: { vehicle: EstimateVehicle; rows: ReadonlyMap<number, readonly EstimateRow[]> };
   /** When estimates are priced, ISO. */
   now?: string;
+  /** The car's coolant and brake fluid capacities, so a fluid is bought by the litres it needs. */
+  fluids?: FluidCapacities | null;
 }): JobPartsResult {
   const parts: QuotedPart[] = [];
   const missing: MissingPart[] = [];
@@ -217,7 +241,7 @@ export function priceJobParts(args: {
         continue;
       }
       const choice = args.choices?.get(choiceKey(job.nodeId, group.genartId)) ?? null;
-      for (const { position, side, selection, quantity: wanted } of selectJobParts(job.description, lookup.offers, choice)) {
+      for (const { position, side, selection, quantity: wanted } of selectJobParts(job.description, lookup.offers, choice, fluidNeedFor(group.label, args.fluids))) {
         // NAPA listed the part type for this car, but nothing that fits, or
         // not how many a job renewing every one of them needs.
         if (selection.source === "none" || selection.offer.costPence == null || wanted === null) {
@@ -314,8 +338,6 @@ export async function quoteJobParts(args: {
   reg: string;
   carTypeId: number;
   jobs: readonly PartsJob[];
-  /** Per NAPA call. Customer quotes keep the 4 s default; a streamed level can wait longer. */
-  timeoutMs?: number;
 }): Promise<JobPartsResult> {
   const genartIds = [...new Set(args.jobs.flatMap((job) => job.groups.map((g) => g.genartId)))];
   if (genartIds.length === 0) return { ok: true, parts: [] };
@@ -325,9 +347,11 @@ export async function quoteJobParts(args: {
   const charged = genartIds.filter((id) => !settings.uncharged.has(id));
   if (charged.length === 0) return { ok: true, parts: [] };
 
-  const [offers, choices] = await Promise.all([
-    loadAagPartOffers(args.db, args.reg, charged, args.timeoutMs ? { timeoutMs: args.timeoutMs } : {}),
+  const hasFluid = args.jobs.some((job) => job.groups.some((g) => !settings.uncharged.has(g.genartId) && fluidKind(g.label)));
+  const [offers, choices, fluids] = await Promise.all([
+    loadAagPartOffers(args.db, args.reg, charged),
     loadChoices(args.db, args.carTypeId, args.jobs.map((job) => job.nodeId)),
+    hasFluid ? fluidCapacitiesFor(args.carTypeId) : Promise.resolve(null),
   ]);
   if (!offers.enabled) return { ok: true, parts: [] };
 
@@ -352,6 +376,7 @@ export async function quoteJobParts(args: {
     choices,
     uncharged: settings.uncharged,
     setPrices: settings.setPrices,
+    fluids,
   });
   if (priced.ok) return priced;
 
@@ -370,6 +395,7 @@ export async function quoteJobParts(args: {
     uncharged: settings.uncharged,
     setPrices: settings.setPrices,
     estimates,
+    fluids,
   });
 }
 

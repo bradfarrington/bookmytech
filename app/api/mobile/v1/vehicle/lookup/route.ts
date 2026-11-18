@@ -84,6 +84,6 @@ export async function POST(request: Request): Promise<Response> {
     return apiRateLimited(message, verdict.retryAfterSeconds);
   }
 
-  const result: LookupResult = await lookupVehicleAction(reg);
+  const result: LookupResult = await lookupVehicleAction(reg, { warmParts: true });
   return apiOk(result);
 }

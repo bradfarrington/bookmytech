@@ -26,8 +26,15 @@ import type { SupplierOffer } from "./supplier-offer";
 
 export const AAG_PRICE_FRESH_MS = 12 * 60 * 60 * 1000;
 export const AAG_PRICE_LAST_KNOWN_MS = 7 * 24 * 60 * 60 * 1000;
-/** Per AAG call on the customer path. The admin pages keep the client's default. */
-export const AAG_CUSTOMER_TIMEOUT_MS = 4_000;
+/**
+ * Per NAPA call on the customer path. Not a time limit: every answer is
+ * waited for (Brad, 2026-11-18: "should never timeout cause this can cause
+ * false results and false prices"; it was 4 s, and NAPA often takes longer on
+ * a car's first visit). Only a connection still silent after a minute is
+ * given up on, so a dead socket can't hold a page forever. That counts as
+ * NAPA not answering: never saved, never priced from, asked again next time.
+ */
+export const AAG_CUSTOMER_TIMEOUT_MS = 60_000;
 
 const TABLE = "aag_part_prices";
 
@@ -124,6 +131,26 @@ async function fetchFromAag(
   return outcome.kind === "no_parts" ? { kind: "no_parts" } : { kind: "failed" };
 }
 
+/**
+ * Lookups already on their way to NAPA, by registration and part type, so a
+ * repair list opened while the car is still being warmed (warm-parts.ts)
+ * waits for the same answer rather than asking again. This server only.
+ */
+const inFlight = new Map<string, Promise<AagFetchOutcome>>();
+
+function sharedFetch(
+  regKey: string,
+  genartId: number,
+  fetch: () => Promise<AagFetchOutcome>,
+): Promise<AagFetchOutcome> {
+  const key = `${regKey}:${genartId}`;
+  const running = inFlight.get(key);
+  if (running) return running;
+  const call = fetch().finally(() => inFlight.delete(key));
+  inFlight.set(key, call);
+  return call;
+}
+
 export type AagPartPriceLoad =
   | { enabled: false }
   | { enabled: true; byGenart: Map<number, AagPartOffers> };
@@ -172,7 +199,8 @@ export async function loadAagPartOffers(
   const codeMaps = needAsking && !options.fetch ? await loadApprovedCodeMaps(db, ids) : new Map<number, number>();
   const fetchOne =
     options.fetch ??
-    ((key: string, genartId: number) => fetchFromAag(key, genartId, engineCodes, codeMaps.get(genartId), timeoutMs));
+    ((key: string, genartId: number) =>
+      sharedFetch(key, genartId, () => fetchFromAag(key, genartId, engineCodes, codeMaps.get(genartId), timeoutMs)));
   const writes: AagPartPriceRow[] = [];
   await Promise.all(
     ids.map(async (genartId) => {

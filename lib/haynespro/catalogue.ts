@@ -455,17 +455,6 @@ async function composeLevelFor(
 }
 
 /**
- * How long part pricing may wait. Absent: the funnel's defaults (4.5 s for
- * the level, 4 s per NAPA call), so a page that can't show anything until
- * prices arrive isn't held up. A page that streams prices in after the rows
- * (the website's repair list, 2026-11-18) can afford longer.
- */
-export interface PartsWait {
-  budgetMs?: number;
-  timeoutMs?: number;
-}
-
-/**
  * Fill in `partsPence` / `totalPence` on a level's bookable rows (Task 63).
  * Returns the same nodes when nothing could be priced, so a supplier that is
  * down or unconfigured leaves the level exactly as it was.
@@ -476,7 +465,6 @@ async function withLevelParts(
   rawById: ReadonlyMap<string, HpRepairtimeNode>,
   reg: string,
   db: SupabaseClient,
-  wait: PartsWait = {},
 ): Promise<CatalogueNode[]> {
   // A product already shows its whole price (its own, plus any engine oil);
   // only HaynesPro-backed repairs have parts on top of labour.
@@ -496,7 +484,7 @@ async function withLevelParts(
     if (jobs.length === item.nodeIds.length) rows.push({ rowId: item.id, nodes: jobs });
   }
 
-  const parts = await priceLevelParts({ db, reg, carTypeId: context.carTypeId, rows, ...wait });
+  const parts = await priceLevelParts({ db, reg, carTypeId: context.carTypeId, rows });
   if (parts.totals.size === 0 && parts.needsQuote.size === 0) return nodes;
 
   return nodes.map((node) => {
@@ -563,7 +551,7 @@ export async function getRepairCatalogueLevel(
   reg: string,
   nodeId: string | null | undefined,
   db: SupabaseClient,
-  options: { priceParts?: boolean; partsWait?: PartsWait } = {},
+  options: { priceParts?: boolean } = {},
 ): Promise<CatalogueLevel> {
   const loaded = await loadContext(reg, db);
   if (!loaded.ok) return loaded;
@@ -601,7 +589,7 @@ export async function getRepairCatalogueLevel(
   return {
     ok: true,
     vehicle: context.vehicle,
-    nodes: options.priceParts ? await withLevelParts(context, nodes, rawById, reg, db, options.partsWait) : nodes,
+    nodes: options.priceParts ? await withLevelParts(context, nodes, rawById, reg, db) : nodes,
   };
 }
 
@@ -673,14 +661,14 @@ export async function searchRepairCatalogue(
   reg: string,
   query: string,
   db: SupabaseClient,
-  options: { priceParts?: boolean; partsWait?: PartsWait } = {},
+  options: { priceParts?: boolean } = {},
 ): Promise<CatalogueSearch> {
   const loaded = await loadContext(reg, db);
   if (!loaded.ok) return loaded;
   const rawById = new Map<string, HpRepairtimeNode>();
   const result = await runSearch(loaded.context, query, { bundles: true, rawById });
   if (!result.ok || !options.priceParts) return result;
-  return { ...result, hits: await withLevelParts(loaded.context, result.hits, rawById, reg, db, options.partsWait) };
+  return { ...result, hits: await withLevelParts(loaded.context, result.hits, rawById, reg, db) };
 }
 
 /**

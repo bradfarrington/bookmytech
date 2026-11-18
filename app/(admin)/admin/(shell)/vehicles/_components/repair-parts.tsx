@@ -201,7 +201,7 @@ function PartGroupCard({
   );
 
   const reselect = (choice: MissingChoice | null) =>
-    group.aag.state === "ok" ? selectJobParts(repairName, group.aag.offers, choice) : group.selections;
+    group.aag.state === "ok" ? selectJobParts(repairName, group.aag.offers, choice, group.fluid) : group.selections;
 
   const choose = (offer: SupplierOffer) =>
     startTransition(async () => {

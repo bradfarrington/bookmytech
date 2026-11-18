@@ -21,6 +21,7 @@
 
 import {
   defaultOffer,
+  ratingRank,
   type PartPosition,
   type PartSide,
   type SupplierId,
@@ -162,6 +163,54 @@ export function partBuckets(jobDescription: string | null | undefined, offers: r
     ];
   }
   return [{ position: null, offers: [...offers] }];
+}
+
+/**
+ * How much of a fluid a job needs, from HaynesPro's capacity for the car
+ * (2026-11-18, lib/haynespro/fluid-capacity.ts). Coolant is the cooling
+ * system's whole volume, a top-up included (Brad: a top-up charges a full
+ * fill); brake fluid is the brake system's.
+ */
+export interface FluidNeed {
+  kind: "coolant" | "brake_fluid";
+  litres: number;
+}
+
+/** Sold ready to pour in: the whole volume. Otherwise antifreeze is a concentrate mixed 50/50 with water. */
+const READY_MIXED = /\b(rtu|ready[\s-]?(to[\s-]?use|mixed?)|pre-?mix(ed)?|premix(ed)?)\b/i;
+
+/** Litres of this product the job needs. Pure. */
+export function litresOfProduct(offer: Pick<SupplierOffer, "description">, need: FluidNeed): number {
+  if (need.kind !== "coolant") return need.litres;
+  return READY_MIXED.test(offer.description ?? "") ? need.litres : need.litres / 2;
+}
+
+/**
+ * The bottles a job buys when its need in litres is known: of the packs NAPA
+ * lists (never a workshop drum), enough of one size to cover the need, at
+ * the lowest cost within the best rating offered, a bigger pack winning a
+ * tie. A 4.9 litre cooling system takes 2.45 litres of concentrate: one 5 L,
+ * or three 1 L if those are dearer. Null when no pack size is known, so the
+ * usual pick applies. Pure.
+ */
+export function fluidPick(
+  offers: readonly SupplierOffer[],
+  need: FluidNeed,
+): { offer: SupplierOffer; quantity: number } | null {
+  let best: { offer: SupplierOffer; quantity: number; line: number; litres: number; rank: number } | null = null;
+  for (const offer of offers) {
+    const litres = packLitres(offer.description);
+    if (litres == null || litres > DRUM_LITRES || !offer.buyable || offer.costPence == null) continue;
+    const quantity = Math.max(1, Math.ceil(litresOfProduct(offer, need) / litres - 1e-9));
+    const line = offer.costPence * quantity;
+    const rank = ratingRank(offer.tier);
+    const better =
+      !best ||
+      rank > best.rank ||
+      (rank === best.rank && (line < best.line || (line === best.line && litres > best.litres)));
+    if (better) best = { offer, quantity, line, litres, rank };
+  }
+  return best ? { offer: best.offer, quantity: best.quantity } : null;
 }
 
 /**
@@ -311,6 +360,8 @@ export function selectJobParts(
   jobDescription: string | null | undefined,
   offers: readonly SupplierOffer[],
   choice: MissingChoice | null,
+  /** The fluid's need in litres, when this part type is one and HaynesPro gave the car's capacity. */
+  fluid?: FluidNeed | null,
 ): JobPartSelection[] {
   const slots = partSlots(jobDescription, offers);
   const home = choice
@@ -322,6 +373,18 @@ export function selectJobParts(
       index === home || (home === -1 && index === 0) ? choice : null,
     );
     const slotsOnAxle = slots.filter((s) => s.position === slot.position).length;
+    if (fluid) {
+      const usingChoice = selection.source === "choice";
+      const sized = usingChoice ? null : fluidPick(slot.offers, fluid);
+      if (sized) {
+        return { position: slot.position, side: slot.side, selection: { source: "default", offer: sized.offer, missingChoice: selection.source === "default" ? selection.missingChoice : null }, quantity: sized.quantity };
+      }
+      const litres = selection.source === "none" ? null : packLitres(selection.offer.description);
+      if (usingChoice && litres) {
+        // The admin's bottle, as many as the car takes.
+        return { position: slot.position, side: slot.side, selection, quantity: Math.max(1, Math.ceil(litresOfProduct(selection.offer, fluid) / litres - 1e-9)) };
+      }
+    }
     return {
       position: slot.position,
       side: slot.side,

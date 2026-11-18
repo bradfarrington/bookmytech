@@ -1,7 +1,9 @@
 "use server";
 
 import { requireAdmin } from "@/lib/auth/require-admin";
+import { fluidCapacitiesFor } from "@/lib/haynespro/fluid-capacity";
 import { getRepairNodesByIds } from "@/lib/haynespro/tree";
+import { fluidNeedFor } from "@/lib/parts/quote-parts";
 import { cacheRegKey, resolveVehicle } from "@/lib/haynespro/vehicle";
 import { engineCodeSource } from "@/lib/parts/engine-codes";
 import { isMissingColumn, isMissingTable, loadPartGroupSettings } from "@/lib/parts/part-group-settings";
@@ -10,6 +12,7 @@ import {
   jobPosition,
   selectJobParts,
   selectRepairPart,
+  type FluidNeed,
   type JobPartSelection,
   type RepairPartChoiceRow,
 } from "@/lib/parts/repair-part-choice";
@@ -47,6 +50,8 @@ export interface RepairPartGroupView {
   aag: SupplierPanel;
   /** The part in use: one, or one per axle. */
   selections: JobPartSelection[];
+  /** ADDITIVE (2026-11-18). A fluid's need on this car, so a re-pick buys the same bottles customers are charged for. */
+  fluid?: FluidNeed | null;
 }
 
 export type RepairPartsResult =
@@ -143,12 +148,17 @@ export async function loadRepairPartsAction(input: {
   const choices = new Map(((choiceRows ?? []) as RepairPartChoiceRow[]).map((r) => [r.genart_id, r]));
 
   const engineCodes = engineCodeSource(reg, { db });
+  const fluids = seen.some((g) => fluidNeedFor(g.description, { coolantLitres: 1, brakeFluidLitres: 1 }))
+    ? await fluidCapacitiesFor(carTypeId)
+    : null;
   const groups = await Promise.all(
     seen.map(async (g): Promise<RepairPartGroupView> => {
       const description = g.description || `Part group ${g.genartId}`;
       const aag = await lookupAagPanel(reg, { genart: String(g.genartId), label: description }, engineCodes);
       const choice = choices.get(g.genartId) ?? null;
+      const fluid = fluidNeedFor(description, fluids);
       return {
+        fluid,
         genartId: g.genartId,
         description,
         charged: !(settings.enabled && settings.uncharged.has(g.genartId)),
@@ -156,7 +166,7 @@ export async function loadRepairPartsAction(input: {
         aag,
         selections:
           aag.state === "ok"
-            ? selectJobParts(repairName, aag.offers, choice)
+            ? selectJobParts(repairName, aag.offers, choice, fluid)
             : [{ position: jobPosition(repairName), selection: selectRepairPart([aag], choice) }],
       };
     }),

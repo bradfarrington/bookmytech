@@ -8,8 +8,9 @@ import { describe, expect, it } from "vitest";
 import { flattenQuote } from "@/lib/aag/quote";
 import type { AagArticle, AagQuoteBody } from "@/lib/aag/types";
 import type { AagPartOffers } from "./aag-part-prices";
-import { priceJobParts, type PartsJob } from "./quote-parts";
-import { jobNeeds, jobPosition, packLitres, selectJobParts, sensiblePacks } from "./repair-part-choice";
+import { fluidKind, fluidNeedFor, priceJobParts, type PartsJob } from "./quote-parts";
+import { fluidPick, jobNeeds, jobPosition, litresOfProduct, packLitres, selectJobParts, sensiblePacks } from "./repair-part-choice";
+import { partTypesToWarm } from "./warm-parts";
 import { aagOffers, cylinderOf, perVehicleOf, positionOf, sideOf, type SupplierOffer } from "./supplier-offer";
 
 const PRICED_AT = "2026-11-18T10:00:00.000Z";
@@ -333,5 +334,76 @@ describe("injectors", () => {
     });
     expect(result).toMatchObject({ ok: false, missing: [{ genartId: 3905, reason: "not_listed" }] });
     expect(bought("Renew the injector", uncounted)).toEqual(["INJ×1"]);
+  });
+});
+
+// Brad, 2026-11-18: "shouldn't this calculate the amount of litres needed and
+// then choose the bottle that's needed for the engine?"
+describe("fluids by the litres the car needs", () => {
+  const fluid = (id: string, description: string, pounds: number, rating = "Better") =>
+    offersOf(article(description, "", {}, [{ id, brand: "NAPA", rating, pounds }]))[0];
+  const antifreeze = [
+    fluid("1L", "LONGLIFE UNIVERSAL (1L)", 8.27),
+    fluid("5L", "LONGLIFE UNIVERSAL (5L)", 22.37),
+    fluid("20L", "LONGLIFE UNIVERSAL (20L)", 72.6),
+    fluid("199L", "LONGLIFE UNIVERSAL (199L)", 611.69, "Best"),
+  ];
+
+  it("knows which part types are fluids", () => {
+    expect(fluidKind("Antifreeze")).toBe("coolant");
+    expect(fluidKind("Coolant")).toBe("coolant");
+    expect(fluidKind("Brake fluid")).toBe("brake_fluid");
+    expect(fluidKind("Coolant pump")).toBeNull();
+    expect(fluidKind("Sensor, coolant temperature")).toBeNull();
+    expect(fluidNeedFor("Antifreeze", { coolantLitres: 4.9, brakeFluidLitres: 1 })).toEqual({ kind: "coolant", litres: 4.9 });
+    expect(fluidNeedFor("Antifreeze", { coolantLitres: null, brakeFluidLitres: 1 })).toBeNull();
+  });
+
+  it("mixes concentrate 50/50, and pours ready-mixed as it is", () => {
+    const need = { kind: "coolant" as const, litres: 8 };
+    expect(litresOfProduct({ description: "LONGLIFE UNIVERSAL (5L)" }, need)).toBe(4);
+    expect(litresOfProduct({ description: "MULTI-VEHICLE COOLANT RTU (5L)" }, need)).toBe(8);
+    expect(litresOfProduct({ description: "BRAKE FLUID DOT 4 (1L)" }, { kind: "brake_fluid", litres: 2.2 })).toBe(2.2);
+  });
+
+  it("buys the cheapest bottles that cover the need, never a drum", () => {
+    // 4.9 litre system: 2.45 litres of concentrate. 3 × 1 L = £24.81 is dearer than one 5 L.
+    expect(fluidPick(antifreeze, { kind: "coolant", litres: 4.9 })).toMatchObject({ offer: { partNumber: "5L" }, quantity: 1 });
+    // 1.8 litre need (a small system): 2 × 1 L = £16.54 beats a 5 L.
+    expect(fluidPick(antifreeze, { kind: "coolant", litres: 3.6 })).toMatchObject({ offer: { partNumber: "1L" }, quantity: 2 });
+    // A 12 litre van: 6 litres of concentrate, 2 × 5 L.
+    expect(fluidPick(antifreeze, { kind: "coolant", litres: 12 })).toMatchObject({ offer: { partNumber: "5L" }, quantity: 2 });
+  });
+
+  it("keeps to the best rating NAPA offers", () => {
+    const offers = [fluid("CHEAP", "COOLANT (5L)", 10, "Good"), fluid("BEST", "COOLANT (5L)", 20, "Best")];
+    expect(fluidPick(offers, { kind: "coolant", litres: 4 })).toMatchObject({ offer: { partNumber: "BEST" } });
+  });
+
+  it("prices a drain and refill from the car's capacity", () => {
+    const result = priceJobParts({
+      jobs: [{ nodeId: "n", description: "Drain/refill the cooling system", groups: [{ genartId: 3356, label: "Antifreeze" }] }],
+      offers: new Map<number, AagPartOffers>([[3356, { state: "ok", offers: antifreeze, pricedAt: PRICED_AT, lastKnown: false }]]),
+      fluids: { coolantLitres: 12, brakeFluidLitres: 1 },
+    });
+    expect(result.parts).toMatchObject([{ partNumber: "5L", quantity: 2, linePence: 4474 }]);
+  });
+
+  it("falls back to the pack rule without a capacity", () => {
+    expect(bought("Drain/refill the cooling system", antifreeze)).toEqual(["5L×1"]);
+  });
+});
+
+describe("partTypesToWarm", () => {
+  it("asks Common jobs' part types first, each once", () => {
+    const repair = (id: string, top: string, genarts: number[]) => ({
+      id,
+      name: id,
+      path: [{ id: top, name: top === "1E00000000GCJ" ? "Common jobs" : "Engine assembly" }],
+      groups: genarts.map((genartId) => ({ genartId, label: String(genartId) })),
+    });
+    expect(
+      partTypesToWarm([repair("a", "1B00000000G", [307, 82]), repair("b", "1E00000000GCJ", [82, 402]), repair("c", "1B00000000G", [307])]),
+    ).toEqual([82, 402, 307]);
   });
 });

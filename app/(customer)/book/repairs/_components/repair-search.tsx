@@ -187,6 +187,9 @@ export function RepairSearch({
               groupHref={hrefs.groupHref}
               bookHref={hrefs.bookHref}
               groupCaption={() => "A group of repairs: open it to see them"}
+              quoteHref={(node) =>
+                quoteRequestHref({ reg, make, model, postcode, q: node.bundleName ?? node.description, reason: "parts" })
+              }
               emptyLabel={
                 <>
                   Nothing matches &ldquo;{trimmed}&rdquo;. Try fewer or different words, browse the

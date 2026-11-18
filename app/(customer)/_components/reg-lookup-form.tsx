@@ -66,7 +66,7 @@ export function RegLookupForm({
       status: "loading",
     });
     startTransition(async () => {
-      const result = await lookupVehicleAction(normalised);
+      const result = await lookupVehicleAction(normalised, { warmParts: true });
       setLookup((current) => {
         // Guard against the user closing the modal / submitting a new reg
         // before the response lands.

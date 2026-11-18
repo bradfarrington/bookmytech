@@ -45,7 +45,8 @@ import type {
 export const AAG_UAT_BASE_URL = "https://aag-sapi-uat1.aaguklabs.co.uk";
 export const AAG_LIVE_BASE_URL = "https://sales.allianceautomotiveapis.co.uk";
 
-const REQUEST_TIMEOUT_MS = 12_000;
+/** Only for a dead connection: NAPA is waited for, never timed out (see AAG_CUSTOMER_TIMEOUT_MS). */
+const REQUEST_TIMEOUT_MS = 60_000;
 /** Don't upsert an "ok" health row on every successful call — once per interval is plenty. */
 const OK_HEALTH_INTERVAL_MS = 5 * 60 * 1000;
 

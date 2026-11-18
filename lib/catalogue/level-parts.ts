@@ -15,25 +15,18 @@
 //    flagged `needsQuote`: the customer asks for a manual quote instead of
 //    booking (2026-11-17). Quoting a total we know is short of the truth would
 //    be worse than pricing it by hand.
-//  - **Hold up the page.** A cold registration means live supplier calls, so
-//    the whole pass is bounded by LEVEL_PARTS_BUDGET_MS. Past that the level
-//    renders with "+ parts" as it did before. The abandoned work still
-//    finishes and still writes the price cache, so the next level — or a
-//    reload — has it.
+//  - **Give up on NAPA.** It waits for every answer (Brad, 2026-11-18: never
+//    time out, never save a timed-out answer; both gave false prices). It
+//    used to stop at 4.5 s and show "+ parts", which on a car's first visit
+//    was most levels. The website shows the rows first and streams the
+//    prices in; the funnel warms the cache when the car is identified
+//    (lib/parts/warm-parts.ts), so the wait is usually none.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { partGroupsOnNodes } from "@/lib/parts/part-groups";
 import { quoteJobParts, type JobPartsResult, type PartsJob } from "@/lib/parts/quote-parts";
 import type { HpRepairtimeNode } from "@/lib/haynespro/types";
-
-/**
- * How long a level will wait for supplier prices before rendering without
- * them. Above the 4s per-call timeout customer pricing uses
- * (AAG_CUSTOMER_TIMEOUT_MS), since the calls run in parallel: one slow group
- * shouldn't cost the level its other rows' prices.
- */
-export const LEVEL_PARTS_BUDGET_MS = 4_500;
 
 /** One bookable row and the HaynesPro jobs behind it (several for a combined repair). */
 export interface PartsRow {
@@ -127,10 +120,6 @@ export async function priceLevelParts(args: {
   reg: string;
   carTypeId: number;
   rows: readonly PartsRow[];
-  /** How long to wait for every price. Overridable for tests and for a streamed level. */
-  budgetMs?: number;
-  /** Per NAPA call; the 4 s customer default when absent. */
-  timeoutMs?: number;
 }): Promise<LevelParts> {
   // A row whose jobs name no part group needs nothing priced: its labour is
   // already the whole price, and asking about it would be a wasted lookup.
@@ -147,16 +136,8 @@ export async function priceLevelParts(args: {
     }
   }
 
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const timeout = new Promise<null>((resolve) => {
-    timer = setTimeout(() => resolve(null), args.budgetMs ?? LEVEL_PARTS_BUDGET_MS);
-  });
   try {
-    const result = await Promise.race([
-      quoteJobParts({ db: args.db, reg: args.reg, carTypeId: args.carTypeId, jobs: [...jobs.values()], timeoutMs: args.timeoutMs }),
-      timeout,
-    ]);
-    if (!result) return EMPTY;
+    const result = await quoteJobParts({ db: args.db, reg: args.reg, carTypeId: args.carTypeId, jobs: [...jobs.values()] });
     const totals = foldLevelParts(rows, result);
     return {
       totals,
@@ -166,7 +147,5 @@ export async function priceLevelParts(args: {
   } catch (err) {
     console.error("[catalogue] pricing a level's parts failed:", err);
     return EMPTY;
-  } finally {
-    if (timer) clearTimeout(timer);
   }
 }

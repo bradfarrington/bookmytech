@@ -119,6 +119,10 @@ You are working on **Book My Tech**, a UK mobile-mechanic booking platform. This
 
 ## Current task
 
+### 📌 2026-11-18 (evening): Wait for NAPA, warm it early, fluids by the litre (Task 80), committed, not pushed
+
+Read `docs/tasks/80-wait-for-napa.md`. Brad's rules: NAPA lookups never time out (60 s dead-connection ceiling only) and a timed-out answer is never saved. Buttons show a price or "Get a quote", never "Pricing" / "+ parts". A car's parts are priced in the background from the reg lookup (`warm-parts.ts`). Coolant and brake fluid are bought by HaynesPro's capacity (antifreeze assumed 50/50). **Brad/Gareth to do:** switch off "Bolt, brake disc" (54) on the Parts panel so the Pads and Discs combined repairs price. **Don't push until Brad says.**
+
 ### 📌 2026-11-18 (later): Gareth's screenshot queries (Task 79), committed, not pushed
 
 Read `docs/tasks/79-gareth-fn60kyp-queries.md`. Search now prices parts. The website's repair list streams prices in (15 s wait) instead of "+ parts" on a cold car. Workshop drums of antifreeze (£611.69) are never charged; antifreeze takes up to 5 L, brake fluid 1 L. A timed-out NAPA lookup is no longer stored as "no parts" for 12 h (FN60KYP's coil springs). Injectors are counted or quoted. Windscreen wipers are the front only. Open for Brad/Gareth: charge "Bolt, brake disc" (54)? Standard vs sports springs. The app's tree still has the 4.5 s budget.

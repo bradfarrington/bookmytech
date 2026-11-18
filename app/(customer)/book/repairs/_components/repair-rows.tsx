@@ -51,9 +51,9 @@ function includesParts(node: CatalogueNode): boolean {
  * The caption's parts note: whether the price includes parts, and whether any
  * of them is estimated for this car because no supplier listed it (Task 72).
  */
-function partsNote(node: CatalogueNode, pricingParts = false): string {
+function partsNote(node: CatalogueNode): string {
   if (node.needsQuote) return " · parts priced by our team";
-  if (pricingParts && node.totalPence == null && (node.genartIds?.length ?? 0) > 0) return " · pricing parts…";
+
   if (!includesParts(node)) return "";
   return node.partsEstimated ? " · includes estimated parts" : " · parts included";
 }
@@ -79,8 +79,9 @@ export interface RepairRowsProps {
   quoteHref?: (node: CatalogueNode) => string;
   /**
    * True while the parts are still being priced (the website streams them in
-   * after the rows, 2026-11-18): a job with parts reads "pricing parts…", not
-   * "+ parts", and its price waits.
+   * after the rows, 2026-11-18): a job with parts shows a placeholder where
+   * its button goes, never a labour-only price. A button only ever shows the
+   * whole price (Brad, 2026-11-18).
    */
   pricingParts?: boolean;
 }
@@ -120,12 +121,18 @@ export function RepairRows({
     const withParts = node.totalPence == null && (node.genartIds?.length ?? 0) > 0;
     if (withParts && pricingParts) {
       return (
-        <span className="flex shrink-0 items-center gap-2 rounded-lg bg-surface px-3.5 py-2 text-sm font-semibold text-text-muted">
-          {label && <span className="text-xs">{label}</span>}
-          <span className="h-3 w-3 animate-spin rounded-full border-2 border-text-muted/40 border-t-text-muted" aria-hidden />
-          Pricing
-        </span>
+        <span
+          className="block h-9 w-24 shrink-0 animate-pulse rounded-lg bg-surface"
+          role="status"
+          aria-label={`Getting the price for ${label ?? node.description}`}
+        />
       );
+    }
+    // Parts we have no price for, and no flag saying why (NAPA's lookup
+    // failed outright, or this list wasn't priced): never a labour-only
+    // price with "+ parts" after it (Brad, 2026-11-18). Ask for a quote.
+    if (withParts && quoteHref && !selectedIds.includes(node.id)) {
+      return <QuoteButton repairName={label ? `${node.bundleName ?? node.description} · ${label}` : node.description} href={quoteHref(node)} />;
     }
     if (atCap) {
       return (
@@ -196,7 +203,7 @@ export function RepairRows({
                     </p>
                     <p className="mt-0.5 text-xs text-text-muted">
                       {single
-                        ? `Combined repair · estimated ${row.options[0].billedHours} hour${row.options[0].billedHours === 1 ? "" : "s"} on your car${partsNote(row.options[0], pricingParts)}`
+                        ? `Combined repair · estimated ${row.options[0].billedHours} hour${row.options[0].billedHours === 1 ? "" : "s"} on your car${partsNote(row.options[0])}`
                         : "Combined repair · choose an option"}
                     </p>
                   </div>
@@ -246,7 +253,7 @@ export function RepairRows({
                 <p className="mt-0.5 text-xs text-text-muted">
                   Estimated {row.node.billedHours} hour
                   {row.node.billedHours === 1 ? "" : "s"} on your car
-                  {partsNote(row.node, pricingParts)}
+                  {partsNote(row.node)}
                 </p>
               </div>
               {bookButton(row.node)}

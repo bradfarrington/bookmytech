@@ -1,6 +1,6 @@
 # Task 79: Gareth's FN60KYP and LP17BJY queries
 
-**Status:** ✅ Complete (2026-11-18). Search prices its parts. The website's repair list streams its prices in with a longer wait. No more workshop drums of fluid. A timed-out lookup is no longer stored as "no parts". Injectors are counted. Windscreen wiper jobs are the front only. No migration. One additive opt-in on the mobile search (`parts=1`).
+**Status:** ✅ Complete (2026-11-18). Parts of 3 superseded by Task 80: no time limits at all, and no "Pricing" / "+ parts" wording. Search prices its parts. The website's repair list streams its prices in with a longer wait. No more workshop drums of fluid. A timed-out lookup is no longer stored as "no parts". Injectors are counted. Windscreen wiper jobs are the front only. No migration. One additive opt-in on the mobile search (`parts=1`).
 
 Gareth tested on FN60KYP (2010 Fiesta 1.4) and LP17BJY (2017 Toyota ProAce 2.0 D4D) and sent screenshots, 2026-11-18.
 
