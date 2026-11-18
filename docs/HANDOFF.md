@@ -121,7 +121,7 @@ You are working on **Book My Tech**, a UK mobile-mechanic booking platform. This
 
 ### 📌 2026-11-18 (night): Tasks 78–82 pushed to `main` (`e5dd5b4`)
 
-All of today's work is live: part quantities (78), Gareth's screenshot fixes (79), no NAPA timeouts + warm-up + logo loader + fluids by the litre + standard suspension (80), not-fitted repairs and admin hides (81), the parts markup switch, off by default (82), estimates switched off, and DVLA lookup on the admin quote form. No migrations. A test custom quote (S28BSW, £395, to brad9629@icloud.com) is open under Admin → Quotes → Sent: withdraw it when done. After deploy every stored NAPA answer is fetched again once (`OFFER_READ_VERSION` 2), so first visits are slower until warmed.
+All of today's work is live: part quantities (78), Gareth's screenshot fixes (79), no NAPA timeouts + warm-up + logo loader + fluids by the litre + standard suspension (80), not-fitted repairs and admin hides (81), the parts markup switch, off by default (82), estimates switched off, and DVLA lookup on the admin quote form. No migrations. A test custom quote (S28BSW, £395, to brad9629@icloud.com) is open under Admin → Quotes → Sent: withdraw it when done. **Customer app** (`bmt-customer-app` `317079b`, `dbbacde`): part lines name their side ("Shock absorber (front left)"), search sends `parts=1`, the repair list and search show the animated logo until priced, and a repair with unpriced parts asks for a quote instead of "+ parts". Needs an EAS build to reach phones. After deploy every stored NAPA answer is fetched again once (`OFFER_READ_VERSION` 2), so first visits are slower until warmed.
 
 ### 📌 2026-11-18 (late): Estimated part prices switched off, pushed 2026-11-18 (`e5dd5b4`)
 
