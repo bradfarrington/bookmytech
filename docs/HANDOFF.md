@@ -119,27 +119,31 @@ You are working on **Book My Tech**, a UK mobile-mechanic booking platform. This
 
 ## Current task
 
-### 📌 2026-11-18 (late): Estimated part prices switched off, committed, not pushed
+### 📌 2026-11-18 (night): Tasks 78–82 pushed to `main` (`e5dd5b4`)
+
+All of today's work is live: part quantities (78), Gareth's screenshot fixes (79), no NAPA timeouts + warm-up + logo loader + fluids by the litre + standard suspension (80), not-fitted repairs and admin hides (81), the parts markup switch, off by default (82), estimates switched off, and DVLA lookup on the admin quote form. No migrations. A test custom quote (S28BSW, £395, to brad9629@icloud.com) is open under Admin → Quotes → Sent: withdraw it when done. After deploy every stored NAPA answer is fetched again once (`OFFER_READ_VERSION` 2), so first visits are slower until warmed.
+
+### 📌 2026-11-18 (late): Estimated part prices switched off, pushed 2026-11-18 (`e5dd5b4`)
 
 Brad: no more estimates from other cars of the same model (Task 72). A part NAPA can't price for the exact car goes to "Get a quote". `PART_ESTIMATES_ENABLED = false` in `lib/parts/quote-parts.ts`; the code stays. Admin set prices for a part group still apply.
 
-### 📌 2026-11-18 (late): Parts markup switch (Task 82), committed, not pushed
+### 📌 2026-11-18 (late): Parts markup switch (Task 82), pushed 2026-11-18 (`e5dd5b4`)
 
-Read `docs/tasks/82-parts-markup.md`. Pricing has "Mark up parts" (on/off) and a percentage. Off by default. Applied in `quoteJobParts` to NAPA-priced parts only (not estimates or set prices), so every customer price follows. The commission splits it like the rest of the total (Brad: keep the calculation as it is). **Don't push until Brad says.**
+Read `docs/tasks/82-parts-markup.md`. Pricing has "Mark up parts" (on/off) and a percentage. Off by default. Applied in `quoteJobParts` to NAPA-priced parts only (not estimates or set prices), so every customer price follows. The commission splits it like the rest of the total (Brad: keep the calculation as it is).
 
-### 📌 2026-11-18 (late): Not-fitted repairs hidden; switched-off repairs hidden in the admin (Task 81), committed, not pushed
+### 📌 2026-11-18 (late): Not-fitted repairs hidden; switched-off repairs hidden in the admin (Task 81), pushed 2026-11-18 (`e5dd5b4`)
 
-Read `docs/tasks/81-not-fitted-repairs-and-admin-hides.md`. A car with rear drums (FN60KYP) no longer lists rear pads/discs repairs (`brake-layout.ts`, NAPA evidence both ways). The admin Repairs and model screens leave out repairs switched off for every vehicle, with a link to show them. **Don't push until Brad says.**
+Read `docs/tasks/81-not-fitted-repairs-and-admin-hides.md`. A car with rear drums (FN60KYP) no longer lists rear pads/discs repairs (`brake-layout.ts`, NAPA evidence both ways). The admin Repairs and model screens leave out repairs switched off for every vehicle, with a link to show them.
 
-### 📌 2026-11-18 (evening): Wait for NAPA, warm it early, fluids by the litre (Task 80), committed, not pushed
+### 📌 2026-11-18 (evening): Wait for NAPA, warm it early, fluids by the litre (Task 80), pushed 2026-11-18 (`e5dd5b4`)
 
-Read `docs/tasks/80-wait-for-napa.md`. Brad's rules: NAPA lookups never time out (60 s dead-connection ceiling only) and a timed-out answer is never saved. Buttons show a price or "Get a quote", never "Pricing" / "+ parts". A car's parts are priced in the background from the reg lookup (`warm-parts.ts`). Coolant and brake fluid are bought by HaynesPro's capacity (antifreeze assumed 50/50). The website shows an animated logo until a level is fully priced. Standard suspension parts unless a sports model. "Bolt, brake disc" (54) is no longer charged (live DB), so Pads and Discs price. Today's 22 false "no parts" answers were re-asked. **Don't push until Brad says.**
+Read `docs/tasks/80-wait-for-napa.md`. Brad's rules: NAPA lookups never time out (60 s dead-connection ceiling only) and a timed-out answer is never saved. Buttons show a price or "Get a quote", never "Pricing" / "+ parts". A car's parts are priced in the background from the reg lookup (`warm-parts.ts`). Coolant and brake fluid are bought by HaynesPro's capacity (antifreeze assumed 50/50). The website shows an animated logo until a level is fully priced. Standard suspension parts unless a sports model. "Bolt, brake disc" (54) is no longer charged (live DB), so Pads and Discs price. Today's 22 false "no parts" answers were re-asked.
 
-### 📌 2026-11-18 (later): Gareth's screenshot queries (Task 79), committed, not pushed
+### 📌 2026-11-18 (later): Gareth's screenshot queries (Task 79), pushed 2026-11-18 (`e5dd5b4`)
 
 Read `docs/tasks/79-gareth-fn60kyp-queries.md`. Search now prices parts. The website's repair list streams prices in (15 s wait) instead of "+ parts" on a cold car. Workshop drums of antifreeze (£611.69) are never charged; antifreeze takes up to 5 L, brake fluid 1 L. A timed-out NAPA lookup is no longer stored as "no parts" for 12 h (FN60KYP's coil springs). Injectors are counted or quoted. Windscreen wipers are the front only. Open for Brad/Gareth: charge "Bolt, brake disc" (54)? Standard vs sports springs. The app's tree still has the 4.5 s budget.
 
-### 📌 2026-11-18: Part quantities (Task 78), committed, not pushed
+### 📌 2026-11-18: Part quantities (Task 78), pushed 2026-11-18 (`e5dd5b4`)
 
 Read `docs/tasks/78-part-quantities.md`. Gareth's two points: repairs listing several parts charged one, and spark/glow plugs charged one plug. Jobs now buy one part per side when NAPA lists left and right, every plug when NAPA gives "No of Plugs" (the Leon: 3 ordinary + 1 pressure-sensor plug), and 2 of a part listed once on a "both" job. No migration. `side` is added (optional) to the mobile quote's part lines; the customer app could show it (optional). Brad has more of Gareth's queries as screenshots: next.
 
