@@ -2,6 +2,8 @@
 
 **Status:** 🟡 **Built and pushed to `main` 2026-10-09, not verified end to end.** Typecheck clean, unit tests pass, lint clean on every touched file. **Migration `0087` is written, not applied.** Until it is, estimated parts save without their flag (the price is still right). Shipped alongside fixes from the same session (see "Also in this change").
 
+**Switched off 2026-11-18 (Brad).** Asked whether "we are still doing this guesswork", Brad said to switch it off: a part NAPA can't price for the exact car now goes to a manual quote (`PART_ESTIMATES_ENABLED = false` in `lib/parts/quote-parts.ts`). The code, the `estimated` flags and the "includes estimated parts" wording stay in place, unused. An admin set price for a part group (migration 0071) still applies.
+
 **Rule changed the same day (owner):** estimates come from the **same make and model only**, any year or generation. **Never a different model**, not even the same make. The first build fell back to same make and then any car; that was removed. So a repair stays "+ parts" when no other car of that model has been priced. On S28BSW (2024 Ranger) that is currently most of them, because no other Ranger has been looked up yet.
 
 ## Why

@@ -119,6 +119,10 @@ You are working on **Book My Tech**, a UK mobile-mechanic booking platform. This
 
 ## Current task
 
+### 📌 2026-11-18 (late): Estimated part prices switched off, committed, not pushed
+
+Brad: no more estimates from other cars of the same model (Task 72). A part NAPA can't price for the exact car goes to "Get a quote". `PART_ESTIMATES_ENABLED = false` in `lib/parts/quote-parts.ts`; the code stays. Admin set prices for a part group still apply.
+
 ### 📌 2026-11-18 (late): Parts markup switch (Task 82), committed, not pushed
 
 Read `docs/tasks/82-parts-markup.md`. Pricing has "Mark up parts" (on/off) and a percentage. Off by default. Applied in `quoteJobParts` to NAPA-priced parts only (not estimates or set prices), so every customer price follows. The commission splits it like the rest of the total (Brad: keep the calculation as it is). **Don't push until Brad says.**

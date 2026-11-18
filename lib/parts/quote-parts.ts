@@ -10,12 +10,11 @@
 // labour (owner decisions, 2026-09-15).
 //
 // A charged group AAG can't price (down, blocked or listing nothing, with no
-// answer from the last 7 days) is ESTIMATED from what AAG charged for it on
-// other cars of the same make and model, any year (Task 72,
-// lib/parts/part-estimates.ts). Never a different model.
-// With no estimate either, it takes the admin's set price for the group when
+// answer from the last 7 days) takes the admin's set price for the group when
 // there is one (migration 0071: consumables AAG doesn't list). Otherwise the
-// set is unpriceable: the booking stops rather than go out without its parts.
+// set is unpriceable and goes to a manual quote. Estimating it from other
+// cars of the same model (Task 72) is switched off: see
+// PART_ESTIMATES_ENABLED.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -143,6 +142,16 @@ export function needsManualQuote(missing: readonly Pick<MissingPart, "reason">[]
 export type JobPartsResult =
   | { ok: true; parts: QuotedPart[] }
   | { ok: false; parts: QuotedPart[]; missing: MissingPart[] };
+
+/**
+ * Whether a part NAPA can't price for this car is estimated from other cars
+ * of the same model (Task 72). Off since 2026-11-18. Brad, asked whether "we
+ * are still doing this guesswork": "yes please" to switching it off. A
+ * different year of a model can take a different part, so an estimate could
+ * be a false price, and it kept repairs NAPA can't price out of Gareth's
+ * quotes. The code stays (part-estimates.ts) in case it's wanted back.
+ */
+export const PART_ESTIMATES_ENABLED = false;
 
 /** The key a repair part choice is looked up by. */
 export function choiceKey(nodeId: string, genartId: number): string {
@@ -455,9 +464,10 @@ async function quoteJobPartsAtCost(args: {
     : first;
   if (priced.ok) return priced;
 
-  // Something AAG couldn't price on this car: estimate it from other cars of the same model
-  // (Task 72). Only the groups that need it are read.
-  // A part the car doesn't have isn't estimated: its repair is hidden.
+  // Something NAPA couldn't price on this car: a manual quote. Estimating it
+  // from other cars of the same model (Task 72) is off (PART_ESTIMATES_ENABLED).
+  // A part the car doesn't have is never estimated: its repair is hidden.
+  if (!PART_ESTIMATES_ENABLED) return priced;
   const toEstimate = priced.missing.filter((m) => m.reason !== "not_fitted");
   if (toEstimate.length === 0) return priced;
   const estimates = await loadPartEstimates(
