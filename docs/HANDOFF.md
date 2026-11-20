@@ -119,7 +119,7 @@ You are working on **Book My Tech**, a UK mobile-mechanic booking platform. This
 
 ## Current task
 
-### 📌 2026-11-20: NAPA parts on services (Task 83), not yet pushed; migration 0091 applied
+### 📌 2026-11-20: NAPA parts on services (Task 83), pushed (`215937b`; app `87de71a`); migration 0091 applied
 
 Read `docs/tasks/83-service-napa-parts.md`. A service in `/admin/services` can tick NAPA part types (oil, air, pollen and fuel filters, spark plugs). They're priced for the exact car like a repair's parts, on top of the service's price, which becomes the labour. Oil stays £/litre × HaynesPro capacity. A part NAPA can't price → "Get a quote". **Migration `0091`** (apply it, then regenerate app types). Nothing changes until Brad ticks the parts and sets labour-only prices, in the same save, per service (list in the task md). Product nodes gain the same optional parts fields repair nodes have; the customer app's price display already handles them. Also tickable: glow plugs, brake fluid, coolant. Customer app: types regenerated, "Includes parts for your car" caption on services; needs an EAS build.
 
