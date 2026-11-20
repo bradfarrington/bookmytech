@@ -1,7 +1,7 @@
 # Task 83: NAPA parts on manually added services
 
 **Status:** ✅ Complete (2026-11-20). Built as proposed. Migration `0091` adds `catalogue_products.part_genart_ids`. A service with parts ticked gets each part priced from NAPA for the car, on top of its own price, which becomes the labour. Deviations from the proposal:
-- The admin picker is a fixed list of five part types (`lib/catalogue/service-parts.ts`), not a search of every NAPA part type. One line adds another.
+- The admin picker is a fixed list of part types (`lib/catalogue/service-parts.ts`), not a search of every NAPA part type. One line adds another. Gareth's five, plus glow plugs (243), brake fluid (3357) and coolant (3356) added the same day for services he adds later (Brad). The fluids are bought by HaynesPro's capacity for the car. A searchable picker of every part type waits until he needs more.
 - No data is seeded. Ticking the parts and dropping the price to labour only are one save, so nobody is charged for filters twice.
 - Not live-fired on a real car yet.
 
@@ -26,7 +26,7 @@ Repairs are different: each HaynesPro job lists its part types, and `quoteJobPar
 
 ## What shipped
 
-1. **Parts per service in the admin.** `/admin/services` → edit has a "NAPA parts" box with five ticks: Oil filter (7), Air filter (8), Pollen filter (424), Fuel filter (9), Spark plugs (686). The ids were checked against NAPA's cached answers. When any are ticked, the price field reads "Price (labour)". The services table shows "+ NAPA oil filter, air filter…" under the price. Saving with ticks before `0091` is applied says so.
+1. **Parts per service in the admin.** `/admin/services` → edit has a "NAPA parts" box of ticks: Oil filter (7), Air filter (8), Pollen filter (424), Fuel filter (9), Spark plugs (686), Glow plugs (243), Brake fluid (3357), Coolant (3356). The ids were checked against NAPA's cached answers. When any are ticked, the price field reads "Price (labour)". The services table shows "+ NAPA oil filter, air filter…" under the price. Saving with ticks before `0091` is applied says so.
 2. **Priced like a repair.** `quoteRepairsResult` adds each product's parts to the same `quoteJobParts` call as the repairs (`servicePartsJobs`), under the product's own id (`p:<uuid>`). So a service gets:
    - the right part for that reg
    - every spark plug (from NAPA's "No of Plugs"; if NAPA doesn't say, it goes to a quote, as the repair does)
@@ -45,12 +45,12 @@ Repairs are different: each HaynesPro job lists its part types, and `quoteJobPar
 - [x] Spark plugs are bought per cylinder.
 - [x] A service whose part NAPA can't price goes to "Get a quote".
 - [x] The Servicing list shows the parts-inclusive price.
-- [x] Unit tests: `lib/catalogue/service-parts.test.ts` (7). Full suite 898 passing, `tsc` and lint clean.
+- [x] Unit tests: `lib/catalogue/service-parts.test.ts` (9). Full suite passing, `tsc` and lint clean.
 - [ ] Live check on a real petrol and diesel reg once `0091` is applied and the parts are ticked (Brad).
 
 ## To switch it on (Brad)
 
-1. Apply `supabase/migrations/0091_service_parts.sql`.
+1. ~~Apply `supabase/migrations/0091_service_parts.sql`.~~ Applied 2026-11-20.
 2. In `/admin/services`, for each service, tick its parts and change the price to labour only, **in the same save**:
    - Interim service: Oil filter
    - Full service: Oil filter, Air filter

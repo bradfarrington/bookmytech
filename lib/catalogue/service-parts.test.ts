@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { foldProductParts } from "@/lib/catalogue/level-parts";
 import { buildRepairsQuote } from "@/lib/haynespro/repair-booking";
 import type { AagPartOffers } from "@/lib/parts/aag-part-prices";
-import { priceJobParts } from "@/lib/parts/quote-parts";
+import { fluidKind, priceJobParts } from "@/lib/parts/quote-parts";
 import type { SupplierOffer } from "@/lib/parts/supplier-offer";
 import { toProductNode, toQuotableProduct, type CatalogueProductRow } from "./products";
 import { servicePartsJobs, servicePartTypes } from "./service-parts";
@@ -63,6 +63,21 @@ describe("servicePartTypes", () => {
     expect(servicePartTypes([686, 7, 7, 999, "8"]).map((t) => t.genartId)).toEqual([7, 8, 686]);
     expect(servicePartTypes(null)).toEqual([]);
     expect(servicePartTypes(undefined)).toEqual([]);
+  });
+});
+
+describe("the part types a service can tick", () => {
+  it("buys fluids by the litre and plugs per cylinder", () => {
+    const byId = new Map(servicePartTypes([3357, 3356, 243, 686]).map((t) => [t.genartId, t]));
+    expect(fluidKind(byId.get(3357)!.label)).toBe("brake_fluid");
+    expect(fluidKind(byId.get(3356)!.label)).toBe("coolant");
+    expect(byId.get(243)!.job).toMatch(/all the glow plugs/);
+  });
+
+  it("prices every glow plug NAPA says the engine has", () => {
+    const glow = servicePartsJobs({ id: "p:x", partTypes: servicePartTypes([243]) });
+    const result = priceJobParts({ jobs: glow, offers: new Map([[243, ok(offer("GLOW-1", 1337, { perVehicle: 4 }))]]) });
+    expect(result.parts.map((p) => [p.quantity, p.linePence])).toEqual([[4, 4 * 1337]]);
   });
 });
 

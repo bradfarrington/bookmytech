@@ -13,6 +13,8 @@
 //   Full service: oil, oil filter, air filter
 //   Major service (petrol): + cabin/pollen filter, spark plugs
 //   Major service (diesel): + cabin/pollen filter, fuel filter
+// Glow plugs, brake fluid and coolant added the same day (Brad), for services
+// Gareth adds later.
 
 import type { PartsJob } from "@/lib/parts/quote-parts";
 
@@ -36,6 +38,11 @@ export const SERVICE_PART_TYPES: readonly ServicePartType[] = [
   { genartId: 424, label: "Pollen filter", job: "Renew the pollen filter" },
   { genartId: 9, label: "Fuel filter", job: "Renew the fuel filter" },
   { genartId: 686, label: "Spark plugs", job: "Renew all the spark plugs" },
+  { genartId: 243, label: "Glow plugs", job: "Renew all the glow plugs" },
+  // Fluids are bought by the litres HaynesPro says the car holds: the label
+  // must start "Brake fluid" / "Coolant" for that (quote-parts.ts fluidKind).
+  { genartId: 3357, label: "Brake fluid", job: "Renew the brake fluid" },
+  { genartId: 3356, label: "Coolant", job: "Renew the coolant" },
 ];
 
 const BY_ID = new Map(SERVICE_PART_TYPES.map((t) => [t.genartId, t]));
