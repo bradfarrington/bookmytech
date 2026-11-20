@@ -67,7 +67,7 @@ export function QuoteButton({ repairName, href }: { repairName: string; href: st
           </button>
         </div>
         <p className="px-6 py-5 text-sm text-text-secondary">
-          Our team prices the parts for this repair on your car by hand. Send us a quick request
+          Our team prices the parts for this job on your car by hand. Send us a quick request
           and we&apos;ll email you a price.
         </p>
         <div className="flex items-center justify-end gap-3 border-t border-border-subtle p-6">

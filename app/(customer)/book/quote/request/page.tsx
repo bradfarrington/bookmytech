@@ -46,7 +46,7 @@ export default async function QuoteRequestPage({ searchParams }: Props) {
         subtitle={
           // From a listed repair whose parts are priced by hand (2026-11-17).
           params.for === "parts"
-            ? `Our team prices the parts for this repair${reg ? ` on your ${describeQuoteVehicle(reg, params.make, params.model)}` : ""} by hand. Check the details and we'll email you a price.`
+            ? `Our team prices the parts for this job${reg ? ` on your ${describeQuoteVehicle(reg, params.make, params.model)}` : ""} by hand. Check the details and we'll email you a price.`
             : reg
             ? `Can't find the job you need for your ${describeQuoteVehicle(reg, params.make, params.model)}? Tell us about it and we'll email you a price.`
             : "Can't find the job you need? Tell us about it and we'll email you a price."

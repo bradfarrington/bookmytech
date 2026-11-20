@@ -65,3 +65,7 @@ Repairs are different: each HaynesPro job lists its part types, and `quoteJobPar
 - **Pricing change**: once the parts are ticked, service prices are per car (labour + oil + parts).
 - **API (additive only)**: product nodes in `/repairs/tree` and `/repairs/search` may now carry `genartIds`, `partsPence`, `totalPence`, `partsEstimated` and `needsQuote`, the same optional fields repair nodes already carry. The quote's `parts` lines may now have a service's `p:<uuid>` as their `nodeId`, and `quoteJobs` may name a service. No field renamed or removed.
 - **The customer app**: its `describeNodePrice` already reads `needsQuote` → `totalPence` → `+ parts` for any node, so the list should be right with no change. To check in the app: the service row shows the total and "Get a quote" correctly, and the price step lists the service's part lines. Old builds from before Task 63 show the service's labour + oil with "+ parts".
+
+## App work done (2026-11-20)
+
+`bmt-customer-app`: types regenerated (only `catalogue_products.part_genart_ids` changed). A service row whose total includes its NAPA parts says "Includes parts for your car" (`describeServiceParts`). The list price, "Get a quote" and the price step's part lines needed no change. "Our team prices the parts for this repair" now reads "this job" in both apps and on the website, since a service can reach it. Needs an EAS build to reach phones. The app's `tsc` has 8 existing typed-route errors (`/quotes`, `/book/quote-request` missing from Expo's generated route types): not from this change.

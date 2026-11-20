@@ -361,7 +361,7 @@ export const PARTS_UNAVAILABLE_MESSAGE =
  * where to ask. Positive on purpose (Brad, 2026-11-17: no "we can't").
  */
 export const PARTS_NEED_QUOTE_MESSAGE =
-  "Our team prices the parts for this repair on your car by hand. Ask us for a quote and we'll email you a price.";
+  "Our team prices the parts for this job on your car by hand. Ask us for a quote and we'll email you a price.";
 
 /** The customer's sentence for a "parts_unavailable" failure. */
 export function partsFailureMessage(failure: { needsQuote?: true }): string {
