@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { ArrowDown, ArrowUp, Droplets, Pencil, Trash2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
+import { servicePartTypes } from "@/lib/catalogue/service-parts";
 import { cn, formatPrice } from "@/lib/utils";
 import { Pill } from "@/components/ui/pill";
 import { productFuels, type CatalogueProductRow, type FuelFamily } from "@/lib/catalogue/products";
@@ -96,6 +97,11 @@ export function ProductsTable({ products }: { products: CatalogueProductRow[] })
                     <div className="flex items-center justify-end gap-1 text-xs text-text-muted">
                       <Droplets size={12} />
                       + engine oil
+                    </div>
+                  )}
+                  {servicePartTypes(p.part_genart_ids).length > 0 && (
+                    <div className="text-xs text-text-muted">
+                      + NAPA {servicePartTypes(p.part_genart_ids).map((t) => t.label.toLowerCase()).join(", ")}
                     </div>
                   )}
                 </td>

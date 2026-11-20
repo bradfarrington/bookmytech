@@ -33,7 +33,8 @@ import { cn, formatPrice } from "@/lib/utils";
 // Every card links to /book?node=…, which carries the choice through the reg
 // and vehicle steps (lib/bookings/start-node.ts). A product can't be priced
 // exactly before the car is known: servicing adds engine oil per vehicle, so
-// its price reads "+ oil".
+// its price reads "+ oil", and a service buying NAPA parts for the car
+// (Task 83) "+ oil & parts".
 
 const CATEGORY_ICONS: Record<ProductCategory, LucideIcon> = {
   diagnostics: Search,
@@ -80,17 +81,18 @@ async function loadServiceGroups(): Promise<ServiceGroup[]> {
         .filter((p): p is { product: typeof p.product; base: number } => p.base != null);
       const lowest = priced.length ? Math.min(...priced.map((p) => p.base)) : null;
       const oil = priced.some((p) => p.product.includesEngineOil);
+      const parts = priced.some((p) => p.product.partTypes.length > 0);
       return {
         key: category.key,
         id: category.id,
         label: category.label,
         blurb: category.blurb,
-        from: lowest == null ? null : `${formatPrice(lowest)}${oil ? " + oil" : ""}`,
+        from: lowest == null ? null : `${formatPrice(lowest)}${extras(oil, parts)}`,
         products: priced.map(({ product, base }) => ({
           id: product.id,
           name: product.name,
           summary: product.summary,
-          price: `${formatPrice(base)}${product.includesEngineOil ? " + oil" : ""}`,
+          price: `${formatPrice(base)}${extras(product.includesEngineOil, product.partTypes.length > 0)}`,
         })),
       };
     }).filter((group) => group.products.length > 0);
@@ -98,6 +100,13 @@ async function loadServiceGroups(): Promise<ServiceGroup[]> {
     console.error("[homepage] services load failed:", err);
     return [];
   }
+}
+
+/** What's added per car on top of a set price: engine oil, NAPA parts (Task 83). */
+function extras(oil: boolean, parts: boolean): string {
+  if (oil && parts) return " + oil & parts";
+  if (parts) return " + parts";
+  return oil ? " + oil" : "";
 }
 
 /** The lowest fixed price among the products sharing this one's name (its fuel variants). */

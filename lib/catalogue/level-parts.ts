@@ -25,6 +25,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { partGroupsOnNodes } from "@/lib/parts/part-groups";
+import { servicePartsJobs, type ServicePartType } from "@/lib/catalogue/service-parts";
 import { quoteJobParts, type JobPartsResult, type PartsJob } from "@/lib/parts/quote-parts";
 import type { HpRepairtimeNode } from "@/lib/haynespro/types";
 
@@ -163,6 +164,57 @@ export async function priceLevelParts(args: {
     };
   } catch (err) {
     console.error("[catalogue] pricing a level's parts failed:", err);
+    return EMPTY;
+  }
+}
+
+/** A product row and the NAPA parts it buys (Task 83). */
+export interface ProductPartsRow {
+  /** "p:<uuid>": its row id, and the nodeId its parts are priced under. */
+  id: string;
+  partTypes: readonly ServicePartType[];
+}
+
+/** Fold a priced result into per-product totals and flags. Pure. */
+export function foldProductParts(rows: readonly ProductPartsRow[], result: JobPartsResult): LevelParts {
+  const unpriced = new Set(result.ok ? [] : result.missing.map((m) => m.nodeId));
+  const out: LevelParts = { totals: new Map(), estimated: new Set(), needsQuote: new Set(), notFitted: new Set() };
+  for (const row of rows) {
+    if (unpriced.has(row.id)) {
+      out.needsQuote.add(row.id);
+      continue;
+    }
+    const mine = result.parts.filter((part) => part.nodeId === row.id);
+    out.totals.set(row.id, mine.reduce((sum, part) => sum + part.linePence, 0));
+    if (mine.some((part) => part.source === "estimate")) out.estimated.add(row.id);
+  }
+  return out;
+}
+
+/**
+ * Price the NAPA parts of a list's services (Task 83), the same call the
+ * quote makes, so a service's listed price is what the price step charges.
+ * A service NAPA can't price a part of is `needsQuote`, as a repair is.
+ * Never throws: on a failure nothing is priced and the rows read "+ parts".
+ */
+export async function priceProductParts(args: {
+  db: SupabaseClient;
+  reg: string;
+  carTypeId: number;
+  rows: readonly ProductPartsRow[];
+}): Promise<LevelParts> {
+  const rows = args.rows.filter((row) => row.partTypes.length > 0);
+  if (rows.length === 0) return EMPTY;
+  try {
+    const result = await quoteJobParts({
+      db: args.db,
+      reg: args.reg,
+      carTypeId: args.carTypeId,
+      jobs: rows.flatMap((row) => servicePartsJobs(row)),
+    });
+    return foldProductParts(rows, result);
+  } catch (err) {
+    console.error("[catalogue] pricing services' parts failed:", err);
     return EMPTY;
   }
 }

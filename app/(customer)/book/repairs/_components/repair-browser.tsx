@@ -184,7 +184,7 @@ export async function RepairBrowser({
       <p className="text-xs text-text-muted">
         Repairs are priced on labour from the manufacturer&apos;s book time for your exact
         vehicle, plus the parts that job needs; diagnostics, servicing and inspections are
-        set prices.
+        set prices, plus any oil and parts your car takes.
         {adding && " Jobs booked together are done in one visit."}
       </p>
 

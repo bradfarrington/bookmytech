@@ -223,6 +223,7 @@ export function RepairRows({
                         {" · "}includes engine oil, {node.oil.litres} L
                       </>
                     )}
+                    {partsNote(node)}
                   </p>
                 </div>
                 {bookButton(node)}

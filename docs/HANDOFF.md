@@ -119,6 +119,10 @@ You are working on **Book My Tech**, a UK mobile-mechanic booking platform. This
 
 ## Current task
 
+### 📌 2026-11-20: NAPA parts on services (Task 83), not yet pushed
+
+Read `docs/tasks/83-service-napa-parts.md`. A service in `/admin/services` can tick NAPA part types (oil, air, pollen and fuel filters, spark plugs). They're priced for the exact car like a repair's parts, on top of the service's price, which becomes the labour. Oil stays £/litre × HaynesPro capacity. A part NAPA can't price → "Get a quote". **Migration `0091`** (apply it, then regenerate app types). Nothing changes until Brad ticks the parts and sets labour-only prices, in the same save, per service (list in the task md). Product nodes gain the same optional parts fields repair nodes have; the customer app's price display already handles them.
+
 ### 📌 2026-11-18 (night): Tasks 78–82 pushed to `main` (`e5dd5b4`)
 
 All of today's work is live: part quantities (78), Gareth's screenshot fixes (79), no NAPA timeouts + warm-up + logo loader + fluids by the litre + standard suspension (80), not-fitted repairs and admin hides (81), the parts markup switch, off by default (82), estimates switched off, and DVLA lookup on the admin quote form. No migrations. A test custom quote (S28BSW, £395, to brad9629@icloud.com) is open under Admin → Quotes → Sent: withdraw it when done. **Customer app** (`bmt-customer-app` `317079b`, `dbbacde`): part lines name their side ("Shock absorber (front left)"), search sends `parts=1`, the repair list and search show the animated logo until priced, and a repair with unpriced parts asks for a quote instead of "+ parts". Needs an EAS build to reach phones. After deploy every stored NAPA answer is fetched again once (`OFFER_READ_VERSION` 2), so first visits are slower until warmed.

@@ -9,7 +9,8 @@
 // has confirmed the car and opened the repair list, the answers are stored,
 // and the list prices from them at once.
 //
-// What is asked: the car's whole HaynesPro tree (about 3 calls: getFullTree,
+// What is asked: the part types the services offered for the car's fuel buy
+// (Task 83: filters and plugs), then the car's whole HaynesPro tree (about 3 calls: getFullTree,
 // then getRepairtimeNodesV4 200 ids at a time, both memoised), less the
 // repairs Gareth hid, Common jobs first. A part type is asked once however
 // many repairs use it, ten at a time so NAPA is never flooded, and never
@@ -20,6 +21,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { aagRegKey } from "@/lib/aag/client";
+import { loadCatalogueProducts } from "@/lib/catalogue/load-products";
+import { productsForFuel } from "@/lib/catalogue/products";
+import { servicePartTypes } from "@/lib/catalogue/service-parts";
+import { vehicleFuelFamily } from "@/lib/haynespro/fuel";
 import { excludedRepairNodeIdsForVehicle, NO_EXCLUSIONS } from "@/lib/haynespro/exclusions";
 import { getFullRepairTree, getRepairNodesByIds } from "@/lib/haynespro/tree";
 import type { HpRepairtimeNode } from "@/lib/haynespro/types";
@@ -73,9 +78,12 @@ export async function warmVehicleParts(db: SupabaseClient, reg: string): Promise
       }
     }
 
-    const hidden = await excludedRepairNodeIdsForVehicle(vehicle.hpModelLabel, db).catch(() => NO_EXCLUSIONS);
+    const [hidden, services] = await Promise.all([
+      excludedRepairNodeIdsForVehicle(vehicle.hpModelLabel, db).catch(() => NO_EXCLUSIONS),
+      servicePartTypesFor(db, vehicle.carTypeId),
+    ]);
     const visible = scannedRepairs(tree, nodes).filter((r) => isVisible(r, hidden));
-    const partTypes = partTypesToWarm(visible);
+    const partTypes = [...new Set([...services, ...partTypesToWarm(visible)])];
     for (let i = 0; i < partTypes.length; i += GENARTS_PER_BATCH) {
       await loadAagPartOffers(db, key, partTypes.slice(i, i + GENARTS_PER_BATCH));
     }
@@ -84,5 +92,16 @@ export async function warmVehicleParts(db: SupabaseClient, reg: string): Promise
     console.error("[parts] warming", key, "failed:", err);
     warmedAt.delete(key);
     return null;
+  }
+}
+
+/** The part types the live services offered for this car's fuel buy (Task 83). Never throws. */
+async function servicePartTypesFor(db: SupabaseClient, carTypeId: number): Promise<number[]> {
+  try {
+    const [rows, fuel] = await Promise.all([loadCatalogueProducts(db), vehicleFuelFamily(carTypeId)]);
+    const live = productsForFuel(rows.filter((row) => row.is_active), fuel);
+    return [...new Set(live.flatMap((row) => servicePartTypes(row.part_genart_ids).map((t) => t.genartId)))];
+  } catch {
+    return [];
   }
 }

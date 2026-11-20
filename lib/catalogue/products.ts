@@ -13,6 +13,7 @@
 
 import { billableHours } from "@/lib/pricing/billable";
 import type { CatalogueNode } from "@/lib/haynespro/catalogue";
+import { servicePartTypes, type ServicePartType } from "./service-parts";
 
 const PRODUCT_PREFIX = "p:";
 const CATEGORY_PREFIX = "c:";
@@ -92,6 +93,8 @@ export interface CatalogueProductRow {
   fuel_types?: string[] | null;
   /** 0088 (Task 74) — what the customer reads before booking it; headings, bullets and paragraphs. */
   info_sheet?: string | null;
+  /** 0091 (Task 83) — the NAPA part types it buys for the car; null or empty = none. */
+  part_genart_ids?: number[] | null;
 }
 
 // --- Fuel (Task 74) ---------------------------------------------------------
@@ -201,6 +204,11 @@ export interface QuotableProduct {
   description: string | null;
   /** What the customer reads before booking (Task 74); null when there is none. */
   infoSheet: string | null;
+  /**
+   * The NAPA parts it buys for the car (Task 83), priced per car on top of
+   * the price above. Empty for most products: the price is then the whole price.
+   */
+  partTypes: ServicePartType[];
 }
 
 export function toQuotableProduct(row: CatalogueProductRow): QuotableProduct {
@@ -217,6 +225,7 @@ export function toQuotableProduct(row: CatalogueProductRow): QuotableProduct {
     summary: row.summary?.trim() || null,
     description: row.description?.trim() || null,
     infoSheet: row.info_sheet?.trim() || null,
+    partTypes: servicePartTypes(row.part_genart_ids),
   };
 }
 
@@ -270,7 +279,7 @@ export function productIncludes(description: string | null | undefined): string[
     .filter(Boolean);
 }
 
-/** The product's own price at this rate, before oil. Null when it can't be priced. */
+/** The product's own price at this rate, before oil and parts. Null when it can't be priced. */
 export function productBasePence(product: QuotableProduct, hourlyRatePence: number): number | null {
   if (product.pricePence != null) return product.pricePence;
   const billed = billableHours(product.labourHours);
@@ -306,6 +315,9 @@ export function toProductNode(
     ...(product.pricePence != null ? { fixedPrice: true as const } : {}),
     durationHours: product.durationHours,
     oil: oilLine,
+    // Its NAPA parts (Task 83): until they're priced for the car, a client
+    // reads "+ parts" (or offers a quote) the same as for a repair.
+    ...(product.partTypes.length > 0 ? { genartIds: product.partTypes.map((t) => t.genartId) } : {}),
   };
 }
 

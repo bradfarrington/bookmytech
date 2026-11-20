@@ -15,6 +15,7 @@ import {
   type FuelFamily,
   type ProductCategory,
 } from "@/lib/catalogue/products";
+import { SERVICE_PART_TYPES, servicePartTypes } from "@/lib/catalogue/service-parts";
 import type { ChecklistRow } from "@/lib/checklists/checklists";
 import { createProduct, updateProduct, type ProductInput } from "@/app/actions/catalogue-products";
 
@@ -75,6 +76,10 @@ export function ProductForm({
   const initialFuels = product ? productFuels(product) : [];
   const [fuel, setFuel] = useState<FuelChoice>(initialFuels.length === 1 ? initialFuels[0] : "any");
   const [infoSheet, setInfoSheet] = useState(product?.info_sheet ?? "");
+  const [partIds, setPartIds] = useState<number[]>(() =>
+    servicePartTypes(product?.part_genart_ids).map((t) => t.genartId),
+  );
+  const hasParts = partIds.length > 0;
 
   function submit() {
     setError(null);
@@ -93,6 +98,7 @@ export function ProductForm({
       checklistTier: chosenChecklist?.kind === "inspection" ? checklistTier || null : null,
       fuelTypes: fuel === "any" ? null : [fuel],
       infoSheet,
+      partGenartIds: partIds,
     };
     startTransition(async () => {
       const result = mode === "create" ? await createProduct(input) : await updateProduct(product!.id, input);
@@ -208,7 +214,7 @@ export function ProductForm({
           </label>
           {pricing === "fixed" ? (
             <label className={FIELD_LABEL}>
-              <span>Price</span>
+              <span>{hasParts ? "Price (labour)" : "Price"}</span>
               <div className="relative">
                 <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-semibold text-text-muted">£</span>
                 <input
@@ -222,6 +228,9 @@ export function ProductForm({
                   className={`${FIELD_INPUT} pl-8`}
                 />
               </div>
+              {hasParts && (
+                <span className="text-xs font-normal text-text-muted">Your labour only: the NAPA parts below are added on top.</span>
+              )}
             </label>
           ) : (
             <label className={FIELD_LABEL}>
@@ -291,6 +300,38 @@ export function ProductForm({
           </div>
           <Switch checked={includesOil} onChange={setIncludesOil} label="Includes engine oil" disabled={pending} />
         </div>
+
+        {/* NAPA parts (Task 83) */}
+        <fieldset className="space-y-3 rounded-button border border-border bg-surface p-4">
+          <legend className="sr-only">NAPA parts</legend>
+          <div>
+            <p className="text-sm font-semibold text-text-primary">NAPA parts</p>
+            <p className="text-xs text-text-muted">
+              Priced from NAPA for the customer&apos;s exact car and added on top of the price above, the same way a
+              repair&apos;s parts are: the right part, every spark plug the engine has, your parts markup and your
+              picks for the model. If NAPA can&apos;t price one for a car, the customer is offered a quote instead.
+              Engine oil stays on the switch below.
+            </p>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-3">
+            {SERVICE_PART_TYPES.map((type) => (
+              <label key={type.genartId} className="flex items-center gap-3 text-sm text-text-secondary">
+                <input
+                  type="checkbox"
+                  checked={partIds.includes(type.genartId)}
+                  disabled={pending}
+                  onChange={(e) =>
+                    setPartIds((ids) =>
+                      e.target.checked ? [...ids, type.genartId] : ids.filter((id) => id !== type.genartId),
+                    )
+                  }
+                  className="size-4 rounded border-border accent-brand-blue"
+                />
+                {type.label}
+              </label>
+            ))}
+          </div>
+        </fieldset>
 
         <div className="flex flex-col gap-4 rounded-button border border-border bg-surface p-4 sm:flex-row sm:items-center sm:justify-between">
           <div>

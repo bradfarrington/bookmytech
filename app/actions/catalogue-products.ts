@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { FUEL_FAMILIES, productId, type FuelFamily, type ProductCategory } from "@/lib/catalogue/products";
+import { servicePartTypes } from "@/lib/catalogue/service-parts";
 
 // The admin's fixed-price products (Task 31): diagnostics, servicing and
 // pre-purchase inspections beside the HaynesPro repair tree. Every write goes
@@ -51,6 +52,8 @@ export interface ProductInput {
   fuelTypes?: string[] | null;
   /** Task 74: what the customer reads before booking it. */
   infoSheet?: string | null;
+  /** Task 83: the NAPA part types it buys for the car (lib/catalogue/service-parts.ts); empty = none. */
+  partGenartIds?: number[] | null;
 }
 
 type Cleaned = {
@@ -67,6 +70,7 @@ type Cleaned = {
   checklist_tier: string | null;
   fuel_types: FuelFamily[] | null;
   info_sheet: string | null;
+  part_genart_ids: number[] | null;
 };
 
 const TIERS = ["bronze", "silver", "gold"];
@@ -103,6 +107,7 @@ function clean(input: ProductInput): { ok: true; row: Cleaned } | { ok: false; e
   const fuels = FUEL_FAMILIES.filter((f) => (input.fuelTypes ?? []).includes(f));
   const info_sheet = (input.infoSheet ?? "").trim() || null;
   if (info_sheet && info_sheet.length > MAX_INFO_SHEET) return { ok: false, error: "That info sheet is too long." };
+  const partIds = servicePartTypes(input.partGenartIds).map((t) => t.genartId);
 
   return {
     ok: true,
@@ -120,33 +125,46 @@ function clean(input: ProductInput): { ok: true; row: Cleaned } | { ok: false; e
       checklist_tier,
       fuel_types: fuels.length > 0 ? fuels : null,
       info_sheet,
+      part_genart_ids: partIds.length > 0 ? partIds : null,
     },
   };
 }
 
 /**
- * Write a product, coping with a database that predates 0088 (Task 74): the
- * fuel and info-sheet columns don't exist yet. When they're left at their
- * defaults the write goes ahead without them; when they're set, the admin is
- * told why they can't be saved yet.
+ * Write a product, coping with a database that predates 0088 (Task 74: fuels
+ * and info sheets) or 0091 (Task 83: NAPA parts). A missing column left at its
+ * default is dropped and the write goes ahead without it; one that's set
+ * tells the admin which migration it needs.
  */
 async function writeWithoutMissingColumns<T>(
   row: Cleaned,
   write: (values: Partial<Cleaned>) => PromiseLike<{ data: T | null; error: { code?: string; message: string } | null }>,
 ): Promise<{ data: T | null; error: { code?: string; message: string } | null }> {
-  const first = await write(row);
-  const missing = first.error && /fuel_types|info_sheet/.test(first.error.message);
-  if (!missing) return first;
-  if (row.fuel_types != null || row.info_sheet != null) {
-    return {
-      data: null,
-      error: { message: "Fuels and info sheets can't be saved until migration 0088 is applied." },
-    };
+  let values: Partial<Cleaned> = row;
+  for (;;) {
+    const result = await write(values);
+    const message = result.error?.message ?? "";
+    if (/part_genart_ids/.test(message) && "part_genart_ids" in values) {
+      if (values.part_genart_ids != null) {
+        return { data: null, error: { message: "NAPA parts can't be saved until migration 0091 is applied." } };
+      }
+      const { part_genart_ids: _parts, ...rest } = values;
+      void _parts;
+      values = rest;
+      continue;
+    }
+    if (/fuel_types|info_sheet/.test(message) && ("fuel_types" in values || "info_sheet" in values)) {
+      if (values.fuel_types != null || values.info_sheet != null) {
+        return { data: null, error: { message: "Fuels and info sheets can't be saved until migration 0088 is applied." } };
+      }
+      const { fuel_types: _fuels, info_sheet: _sheet, ...rest } = values;
+      void _fuels;
+      void _sheet;
+      values = rest;
+      continue;
+    }
+    return result;
   }
-  const { fuel_types: _fuels, info_sheet: _sheet, ...rest } = row;
-  void _fuels;
-  void _sheet;
-  return write(rest);
 }
 
 function revalidate() {

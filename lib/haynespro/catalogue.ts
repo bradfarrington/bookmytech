@@ -26,7 +26,7 @@ import {
   overrideFor,
   type CatalogueOverlay,
 } from "@/lib/catalogue/overlay";
-import { priceLevelParts, type PartsRow } from "@/lib/catalogue/level-parts";
+import { priceLevelParts, priceProductParts, type LevelParts, type PartsRow } from "@/lib/catalogue/level-parts";
 import { loadCatalogueProducts } from "@/lib/catalogue/load-products";
 import {
   composeTopLevel,
@@ -466,25 +466,16 @@ async function withLevelParts(
   reg: string,
   db: SupabaseClient,
 ): Promise<CatalogueNode[]> {
-  // A product already shows its whole price (its own, plus any engine oil);
-  // only HaynesPro-backed repairs have parts on top of labour.
-  const rowIds = nodes
-    .filter((n) => n.kind === "repair" && !n.productId && n.pricePence != null)
-    .map((n) => n.id);
-  if (rowIds.length === 0) return nodes;
-
-  // What each chosen id stands for — a job, or the several a combined repair
-  // books together. The same expansion the quote uses.
-  const items = expandCatalogueItems(rowIds, context.overlay);
-  if (!items) return nodes;
-
-  const rows: PartsRow[] = [];
-  for (const item of items) {
-    const jobs = item.nodeIds.map((id) => rawById.get(id)).filter((n): n is HpRepairtimeNode => n != null);
-    if (jobs.length === item.nodeIds.length) rows.push({ rowId: item.id, nodes: jobs });
-  }
-
-  const parts = await priceLevelParts({ db, reg, carTypeId: context.carTypeId, rows });
+  const [repairs, products] = await Promise.all([
+    repairRowParts(context, nodes, rawById, reg, db),
+    productRowParts(context, nodes, reg, db),
+  ]);
+  const parts: LevelParts = {
+    totals: new Map([...repairs.totals, ...products.totals]),
+    estimated: new Set([...repairs.estimated, ...products.estimated]),
+    needsQuote: new Set([...repairs.needsQuote, ...products.needsQuote]),
+    notFitted: new Set([...repairs.notFitted, ...products.notFitted]),
+  };
   if (parts.totals.size === 0 && parts.needsQuote.size === 0 && parts.notFitted.size === 0) return nodes;
 
   // A repair for a part this car doesn't have (rear discs on rear drums) isn't listed.
@@ -499,6 +490,54 @@ async function withLevelParts(
       ...(parts.estimated.has(node.id) ? { partsEstimated: true } : {}),
     };
   });
+}
+
+const NO_PARTS: LevelParts = { totals: new Map(), estimated: new Set(), needsQuote: new Set(), notFitted: new Set() };
+
+/** The parts of the HaynesPro-backed rows: jobs and combined repairs. */
+async function repairRowParts(
+  context: CatalogueContext,
+  nodes: readonly CatalogueNode[],
+  rawById: ReadonlyMap<string, HpRepairtimeNode>,
+  reg: string,
+  db: SupabaseClient,
+): Promise<LevelParts> {
+  const rowIds = nodes
+    .filter((n) => n.kind === "repair" && !n.productId && n.pricePence != null)
+    .map((n) => n.id);
+  if (rowIds.length === 0) return NO_PARTS;
+
+  // What each chosen id stands for — a job, or the several a combined repair
+  // books together. The same expansion the quote uses.
+  const items = expandCatalogueItems(rowIds, context.overlay);
+  if (!items) return NO_PARTS;
+
+  const rows: PartsRow[] = [];
+  for (const item of items) {
+    const jobs = item.nodeIds.map((id) => rawById.get(id)).filter((n): n is HpRepairtimeNode => n != null);
+    if (jobs.length === item.nodeIds.length) rows.push({ rowId: item.id, nodes: jobs });
+  }
+  return priceLevelParts({ db, reg, carTypeId: context.carTypeId, rows });
+}
+
+/**
+ * The NAPA parts of the product rows that buy some (Task 83: a service's
+ * filters and plugs). A product without any already shows its whole price:
+ * its own, plus any engine oil.
+ */
+async function productRowParts(
+  context: CatalogueContext,
+  nodes: readonly CatalogueNode[],
+  reg: string,
+  db: SupabaseClient,
+): Promise<LevelParts> {
+  const listed = new Set(nodes.filter((n) => n.productId && n.pricePence != null).map((n) => n.id));
+  if (listed.size === 0) return NO_PARTS;
+  const rows = context.products
+    .map(toQuotableProduct)
+    .filter((p) => listed.has(p.id) && p.partTypes.length > 0);
+  if (rows.length === 0) return NO_PARTS;
+  return priceProductParts({ db, reg, carTypeId: context.carTypeId, rows });
 }
 
 /**
@@ -582,8 +621,10 @@ export async function getRepairCatalogueLevel(
   }
 
   if (isProductCategoryId(level)) {
-    // A product's price is already its whole price; there is nothing to add.
-    return { ok: true, vehicle: context.vehicle, nodes: await composeProductLevel(context, level) };
+    // A product's price is its whole price, unless it buys NAPA parts (Task 83).
+    const nodes = await composeProductLevel(context, level);
+    const priced = options.priceParts ? await withLevelParts(context, nodes, new Map(), reg, db) : nodes;
+    return { ok: true, vehicle: context.vehicle, nodes: priced };
   }
 
   const { nodes, rawById } = await composeLevelFor(context, level, raw);

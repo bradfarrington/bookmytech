@@ -14,8 +14,10 @@
 // 1h applied ONCE to the whole booking's hourly work, × the global hourly
 // rate. A fixed-price product adds its price; a servicing product adds engine
 // oil at £/litre × the vehicle's capacity; each job adds the Alliance
-// Automotive parts its part groups need (lib/parts/quote-parts.ts). Oil and
-// parts together are the parts line. Commission comes out of the total.
+// Automotive parts its part groups need (lib/parts/quote-parts.ts), and a
+// product adds the NAPA parts the admin ticked for it (Task 83: a service's
+// filters and plugs, lib/catalogue/service-parts.ts). Oil and parts together
+// are the parts line. Commission comes out of the total.
 //
 // The quote is re-derived SERVER-SIDE from (reg, ids) at every funnel step
 // (match → slot → checkout hold → booking create) — the client never supplies
@@ -47,6 +49,7 @@ import {
   type OilQuote,
   type QuotableProduct,
 } from "@/lib/catalogue/products";
+import { servicePartsJobs } from "@/lib/catalogue/service-parts";
 import { partGroupsOnNodes } from "@/lib/parts/part-groups";
 import { vehicleFuelFamily } from "./fuel";
 import { needsManualQuote, quoteJobParts, type PartsJob, type QuotedPart } from "@/lib/parts/quote-parts";
@@ -117,7 +120,11 @@ export interface RepairsQuote {
   /** Hours the visit is blocked out for: billed hours + fixed products' durations. */
   visitHours: number;
   // --- Parts (Task 43). ADDITIVE. ---
-  /** The Alliance Automotive parts the jobs need: one per job, part group and axle. With any oil, they make breakdown.partsPence. */
+  /**
+   * The Alliance Automotive parts the jobs need: one per job, part group and
+   * axle; and a product's (Task 83), under the product's "p:<uuid>" id. With
+   * any oil, they make breakdown.partsPence.
+   */
   parts: QuotedPart[];
 }
 
@@ -438,15 +445,19 @@ export async function quoteRepairsResult(
       }
     }
 
-    // The part groups each job uses, as HaynesPro names them (Task 43).
-    const partsJobs: PartsJob[] = nodeIds.map((id) => ({
-      nodeId: id,
-      description: quotable.get(id)!.description,
-      groups: partGroupsOnNodes([rawNodes.get(id)!]).map((g) => ({
-        genartId: g.genartId,
-        label: g.description || `Part group ${g.genartId}`,
+    // The part groups each job uses, as HaynesPro names them (Task 43), and
+    // the parts each product buys (Task 83), priced in the same call.
+    const partsJobs: PartsJob[] = [
+      ...nodeIds.map((id) => ({
+        nodeId: id,
+        description: quotable.get(id)!.description,
+        groups: partGroupsOnNodes([rawNodes.get(id)!]).map((g) => ({
+          genartId: g.genartId,
+          label: g.description || `Part group ${g.genartId}`,
+        })),
       })),
-    }));
+      ...products.flatMap(servicePartsJobs),
+    ];
 
     const [hourlyRatePence, commissionRate, combineMode, pricedParts] = await Promise.all([
       overrides.hourlyRatePence != null && overrides.hourlyRatePence > 0
@@ -461,9 +472,12 @@ export async function quoteRepairsResult(
     if (!pricedParts.ok) {
       if (!needsManualQuote(pricedParts.missing)) return { ok: false, reason: "parts_unavailable" };
       const unpriced = new Set(pricedParts.missing.map((m) => m.nodeId));
-      const quoteJobs = items
-        .filter((item) => item.nodeIds.some((id) => unpriced.has(id)))
-        .map((item) => item.label ?? displayName({ id: item.nodeIds[0], description: quotable.get(item.nodeIds[0])?.description }, overlay));
+      const quoteJobs = [
+        ...items
+          .filter((item) => item.nodeIds.some((id) => unpriced.has(id)))
+          .map((item) => item.label ?? displayName({ id: item.nodeIds[0], description: quotable.get(item.nodeIds[0])?.description }, overlay)),
+        ...products.filter((product) => unpriced.has(product.id)).map((product) => product.name),
+      ];
       return { ok: false, reason: "parts_unavailable", needsQuote: true, quoteJobs };
     }
 
