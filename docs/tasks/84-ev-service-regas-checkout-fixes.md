@@ -30,4 +30,4 @@ The payment step (where "To pay" is) now has "Have a discount code?" too, as wel
 - [x] Discount code on the payment step, before the card is authorised
 - [ ] Brad sets the two services' prices and switches them on
 - [ ] Interim and Full service set to petrol + diesel once the EV service is live (they currently show for EVs, with oil)
-- [ ] EV registrations HaynesPro doesn't recognise: waiting on example regs from Brad
+- [x] "EVs not recognised" (BD26HXH, FN72RMO, EA23XLW, checked 2026-11-23): all three match HaynesPro on the live site (Puma Gen-E, Leaf ZE1, S-Max 2.5 FHEV) with full repair data. The real fault: a pure EV's Servicing offered only Interim and Full service (no fuel set), and both went to "Get a quote" because NAPA has no oil filter for an electric car, so an EV had no bookable service. Fixed by switching on the EV service and setting Interim + Full to petrol + diesel, both at the same moment (the two boxes above). EA23XLW is a petrol hybrid and prices all three services normally. It had never been matched before, so an earlier failure was probably a passing HaynesPro error (failures are remembered for a few minutes).
