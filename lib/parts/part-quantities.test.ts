@@ -263,6 +263,28 @@ describe("fluid packs", () => {
     expect(packLitres("NAPA Battery EFB STOP START 12V 60AH 560CCA")).toBeNull();
   });
 
+  // BD26HXH (Puma Gen-E), 2026-11-23: NAPA's only brake fluids were Febi's,
+  // none sized, and "Best, dearest" charged £45.57 for a 1 litre need.
+  it("takes the cheapest brake fluid when no bottle says its size", () => {
+    const febi = [
+      fluid("FEB171874", "FEB BRAKE FLUID", 30.67),
+      fluid("FEB171876", "BRAKE FLUID", 7.58),
+      fluid("FEB171875", "BRAKE FLUID", 45.57),
+      fluid("FEB180590", "BRAKE FLUID", 10.81),
+    ];
+    expect(sensiblePacks(febi).map((o) => o.partNumber)).toEqual(["FEB171876"]);
+    expect(bought("Renew the brake fluid", febi)).toEqual(["FEB171876×1"]);
+    // With HaynesPro's 1 litre known, no bottle size to work from: the same pick.
+    const withNeed = selectJobParts("Renew the brake fluid", febi, null, { kind: "brake_fluid", litres: 1 });
+    expect(withNeed.map((p) => (p.selection.source === "none" ? "none" : `${p.selection.offer.partNumber}×${p.quantity}`))).toEqual(["FEB171876×1"]);
+    // Still within the best rating offered.
+    const rated = [...febi, fluid("BEST", "BRAKE FLUID", 12.5, "Best")];
+    expect(sensiblePacks(rated).map((o) => o.partNumber)).toEqual(["BEST"]);
+    // Unsized parts that aren't brake fluid keep the usual pick.
+    const other = [fluid("A", "ANTI FREEZE MULTI VEHICLE RED CON", 20), fluid("B", "ANTI FREEZE", 10)];
+    expect(sensiblePacks(other)).toEqual(other);
+  });
+
   it("never charges a workshop drum, and takes up to 5 litres of antifreeze", () => {
     const offers = [
       fluid("1L", "LONGLIFE UNIVERSAL (1L)", 8.27),

@@ -140,8 +140,8 @@ const DRUM_LITRES = 25;
 export function sensiblePacks(offers: readonly SupplierOffer[]): readonly SupplierOffer[] {
   const sized = offers.map((offer) => ({ offer, litres: packLitres(offer.description) }));
   const labelled = sized.filter((s) => s.litres != null);
+  if (labelled.length === 0) return unsizedBrakeFluid(offers) ?? offers;
   // One size mentioned among other parts ("…1.6L"?) isn't a range of packs.
-  if (labelled.length === 0) return offers;
   if (labelled.length === 1 && (labelled[0].litres as number) <= DRUM_LITRES) return offers;
   if (labelled.length === 1) return sized.filter((s) => s.litres == null).map((s) => s.offer);
   const packs = sized.filter((s) => s.litres != null && s.litres <= DRUM_LITRES);
@@ -157,6 +157,26 @@ export function sensiblePacks(offers: readonly SupplierOffer[]): readonly Suppli
   }
   const smallest = Math.min(...sizes);
   return packs.filter((s) => s.litres === smallest).map((s) => s.offer);
+}
+
+/**
+ * Brake fluid NAPA lists with no size on any bottle (2026-11-23): the
+ * cheapest within the best rating, not the dearest. Febi's range reads just
+ * "BRAKE FLUID" (BD26HXH, S28BSW; NAPA's product info says no more), and
+ * "Best, dearest" charged its £45.57 bottle for the Puma Gen-E's 1 litre.
+ * Every sized brake fluid NAPA lists puts 1 litre at £9.34–£25.12 and 5
+ * litres at £33+, so the dear unlabelled ones are the big packs, and the job
+ * buys a 1 litre bottle (packCapLitres). Null when it isn't brake fluid.
+ * Pure.
+ */
+function unsizedBrakeFluid(offers: readonly SupplierOffer[]): readonly SupplierOffer[] | null {
+  if (packCapLitres(offers) !== 1) return null;
+  const priced = offers.filter((o) => o.buyable && o.costPence != null);
+  if (priced.length === 0) return null;
+  const rank = Math.max(...priced.map((o) => ratingRank(o.tier)));
+  const best = priced.filter((o) => ratingRank(o.tier) === rank);
+  const cheapest = Math.min(...best.map((o) => o.costPence as number));
+  return best.filter((o) => o.costPence === cheapest);
 }
 
 /**
