@@ -119,9 +119,9 @@ You are working on **Book My Tech**, a UK mobile-mechanic booking platform. This
 
 ## Current task
 
-### 📌 2026-11-23: Multi-job checkout fix, refrigerant by weight, EV service, discount code on the payment page (Task 84), not yet pushed
+### 📌 2026-11-23: Multi-job checkout fix, EV service, air con regas, discount code on the payment page (Task 84), not yet pushed
 
-Read `docs/tasks/84-ev-service-regas-checkout-fixes.md`. **Live bug fixed:** a basket mixing a HaynesPro job with a service failed to save its lines (supabase-js fills a key a row lacks with NULL, not the default; `kind` is not-null), leaving an orphaned hold. Rule from now on: **every row of a bulk insert names the same keys.** Refrigerant (1442) is priced by HaynesPro's grams × a £/100 g setting per gas (new on `/admin/pricing`, unset = quote). "EV service" and "Air con regas" created switched off at £0. Discount code now on the payment step too. No migration; no API shape change, so nothing to do in the apps.
+Read `docs/tasks/84-ev-service-regas-checkout-fixes.md`. **Live bug fixed:** a basket mixing a HaynesPro job with a service failed to save its lines (supabase-js fills a key a row lacks with NULL, not the default; `kind` is not-null), leaving an orphaned hold. Rule from now on: **every row of a bulk insert names the same keys.** "EV service" (electric, pollen filter from NAPA) and "Air con regas" (fixed price) created switched off at £0. Every HaynesPro air-con job is hidden globally (group `1V00000000G`). Discount code now on the payment step too. No migration; no API shape change, so nothing to do in the apps.
 
 ### 📌 2026-11-20: NAPA parts on services (Task 83), pushed (`215937b`; app `87de71a`); migration 0091 applied
 

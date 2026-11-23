@@ -3,15 +3,12 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { applyPartsMarkup } from "./parts-markup";
-
 import { parseAagEnvelope } from "@/lib/aag/client";
 import { flattenQuote } from "@/lib/aag/quote";
 import type { AagQuoteBody } from "@/lib/aag/types";
 import type { AagPartOffers } from "./aag-part-prices";
 import {
   catalogueBookingPartRows,
-  REFRIGERANT_GENART,
   choiceKey,
   customerPartLines,
   needsManualQuote,
@@ -374,45 +371,5 @@ describe("customerPartLines", () => {
     expect(customerPartLines([part])).toEqual([
       { nodeId: "discs", name: "Brake disc", brand: "BREMBO", position: "front", quantity: 2, unitPence: 4354, linePence: 8708, estimated: false },
     ]);
-  });
-});
-
-describe("priceJobParts: air-con refrigerant by weight (2026-11-23)", () => {
-  const regas = {
-    nodeId: "p:regas",
-    description: "Regas the air conditioning",
-    groups: [{ genartId: REFRIGERANT_GENART, label: "Refrigerant" }],
-  };
-
-  it("charges HaynesPro's grams at the gas's price, named so the mechanic knows what to put in", () => {
-    const result = priceJobParts({
-      jobs: [regas],
-      offers: new Map(),
-      refrigerant: { gas: "R1234yf", grams: 460, pencePer100g: 1500, pence: 6900 },
-      now: "2026-11-23T00:00:00.000Z",
-    });
-    expect(result).toEqual({
-      ok: true,
-      parts: [
-        expect.objectContaining({
-          nodeId: "p:regas",
-          genartId: REFRIGERANT_GENART,
-          groupLabel: "Air-con refrigerant R1234yf · 460 g",
-          supplier: null,
-          quantity: 1,
-          unitPence: 6900,
-          linePence: 6900,
-          source: "set_price",
-        }),
-      ],
-    });
-    // Not NAPA-priced, so the parts markup leaves it alone.
-    expect(applyPartsMarkup(result.parts, 0.2)[0].linePence).toBe(6900);
-  });
-
-  it("goes to a quote when there's no figure or no price", () => {
-    const result = priceJobParts({ jobs: [regas], offers: new Map(), refrigerant: null });
-    expect(result.ok).toBe(false);
-    expect(result.ok ? [] : result.missing.map((m) => m.genartId)).toEqual([REFRIGERANT_GENART]);
   });
 });

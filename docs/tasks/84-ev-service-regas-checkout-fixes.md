@@ -1,6 +1,6 @@
 # Task 84: EV service, air-con regas, discount code on the payment page, multi-job checkout fix
 
-**Status:** ✅ Complete (2026-11-23), not yet pushed. The multi-job booking fix, refrigerant by weight, the two new services (created switched off at £0) and the discount code on the payment step all shipped. No migration. Deviations: refrigerant isn't from NAPA, which sells none (2026-11-17 parts-gap review: part type 1442 is "empty" on every car), so it's HaynesPro's grams × a £-per-100 g setting per gas, like engine oil. Not tried in a browser: typecheck, lint and unit tests only.
+**Status:** ✅ Complete (2026-11-23), not yet pushed. The multi-job booking fix, the two new services (created switched off at £0) and the discount code on the payment step shipped. No migration. Deviation: air-con regas is a fixed price, not refrigerant by weight (see 2). Not tried in a browser: typecheck, lint and unit tests only.
 
 Brad, 2026-11-23: "Can we create a ev service … add into it a pollen filter as all evs had them done - Also air conditioning regas needs to be added as well - I've just spotted on checkout there's nowhere to put the discount code … [multi-job booking] wont let me finalise". Then: "do 2 - but this needs to pull parts from napa and the amount from haynespro - 3. yes add it to the payment page aswell as before payment so it is a double".
 
@@ -12,12 +12,11 @@ Brad, 2026-11-23: "Can we create a ev service … add into it a pollen filter as
 
 ## 2. EV service and air-con regas
 
-- **Refrigerant by weight** (`lib/haynespro/refrigerant.ts`): HaynesPro's capacities give the charge in grams, sometimes per gas ("With R134a / R1234yf refrigerant" headings) or per heat-pump variant. The gas is the one HaynesPro names. Where it names both or neither: a plate from 2017 on is R1234yf (a plate can't make a car look newer), from 2012 or before is R134a, and otherwise the dearer gas is charged. The figure is the largest for that gas.
-- **Prices**: `/admin/pricing` → "Air-con refrigerant", R1234yf and R134a per 100 g (`platform_settings` keys `refrigerant_r1234yf_price_per_100g_pence`, `refrigerant_r134a_price_per_100g_pence`). Unset = a job needing gas goes to a quote.
-- **Engine**: `quoteJobParts` prices part type 1442 (`REFRIGERANT_GENART`) this way and never asks NAPA for it or logs it as a NAPA gap. It's a `set_price` line named "Air-con refrigerant R1234yf · 460 g", so the mechanic knows what to put in, with no markup. This also prices HaynesPro air-con repairs that carry 1442 (evaporator, compressor lines), which went to a quote before.
-- **Services**: "Air-con refrigerant" is tickable on a service (`SERVICE_PART_TYPES`). Created, both **switched off at £0** for Brad to set the labour price and switch on:
-  - **EV service**: servicing, fuel = electric, pollen filter from NAPA, no engine oil, no checklist yet (Brad is writing the schedule).
-  - **Air con regas**: servicing, every fuel, **a fixed price** like the pre-purchase inspections (Brad, 2026-11-23: "the air con regas wont be pulling prices it will be a fixed price"). Refrigerant isn't ticked on it. The by-weight pricing stays for HaynesPro air-con repairs, and does nothing until the gas prices are set.
+Created, both **switched off at £0** for Brad to set the price and switch on:
+- **EV service**: servicing, fuel = electric, pollen filter priced from NAPA per car (Task 83), no engine oil, no checklist yet (Brad is writing the schedule).
+- **Air con regas**: servicing, every fuel, **a fixed price** like the pre-purchase inspections. No parts.
+
+Refrigerant by weight (HaynesPro's grams × a £/100 g setting per gas) was built, then taken out the same day. Brad: "the air con regas wont be pulling prices it will be a fixed price like we have done for the pre purchase inspections". Every HaynesPro air-con job is already hidden for all cars, since the whole "Air conditioning" group (`1V00000000G`) got a global hide on 2026-11-18. That includes HaynesPro's own regas ("Drain/refill the air-conditioning system"), and no model shows any of it. So nothing was left for by-weight pricing to price. If it's ever wanted: HaynesPro's capacities carry "Refrigerant = 460 ± 15 (g)" rows, headed "With R134a / R1234yf refrigerant" (fixtures `capacities-301000817.json`, `-619114949.json`), and NAPA lists nothing for part type 1442. The removed code is in commit `8259a46`.
 
 ## 3. Discount code on the payment page
 
@@ -27,9 +26,8 @@ The payment step (where "To pay" is) now has "Have a discount code?" too, as wel
 
 - [x] A basket with a HaynesPro job and a service saves its lines (row shape checked against the live table)
 - [x] Revisions write lines the same way
-- [x] Refrigerant priced from HaynesPro grams × gas price, tested against all six real capacity fixtures
 - [x] EV service and Air con regas created (switched off, £0)
 - [x] Discount code on the payment step, before the card is authorised
-- [ ] Brad sets the two services' prices and switches them on (the refrigerant prices are only needed if air-con repairs should price by weight)
+- [ ] Brad sets the two services' prices and switches them on
 - [ ] Interim and Full service set to petrol + diesel once the EV service is live (they currently show for EVs, with oil)
 - [ ] EV registrations HaynesPro doesn't recognise: waiting on example regs from Brad

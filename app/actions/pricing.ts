@@ -208,9 +208,6 @@ const SETTING_KEYS = [
   // A markup on every part priced into a repair (2026-11-18, lib/parts/parts-markup.ts).
   "parts_markup_enabled",
   "parts_markup_rate",
-  // Air-con refrigerant, pence per 100 g, by gas (2026-11-23, lib/haynespro/refrigerant.ts).
-  "refrigerant_r134a_price_per_100g_pence",
-  "refrigerant_r1234yf_price_per_100g_pence",
 ] as const;
 type SettingKey = (typeof SETTING_KEYS)[number];
 

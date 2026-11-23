@@ -30,7 +30,6 @@ import { getFullRepairTree, getRepairNodesByIds } from "@/lib/haynespro/tree";
 import type { HpRepairtimeNode } from "@/lib/haynespro/types";
 import { resolveVehicle } from "@/lib/haynespro/vehicle";
 import { loadAagPartOffers } from "./aag-part-prices";
-import { REFRIGERANT_GENART } from "./quote-parts";
 import { isVisible, scannedRepairs, treeRepairIds, type ScannedRepair } from "./model-scan";
 
 /** getRepairtimeNodesV4 takes up to 200 ids a call. */
@@ -84,8 +83,7 @@ export async function warmVehicleParts(db: SupabaseClient, reg: string): Promise
       servicePartTypesFor(db, vehicle.carTypeId),
     ]);
     const visible = scannedRepairs(tree, nodes).filter((r) => isVisible(r, hidden));
-    // Refrigerant is priced by weight, never asked of NAPA.
-    const partTypes = [...new Set([...services, ...partTypesToWarm(visible)])].filter((id) => id !== REFRIGERANT_GENART);
+    const partTypes = [...new Set([...services, ...partTypesToWarm(visible)])];
     for (let i = 0; i < partTypes.length; i += GENARTS_PER_BATCH) {
       await loadAagPartOffers(db, key, partTypes.slice(i, i + GENARTS_PER_BATCH));
     }

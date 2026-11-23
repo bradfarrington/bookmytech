@@ -43,9 +43,6 @@ export const SERVICE_PART_TYPES: readonly ServicePartType[] = [
   // must start "Brake fluid" / "Coolant" for that (quote-parts.ts fluidKind).
   { genartId: 3357, label: "Brake fluid", job: "Renew the brake fluid" },
   { genartId: 3356, label: "Coolant", job: "Renew the coolant" },
-  // Not from NAPA (it sells none): HaynesPro's grams for the car × the gas's
-  // price per 100 g on /admin/pricing (REFRIGERANT_GENART, 2026-11-23).
-  { genartId: 1442, label: "Air-con refrigerant", job: "Regas the air conditioning" },
 ];
 
 const BY_ID = new Map(SERVICE_PART_TYPES.map((t) => [t.genartId, t]));

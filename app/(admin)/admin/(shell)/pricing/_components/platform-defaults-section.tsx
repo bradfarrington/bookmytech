@@ -27,9 +27,6 @@ export interface PlatformSettings {
   parts_markup_enabled: number;
   /** The markup as a decimal: 0.2 = 20%. */
   parts_markup_rate: number;
-  /** Air-con refrigerant, pence per 100 g (2026-11-23). 0 = not set: the job goes to a quote. */
-  refrigerant_r134a_price_per_100g_pence: number;
-  refrigerant_r1234yf_price_per_100g_pence: number;
 }
 
 /** A markup percentage: 0–100%, stored as a decimal. */
@@ -215,38 +212,6 @@ export function PlatformDefaultsSection({ settings }: { settings: PlatformSettin
               {...litres}
               ariaLabel="Default engine oil litres"
               onSave={(v) => updatePlatformSetting("engine_oil_default_litres", v ?? 0)}
-            />
-          </Row>
-        </div>
-      </section>
-
-      {/* Air-con refrigerant, by weight (2026-11-23) */}
-      <section className="space-y-3">
-        <div>
-          <h2 className="text-lg font-bold tracking-tight text-text-primary">Air-con refrigerant</h2>
-          <p className="text-sm text-text-muted">
-            An air-con regas, or any air-con repair, adds refrigerant at this price per 100 g × the
-            manufacturer&apos;s stated charge for the customer&apos;s car (from HaynesPro). NAPA doesn&apos;t
-            sell refrigerant. Cars from 2017 run on R1234yf; when HaynesPro and the car&apos;s age
-            can&apos;t settle which gas, the dearer one is charged. Until a gas has a price, a job that
-            needs it goes to a quote.
-          </p>
-        </div>
-        <div className="overflow-hidden rounded-2xl border border-border bg-surface-card">
-          <Row label="R1234yf per 100 g" hint="Most cars registered from 2017">
-            <InlineNumber
-              value={settings.refrigerant_r1234yf_price_per_100g_pence || null}
-              {...pounds}
-              ariaLabel="R1234yf refrigerant price per 100 g"
-              onSave={(v) => updatePlatformSetting("refrigerant_r1234yf_price_per_100g_pence", v ?? 0)}
-            />
-          </Row>
-          <Row label="R134a per 100 g" hint="Older cars">
-            <InlineNumber
-              value={settings.refrigerant_r134a_price_per_100g_pence || null}
-              {...pounds}
-              ariaLabel="R134a refrigerant price per 100 g"
-              onSave={(v) => updatePlatformSetting("refrigerant_r134a_price_per_100g_pence", v ?? 0)}
             />
           </Row>
         </div>
