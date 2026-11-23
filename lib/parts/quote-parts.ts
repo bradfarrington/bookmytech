@@ -516,10 +516,12 @@ export function catalogueBookingPartRows(bookingId: string, parts: readonly Quot
     genart_id: part.genartId,
     node_id: part.nodeId,
     priced_at: part.pricedAt,
-    // Migration 0087 (Task 72). Only written when true, so a booking with no
-    // estimate saves exactly as before while the column is missing; see
-    // insertCatalogueBookingParts.
-    ...(part.source === "estimate" ? { price_estimated: true } : {}),
+    // Migration 0087 (Task 72). Named on EVERY row: supabase-js fills a key
+    // one row of a bulk insert lacks with NULL, not the column default, so
+    // naming it only on estimated rows broke its not-null whenever a booking
+    // mixed estimated and NAPA-priced parts (2026-11-23). If the column is
+    // ever missing, insertCatalogueBookingParts retries without it.
+    price_estimated: part.source === "estimate",
   }));
 }
 

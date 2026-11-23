@@ -280,7 +280,11 @@ describe("priceJobParts", () => {
       });
       const [, row] = catalogueBookingPartRows("b1", result.parts);
       expect(row).toMatchObject({ price_estimated: true, supplier: null, supplier_part_number: null, total_pence: 1150 });
-      expect(catalogueBookingPartRows("b1", result.parts)[0]).not.toHaveProperty("price_estimated");
+      // Every row names the column: supabase-js would send NULL for a row that
+      // left it out of a mixed insert, breaking its not-null (2026-11-23).
+      const rows = catalogueBookingPartRows("b1", result.parts);
+      expect(rows[0]).toMatchObject({ price_estimated: false });
+      expect(new Set(rows.map((r) => Object.keys(r).sort().join(","))).size).toBe(1);
       expect(customerPartLines(result.parts).map((l) => l.estimated)).toEqual([false, true]);
     });
   });
@@ -331,6 +335,7 @@ describe("catalogueBookingPartRows", () => {
         genart_id: 82,
         node_id: "discs",
         priced_at: PRICED_AT,
+        price_estimated: false,
       },
     ]);
   });
