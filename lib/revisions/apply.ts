@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { bookingRepairRows } from "@/lib/bookings/repair-lines";
 import { catalogueBookingPartRows, insertCatalogueBookingParts } from "@/lib/parts/quote-parts";
 import { loadQuotesForBooking } from "@/lib/quotes/load";
 import { approvedExtras } from "./snapshot";
@@ -56,19 +57,10 @@ export async function applyRevision(
   // repairLinesFor invariant), several become booking_repairs rows.
   await admin.from("booking_repairs").delete().eq("booking_id", revision.bookingId);
   if (after.lines.length > 1) {
-    const { error: linesError } = await admin.from("booking_repairs").insert(
-      after.lines.map((line, index) => ({
-        booking_id: revision.bookingId,
-        position: index,
-        node_id: line.nodeId,
-        description: line.description,
-        raw_hours: line.rawHours,
-        charged_hours: line.chargedHours,
-        line_pence: line.linePence,
-        ...(line.itemLabel ? { item_id: line.itemId, item_label: line.itemLabel } : {}),
-        ...(line.kind === "product" ? { kind: "product" } : {}),
-      })),
-    );
+    // Every row names the same columns — see bookingRepairRows for why.
+    const { error: linesError } = await admin
+      .from("booking_repairs")
+      .insert(bookingRepairRows(revision.bookingId, after.lines));
     if (linesError) console.error("[revisions] repair lines insert failed", revision.id, linesError);
   }
 

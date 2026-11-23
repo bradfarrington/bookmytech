@@ -32,6 +32,44 @@ export interface BookingRepairRow {
   kind?: string | null;
 }
 
+/** What a writer knows about one line it's about to store in booking_repairs. */
+export interface RepairLineToWrite {
+  nodeId: string;
+  description: string;
+  rawHours: number;
+  chargedHours: number;
+  linePence: number;
+  itemId?: string | null;
+  itemLabel?: string | null;
+  kind?: "job" | "product";
+}
+
+/**
+ * The booking_repairs rows for a booking's lines — the one builder every
+ * writer uses (booking creation, applied revisions).
+ *
+ * Every row carries the SAME keys. supabase-js sends a bulk insert with the
+ * union of the rows' keys and fills a key a row lacks with NULL, not the column
+ * default. So a job row that omitted `kind` beside a product row that named it
+ * went in as kind = NULL and broke the not-null constraint, failing every
+ * basket that mixed a job with a service (2026-11-23). item_id / item_label
+ * are nullable; `kind` is always named ("job" unless it's a product).
+ */
+export function bookingRepairRows(bookingId: string, lines: RepairLineToWrite[]) {
+  return lines.map((line, index) => ({
+    booking_id: bookingId,
+    position: index,
+    node_id: line.nodeId,
+    description: line.description,
+    raw_hours: line.rawHours,
+    charged_hours: line.chargedHours,
+    line_pence: line.linePence,
+    item_id: line.itemLabel ? (line.itemId ?? null) : null,
+    item_label: line.itemLabel ?? null,
+    kind: line.kind === "product" ? ("product" as const) : ("job" as const),
+  }));
+}
+
 /** A product line's id is "p:<uuid>" (Task 31) — the same test the catalogue uses. */
 export function isProductLineId(nodeId: string | null | undefined): boolean {
   return typeof nodeId === "string" && nodeId.startsWith("p:");

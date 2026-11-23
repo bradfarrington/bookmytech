@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { bookingRepairRows } from "@/lib/bookings/repair-lines";
 import { parseInfoSheet } from "@/lib/catalogue/products";
 import { sendEmail } from "@/lib/email/send";
 import { renderTemplateEmail } from "@/emails/resolve";
@@ -428,24 +429,8 @@ export async function createBooking(
   // and report the same "please try again" the customer would get from any
   // other insert failure. Single-job bookings write no lines.
   if (multiJob) {
-    // item_id / item_label (0056) name the combined repair a job came from.
-    // Only sent when a line has one — a combined repair can't exist before
-    // that migration, so a plain multi-job insert never names the columns.
-    const { error: linesError } = await db.from("booking_repairs").insert(
-      quote.lines.map((line, index) => ({
-        booking_id: data.id,
-        position: index,
-        node_id: line.nodeId,
-        description: line.description,
-        raw_hours: line.rawHours,
-        charged_hours: line.chargedHours,
-        line_pence: line.linePence,
-        ...(line.itemLabel ? { item_id: line.itemId, item_label: line.itemLabel } : {}),
-        // kind (0060) — only named on a product line, so a plain multi-job
-        // insert never names the column.
-        ...(line.kind === "product" ? { kind: "product" } : {}),
-      })),
-    );
+    // Every row names the same columns — see bookingRepairRows for why.
+    const { error: linesError } = await db.from("booking_repairs").insert(bookingRepairRows(data.id, quote.lines));
     if (linesError) {
       console.error("[booking] repair lines insert failed; booking rolled back", data.id, linesError);
       await db.from("bookings").delete().eq("id", data.id);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { groupRepairLines, isMultiJob, repairLinesFor, repairSummary } from "./repair-lines";
+import { bookingRepairRows, groupRepairLines, isMultiJob, repairLinesFor, repairSummary } from "./repair-lines";
 
 describe("groupRepairLines", () => {
   it("groups a combined repair's jobs under its label and leaves plain jobs alone", () => {
@@ -82,5 +82,23 @@ describe("repairLinesFor", () => {
       { position: 0, node_id: "", description: "x", raw_hours: 1, charged_hours: 1, line_pence: 1 },
     ]);
     expect(lines[0].synthetic).toBe(true);
+  });
+});
+
+describe("bookingRepairRows", () => {
+  // supabase-js fills a key one row lacks with NULL (not the default), so a
+  // job row without `kind` beside a product row broke kind's not-null.
+  it("gives every row the same keys when jobs, combined repairs and products mix", () => {
+    const rows = bookingRepairRows("b1", [
+      { nodeId: "1", description: "Pads", rawHours: 0.7, chargedHours: 0.7, linePence: 4200, itemId: "c:1", itemLabel: "Pads and discs" },
+      { nodeId: "p:svc", description: "Full service", rawHours: 0, chargedHours: 0, linePence: 18000, itemId: "p:svc", itemLabel: null, kind: "product" },
+      { nodeId: "2", description: "Stabiliser link", rawHours: 0.4, chargedHours: 0.4, linePence: 2400, itemId: "2", itemLabel: null },
+    ]);
+    const keys = rows.map((r) => Object.keys(r).sort().join(","));
+    expect(new Set(keys).size).toBe(1);
+    expect(rows.map((r) => r.kind)).toEqual(["job", "product", "job"]);
+    expect(rows.map((r) => r.position)).toEqual([0, 1, 2]);
+    expect(rows[0]).toMatchObject({ item_id: "c:1", item_label: "Pads and discs" });
+    expect(rows[2]).toMatchObject({ item_id: null, item_label: null });
   });
 });
