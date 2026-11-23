@@ -17,7 +17,7 @@ Brad, 2026-11-23: "Can we create a ev service … add into it a pollen filter as
 - **Engine**: `quoteJobParts` prices part type 1442 (`REFRIGERANT_GENART`) this way and never asks NAPA for it or logs it as a NAPA gap. It's a `set_price` line named "Air-con refrigerant R1234yf · 460 g", so the mechanic knows what to put in, with no markup. This also prices HaynesPro air-con repairs that carry 1442 (evaporator, compressor lines), which went to a quote before.
 - **Services**: "Air-con refrigerant" is tickable on a service (`SERVICE_PART_TYPES`). Created, both **switched off at £0** for Brad to set the labour price and switch on:
   - **EV service**: servicing, fuel = electric, pollen filter from NAPA, no engine oil, no checklist yet (Brad is writing the schedule).
-  - **Air con regas**: servicing, every fuel, refrigerant by weight.
+  - **Air con regas**: servicing, every fuel, **a fixed price** like the pre-purchase inspections (Brad, 2026-11-23: "the air con regas wont be pulling prices it will be a fixed price"). Refrigerant isn't ticked on it. The by-weight pricing stays for HaynesPro air-con repairs, and does nothing until the gas prices are set.
 
 ## 3. Discount code on the payment page
 
@@ -30,6 +30,6 @@ The payment step (where "To pay" is) now has "Have a discount code?" too, as wel
 - [x] Refrigerant priced from HaynesPro grams × gas price, tested against all six real capacity fixtures
 - [x] EV service and Air con regas created (switched off, £0)
 - [x] Discount code on the payment step, before the card is authorised
-- [ ] Brad sets the refrigerant prices and the two services' labour prices, then switches them on
+- [ ] Brad sets the two services' prices and switches them on (the refrigerant prices are only needed if air-con repairs should price by weight)
 - [ ] Interim and Full service set to petrol + diesel once the EV service is live (they currently show for EVs, with oil)
 - [ ] EV registrations HaynesPro doesn't recognise: waiting on example regs from Brad
