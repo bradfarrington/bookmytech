@@ -119,7 +119,7 @@ You are working on **Book My Tech**, a UK mobile-mechanic booking platform. This
 
 ## Current task
 
-### 📌 2026-11-23: Multi-job checkout fix, EV service, air con regas, discount code on the payment page (Task 84), not yet pushed
+### 📌 2026-11-23: Multi-job checkout fix, EV service, air con regas, discount code on the payment page (Task 84), pushed 2026-11-23 (`78102fb`)
 
 Read `docs/tasks/84-ev-service-regas-checkout-fixes.md`. **Live bug fixed:** a basket mixing a HaynesPro job with a service failed to save its lines (supabase-js fills a key a row lacks with NULL, not the default; `kind` is not-null), leaving an orphaned hold. Rule from now on: **every row of a bulk insert names the same keys.** "EV service" (electric, pollen filter from NAPA) and "Air con regas" (fixed price) created switched off at £0. Both switched on at £0 (Brad wants Gareth to see them live); Interim + Full are now petrol + diesel only. EV major service (pollen filter + brake fluid) added too. HaynesPro's regas job is hidden; other air-con repairs stay as Gareth left them. Open: Puma Gen-E brake fluid picks a £45.57 Febi bottle because NAPA gives no sizes. Discount code now on the payment step too. No migration; no API shape change, so nothing to do in the apps.
 

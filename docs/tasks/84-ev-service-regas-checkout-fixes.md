@@ -1,6 +1,6 @@
 # Task 84: EV service, air-con regas, discount code on the payment page, multi-job checkout fix
 
-**Status:** ✅ Complete (2026-11-23), not yet pushed. The multi-job booking fix, the two new services (created switched off at £0) and the discount code on the payment step shipped. No migration. Deviation: air-con regas is a fixed price, not refrigerant by weight (see 2). Not tried in a browser: typecheck, lint and unit tests only.
+**Status:** ✅ Complete (2026-11-23), pushed (`78102fb`). The multi-job booking fix, the two new services (created switched off at £0) and the discount code on the payment step shipped. No migration. Deviation: air-con regas is a fixed price, not refrigerant by weight (see 2). Not tried in a browser: typecheck, lint and unit tests only.
 
 Brad, 2026-11-23: "Can we create a ev service … add into it a pollen filter as all evs had them done - Also air conditioning regas needs to be added as well - I've just spotted on checkout there's nowhere to put the discount code … [multi-job booking] wont let me finalise". Then: "do 2 - but this needs to pull parts from napa and the amount from haynespro - 3. yes add it to the payment page aswell as before payment so it is a double".
 
