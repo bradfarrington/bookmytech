@@ -310,7 +310,8 @@ export function ProductForm({
               Priced from NAPA for the customer&apos;s exact car and added on top of the price above, the same way a
               repair&apos;s parts are: the right part, every spark plug the engine has, your parts markup and your
               picks for the model. If NAPA can&apos;t price one for a car, the customer is offered a quote instead.
-              Engine oil stays on the switch below.
+              Engine oil stays on the switch below. Air-con refrigerant isn&apos;t from NAPA: it&apos;s the
+              car&apos;s charge from HaynesPro × your price per 100 g under Pricing.
             </p>
           </div>
           <div className="grid gap-2 sm:grid-cols-3">

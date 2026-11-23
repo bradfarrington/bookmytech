@@ -40,9 +40,19 @@ import {
   type RepairPartChoiceRow,
 } from "./repair-part-choice";
 import { fluidCapacitiesFor, type FluidCapacities } from "@/lib/haynespro/fluid-capacity";
+import { quoteRefrigerant, refrigerantChargesFor, type RefrigerantQuote } from "@/lib/haynespro/refrigerant";
+import { getRefrigerantPrices } from "@/lib/pricing/calculate";
 import { BRAKE_PART_TYPES, brakeLayout, notFittedOnCar, type BrakeLayout } from "./brake-layout";
 import { applyPartsMarkup, loadPartsMarkupRate } from "./parts-markup";
 import type { PartPosition, PartSide, SupplierId } from "./supplier-offer";
+
+/**
+ * Air-con refrigerant (TecDoc 1442). NAPA lists none on any car, so it is
+ * never asked for: it's charged by weight, HaynesPro's grams × the gas's
+ * price per 100 g (lib/haynespro/refrigerant.ts, 2026-11-23), as a set-price
+ * line named with the gas and weight so the mechanic knows what to put in.
+ */
+export const REFRIGERANT_GENART = 1442;
 
 /** One part priced into a quote. Serialisable: it is snapshotted onto bookings and revisions. */
 export interface QuotedPart {
@@ -196,6 +206,8 @@ export function priceJobParts(args: {
   car?: CarTraits | null;
   /** Discs or drums on each axle, when NAPA's answers settle it. */
   brakes?: BrakeLayout | null;
+  /** The car's refrigerant by weight and its price; null/absent = refrigerant unpriced. */
+  refrigerant?: RefrigerantQuote | null;
 }): JobPartsResult {
   const parts: QuotedPart[] = [];
   const missing: MissingPart[] = [];
@@ -271,6 +283,28 @@ export function priceJobParts(args: {
     const skipped = alternativesToSkip(job, args.offers, args.uncharged);
     for (const group of job.groups) {
       if (args.uncharged?.has(group.genartId) || skipped.has(group.genartId)) continue;
+      if (group.genartId === REFRIGERANT_GENART && args.refrigerant) {
+        const gas = args.refrigerant;
+        parts.push({
+          nodeId: job.nodeId,
+          genartId: group.genartId,
+          groupLabel: `Air-con refrigerant ${gas.gas} · ${gas.grams} g`,
+          supplier: null,
+          partNumber: null,
+          brand: null,
+          description: null,
+          imageUrl: null,
+          position: null,
+          rating: null,
+          quantity: 1,
+          unitPence: gas.pence,
+          linePence: gas.pence,
+          source: "set_price",
+          lastKnown: false,
+          pricedAt: args.now ?? new Date().toISOString(),
+        });
+        continue;
+      }
       const lookup = args.offers.get(group.genartId);
       if (!lookup || lookup.state !== "ok") {
         unpriced(job, group, jobPosition(job.description), lookup?.state === "empty" ? "not_listed" : "unavailable");
@@ -406,18 +440,21 @@ async function quoteJobPartsAtCost(args: {
   if (charged.length === 0) return { ok: true, parts: [] };
 
   const hasFluid = args.jobs.some((job) => job.groups.some((g) => !settings.uncharged.has(g.genartId) && fluidKind(g.label)));
-  const [offers, choices, fluids, car] = await Promise.all([
-    loadAagPartOffers(args.db, args.reg, charged),
+  // Refrigerant is priced by weight, never asked of NAPA (REFRIGERANT_GENART).
+  const napaIds = charged.filter((id) => id !== REFRIGERANT_GENART);
+  const [offers, choices, fluids, car, refrigerant] = await Promise.all([
+    loadAagPartOffers(args.db, args.reg, napaIds),
     loadChoices(args.db, args.carTypeId, args.jobs.map((job) => job.nodeId)),
     hasFluid ? fluidCapacitiesFor(args.carTypeId) : Promise.resolve(null),
     loadCarTraits(args.db, args.reg),
+    charged.includes(REFRIGERANT_GENART) ? loadRefrigerantQuote(args.db, args.reg, args.carTypeId) : Promise.resolve(null),
   ]);
   if (!offers.enabled) return { ok: true, parts: [] };
 
   // Part types NAPA has nothing for on this car (Task 77): use the admin's
   // pick for the model where there is one, and record the gap for the Parts
   // gaps screen either way.
-  const gaps = charged.filter((id) => offers.byGenart.get(id)?.state !== "ok");
+  const gaps = napaIds.filter((id) => offers.byGenart.get(id)?.state !== "ok");
   if (gaps.length > 0) {
     const model = await loadVehicleModel(args.db, args.reg);
     if (model) {
@@ -437,6 +474,7 @@ async function quoteJobPartsAtCost(args: {
     setPrices: settings.setPrices,
     fluids,
     car,
+    refrigerant,
   });
   if (first.ok) return first;
 
@@ -460,6 +498,7 @@ async function quoteJobPartsAtCost(args: {
         fluids,
         car,
         brakes,
+        refrigerant,
       })
     : first;
   if (priced.ok) return priced;
@@ -486,7 +525,18 @@ async function quoteJobPartsAtCost(args: {
     fluids,
     car,
     brakes,
+    refrigerant,
   });
+}
+
+/** The car's refrigerant, priced; null when HaynesPro has no figure or the gas no price. Never throws. */
+async function loadRefrigerantQuote(db: SupabaseClient, reg: string, carTypeId: number): Promise<RefrigerantQuote | null> {
+  try {
+    const [charges, prices] = await Promise.all([refrigerantChargesFor(carTypeId), getRefrigerantPrices(db)]);
+    return quoteRefrigerant(charges, prices, reg);
+  } catch {
+    return null;
+  }
 }
 
 /** "Brake disc (front)", "Shock absorber (front left)": the part group, with its axle and side when there are. */

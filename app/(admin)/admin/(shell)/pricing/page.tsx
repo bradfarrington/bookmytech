@@ -26,6 +26,8 @@ const SETTING_DEFAULTS: PlatformSettings = {
   on_site_diagnostic_fee_pence: 5999,
   parts_markup_enabled: 0,
   parts_markup_rate: 0,
+  refrigerant_r134a_price_per_100g_pence: 0,
+  refrigerant_r1234yf_price_per_100g_pence: 0,
 };
 
 export default async function AdminPricingPage() {

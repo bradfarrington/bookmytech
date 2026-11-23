@@ -591,6 +591,30 @@ export function ConfirmCheckout({
     });
   }
 
+  // A discount code entered on the payment step (2026-11-23: Brad wanted it
+  // there as well as before payment). Re-prepares the checkout with the code,
+  // exactly as the step before does: a fresh intent for the new amount, which
+  // the card form remounts onto. Only offered before the card is authorised,
+  // so no hold is ever left behind on the old amount. Returns an error to
+  // show, or null when it applied.
+  async function applyPromoAtPayment(code: string): Promise<string | null> {
+    if (!address) return "Please go back and check your address.";
+    const result = await prepareCheckout({
+      postcode: address.postcode,
+      vehicleReg: reg,
+      repairNodeId: repairNodeIds[0],
+      repairNodeIds,
+      quoteId,
+      promoCode: code,
+    });
+    if (!result.ok) return result.error;
+    if (!result.promoCode) return "That discount code couldn't be applied to this booking.";
+    setPromoInput(code);
+    setAppliedPromo(result.promoCode);
+    setCheckout(result);
+    return null;
+  }
+
   // Switch between creating an account and signing in to one.
   //
   // Until now this could only happen REACTIVELY: `accountMode` started at
@@ -707,6 +731,9 @@ export function ConfirmCheckout({
     // those cards. Absent on older parked drafts and for everyone else.
     return (
       <Elements
+        // A discount applied on this step brings a new intent, and Stripe
+        // can't swap the client secret on a mounted form.
+        key={checkout.clientSecret}
         stripe={stripePromise}
         options={{
           clientSecret: checkout.clientSecret,
@@ -723,6 +750,7 @@ export function ConfirmCheckout({
           onConfirmed={setConfirmedIntentId}
           onSlotPassed={handleSlotPassed}
           onPromoUnavailable={handlePromoUnavailable}
+          onApplyPromo={applyPromoAtPayment}
         />
       </Elements>
     );
@@ -923,32 +951,16 @@ export function ConfirmCheckout({
           server is the only thing that ever decides what a code is worth. */}
       {appliedPromo ? (
         <Alert tone="success">Code {appliedPromo} applied. The saving shows at the next step.</Alert>
-      ) : promoOpen ? (
-        <div className="flex gap-2">
-          <input
-            value={promoInput}
-            onChange={(e) => setPromoInput(e.target.value.toUpperCase())}
-            placeholder="Discount code"
-            aria-label="Discount code"
-            autoCapitalize="characters"
-            className={cn(inputClass, "flex-1 font-mono uppercase")}
-          />
-          <Button
-            variant="secondary"
-            disabled={!canProceed || pending || !promoInput.trim()}
-            onClick={handleProceedToPayment}
-          >
-            Apply
-          </Button>
-        </div>
       ) : (
-        <button
-          type="button"
-          onClick={() => setPromoOpen(true)}
-          className="self-start text-sm font-semibold text-brand-blue hover:underline"
-        >
-          Have a discount code?
-        </button>
+        <PromoCodeField
+          value={promoInput}
+          onChange={setPromoInput}
+          open={promoOpen}
+          onOpen={() => setPromoOpen(true)}
+          disabled={!canProceed || pending}
+          applying={false}
+          onApply={handleProceedToPayment}
+        />
       )}
 
       {stripeError && <Alert tone="error">{stripeError}</Alert>}
@@ -1082,6 +1094,66 @@ function bookingInputFrom(
 
 function hoursLabel(h: number): string {
   return `${Number(h.toFixed(2))} h`;
+}
+
+// "Have a discount code?" and, once opened, the code box and its Apply
+// button. The same on the step before payment and the payment step.
+function PromoCodeField({
+  value,
+  onChange,
+  open,
+  onOpen,
+  disabled,
+  applying,
+  onApply,
+}: {
+  value: string;
+  onChange: (code: string) => void;
+  open: boolean;
+  onOpen: () => void;
+  disabled: boolean;
+  applying: boolean;
+  onApply: () => void;
+}) {
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={onOpen}
+        className="self-start text-sm font-semibold text-brand-blue hover:underline"
+      >
+        Have a discount code?
+      </button>
+    );
+  }
+  return (
+    <div className="flex gap-2">
+      <input
+        value={value}
+        onChange={(e) => onChange(e.target.value.toUpperCase())}
+        onKeyDown={(e) => {
+          // Inside the payment form Enter would submit the card: apply the code instead.
+          if (e.key === "Enter") {
+            e.preventDefault();
+            if (!disabled && value.trim()) onApply();
+          }
+        }}
+        placeholder="Discount code"
+        aria-label="Discount code"
+        autoCapitalize="characters"
+        className={cn(inputClass, "flex-1 font-mono uppercase")}
+      />
+      <Button
+        type="button"
+        variant="secondary"
+        disabled={disabled || !value.trim()}
+        iconLeft={applying ? Loader2 : undefined}
+        onClick={onApply}
+      >
+        {applying ? "Applying…" : "Apply"}
+      </Button>
+    </div>
+  );
 }
 
 // Price breakdown shown on every confirm step. Several jobs list each one
@@ -1226,6 +1298,7 @@ function CheckoutForm({
   onConfirmed,
   onSlotPassed,
   onPromoUnavailable,
+  onApplyPromo,
   ...c
 }: ConfirmCommon & {
   checkout: Extract<ReadyCheckout, { mode: "preauth" }>;
@@ -1234,11 +1307,27 @@ function CheckoutForm({
   onConfirmed: (intentId: string) => void;
   onSlotPassed: () => void;
   onPromoUnavailable: () => void;
+  /** Apply a discount code here, before the card is authorised. Resolves to an error, or null. */
+  onApplyPromo: (code: string) => Promise<string | null>;
 }) {
   const stripe = useStripe();
   const elements = useElements();
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [promo, setPromo] = useState("");
+  const [promoOpen, setPromoOpen] = useState(false);
+  const [promoError, setPromoError] = useState<string | null>(null);
+  const [applyingPromo, startApplyPromo] = useTransition();
+
+  function applyPromo() {
+    const code = promo.trim();
+    if (!code) return;
+    setPromoError(null);
+    startApplyPromo(async () => {
+      const failed = await onApplyPromo(code);
+      if (failed) setPromoError(failed);
+    });
+  }
 
   const piId = intentIdFrom(checkout.clientSecret);
   // The hold is already placed on THIS intent (a retry after the booking
@@ -1341,6 +1430,23 @@ function CheckoutForm({
         lines={c.repairLines}
         extras={c.priceExtras}
       />
+
+      {/* Discount code, here as well as on the step before (2026-11-23).
+          Not once the card is authorised: the hold is for the amount above. */}
+      {!alreadyConfirmed && !checkout.promoCode && (
+        <div className="flex flex-col gap-2">
+          <PromoCodeField
+            value={promo}
+            onChange={setPromo}
+            open={promoOpen}
+            onOpen={() => setPromoOpen(true)}
+            disabled={submitting || applyingPromo}
+            applying={applyingPromo}
+            onApply={applyPromo}
+          />
+          {promoError && <Alert tone="error">{promoError}</Alert>}
+        </div>
+      )}
 
       {alreadyConfirmed ? (
         <Alert tone="success">

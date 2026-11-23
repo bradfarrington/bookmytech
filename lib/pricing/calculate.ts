@@ -242,6 +242,33 @@ export async function getEngineOilDefaultLitres(client?: DbClient): Promise<numb
   }
 }
 
+// --- Air-con refrigerant, by weight (2026-11-23) -----------------------------
+// A regas (or an air-con repair) charges HaynesPro's grams for the car × the
+// gas's price per 100 g (lib/haynespro/refrigerant.ts). NAPA sells none.
+// Unset or £0 = not set: the job goes to a quote rather than charging no gas.
+// Editable on /admin/pricing.
+
+export const REFRIGERANT_R134A_PRICE_KEY = "refrigerant_r134a_price_per_100g_pence";
+export const REFRIGERANT_R1234YF_PRICE_KEY = "refrigerant_r1234yf_price_per_100g_pence";
+
+export async function getRefrigerantPrices(client?: DbClient): Promise<{ R134a: number | null; R1234yf: number | null }> {
+  const db = client ?? (await import("@/lib/supabase/admin")).createAdminClient();
+  const read = (raw: unknown) => {
+    const n = typeof raw === "number" ? raw : Number(raw);
+    return Number.isFinite(n) && n > 0 ? Math.round(n) : null;
+  };
+  try {
+    const { data } = await db
+      .from("platform_settings")
+      .select("key, value")
+      .in("key", [REFRIGERANT_R134A_PRICE_KEY, REFRIGERANT_R1234YF_PRICE_KEY]);
+    const byKey = new Map(((data ?? []) as Array<{ key: string; value: unknown }>).map((r) => [r.key, r.value]));
+    return { R134a: read(byKey.get(REFRIGERANT_R134A_PRICE_KEY)), R1234yf: read(byKey.get(REFRIGERANT_R1234YF_PRICE_KEY)) };
+  } catch {
+    return { R134a: null, R1234yf: null };
+  }
+}
+
 // --- The on-site diagnostic fee (Task 37) ------------------------------------
 // Gareth: when the customer declines the revised job, "the mechanic chooses to
 // charge the cancellation fee or a diagnostic (set by you)". Seeded by 0064 to
