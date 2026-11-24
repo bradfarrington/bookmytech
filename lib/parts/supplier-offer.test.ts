@@ -8,10 +8,14 @@ import { flattenQuote } from "@/lib/aag/quote";
 import type { AagQuoteBody } from "@/lib/aag/types";
 import {
   aagOffers,
+  DEFAULT_PART_PICK_RULE,
   defaultOffer,
+  inStock,
   offerLinePence,
   positionOf,
+  ratingDistance,
   ratingRank,
+  type PartPickRule,
   type SupplierOffer,
 } from "./supplier-offer";
 
@@ -65,6 +69,63 @@ describe("defaultOffer", () => {
     expect(defaultOffer([offer({ tier: "Best", buyable: false }), offer({ partNumber: "ok" })])?.partNumber).toBe("ok");
     expect(defaultOffer([offer({ costPence: null, buyable: false })])).toBeNull();
     expect(defaultOffer([])).toBeNull();
+  });
+});
+
+// Task 85: Gareth chooses price, rating and stock under Pricing.
+describe("defaultOffer with a pick rule", () => {
+  const rule = (over: Partial<PartPickRule>): PartPickRule => ({ ...DEFAULT_PART_PICK_RULE, ...over });
+  const pads = [
+    offer({ partNumber: "good-in", tier: "Good", costPence: 1200, totalQty: 3 }),
+    offer({ partNumber: "good-out", tier: "Good", costPence: 900, totalQty: 0 }),
+    offer({ partNumber: "better-in", tier: "Better", costPence: 1800, totalQty: 5 }),
+    offer({ partNumber: "best-out", tier: "Best", costPence: 2500, totalQty: 0 }),
+    offer({ partNumber: "best-in", tier: "Best", costPence: 2000, totalQty: 1 }),
+    offer({ partNumber: "best-in-dear", tier: "Best", costPence: 2400, totalQty: 2 }),
+  ];
+  const pick = (over: Partial<PartPickRule>, offers = pads) => defaultOffer(offers, rule(over))?.partNumber;
+
+  it("is today's rule when unset: Best, dearest, stock ignored", () => {
+    expect(defaultOffer(pads)?.partNumber).toBe("best-out");
+    expect(pick({})).toBe("best-out");
+  });
+
+  it("cheapest in stock, any rating: Gareth's ask", () => {
+    expect(pick({ price: "cheapest", rating: "any", stock: "in_stock" })).toBe("good-in");
+    // Stock ignored, the cheapest of all.
+    expect(pick({ price: "cheapest", rating: "any", stock: "any" })).toBe("good-out");
+  });
+
+  it("checks stock first, then the rating, then the price", () => {
+    expect(pick({ price: "cheapest", rating: "best", stock: "in_stock" })).toBe("best-in");
+    expect(pick({ price: "dearest", rating: "best", stock: "in_stock" })).toBe("best-in-dear");
+    expect(pick({ price: "dearest", rating: "good", stock: "in_stock" })).toBe("good-in");
+  });
+
+  it("falls back to an out-of-stock part when nothing is in stock", () => {
+    const none = pads.map((o) => ({ ...o, totalQty: 0 }));
+    expect(pick({ price: "cheapest", rating: "any", stock: "in_stock" }, none)).toBe("good-out");
+    // No stock figures at all reads as out of stock, and still prices.
+    expect(pick({ price: "cheapest", rating: "any", stock: "in_stock" }, [offer({ partNumber: "x", totalQty: null })])).toBe("x");
+  });
+
+  it("takes the nearest rating when NAPA has none at the one wanted: above first, then below", () => {
+    const noBetter = pads.filter((o) => o.tier !== "Better");
+    expect(pick({ price: "cheapest", rating: "better" }, noBetter)).toBe("best-in");
+    const onlyGood = pads.filter((o) => o.tier === "Good");
+    expect(pick({ price: "cheapest", rating: "best" }, onlyGood)).toBe("good-out");
+    // An in-stock Better beats an out-of-stock Best when stock comes first.
+    const mixed = [offer({ partNumber: "best-out", tier: "Best", totalQty: 0 }), offer({ partNumber: "better-in", tier: "Better", totalQty: 4 })];
+    expect(pick({ rating: "best", stock: "in_stock" }, mixed)).toBe("better-in");
+  });
+
+  it("ranks ratings by distance from the one wanted", () => {
+    expect(["Best", "Better", "Good", null].map((t) => ratingDistance(t, "better"))).toEqual([1, 0, 11, 12]);
+    expect(["Best", "Better", "Good", null].map((t) => ratingDistance(t, "best"))).toEqual([0, 11, 12, 13]);
+    expect(ratingDistance("Good", "any")).toBe(0);
+    expect(inStock({ totalQty: 2 })).toBe(true);
+    expect(inStock({ totalQty: 0 })).toBe(false);
+    expect(inStock({ totalQty: null })).toBe(false);
   });
 });
 

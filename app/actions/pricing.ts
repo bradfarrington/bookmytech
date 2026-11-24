@@ -305,3 +305,35 @@ export async function updateRepairCombineMode(mode: string): Promise<PricingResu
   revalidate();
   return { ok: true };
 }
+
+/**
+ * How the default NAPA part is picked (Task 85): the price, the rating and
+ * stock, one field at a time. Applies to new quotes only; bookings keep the
+ * parts they were priced with.
+ */
+export async function updatePartPickRule(field: string, value: string): Promise<PricingResult> {
+  const guard = await requireAdmin();
+  if (!guard.ok) return guard;
+
+  const { PART_PICK_KEYS, isPickValue } = await import("@/lib/parts/part-pick-rule");
+  if (field !== "price" && field !== "rating" && field !== "stock") return { ok: false, error: "Unknown setting." };
+  if (!isPickValue(field, value)) return { ok: false, error: "Unknown option." };
+  const key = PART_PICK_KEYS[field];
+
+  const admin = createAdminClient();
+  const { data: prev } = await admin
+    .from("platform_settings")
+    .select("value")
+    .eq("key", key)
+    .maybeSingle();
+
+  const { error } = await admin.from("platform_settings").upsert(
+    { key, value, updated_at: new Date().toISOString(), updated_by: guard.adminId },
+    { onConflict: "key" },
+  );
+  if (error) return { ok: false, error: error.message };
+
+  await audit(admin, guard.adminId, "platform_setting", key, key, prev?.value ?? null, value);
+  revalidate();
+  return { ok: true };
+}

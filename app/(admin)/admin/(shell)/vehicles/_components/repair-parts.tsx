@@ -16,10 +16,12 @@ import {
 import { Button } from "@/components/ui/button";
 import { Pill } from "@/components/ui/pill";
 import { Switch } from "@/components/ui/switch";
+import { describePartPickRule } from "@/lib/parts/part-pick-rule";
 import { selectJobParts, type MissingChoice } from "@/lib/parts/repair-part-choice";
 import {
-  offerLinePence,
-  ratingRank,
+  compareOffers,
+  DEFAULT_PART_PICK_RULE,
+  inStock,
   type SupplierOffer,
   type SupplierPanel,
 } from "@/lib/parts/supplier-offer";
@@ -30,8 +32,8 @@ import { cn, formatPrice } from "@/lib/utils";
 //
 // Nothing is fetched until the admin opens it. Alliance Automotive prices each
 // part group the repair uses, and the part shown is the one customer quotes use
-// (Task 43): AAG's best-rated, dearest within that rating, one per axle when the
-// repair names neither. "Change" lists every fitting part, and a choice applies
+// (Task 43): the part the pick rule under Pricing prefers (Task 85: price,
+// rating and stock), one per axle when the repair names neither. "Change" lists every fitting part, and a choice applies
 // to this engine variant only. Per part group, on every repair: the switch
 // stops customers being charged (a tool, not a part), and a set price is what
 // customers pay when AAG has no price (antifreeze, screenwash).
@@ -57,10 +59,6 @@ function panelNote(panel: SupplierPanel): string | null {
   }
 }
 
-/** Best-rated first, dearest first within a rating: the order the default is picked in. */
-function byDefaultOrder(a: SupplierOffer, b: SupplierOffer): number {
-  return ratingRank(b.tier) - ratingRank(a.tier) || (offerLinePence(b) ?? -1) - (offerLinePence(a) ?? -1);
-}
 
 function OfferSummary({ offer }: { offer: SupplierOffer }) {
   return (
@@ -69,6 +67,8 @@ function OfferSummary({ offer }: { offer: SupplierOffer }) {
         <span className="text-sm font-semibold text-text-primary">{offer.brand ?? "Unbranded"}</span>
         <span className="font-mono text-xs text-text-muted">{offer.partNumber}</span>
         {offer.tier && <Pill tone="neutral">{offer.tier}</Pill>}
+        {offer.totalQty != null &&
+          (inStock(offer) ? <Pill tone="success">In stock</Pill> : <Pill tone="pending">Out of stock</Pill>)}
         {offer.position && <Pill tone="info">{POSITION_LABEL[offer.position]}</Pill>}
         {offer.side && <Pill tone="info">{SIDE_LABEL[offer.side]}</Pill>}
         {offer.cylinder && <Pill tone="info">{offer.cylinder}</Pill>}
@@ -189,7 +189,9 @@ function PartGroupCard({
   const [changing, setChanging] = useState(false);
   const [pending, startTransition] = useTransition();
 
-  const offers = [...panelOffers(group.aag)].sort(byDefaultOrder);
+  const rule = group.rule ?? DEFAULT_PART_PICK_RULE;
+  // The order the default is picked in (Task 85).
+  const offers = [...panelOffers(group.aag)].sort((a, b) => compareOffers(a, b, rule));
   const note = panelNote(group.aag);
   const chosen = group.selections.some((s) => s.selection.source === "choice");
   const unpriced = group.aag.state !== "ok" || group.selections.some((s) => s.selection.source === "none");
@@ -201,7 +203,7 @@ function PartGroupCard({
   );
 
   const reselect = (choice: MissingChoice | null) =>
-    group.aag.state === "ok" ? selectJobParts(repairName, group.aag.offers, choice, group.fluid, group.car) : group.selections;
+    group.aag.state === "ok" ? selectJobParts(repairName, group.aag.offers, choice, group.fluid, group.car, rule) : group.selections;
 
   const choose = (offer: SupplierOffer) =>
     startTransition(async () => {
@@ -291,7 +293,7 @@ function PartGroupCard({
               <>
                 <div className="flex min-w-0 items-start gap-2">
                   <Pill tone={selection.source === "choice" ? "dark" : "accent"}>
-                    {selection.source === "choice" ? "Chosen" : "Default: Best, dearest"}
+                    {selection.source === "choice" ? "Chosen" : `Default: ${describePartPickRule(rule)}`}
                   </Pill>
                   <OfferSummary offer={selection.offer} />
                 </div>

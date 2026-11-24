@@ -4,7 +4,8 @@
 // HaynesPro names the TecDoc part groups each job uses. Every group is charged
 // unless an admin switched it off (a tool, not a part). A group's part is the
 // admin's chosen part for this engine variant when AAG still lists it,
-// otherwise AAG's best-rated part, dearest within that rating. A job that names
+// otherwise the part the admin's pick rule prefers (Task 85, under Pricing:
+// price, rating and stock; part-pick-rule.ts). A job that names
 // an axle takes that axle's part; one that names neither, on a group AAG lists
 // for both axles, takes one per axle. Each job carries its own parts, like
 // labour (owner decisions, 2026-09-15).
@@ -42,7 +43,8 @@ import {
 import { fluidCapacitiesFor, type FluidCapacities } from "@/lib/haynespro/fluid-capacity";
 import { BRAKE_PART_TYPES, brakeLayout, notFittedOnCar, type BrakeLayout } from "./brake-layout";
 import { applyPartsMarkup, loadPartsMarkupRate } from "./parts-markup";
-import type { PartPosition, PartSide, SupplierId } from "./supplier-offer";
+import { loadPartPickRule } from "./part-pick-rule";
+import type { PartPickRule, PartPosition, PartSide, SupplierId } from "./supplier-offer";
 
 /** One part priced into a quote. Serialisable: it is snapshotted onto bookings and revisions. */
 export interface QuotedPart {
@@ -77,8 +79,8 @@ export interface QuotedPart {
   /** ADDITIVE (2026-11-18). The markup applied (0.2 = 20%). Only when one was. */
   markupRate?: number;
   /**
-   * "chosen": an admin picked it for this engine variant. "default": AAG's
-   * best-rated, dearest within. "estimate": AAG had no price for this car, so
+   * "chosen": an admin picked it for this engine variant. "default": the
+   * part the pick rule prefers (Task 85). "estimate": AAG had no price for this car, so
    * it was estimated from other cars of the same model (Task 72; see `estimate`). "set_price":
    * AAG had no price and there was no estimate, so the admin's set price for
    * the part group.
@@ -196,6 +198,8 @@ export function priceJobParts(args: {
   car?: CarTraits | null;
   /** Discs or drums on each axle, when NAPA's answers settle it. */
   brakes?: BrakeLayout | null;
+  /** How the default part is picked (Task 85). Today's rule when absent. */
+  rule?: PartPickRule;
 }): JobPartsResult {
   const parts: QuotedPart[] = [];
   const missing: MissingPart[] = [];
@@ -277,7 +281,7 @@ export function priceJobParts(args: {
         continue;
       }
       const choice = args.choices?.get(choiceKey(job.nodeId, group.genartId)) ?? null;
-      for (const { position, side, selection, quantity: wanted } of selectJobParts(job.description, lookup.offers, choice, fluidNeedFor(group.label, args.fluids), args.car)) {
+      for (const { position, side, selection, quantity: wanted } of selectJobParts(job.description, lookup.offers, choice, fluidNeedFor(group.label, args.fluids), args.car, args.rule)) {
         // NAPA listed the part type for this car, but nothing that fits, or
         // not how many a job renewing every one of them needs.
         if (selection.source === "none" || selection.offer.costPence == null || wanted === null) {
@@ -406,11 +410,12 @@ async function quoteJobPartsAtCost(args: {
   if (charged.length === 0) return { ok: true, parts: [] };
 
   const hasFluid = args.jobs.some((job) => job.groups.some((g) => !settings.uncharged.has(g.genartId) && fluidKind(g.label)));
-  const [offers, choices, fluids, car] = await Promise.all([
+  const [offers, choices, fluids, car, rule] = await Promise.all([
     loadAagPartOffers(args.db, args.reg, charged),
     loadChoices(args.db, args.carTypeId, args.jobs.map((job) => job.nodeId)),
     hasFluid ? fluidCapacitiesFor(args.carTypeId) : Promise.resolve(null),
     loadCarTraits(args.db, args.reg),
+    loadPartPickRule(args.db),
   ]);
   if (!offers.enabled) return { ok: true, parts: [] };
 
@@ -437,6 +442,7 @@ async function quoteJobPartsAtCost(args: {
     setPrices: settings.setPrices,
     fluids,
     car,
+    rule,
   });
   if (first.ok) return first;
 
@@ -460,6 +466,7 @@ async function quoteJobPartsAtCost(args: {
         fluids,
         car,
         brakes,
+        rule,
       })
     : first;
   if (priced.ok) return priced;
@@ -486,6 +493,7 @@ async function quoteJobPartsAtCost(args: {
     fluids,
     car,
     brakes,
+    rule,
   });
 }
 

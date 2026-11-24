@@ -2,10 +2,16 @@
 
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { updatePlatformSetting, updateRepairCombineMode } from "@/app/actions/pricing";
+import { updatePartPickRule, updatePlatformSetting, updateRepairCombineMode } from "@/app/actions/pricing";
 import { Select, type SelectOption } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import type { RepairCombineMode } from "@/lib/pricing/calculate";
+import {
+  PICK_PRICE_OPTIONS,
+  PICK_RATING_OPTIONS,
+  PICK_STOCK_OPTIONS,
+} from "@/lib/parts/part-pick-rule";
+import type { PartPickRule } from "@/lib/parts/supplier-offer";
 import { InlineNumber } from "./inline-edit";
 import { pounds, percent } from "./converters";
 
@@ -105,6 +111,43 @@ function CombineModeSelect({ initial }: { initial: RepairCombineMode }) {
   );
 }
 
+/** One field of the part pick rule (Task 85), saved as soon as it changes. */
+function PartPickSelect<K extends keyof PartPickRule>({
+  field,
+  initial,
+  options,
+  label,
+}: {
+  field: K;
+  initial: PartPickRule[K];
+  options: ReadonlyArray<SelectOption<PartPickRule[K]>>;
+  label: string;
+}) {
+  const [value, setValue] = useState<PartPickRule[K]>(initial);
+  const [pending, startTransition] = useTransition();
+  return (
+    <Select
+      value={value}
+      onChange={(next) => {
+        const previous = value;
+        setValue(next);
+        startTransition(async () => {
+          const result = await updatePartPickRule(field, next);
+          if (!result.ok) {
+            setValue(previous);
+            toast.error(result.error);
+            return;
+          }
+          toast.success("Saved. Applies to new quotes.");
+        });
+      }}
+      options={options}
+      aria-label={label}
+      className={pending ? "opacity-60" : undefined}
+    />
+  );
+}
+
 function Row({
   label,
   hint,
@@ -125,7 +168,13 @@ function Row({
   );
 }
 
-export function PlatformDefaultsSection({ settings }: { settings: PlatformSettings }) {
+export function PlatformDefaultsSection({
+  settings,
+  partPick,
+}: {
+  settings: PlatformSettings;
+  partPick: PartPickRule;
+}) {
   return (
     <div className="grid gap-6 lg:grid-cols-2">
       {/* Default commission rates */}
@@ -183,6 +232,30 @@ export function PlatformDefaultsSection({ settings }: { settings: PlatformSettin
             hint="Add every job's book time, or let HaynesPro remove the overlap (e.g. pads add nothing once the discs are off)"
           >
             <CombineModeSelect initial={settings.repair_combine_mode} />
+          </Row>
+        </div>
+      </section>
+
+      {/* Which NAPA part a repair uses by default (Task 85) */}
+      <section className="space-y-3">
+        <div>
+          <h2 className="text-lg font-bold tracking-tight text-text-primary">Choosing parts</h2>
+          <p className="text-sm text-text-muted">
+            Which NAPA part a repair is priced with when NAPA lists several. Stock is
+            checked first, then the rating, then the price. If nothing matches, the
+            closest part is used so the customer still gets a price. A part you pick
+            for a vehicle always wins.
+          </p>
+        </div>
+        <div className="overflow-hidden rounded-2xl border border-border bg-surface-card">
+          <Row label="Stock" hint="In stock: a part NAPA has at the branch or a warehouse. Out-of-stock parts are only used when nothing is in stock">
+            <PartPickSelect field="stock" initial={partPick.stock} options={PICK_STOCK_OPTIONS} label="Stock" />
+          </Row>
+          <Row label="Rating" hint="NAPA's Good, Better or Best. With none at this rating, the nearest one above, then below">
+            <PartPickSelect field="rating" initial={partPick.rating} options={PICK_RATING_OPTIONS} label="Rating" />
+          </Row>
+          <Row label="Price" hint="Of the parts left, the cheapest or the dearest. Fluids always buy the cheapest bottles that cover the car">
+            <PartPickSelect field="price" initial={partPick.price} options={PICK_PRICE_OPTIONS} label="Price" />
           </Row>
         </div>
       </section>

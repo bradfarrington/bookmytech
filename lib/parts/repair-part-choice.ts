@@ -1,8 +1,10 @@
 // Which part a repair uses on one engine variant (Task 45; Alliance Automotive
 // only since Task 43).
 //
-// The default is AAG's best-rated part for that part group on that vehicle,
-// the dearest within that rating (owner decision, 2026-09-15). An admin can
+// The default is the part the admin's pick rule prefers (Task 85, under
+// Pricing: price, rating and stock; supplier-offer.ts). Until it is set, AAG's
+// best-rated part, the dearest within that rating (owner decision,
+// 2026-09-15). An admin can
 // change it on the vehicle's model page; the choice is stored per engine
 // variant + repair + part group (`repair_part_choices`, migration 0067) as the
 // part's identity — supplier and part number — never its price, so the price
@@ -20,8 +22,10 @@
 // Pure: no I/O.
 
 import {
+  compareStockAndRating,
+  DEFAULT_PART_PICK_RULE,
   defaultOffer,
-  ratingRank,
+  type PartPickRule,
   type PartPosition,
   type PartSide,
   type SupplierId,
@@ -46,7 +50,7 @@ export type MissingChoice = Pick<RepairPartChoiceRow, "supplier" | "part_number"
 export type PartSelection =
   /** The admin's chosen part, found in today's results. */
   | { source: "choice"; offer: SupplierOffer }
-  /** No usable choice, so AAG's best-rated part, dearest within that rating. */
+  /** No usable choice, so the part the pick rule prefers (Task 85). */
   | { source: "default"; offer: SupplierOffer; missingChoice: MissingChoice | null }
   /** Nothing buyable came back. */
   | { source: "none"; missingChoice: MissingChoice | null };
@@ -88,7 +92,11 @@ export function forSuspension(offers: readonly SupplierOffer[], car: CarTraits |
   return offers.filter((o) => !o.suspension || o.suspension === wanted);
 }
 
-export function selectRepairPart(panels: readonly SupplierPanel[], choice: MissingChoice | null): PartSelection {
+export function selectRepairPart(
+  panels: readonly SupplierPanel[],
+  choice: MissingChoice | null,
+  rule: PartPickRule = DEFAULT_PART_PICK_RULE,
+): PartSelection {
   const offers = offersFrom(panels);
   if (choice) {
     const chosen = offers.find((o) => o.supplier === choice.supplier && o.partNumber === choice.part_number);
@@ -102,7 +110,7 @@ export function selectRepairPart(panels: readonly SupplierPanel[], choice: Missi
         description: choice.description,
       }
     : null;
-  const best = defaultOffer(sensiblePacks(offers));
+  const best = defaultOffer(sensiblePacks(offers, rule), rule);
   return best ? { source: "default", offer: best, missingChoice } : { source: "none", missingChoice };
 }
 
@@ -137,10 +145,13 @@ const DRUM_LITRES = 25;
  * label). Anything not sold by the litre is left alone. An admin's choice is
  * still honoured whatever its size. Pure.
  */
-export function sensiblePacks(offers: readonly SupplierOffer[]): readonly SupplierOffer[] {
+export function sensiblePacks(
+  offers: readonly SupplierOffer[],
+  rule: PartPickRule = DEFAULT_PART_PICK_RULE,
+): readonly SupplierOffer[] {
   const sized = offers.map((offer) => ({ offer, litres: packLitres(offer.description) }));
   const labelled = sized.filter((s) => s.litres != null);
-  if (labelled.length === 0) return unsizedBrakeFluid(offers) ?? offers;
+  if (labelled.length === 0) return unsizedBrakeFluid(offers, rule) ?? offers;
   // One size mentioned among other parts ("…1.6L"?) isn't a range of packs.
   if (labelled.length === 1 && (labelled[0].litres as number) <= DRUM_LITRES) return offers;
   if (labelled.length === 1) return sized.filter((s) => s.litres == null).map((s) => s.offer);
@@ -161,7 +172,8 @@ export function sensiblePacks(offers: readonly SupplierOffer[]): readonly Suppli
 
 /**
  * Brake fluid NAPA lists with no size on any bottle (2026-11-23): the
- * cheapest within the best rating, not the dearest. Febi's range reads just
+ * cheapest of the bottles the pick rule prefers on stock and rating, whatever
+ * its price setting. Febi's range reads just
  * "BRAKE FLUID" (BD26HXH, S28BSW; NAPA's product info says no more), and
  * "Best, dearest" charged its £45.57 bottle for the Puma Gen-E's 1 litre.
  * Every sized brake fluid NAPA lists puts 1 litre at £9.34–£25.12 and 5
@@ -169,12 +181,12 @@ export function sensiblePacks(offers: readonly SupplierOffer[]): readonly Suppli
  * buys a 1 litre bottle (packCapLitres). Null when it isn't brake fluid.
  * Pure.
  */
-function unsizedBrakeFluid(offers: readonly SupplierOffer[]): readonly SupplierOffer[] | null {
+function unsizedBrakeFluid(offers: readonly SupplierOffer[], rule: PartPickRule): readonly SupplierOffer[] | null {
   if (packCapLitres(offers) !== 1) return null;
   const priced = offers.filter((o) => o.buyable && o.costPence != null);
   if (priced.length === 0) return null;
-  const rank = Math.max(...priced.map((o) => ratingRank(o.tier)));
-  const best = priced.filter((o) => ratingRank(o.tier) === rank);
+  const top = priced.reduce((a, b) => (compareStockAndRating(b, a, rule) < 0 ? b : a));
+  const best = priced.filter((o) => compareStockAndRating(o, top, rule) === 0);
   const cheapest = Math.min(...best.map((o) => o.costPence as number));
   return best.filter((o) => o.costPence === cheapest);
 }
@@ -240,27 +252,27 @@ export function litresOfProduct(offer: Pick<SupplierOffer, "description">, need:
 /**
  * The bottles a job buys when its need in litres is known: of the packs NAPA
  * lists (never a workshop drum), enough of one size to cover the need, at
- * the lowest cost within the best rating offered, a bigger pack winning a
- * tie. A 4.9 litre cooling system takes 2.45 litres of concentrate: one 5 L,
- * or three 1 L if those are dearer. Null when no pack size is known, so the
+ * the lowest cost among the packs the pick rule prefers on stock and rating,
+ * a bigger pack winning a tie. Always the lowest cost, whatever the price
+ * setting: "dearest" would buy five 1 litre bottles for a 5 litre need.
+ * A 4.9 litre cooling system takes 2.45 litres of concentrate: one 5 L, or
+ * three 1 L if those are dearer. Null when no pack size is known, so the
  * usual pick applies. Pure.
  */
 export function fluidPick(
   offers: readonly SupplierOffer[],
   need: FluidNeed,
+  rule: PartPickRule = DEFAULT_PART_PICK_RULE,
 ): { offer: SupplierOffer; quantity: number } | null {
-  let best: { offer: SupplierOffer; quantity: number; line: number; litres: number; rank: number } | null = null;
+  let best: { offer: SupplierOffer; quantity: number; line: number; litres: number } | null = null;
   for (const offer of offers) {
     const litres = packLitres(offer.description);
     if (litres == null || litres > DRUM_LITRES || !offer.buyable || offer.costPence == null) continue;
     const quantity = Math.max(1, Math.ceil(litresOfProduct(offer, need) / litres - 1e-9));
     const line = offer.costPence * quantity;
-    const rank = ratingRank(offer.tier);
-    const better =
-      !best ||
-      rank > best.rank ||
-      (rank === best.rank && (line < best.line || (line === best.line && litres > best.litres)));
-    if (better) best = { offer, quantity, line, litres, rank };
+    const byRule = best ? compareStockAndRating(offer, best.offer, rule) : -1;
+    const better = byRule < 0 || (byRule === 0 && best && (line < best.line || (line === best.line && litres > best.litres)));
+    if (better) best = { offer, quantity, line, litres };
   }
   return best ? { offer: best.offer, quantity: best.quantity } : null;
 }
@@ -416,6 +428,8 @@ export function selectJobParts(
   fluid?: FluidNeed | null,
   /** Standard or sports suspension parts. Standard when unknown. */
   car?: CarTraits | null,
+  /** How the default is picked (Task 85). Today's rule when absent. */
+  rule: PartPickRule = DEFAULT_PART_PICK_RULE,
 ): JobPartSelection[] {
   const chosen = (o: SupplierOffer) => !!choice && o.supplier === choice.supplier && o.partNumber === choice.part_number;
   // An admin's pick stands whatever its suspension: only the default is narrowed.
@@ -429,11 +443,12 @@ export function selectJobParts(
     const selection = selectRepairPart(
       [{ state: "ok", offers: slot.offers }],
       index === home || (home === -1 && index === 0) ? choice : null,
+      rule,
     );
     const slotsOnAxle = slots.filter((s) => s.position === slot.position).length;
     if (fluid) {
       const usingChoice = selection.source === "choice";
-      const sized = usingChoice ? null : fluidPick(slot.offers, fluid);
+      const sized = usingChoice ? null : fluidPick(slot.offers, fluid, rule);
       if (sized) {
         return { position: slot.position, side: slot.side, selection: { source: "default", offer: sized.offer, missingChoice: selection.source === "default" ? selection.missingChoice : null }, quantity: sized.quantity };
       }

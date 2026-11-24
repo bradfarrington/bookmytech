@@ -8,6 +8,7 @@ import { cacheRegKey, resolveVehicle } from "@/lib/haynespro/vehicle";
 import { engineCodeSource } from "@/lib/parts/engine-codes";
 import { isMissingColumn, isMissingTable, loadPartGroupSettings } from "@/lib/parts/part-group-settings";
 import { partGroupsOnNodes } from "@/lib/parts/part-groups";
+import { loadPartPickRule } from "@/lib/parts/part-pick-rule";
 import {
   jobPosition,
   selectJobParts,
@@ -17,7 +18,7 @@ import {
   type JobPartSelection,
   type RepairPartChoiceRow,
 } from "@/lib/parts/repair-part-choice";
-import type { SupplierPanel } from "@/lib/parts/supplier-offer";
+import type { PartPickRule, SupplierPanel } from "@/lib/parts/supplier-offer";
 import { lookupAagPanel } from "@/lib/parts/supplier-lookup";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -25,8 +26,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 // page. HaynesPro says which part groups the repair uses; Alliance Automotive
 // prices those groups directly and says what fits this vehicle and what it
 // costs. The part shown is the one customer quotes use (lib/parts/quote-parts.ts):
-// the admin's choice for this variant, else AAG's best-rated, dearest within
-// that rating, one per axle when the repair names neither. An admin can also
+// the admin's choice for this variant, else the part the pick rule under
+// Pricing prefers (Task 85), one per axle when the repair names neither. An admin can also
 // stop customers being charged for a part group (a tool, not a part), and give
 // a part group a set price for when AAG has none (Task 43).
 //
@@ -55,6 +56,8 @@ export interface RepairPartGroupView {
   fluid?: FluidNeed | null;
   /** ADDITIVE (2026-11-18). Standard or sports suspension, so a re-pick defaults as customers' prices do. */
   car?: CarTraits | null;
+  /** ADDITIVE (Task 85). The pick rule under Pricing, so a re-pick defaults as customers' prices do. */
+  rule?: PartPickRule;
 }
 
 export type RepairPartsResult =
@@ -151,7 +154,7 @@ export async function loadRepairPartsAction(input: {
   const choices = new Map(((choiceRows ?? []) as RepairPartChoiceRow[]).map((r) => [r.genart_id, r]));
 
   const engineCodes = engineCodeSource(reg, { db });
-  const car = await loadCarTraits(db, reg);
+  const [car, rule] = await Promise.all([loadCarTraits(db, reg), loadPartPickRule(db)]);
   const fluids = seen.some((g) => fluidNeedFor(g.description, { coolantLitres: 1, brakeFluidLitres: 1 }))
     ? await fluidCapacitiesFor(carTypeId)
     : null;
@@ -164,6 +167,7 @@ export async function loadRepairPartsAction(input: {
       return {
         fluid,
         car,
+        rule,
         genartId: g.genartId,
         description,
         charged: !(settings.enabled && settings.uncharged.has(g.genartId)),
@@ -171,8 +175,8 @@ export async function loadRepairPartsAction(input: {
         aag,
         selections:
           aag.state === "ok"
-            ? selectJobParts(repairName, aag.offers, choice, fluid, car)
-            : [{ position: jobPosition(repairName), selection: selectRepairPart([aag], choice) }],
+            ? selectJobParts(repairName, aag.offers, choice, fluid, car, rule)
+            : [{ position: jobPosition(repairName), selection: selectRepairPart([aag], choice, rule) }],
       };
     }),
   );

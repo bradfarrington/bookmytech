@@ -5,6 +5,7 @@ import {
   REPAIR_COMBINE_MODE_KEY,
   parseRepairCombineMode,
 } from "@/lib/pricing/calculate";
+import { PART_PICK_KEYS, parsePartPickRule } from "@/lib/parts/part-pick-rule";
 import { AreasSection, type AreaRowData } from "./_components/areas-section";
 import {
   PlatformDefaultsSection,
@@ -42,7 +43,7 @@ export default async function AdminPricingPage() {
     supabase
       .from("platform_settings")
       .select("key, value")
-      .in("key", [...Object.keys(SETTING_DEFAULTS), REPAIR_COMBINE_MODE_KEY]),
+      .in("key", [...Object.keys(SETTING_DEFAULTS), REPAIR_COMBINE_MODE_KEY, ...Object.values(PART_PICK_KEYS)]),
   ]);
 
   // Default area sorts last so the catch-all sits at the bottom of the table.
@@ -50,6 +51,7 @@ export default async function AdminPricingPage() {
     a.name === "Default" ? 1 : b.name === "Default" ? -1 : a.name.localeCompare(b.name),
   );
 
+  const partPick = parsePartPickRule(new Map((settingRows ?? []).map((row) => [row.key as string, row.value as unknown])));
   const settings: PlatformSettings = { ...SETTING_DEFAULTS };
   for (const row of settingRows ?? []) {
     if (row.key === REPAIR_COMBINE_MODE_KEY) {
@@ -79,7 +81,7 @@ export default async function AdminPricingPage() {
       </header>
 
       <AreasSection areas={areaRows} />
-      <PlatformDefaultsSection settings={settings} />
+      <PlatformDefaultsSection settings={settings} partPick={partPick} />
     </div>
   );
 }

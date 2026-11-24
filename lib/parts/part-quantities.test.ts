@@ -280,6 +280,9 @@ describe("fluid packs", () => {
     // Still within the best rating offered.
     const rated = [...febi, fluid("BEST", "BRAKE FLUID", 12.5, "Best")];
     expect(sensiblePacks(rated).map((o) => o.partNumber)).toEqual(["BEST"]);
+    // The pick rule's stock and rating come first (Task 85).
+    const stocked = febi.map((o) => ({ ...o, totalQty: o.partNumber === "FEB180590" ? 2 : 0 }));
+    expect(sensiblePacks(stocked, { price: "cheapest", rating: "any", stock: "in_stock" }).map((o) => o.partNumber)).toEqual(["FEB180590"]);
     // Unsized parts that aren't brake fluid keep the usual pick.
     const other = [fluid("A", "ANTI FREEZE MULTI VEHICLE RED CON", 20), fluid("B", "ANTI FREEZE", 10)];
     expect(sensiblePacks(other)).toEqual(other);
@@ -400,6 +403,19 @@ describe("fluids by the litres the car needs", () => {
   it("keeps to the best rating NAPA offers", () => {
     const offers = [fluid("CHEAP", "COOLANT (5L)", 10, "Good"), fluid("BEST", "COOLANT (5L)", 20, "Best")];
     expect(fluidPick(offers, { kind: "coolant", litres: 4 })).toMatchObject({ offer: { partNumber: "BEST" } });
+  });
+
+  it("follows the pick rule's stock and rating, and still buys the cheapest bottles (Task 85)", () => {
+    const offers = [
+      { ...fluid("CHEAP", "COOLANT (5L)", 10, "Good"), totalQty: 0 },
+      { ...fluid("BEST", "COOLANT (5L)", 20, "Best"), totalQty: 0 },
+      { ...fluid("STOCKED", "COOLANT (5L)", 15, "Better"), totalQty: 6 },
+    ];
+    const need = { kind: "coolant" as const, litres: 4 };
+    expect(fluidPick(offers, need, { price: "cheapest", rating: "any", stock: "any" })).toMatchObject({ offer: { partNumber: "CHEAP" } });
+    expect(fluidPick(offers, need, { price: "cheapest", rating: "any", stock: "in_stock" })).toMatchObject({ offer: { partNumber: "STOCKED" } });
+    // "Dearest" doesn't buy dearer bottles.
+    expect(fluidPick(offers, need, { price: "dearest", rating: "any", stock: "any" })).toMatchObject({ offer: { partNumber: "CHEAP" } });
   });
 
   it("prices a drain and refill from the car's capacity", () => {

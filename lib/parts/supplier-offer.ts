@@ -145,21 +145,86 @@ export function offerLinePence(offer: SupplierOffer): number | null {
 }
 
 /**
- * The default part for a repair: the best-rated part we could actually buy,
- * the dearest within that rating (owner decision, 2026-09-15: "Best-rated,
- * dearest within"). Null when nothing is buyable.
+ * How the default part is picked from NAPA's alternatives (Task 85, set under
+ * Admin → Pricing; lib/parts/part-pick-rule.ts loads it). Gareth chooses the
+ * combination:
+ *   - stock: "in_stock" prefers a part NAPA has in stock anywhere (the branch,
+ *     Birmingham or a warehouse); "any" ignores stock.
+ *   - rating: the rating wanted. When NAPA has none at it, the nearest above,
+ *     then the nearest below; unrated parts last. "any" ignores rating.
+ *   - price: the cheapest or the dearest of what's left.
+ * Stock comes first, then rating, then price. Nothing is ever ruled out: with
+ * nothing in stock, or nothing at the rating, the rest is still priced
+ * (Brad, 2026-11-24), so a customer never loses a price to a setting.
  */
-export function defaultOffer(offers: readonly SupplierOffer[]): SupplierOffer | null {
+export type PickPrice = "cheapest" | "dearest";
+export type PickRating = "any" | "best" | "better" | "good";
+export type PickStock = "in_stock" | "any";
+export interface PartPickRule {
+  price: PickPrice;
+  rating: PickRating;
+  stock: PickStock;
+}
+
+/** The rule until an admin sets one: "Best-rated, dearest within", stock ignored (owner decision, 2026-09-15). */
+export const DEFAULT_PART_PICK_RULE: PartPickRule = { price: "dearest", rating: "best", stock: "any" };
+
+/** NAPA has some anywhere. Stock is as of NAPA's answer, which is kept up to 12 hours. */
+export function inStock(offer: Pick<SupplierOffer, "totalQty">): boolean {
+  return (offer.totalQty ?? 0) > 0;
+}
+
+const RATING_TARGET: Record<Exclude<PickRating, "any">, number> = { best: 3, better: 2, good: 1 };
+
+/**
+ * How far a part's rating is from the one wanted, lower first: the rating
+ * itself, then those above it (nearest first), then those below (nearest
+ * first), unrated last. Pure.
+ */
+export function ratingDistance(tier: string | null | undefined, rating: PickRating): number {
+  if (rating === "any") return 0;
+  const target = RATING_TARGET[rating];
+  const rank = ratingRank(tier);
+  if (rank === target) return 0;
+  return rank > target ? rank - target : 10 + (target - rank);
+}
+
+/** Which of two parts the rule prefers on stock and rating, price aside: negative for a. Pure. */
+export function compareStockAndRating(
+  a: Pick<SupplierOffer, "totalQty" | "tier">,
+  b: Pick<SupplierOffer, "totalQty" | "tier">,
+  rule: PartPickRule,
+): number {
+  if (rule.stock === "in_stock") {
+    const byStock = Number(inStock(b)) - Number(inStock(a));
+    if (byStock !== 0) return byStock;
+  }
+  return ratingDistance(a.tier, rule.rating) - ratingDistance(b.tier, rule.rating);
+}
+
+/** Which of two parts the rule prefers, price included: negative for a. Unpriced parts last. Pure. */
+export function compareOffers(a: SupplierOffer, b: SupplierOffer, rule: PartPickRule): number {
+  const byRule = compareStockAndRating(a, b, rule);
+  if (byRule !== 0) return byRule;
+  const la = offerLinePence(a);
+  const lb = offerLinePence(b);
+  if (la == null || lb == null) return (la == null ? 1 : 0) - (lb == null ? 1 : 0);
+  return rule.price === "cheapest" ? la - lb : lb - la;
+}
+
+/**
+ * The default part for a repair: of the parts we could actually buy, the one
+ * the pick rule prefers (Task 85). NAPA's order breaks a tie. Null when
+ * nothing is buyable.
+ */
+export function defaultOffer(
+  offers: readonly SupplierOffer[],
+  rule: PartPickRule = DEFAULT_PART_PICK_RULE,
+): SupplierOffer | null {
   let best: SupplierOffer | null = null;
   for (const offer of offers) {
-    const line = offerLinePence(offer);
-    if (!offer.buyable || line == null) continue;
-    if (!best) {
-      best = offer;
-      continue;
-    }
-    const byRating = ratingRank(offer.tier) - ratingRank(best.tier);
-    if (byRating > 0 || (byRating === 0 && line > (offerLinePence(best) as number))) best = offer;
+    if (!offer.buyable || offerLinePence(offer) == null) continue;
+    if (!best || compareOffers(offer, best, rule) < 0) best = offer;
   }
   return best;
 }
