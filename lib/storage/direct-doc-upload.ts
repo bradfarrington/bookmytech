@@ -1,12 +1,12 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { ACCEPTED_DOC_MIME, MAX_DOC_BYTES } from "@/lib/onboarding/docs";
+import { ACCEPTED_DOC_MIME } from "@/lib/onboarding/docs";
 
 // Documents that go from the mechanic app STRAIGHT to Supabase Storage, rather
 // than through a route here.
 //
 // Why: every request to this app runs on Vercel, which refuses a body over
-// 4.5 MB before our code sees it — whatever `MAX_DOC_BYTES` says. A scanned
+// 4.5 MB before our code sees it — whatever limit a route sets. A scanned
 // insurance certificate or a multi-page PDF is routinely bigger than that, and
 // on Android the refusal surfaces as a dropped connection, not an error. Photos
 // are shrunk on the phone; a PDF can't be.
@@ -20,10 +20,20 @@ import { ACCEPTED_DOC_MIME, MAX_DOC_BYTES } from "@/lib/onboarding/docs";
 //                Anything over the cap or of a type we don't take is deleted
 //                rather than left in the bucket.
 //
+// The cap here is 25 MB, not the 10 MB `MAX_DOC_BYTES` the multipart routes and
+// the website use. 10 MB was only ever about request bodies; this path has
+// none, and a PDF can't be shrunk on the phone the way a photo is (and there is
+// no way to compress one here without sending ID and insurance documents to a
+// third party). 25 MB fits virtually any real scan; Storage's own project limit
+// is above it.
+//
 // The signed token is the only grant: `mechanic-docs` stays private with no
 // browser policies, and the token can write that one path and nothing else.
 
 const DOCS_BUCKET = "mechanic-docs";
+
+/** The most a directly uploaded document may be. Mirrored in the mechanic app. */
+export const MAX_DIRECT_DOC_BYTES = 25 * 1024 * 1024;
 
 export interface SignedDocUpload {
   /** The object key the app must send back on confirm. */
@@ -70,7 +80,7 @@ export async function checkUploadedDoc(path: string): Promise<UploadedDocCheck> 
   const reason =
     size === 0
       ? ("missing" as const)
-      : size > MAX_DOC_BYTES
+      : size > MAX_DIRECT_DOC_BYTES
         ? ("too_big" as const)
         : ACCEPTED_DOC_MIME[mime] !== ext
           ? ("wrong_type" as const)
@@ -87,6 +97,7 @@ export async function checkUploadedDoc(path: string): Promise<UploadedDocCheck> 
 /** The applicant- and mechanic-facing wording for a refused upload. */
 export const UPLOAD_CHECK_MESSAGE: Record<Exclude<UploadedDocCheck, { ok: true }>["reason"], string> = {
   missing: "That file didn't finish uploading. Please try again.",
-  too_big: "File must be 10 MB or smaller.",
+  too_big:
+    "This file is over 25 MB. Try scanning it at a lower quality, or upload a photo of it instead — photos are made smaller automatically.",
   wrong_type: "Use a PDF, JPG, PNG or WebP file.",
 };

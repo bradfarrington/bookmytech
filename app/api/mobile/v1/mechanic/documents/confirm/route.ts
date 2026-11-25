@@ -8,7 +8,7 @@ import { recordUploadedMechanicDocumentFor } from "@/lib/mechanics/documents";
 // Body: { doc_type, path, expires_at } — `path` exactly as …/upload-url
 //       returned it; expires_at "YYYY-MM-DD" or empty for none.
 // 200:  { id } — same as the multipart POST …/documents.
-// 400:  over 10 MB, a format we don't take, not uploaded, a bad date — the
+// 400:  over 25 MB, a format we don't take, not uploaded, a bad date — the
 //       refused file is deleted.   403: a path that isn't this mechanic's.
 //       Otherwise `{ error }`: 401, 429, 500.
 //

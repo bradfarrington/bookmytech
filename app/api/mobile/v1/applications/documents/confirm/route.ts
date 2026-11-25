@@ -8,7 +8,7 @@ import { confirmApplicationDocFor } from "@/lib/applications/submit";
 // Headers: X-BMT-Client: mechanic-app — REQUIRED.
 // Body:    { draftId, docType, path } — path exactly as …/upload-url returned.
 // 200:     { path } — send it in the submit's `docs`, as with the multipart route.
-// 400:     over 10 MB, wrong format, not uploaded, or not this draft's path;
+// 400:     over 25 MB, wrong format, not uploaded, or not this draft's path;
 //          a refused file is deleted.
 //
 // Not rate limited on its own: it moves no file, reads one object's metadata,

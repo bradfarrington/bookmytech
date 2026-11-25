@@ -115,7 +115,7 @@ async function insertDocumentRow(
 // ---------------------------------------------------------------------------
 // Direct-to-Storage uploads (lib/storage/direct-doc-upload.ts). Same rules and
 // same row as `uploadMechanicDocumentFor`; the file just never passes through
-// Vercel, so a document can be the full 10 MB rather than the 4.5 MB a request
+// Vercel, so a document can be up to 25 MB rather than the 4.5 MB a request
 // body is allowed there.
 // ---------------------------------------------------------------------------
 
