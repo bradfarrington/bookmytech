@@ -12,7 +12,12 @@ import { formatPrice } from "@/lib/utils";
 //     platform has no such tier. A same-day cancellation is charged the
 //     within-24-hours fee unless the mechanic is already en route.
 //   • §22: rescheduling is always free on the platform, so the document's
-//     "a cancellation charge may apply" sentence is replaced.
+//     "a cancellation charge may apply" sentence is replaced. Since 25 November
+//     2026 (migration 0092) it also says that once a mechanic has accepted, a
+//     new time is a request they confirm, and the booking keeps its original
+//     time (and so its cancellation terms) until they do. The mechanic accepts
+//     or proposes another time; the customer can then accept, keep the
+//     original time, have it offered to another mechanic, or ask us to cancel.
 //
 // Added 13 November 2026 (Task 74), from Brad's "book my tech dpf.odt"
 // (docs/legal/dpf-info-sheet.odt): the "DPF Cleaning and Regeneration" section
@@ -473,8 +478,21 @@ export function buildSections(tiers: CancelFeeTiers): LegalSection[] {
     heading: "Rescheduling",
     blocks: [
       { type: "p", text: "Where possible, we will try to reschedule your booking rather than cancel it." },
-      { type: "p", text: "Rescheduling is free and is not treated as a cancellation, however close to your appointment you do it. Where possible you will keep the same mechanic." },
-      { type: "p", text: "Your mechanic may also propose a new time. If they do, you will be asked to accept or decline it, and declining does not incur a fee." },
+      { type: "p", text: "Rescheduling is free and is not treated as a cancellation." },
+      { type: "p", text: "Before a mechanic has accepted your booking, you may change its time through your account at any time." },
+      { type: "p", text: "Once a mechanic has accepted your booking, any change of time you ask for is a request to that mechanic. The mechanic may accept it or propose an alternative time. Until the mechanic accepts a new time, your booking remains at its original time, and the cancellation terms in these Terms continue to apply by reference to that original time." },
+      { type: "p", text: "You may withdraw a request for a new time at any time before the mechanic answers it." },
+      { type: "p", text: "Your mechanic may also propose a new time, either of their own accord or in answer to your request. If they do, you may:" },
+      {
+        type: "bullets",
+        items: [
+          "accept the proposed time;",
+          "keep your booking at its original time;",
+          "ask us to offer the booking to another mechanic at a time you choose, in which case the original mechanic will no longer carry out the work; or",
+          "ask us to cancel the booking.",
+        ],
+      },
+      { type: "p", text: "Keeping your original time does not incur a fee. If you ask us to cancel, your booking remains at its original time while we consider the request, and we will decide whether a cancellation charge applies under the cancellation terms in these Terms, by reference to the booking's time." },
     ],
   },
   {

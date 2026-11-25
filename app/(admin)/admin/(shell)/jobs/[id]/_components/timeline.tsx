@@ -9,6 +9,7 @@ import {
   StickyNote,
   ArrowRightLeft,
   CalendarClock,
+  Flag,
   type LucideIcon,
 } from "lucide-react";
 
@@ -18,6 +19,13 @@ export interface TimelineEvent {
   actorRole: string | null;
   reason: string | null;
   createdAt: string;
+  /**
+   * `payload.kind` of a 'note' event, which some features use to say what the
+   * note is (0092: 'cancellation_requested', 'cancellation_request_dismissed').
+   */
+  noteKind?: string | null;
+  /** `payload.by`: who made a change (0092: 'customer' on a mechanic_reassigned = they chose another mechanic). */
+  payloadBy?: string | null;
 }
 
 const META: Record<string, { label: string; icon: LucideIcon; tone: string }> = {
@@ -30,6 +38,12 @@ const META: Record<string, { label: string; icon: LucideIcon; tone: string }> = 
   payment_authorised: { label: "Payment pre-authorised", icon: CreditCard, tone: "text-brand-blue" },
   payment_captured: { label: "Payment captured", icon: CheckCircle2, tone: "text-green-600" },
   arrival_window_set: { label: "Arrival window set", icon: CalendarClock, tone: "text-brand-blue" },
+  reschedule_proposed: { label: "New time proposed", icon: CalendarClock, tone: "text-amber-600" },
+  reschedule_accepted: { label: "New time accepted", icon: CalendarClock, tone: "text-green-600" },
+  reschedule_declined: { label: "New time declined", icon: CalendarClock, tone: "text-text-muted" },
+  // 0092: a customer's new time on a confirmed booking is a request the mechanic answers.
+  reschedule_requested: { label: "Customer asked for a new time", icon: CalendarClock, tone: "text-amber-600" },
+  reschedule_withdrawn: { label: "Customer withdrew their new time", icon: CalendarClock, tone: "text-text-muted" },
   // Task 33
   fault_added: { label: "Fault noted", icon: AlertTriangle, tone: "text-amber-600" },
   quote_sent: { label: "Quote sent", icon: CreditCard, tone: "text-brand-blue" },
@@ -46,6 +60,15 @@ const META: Record<string, { label: string; icon: LucideIcon; tone: string }> = 
   payment_refunded: { label: "Payment refunded", icon: CreditCard, tone: "text-red-600" },
   payout_transferred: { label: "Payout transferred", icon: CheckCircle2, tone: "text-green-600" },
   note: { label: "Note", icon: StickyNote, tone: "text-text-muted" },
+};
+
+/** 0092: the customer turned down their mechanic's new time and had the job offered to others. */
+const CUSTOMER_REASSIGNED = { label: "Customer chose another mechanic", icon: Repeat, tone: "text-amber-600" };
+
+/** Notes that mean something specific, by `payload.kind`. */
+const NOTE_META: Record<string, { label: string; icon: LucideIcon; tone: string }> = {
+  cancellation_requested: { label: "Customer asked us to cancel", icon: Flag, tone: "text-amber-600" },
+  cancellation_request_dismissed: { label: "Cancellation request dismissed", icon: Flag, tone: "text-text-muted" },
 };
 
 function formatStamp(iso: string): string {
@@ -70,7 +93,9 @@ export function Timeline({ events }: { events: TimelineEvent[] }) {
   return (
     <ol className="space-y-0">
       {events.map((e, i) => {
-        const meta = META[e.eventType] ?? {
+        const meta = (e.eventType === "note" && e.noteKind ? NOTE_META[e.noteKind] : undefined) ??
+          (e.eventType === "mechanic_reassigned" && e.payloadBy === "customer" ? CUSTOMER_REASSIGNED : undefined) ??
+          META[e.eventType] ?? {
           label: e.eventType,
           icon: CircleDot,
           tone: "text-text-muted",

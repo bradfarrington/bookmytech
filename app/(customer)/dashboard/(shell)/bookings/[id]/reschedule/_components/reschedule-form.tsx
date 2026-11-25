@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { Button, Caption, Notice, Section } from "@/components/dashboard/ui";
 import { cn } from "@/lib/utils";
 import {
@@ -12,11 +13,15 @@ import {
   slotIso,
   twoHourSlotByWindow,
 } from "@/lib/slots";
-import { rescheduleAvailability, rescheduleBooking } from "@/app/actions/customer-bookings";
+import { findAnotherMechanic, rescheduleAvailability, rescheduleBooking } from "@/app/actions/customer-bookings";
 
 // The day chips, window tiles, reason and "Move to …" of the reschedule screen.
 // The same pure helpers as the booking flow's Time step (lib/slots.ts), so a
-// window closes here exactly when it closes there.
+// window closes here exactly when it closes there. Three modes (0092):
+//   move    — still finding a mechanic: the time changes at once;
+//   request — confirmed: the button asks, and the mechanic confirms;
+//   another — "Find another mechanic": confirming takes the job off the
+//             mechanic and offers it to others at the time picked.
 
 type Counts = Record<string, number>;
 
@@ -28,24 +33,40 @@ export function RescheduleForm({
   nowIso,
   days,
   initialDay,
+  initialWindow = null,
   initialCounts,
   currentIso,
   currentWindow,
   mechanicName,
+  mode,
+  currentLabel,
 }: {
   bookingId: string;
   nowIso: string;
   days: string[];
   initialDay: string;
+  /** A window to start picked on `initialDay` ("2pm–4pm"), when it's still open. */
+  initialWindow?: string | null;
   initialCounts: Counts | null;
   currentIso: string | null;
   currentWindow: string | null;
   mechanicName: string | null;
+  mode: "move" | "request" | "another";
+  /** The booking's current time, as shown on the page. */
+  currentLabel: string;
 }) {
   const router = useRouter();
   const now = new Date(nowIso);
+  const who = !mechanicName || mechanicName === "Your mechanic" ? "your mechanic" : mechanicName;
+  const needsConfirmation = mode === "request";
+  const another = mode === "another";
   const [day, setDay] = useState(initialDay);
-  const [picked, setPicked] = useState<string | null>(null);
+  const [picked, setPicked] = useState<string | null>(() => {
+    const start = twoHourSlotByWindow(initialWindow);
+    return start && isSlotBookable(initialDay, start, new Date(nowIso)) ? start.window : null;
+  });
+  // "another": the consequence is spelled out and confirmed before anything is sent.
+  const [confirming, setConfirming] = useState(false);
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
   // undefined: still loading; null: couldn't count, so no captions.
@@ -54,12 +75,16 @@ export function RescheduleForm({
 
   const slot = twoHourSlotByWindow(picked);
   const iso = slot ? slotIso(day, slot.startHour) : null;
-  const isCurrent = !!iso && !!currentIso && new Date(currentIso).toISOString() === iso && currentWindow === slot?.window;
+  // Another mechanic may well take the job at the time it already has.
+  const isCurrent =
+    !another && !!iso && !!currentIso && new Date(currentIso).toISOString() === iso && currentWindow === slot?.window;
+  const pickedLabel = slot && iso ? `${formatBookingDay(iso)} · ${slot.window}` : null;
   const dayCounts = counts[day];
 
   function pickDay(next: string) {
     setDay(next);
     setPicked(null);
+    setConfirming(false);
     setError(null);
     if (next in counts) return;
     setCounts((prev) => ({ ...prev, [next]: undefined }));
@@ -75,11 +100,30 @@ export function RescheduleForm({
       setError("That window has just closed. Please pick another.");
       return;
     }
+    if (another) {
+      startTransition(async () => {
+        const res = await findAnotherMechanic(bookingId, iso, slot.window);
+        if (!res.ok) {
+          setError(res.error);
+          setConfirming(false);
+          return;
+        }
+        toast.success(`We're finding you another mechanic for ${formatBookingDay(iso)} · ${slot.window}.`);
+        router.push(`/dashboard/bookings/${bookingId}`);
+      });
+      return;
+    }
     startTransition(async () => {
       const res = await rescheduleBooking(bookingId, iso, reason, slot.window);
       if (!res.ok) {
         setError(res.error);
         return;
+      }
+      // `requested`: it went to the mechanic to accept, and the booking hasn't moved yet.
+      if (res.requested) {
+        toast.success(`Sent to ${who}. Your booking stays at ${currentLabel} until they confirm.`);
+      } else {
+        toast.success(`Your booking has moved to ${formatBookingDay(iso)} · ${slot.window}.`);
       }
       router.push(`/dashboard/bookings/${bookingId}`);
     });
@@ -134,6 +178,7 @@ export function RescheduleForm({
                 aria-pressed={on}
                 onClick={() => {
                   setPicked(option.window);
+                  setConfirming(false);
                   setError(null);
                 }}
                 className={cn(
@@ -160,20 +205,22 @@ export function RescheduleForm({
         </div>
       </Section>
 
-      <div>
-        <label htmlFor="reschedule-reason" className="mb-1.5 block text-xs font-semibold text-text-secondary">
-          Why are you moving it? <span className="font-normal text-text-muted">(optional)</span>
-        </label>
-        <textarea
-          id="reschedule-reason"
-          rows={3}
-          maxLength={1000}
-          value={reason}
-          onChange={(e) => setReason(e.target.value)}
-          placeholder="For example, something's come up at work"
-          className={FIELD}
-        />
-      </div>
+      {!another && (
+        <div>
+          <label htmlFor="reschedule-reason" className="mb-1.5 block text-xs font-semibold text-text-secondary">
+            Why are you moving it? <span className="font-normal text-text-muted">(optional)</span>
+          </label>
+          <textarea
+            id="reschedule-reason"
+            rows={3}
+            maxLength={1000}
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="For example, something's come up at work"
+            className={FIELD}
+          />
+        </div>
+      )}
 
       {error && (
         <div role="alert">
@@ -181,18 +228,55 @@ export function RescheduleForm({
         </div>
       )}
 
-      <div className="sticky bottom-0 z-10 -mx-4 mt-1 flex flex-col gap-2 border-t border-border-subtle bg-surface px-4 pb-5 pt-3 sm:-mx-6 sm:px-6">
-        <Button variant="primary" size="lg" full disabled={!slot || isCurrent || pending} onClick={submit}>
-          {pending ? "Moving your booking…" : slot && iso ? `Move to ${formatBookingDay(iso)} · ${slot.window}` : "Pick a window"}
-        </Button>
-        <Caption className="text-center">
-          {isCurrent
-            ? "That's the time you already have."
-            : mechanicName
-              ? `${mechanicName} keeps the job. Moving is free.`
-              : "Moving is free."}
-        </Caption>
-      </div>
+      {another ? (
+        <div className="sticky bottom-0 z-10 -mx-4 mt-1 flex flex-col gap-2 border-t border-border-subtle bg-surface px-4 pb-5 pt-3 sm:-mx-6 sm:px-6">
+          {confirming && pickedLabel ? (
+            <>
+              <Notice tone="warn" title={`${mechanicName ?? "Your mechanic"} won't do this job`}>
+                We&apos;ll offer it to other mechanics for {pickedLabel}. This can&apos;t be undone.
+              </Notice>
+              <Button variant="primary" size="lg" full disabled={pending} onClick={submit}>
+                {pending ? "Finding another mechanic…" : "Yes, find another mechanic"}
+              </Button>
+              <Button variant="ghost" size="md" full disabled={pending} onClick={() => setConfirming(false)}>
+                Back
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button variant="primary" size="lg" full disabled={!slot} onClick={() => setConfirming(true)}>
+                {pickedLabel ? `Find a mechanic for ${pickedLabel}` : "Pick a window"}
+              </Button>
+              <Caption className="text-center">
+                {pickedLabel
+                  ? `${mechanicName ?? "Your mechanic"} won't do this job; we'll offer it to other mechanics for ${pickedLabel}.`
+                  : "Your mechanic won't do this job; we'll offer it to other mechanics for the time you pick."}
+              </Caption>
+            </>
+          )}
+        </div>
+      ) : (
+        <div className="sticky bottom-0 z-10 -mx-4 mt-1 flex flex-col gap-2 border-t border-border-subtle bg-surface px-4 pb-5 pt-3 sm:-mx-6 sm:px-6">
+          <Button variant="primary" size="lg" full disabled={!slot || isCurrent || pending} onClick={submit}>
+            {pending
+              ? needsConfirmation
+                ? "Sending your request…"
+                : "Moving your booking…"
+              : slot && iso
+                ? `${needsConfirmation ? "Ask for" : "Move to"} ${formatBookingDay(iso)} · ${slot.window}`
+                : "Pick a window"}
+          </Button>
+          <Caption className="text-center">
+            {isCurrent
+              ? "That's the time you already have."
+              : needsConfirmation
+                ? `Free to ask. Your booking only moves once ${who} confirms.`
+                : mechanicName
+                  ? `${mechanicName} keeps the job. Moving is free.`
+                  : "Moving is free."}
+          </Caption>
+        </div>
+      )}
     </>
   );
 }

@@ -2,8 +2,10 @@ import Link from "next/link";
 import { CalendarDays } from "lucide-react";
 import type { CustomerBooking } from "@/lib/dashboard/customer-bookings";
 import { bookingStatusMeta } from "@/lib/bookings/status-meta";
+import { formatBookingSlot } from "@/lib/slots";
 import { formatPrice } from "@/lib/utils";
 import { Caption, Panel, Section, Stack, StatusPill, Tile } from "@/components/dashboard/ui";
+import { requestedTime } from "./booking-logic";
 
 // Booked and not started, soonest first. Each card opens the booking.
 export function UpcomingList({ bookings }: { bookings: CustomerBooking[] }) {
@@ -13,6 +15,8 @@ export function UpcomingList({ bookings }: { bookings: CustomerBooking[] }) {
       <Stack className="gap-2.5">
         {bookings.map((booking) => {
           const meta = bookingStatusMeta(booking.status);
+          // The time the customer asked for (0092) until the mechanic answers; the booking keeps its own.
+          const requested = requestedTime(booking);
           return (
             <Link
               key={booking.id}
@@ -27,6 +31,11 @@ export function UpcomingList({ bookings }: { bookings: CustomerBooking[] }) {
                     <Caption className="mt-0.5">
                       {booking.whenLabel} · {formatPrice(booking.totalPence)}
                     </Caption>
+                    {requested && (
+                      <Caption className="mt-0.5 text-text-secondary">
+                        New time requested: {formatBookingSlot(requested.at, requested.window)}
+                      </Caption>
+                    )}
                   </div>
                   {meta && <StatusPill tone={meta.tone}>{meta.label}</StatusPill>}
                 </div>

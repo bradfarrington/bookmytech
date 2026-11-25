@@ -69,7 +69,7 @@ export async function setArrivalWindowFor(
   const { data: booking } = await admin
     .from("bookings")
     .select(
-      `id, job_number, status, mechanic_id, scheduled_at, slot_window, candidate_days, reschedule_status,
+      `id, job_number, status, mechanic_id, scheduled_at, slot_window, candidate_days, reschedule_status, reschedule_proposed_by,
        customer_id, customer_email, customer_name, customer_phone, repair_description`,
     )
     .eq("id", bookingId)
@@ -101,7 +101,9 @@ export async function setArrivalWindowFor(
       ok: false,
       code: "conflict",
       error:
-        "You've proposed a new time for this job. Wait for the customer's answer before choosing an arrival window.",
+        booking.reschedule_proposed_by === "customer"
+          ? "The customer has asked for a new time. Accept it or suggest another time first."
+          : "You've proposed a new time for this job. Wait for the customer's answer before choosing an arrival window.",
     };
   if (!booking.scheduled_at) return { ok: false, code: "conflict", error: "This job has no date yet." };
 

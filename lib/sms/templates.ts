@@ -115,18 +115,6 @@ export const SMS_TEMPLATE_DEFS: readonly SmsTemplateDef[] = [
       "Your Book My Tech booking is now set for {{slot}}. Your pre-authorisation stays in place.",
   },
   {
-    key: "reschedule_request_declined",
-    label: "Mechanic declined the new time",
-    description: "Sent to the customer when their mechanic can't do the time they asked for; the booking keeps its original time.",
-    audience: "customer",
-    variables: [
-      { name: "proposed", description: "The time the customer asked for", example: "Thu 4 Sep · 2pm–4pm" },
-      { name: "original", description: "The time the booking stays at", example: "Wed 3 Sep · 8am–10am" },
-    ],
-    defaultBody:
-      "Book My Tech: your mechanic can't do {{proposed}}, so your booking stays at {{original}}. You can ask for another time from your booking.",
-  },
-  {
     key: "finding_replacement",
     label: "Finding a replacement mechanic",
     description: "Sent to the customer when their mechanic drops out and the job is re-broadcast.",

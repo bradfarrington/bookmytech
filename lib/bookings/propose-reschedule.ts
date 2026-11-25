@@ -38,7 +38,7 @@ export async function proposeRescheduleFor(
   const { data: booking } = await admin
     .from("bookings")
     .select(
-      "id, status, mechanic_id, customer_id, scheduled_at, customer_email, customer_name, customer_phone, reschedule_status, reschedule_proposed_by",
+      "id, status, mechanic_id, customer_id, scheduled_at, customer_email, customer_name, customer_phone, reschedule_status, reschedule_proposed_by, reschedule_proposed_at, reschedule_proposed_window",
     )
     .eq("id", bookingId)
     .single();
@@ -75,7 +75,17 @@ export async function proposeRescheduleFor(
     payload: {
       from: booking.scheduled_at,
       proposed: when.toISOString(),
-      ...(countering ? { counter: true } : {}),
+      // A counter keeps what the customer had asked for, so "find another
+      // mechanic" can start from that time if they turn the counter down.
+      ...(countering
+        ? {
+            counter: true,
+            requested: {
+              at: booking.reschedule_proposed_at,
+              window: booking.reschedule_proposed_window ?? null,
+            },
+          }
+        : {}),
     },
   });
 

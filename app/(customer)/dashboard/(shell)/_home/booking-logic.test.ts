@@ -14,6 +14,7 @@ import {
   proposedTime,
   proposedTimeLabel,
   rebookHref,
+  requestedTime,
   shortDate,
   telHref,
   timeAgo,
@@ -48,6 +49,8 @@ function booking(overrides: Partial<CustomerBooking> = {}): CustomerBooking {
     rescheduleStatus: null,
     rescheduleProposedAt: null,
     rescheduleNote: null,
+    rescheduleProposedBy: null,
+    rescheduleProposedWindow: null,
     repairDescription: "Front brake pads",
     repairNodeId: "p:abc",
     repairNodeIds: ["p:abc"],
@@ -221,10 +224,55 @@ describe("waitingOnCustomer", () => {
     ]);
   });
 
+  it("leaves out the customer's own request, which the mechanic answers", () => {
+    const asked = booking({
+      rescheduleStatus: "proposed",
+      rescheduleProposedAt: "2026-01-17T14:00:00Z",
+      rescheduleProposedBy: "customer",
+      rescheduleProposedWindow: "2pm–4pm",
+    });
+    expect(proposedTime(asked)).toBeNull();
+    expect(waitingOnCustomer([asked])).toEqual([]);
+  });
+
+  it("reads a proposal from before 0092 as the mechanic's", () => {
+    const old = booking({ rescheduleStatus: "proposed", rescheduleProposedAt: "2026-01-17T14:00:00Z" });
+    expect(proposedTime(old)).toBe("2026-01-17T14:00:00Z");
+    expect(requestedTime(old)).toBeNull();
+  });
+
   it("ignores a proposal left on a finished booking", () => {
     const done = booking({ status: "cancelled", rescheduleStatus: "proposed", rescheduleProposedAt: "2026-01-17T14:00:00Z" });
     expect(proposedTime(done)).toBeNull();
     expect(waitingOnCustomer([done])).toEqual([]);
+  });
+});
+
+describe("requestedTime", () => {
+  it("returns the time and window the customer asked for", () => {
+    const asked = booking({
+      rescheduleStatus: "proposed",
+      rescheduleProposedAt: "2026-01-17T14:00:00Z",
+      rescheduleProposedBy: "customer",
+      rescheduleProposedWindow: "2pm–4pm",
+    });
+    expect(requestedTime(asked)).toEqual({ at: "2026-01-17T14:00:00Z", window: "2pm–4pm" });
+  });
+
+  it("ignores a mechanic's proposal and a finished booking", () => {
+    const mechanic = booking({
+      rescheduleStatus: "proposed",
+      rescheduleProposedAt: "2026-01-17T14:00:00Z",
+      rescheduleProposedBy: "mechanic",
+    });
+    expect(requestedTime(mechanic)).toBeNull();
+    const done = booking({
+      status: "cancelled",
+      rescheduleStatus: "proposed",
+      rescheduleProposedAt: "2026-01-17T14:00:00Z",
+      rescheduleProposedBy: "customer",
+    });
+    expect(requestedTime(done)).toBeNull();
   });
 });
 

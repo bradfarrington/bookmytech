@@ -9,8 +9,9 @@ import { sendSms } from "@/lib/sms/send-sms";
 import { renderSmsTemplate } from "@/lib/sms/render-template";
 import { formatBookingSlot } from "@/lib/slots";
 import { rescheduleSlotWindow } from "@/lib/bookings/reschedule-window";
-import { reofferAfterTimeChange } from "@/lib/dispatch/dispatch";
+import { dispatchBooking, notifyOfferHoldersOfNewTime } from "@/lib/dispatch/dispatch";
 import { sendPushToCustomer } from "@/lib/push/send";
+import { logCancellationRequest, openCancellationRequest } from "@/lib/bookings/cancellation-request";
 import { formatJobNumber, formatPrice } from "@/lib/utils";
 import { ownsBooking, type BookingCaller } from "@/lib/bookings/ownership";
 import { splitCommission } from "@/lib/quotes/pricing";
@@ -497,7 +498,7 @@ async function settleCancellation({
  *
  * - Still finding a mechanic (`sourcing_mechanic`, nobody assigned): there is
  *   nobody to ask, so the time changes at once, as it always did, and the open
- *   offers are refreshed (`reofferAfterTimeChange`).
+ *   mechanics holding the offer are told (`notifyOfferHoldersOfNewTime`).
  * - Confirmed with a mechanic: it is a REQUEST (0092). The booking keeps its
  *   time — and so its cancellation tier — until the mechanic accepts, declines
  *   or counters (lib/bookings/customer-reschedule.ts). Before this, the move
@@ -589,8 +590,8 @@ export async function rescheduleBookingFor(
     },
   });
 
-  // Mechanics holding (or who declined) the offer hear the new time.
-  await reofferAfterTimeChange(bookingId);
+  // Mechanics holding the offer hear the new time.
+  await notifyOfferHoldersOfNewTime(bookingId);
 
   const rescheduleEmail = booking.customer_email;
   if (rescheduleEmail) {
@@ -741,6 +742,153 @@ export async function withdrawRescheduleRequestFor(
   revalidatePath("/mechanic/jobs");
   revalidatePath(`/mechanic/jobs/${bookingId}`);
   return { ok: true };
+}
+
+/** A mechanic's proposal (or counter-offer) the customer has yet to answer. */
+function awaitingCustomer(booking: {
+  status: string;
+  mechanic_id: string | null;
+  reschedule_status: string | null;
+  reschedule_proposed_by: string | null;
+}): boolean {
+  return (
+    booking.status === "confirmed" &&
+    !!booking.mechanic_id &&
+    booking.reschedule_status === "proposed" &&
+    booking.reschedule_proposed_by !== "customer"
+  );
+}
+
+/**
+ * The customer turns down the time their mechanic suggested and has the job
+ * offered to OTHER mechanics instead, at a time they choose — the time they
+ * first asked for, by default, which the app pre-fills (it is on the counter's
+ * `reschedule_proposed` event as payload.requested). Owner's call, 2026-11-25.
+ *
+ * The booking moves to that time, drops back to `sourcing_mechanic` with no
+ * mechanic, and is dispatched afresh. The previous mechanic's offer is marked
+ * declined so they aren't offered it again; everyone else's old offer row is
+ * removed so they are (and get the usual new-offer push). The card hold is
+ * untouched: the booking carries on, only the mechanic changes.
+ */
+export async function findAnotherMechanicFor(
+  bookingId: string,
+  newIso: string,
+  caller: BookingCaller,
+  slotWindow?: string | null,
+): Promise<CustomerBookingResult> {
+  const when = new Date(newIso);
+  if (!newIso || Number.isNaN(when.getTime()))
+    return { ok: false, error: "Pick a valid new date and time." };
+  if (when.getTime() < Date.now())
+    return { ok: false, error: "The new time must be in the future." };
+
+  const guard = await requireBookingCustomer(bookingId, caller);
+  if (!guard.ok) return guard;
+  const { admin, booking, userId } = guard;
+  if (!awaitingCustomer(booking))
+    return { ok: false, error: "There's no new time from your mechanic to answer. Refresh the page." };
+
+  const previous = booking.mechanic_id!;
+  const keptWindow = rescheduleSlotWindow(newIso, slotWindow);
+
+  const { error } = await admin
+    .from("bookings")
+    .update({
+      mechanic_id: null,
+      status: "sourcing_mechanic",
+      scheduled_at: when.toISOString(),
+      slot_window: keptWindow,
+      candidate_days: null,
+      reschedule_status: null,
+      reschedule_proposed_by: null,
+      reschedule_proposed_at: null,
+      reschedule_proposed_window: null,
+      reschedule_note: null,
+    })
+    .eq("id", bookingId)
+    .eq("status", "confirmed")
+    .eq("mechanic_id", previous);
+  if (error) return { ok: false, error: error.message };
+
+  await admin
+    .from("job_offers")
+    .update({ response: "declined", responded_at: new Date().toISOString() })
+    .eq("booking_id", bookingId)
+    .eq("mechanic_id", previous);
+  await admin.from("job_offers").delete().eq("booking_id", bookingId).neq("mechanic_id", previous);
+
+  await admin.from("booking_events").insert({
+    booking_id: bookingId,
+    event_type: "mechanic_reassigned",
+    actor_id: userId,
+    actor_role: "customer",
+    reason: "The customer turned down the mechanic's new time and asked for another mechanic.",
+    payload: {
+      previous_mechanic_id: previous,
+      by: "customer",
+      from: booking.scheduled_at,
+      to: when.toISOString(),
+      status_from: "confirmed",
+      status_to: "sourcing_mechanic",
+      ...(keptWindow ? { slot_window: keptWindow } : {}),
+    },
+  });
+
+  pushMechanicUpdate(
+    previous,
+    {
+      title: "Job moved to another mechanic",
+      body: `The customer needed a different time for job ${formatJobNumber(booking.job_number)}, so it's been offered to other mechanics.`,
+    },
+    { type: "job", bookingId },
+  );
+
+  // A dispatch hiccup must not fail the customer's choice — the stall sweep
+  // and the admin pick it up, as after any redistribute.
+  try {
+    await dispatchBooking(bookingId);
+  } catch (err) {
+    console.error("[find-another-mechanic] dispatch failed", bookingId, err);
+  }
+
+  revalidatePath("/dashboard");
+  revalidatePath(`/book/confirmed/${bookingId}`);
+  revalidatePath("/mechanic/jobs");
+  revalidatePath(`/mechanic/jobs/${bookingId}`);
+  revalidatePath("/admin/jobs");
+  revalidatePath(`/admin/jobs/${bookingId}`);
+  return { ok: true };
+}
+
+/**
+ * The customer turns down the time their mechanic suggested and asks Book My
+ * Tech to cancel, rather than cancelling themselves. The proposal is declined
+ * — the booking keeps its original time, and the mechanic is told as for any
+ * decline — and the admin team is asked (lib/bookings/cancellation-request.ts).
+ * An admin then cancels, charging the fee the booking's time allows or waiving
+ * it, or dismisses the request.
+ */
+export async function askBookMyTechToCancelFor(
+  bookingId: string,
+  reason: string,
+  caller: BookingCaller,
+): Promise<CustomerBookingResult> {
+  const trimmed = reason.trim().slice(0, 1000);
+  if (!trimmed) return { ok: false, error: "Tell us why you'd like it cancelled." };
+
+  const guard = await requireBookingCustomer(bookingId, caller);
+  if (!guard.ok) return guard;
+  const { admin, booking, userId } = guard;
+  if (!awaitingCustomer(booking))
+    return { ok: false, error: "There's no new time from your mechanic to answer. Refresh the page." };
+  if (await openCancellationRequest(admin, bookingId))
+    return { ok: false, error: "You've already asked us to cancel this booking. We'll be in touch." };
+
+  const declined = await respondToRescheduleFor(bookingId, "decline", caller);
+  if (!declined.ok) return declined;
+
+  return logCancellationRequest(admin, booking, userId, trimmed);
 }
 
 /**

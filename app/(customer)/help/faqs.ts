@@ -41,12 +41,12 @@ export const FAQ_GROUPS: FaqGroup[] = [
       {
         question: "Can I reschedule or cancel a booking?",
         answer:
-          "Yes, from your dashboard. Rescheduling is free. Cancelling is free more than 24 hours before your slot; a fee applies closer to the time or once your mechanic is on the way. Our cancellation policy lists the current fees.",
+          "Yes, from your dashboard. Changing the time is free. Until a mechanic accepts your booking you can move it whenever you like. Once one has, a new time is a request: they accept it or suggest another, and your booking keeps its original time (and its cancellation terms) until they accept. If their suggested time doesn't suit you, you can keep your original time, have us find another mechanic, or ask us to cancel, in which case we decide whether a fee applies based on your booking's time. Cancelling is free more than 24 hours before your slot; a fee applies closer to the time or once your mechanic is on the way. Our cancellation policy lists the current fees.",
       },
       {
         question: "What if I'm not at home when the mechanic arrives?",
         answer:
-          "You (or someone who can authorise the work and give access to the vehicle) should be present at the start of the appointment. If your plans change, reschedule from your dashboard before the slot begins.",
+          "You (or someone who can authorise the work and give access to the vehicle) should be present at the start of the appointment. If your plans change, ask for a new time from your dashboard well before the slot begins. If a mechanic has already accepted, they'll need to confirm it.",
       },
     ],
   },

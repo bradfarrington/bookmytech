@@ -55,6 +55,14 @@ export interface CustomerBooking {
   rescheduleStatus: string | null;
   rescheduleProposedAt: string | null;
   rescheduleNote: string | null;
+  /**
+   * Who made the open proposal (0092): "customer" is their own request, which
+   * the mechanic answers; "mechanic" (or null, from before 0092) is one the
+   * customer answers.
+   */
+  rescheduleProposedBy: "mechanic" | "customer" | null;
+  /** The 2-hour window the customer asked for with their request ("2pm–4pm"), or null. */
+  rescheduleProposedWindow: string | null;
   /** One line for the whole booking ("X + 2 more jobs" when there are several). */
   repairDescription: string;
   repairNodeId: string | null;
@@ -89,10 +97,14 @@ const COLUMNS = `id, job_number, status, scheduled_at, slot_window, candidate_da
   total_pence, parts_price_pence, discount_pence, promo_code, payment_mode,
   vehicle_reg, vehicle_make, vehicle_model, address_line_1, address_line_2, postcode, parking_type,
   special_instructions, mechanic_id, reschedule_status, reschedule_proposed_at, reschedule_note,
+  reschedule_proposed_by, reschedule_proposed_window,
   repair_description, repair_node_id, customer_id, customer_email`;
 
-// Before 0063 (discount codes) those two columns don't exist.
-const COLUMNS_WITHOUT_DISCOUNTS = COLUMNS.replace("discount_pence, promo_code, ", "");
+// Before 0092 (customer reschedule requests) those two columns don't exist:
+// every open proposal then reads as the mechanic's, as it was.
+const COLUMNS_BEFORE_REQUESTS = COLUMNS.replace("reschedule_proposed_by, reschedule_proposed_window,", "");
+// Before 0063 (discount codes) those two columns don't exist either.
+const COLUMNS_WITHOUT_DISCOUNTS = COLUMNS_BEFORE_REQUESTS.replace("discount_pence, promo_code, ", "");
 
 type Admin = ReturnType<typeof createAdminClient>;
 type Row = Record<string, unknown> & { id: string; customer_id: string | null; customer_email: string | null };
@@ -112,10 +124,10 @@ async function selectBookings(admin: Admin, caller: BookingCaller, bookingId: st
     if (bookingId) query = query.eq("id", bookingId);
     return query.order("scheduled_at", { ascending: false, nullsFirst: false });
   };
+  const missingColumn = (e: { code?: string } | null) => !!e && (e.code === "42703" || e.code === "PGRST204");
   let { data, error } = await run(COLUMNS);
-  if (error && (error.code === "42703" || error.code === "PGRST204")) {
-    ({ data, error } = await run(COLUMNS_WITHOUT_DISCOUNTS));
-  }
+  if (missingColumn(error)) ({ data, error } = await run(COLUMNS_BEFORE_REQUESTS));
+  if (missingColumn(error)) ({ data, error } = await run(COLUMNS_WITHOUT_DISCOUNTS));
   if (error) {
     console.error("[dashboard] bookings read failed", caller.userId, error.message);
     throw new Error("We couldn't load your bookings.");
@@ -292,6 +304,9 @@ async function hydrate(admin: Admin, rows: Row[]): Promise<CustomerBooking[]> {
       rescheduleStatus: str(row.reschedule_status),
       rescheduleProposedAt: str(row.reschedule_proposed_at),
       rescheduleNote: str(row.reschedule_note),
+      rescheduleProposedBy:
+        row.reschedule_proposed_by === "customer" ? "customer" : row.reschedule_proposed_by === "mechanic" ? "mechanic" : null,
+      rescheduleProposedWindow: str(row.reschedule_proposed_window),
       repairDescription: str(row.repair_description) ?? "Vehicle repair",
       repairNodeId: str(row.repair_node_id),
       repairNodeIds: bookingLines

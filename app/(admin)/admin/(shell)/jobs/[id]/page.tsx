@@ -15,12 +15,21 @@ import {
   Split,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { CANCELLABLE } from "@/lib/bookings/manage-booking";
+import { openCancellationRequest } from "@/lib/bookings/cancellation-request";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Pill } from "@/components/ui/pill";
 import { Overline } from "@/components/ui/overline";
 import { formatPrice, formatJobNumber } from "@/lib/utils";
-import { formatBookingWhen, formatCandidateDays, isFlexibleBooking } from "@/lib/slots";
+import {
+  BOOKING_TIME_ZONE,
+  formatBookingSlot,
+  formatBookingWhen,
+  formatCandidateDays,
+  isFlexibleBooking,
+} from "@/lib/slots";
 import { calcEarnings } from "@/lib/earnings";
 import { repairLinesFor, type BookingRepairRow } from "@/lib/bookings/repair-lines";
 import { loadBookingChecklists, productIdsInLines } from "@/lib/checklists/load";
@@ -32,6 +41,7 @@ import { REVISION_STATUS_LABEL } from "@/lib/revisions/status";
 import { diffRevision, differenceLabel } from "@/lib/revisions/diff";
 import { Timeline, type TimelineEvent } from "./_components/timeline";
 import { BookingActions } from "./_components/booking-actions";
+import { CancellationRequestBanner } from "./_components/cancellation-request-banner";
 
 export const dynamic = "force-dynamic";
 
@@ -110,7 +120,8 @@ export default async function BookingDetailPage({ params }: PageProps) {
        vehicle_reg, vehicle_make, vehicle_model, mechanic_id,
        repair_node_id, repair_description, vehicle_raw_duration_hours,
        scheduled_at, slot_window, candidate_days, created_at, address_line_1, address_line_2, parking_type,
-       special_instructions, stripe_payment_intent_id, mileage`,
+       special_instructions, stripe_payment_intent_id, mileage,
+       reschedule_status, reschedule_proposed_at, reschedule_proposed_by, reschedule_proposed_window, reschedule_note`,
     )
     .eq("id", id)
     .single();
@@ -145,7 +156,11 @@ export default async function BookingDetailPage({ params }: PageProps) {
   const quoteTotals = quoteMoney(quotes);
   const combineSource: string | null = combineRow?.combine_source ?? null;
 
-  const [{ data: events }, { data: mechRows }, paymentStatus] =
+  // Cancelling while the customer still could settles like their own cancel (fee
+  // tiers and all); the customer's "please cancel" only matters on such a booking.
+  const settlesLikeCustomer = (CANCELLABLE as readonly string[]).includes(booking.status);
+
+  const [{ data: events }, { data: mechRows }, paymentStatus, cancellationRequest] =
     await Promise.all([
       supabase
         .from("booking_events")
@@ -157,6 +172,7 @@ export default async function BookingDetailPage({ params }: PageProps) {
         .select("id, status, profile:profiles!inner(full_name)")
         .order("created_at", { ascending: false }),
       retrievePaymentStatus(booking.stripe_payment_intent_id),
+      settlesLikeCustomer ? openCancellationRequest(createAdminClient(), id) : Promise.resolve(null),
     ]);
 
   const mechanics = (mechRows ?? []).map((m) => {
@@ -169,12 +185,25 @@ export default async function BookingDetailPage({ params }: PageProps) {
   const currentMechanicName =
     mechanics.find((m) => m.id === booking.mechanic_id)?.name ?? null;
 
+  // An open new time (0092): the customer's request waiting on the mechanic, or
+  // the mechanic's proposal (null "by" = before 0092) waiting on the customer.
+  const pendingReschedule =
+    booking.reschedule_status === "proposed" && booking.reschedule_proposed_at
+      ? {
+          label: formatBookingSlot(booking.reschedule_proposed_at, booking.reschedule_proposed_window),
+          byCustomer: booking.reschedule_proposed_by === "customer",
+          note: booking.reschedule_note as string | null,
+        }
+      : null;
+
   const timelineEvents: TimelineEvent[] = (events ?? []).map((e) => ({
     id: e.id,
     eventType: e.event_type,
     actorRole: e.actor_role,
     reason: e.reason,
     createdAt: e.created_at,
+    noteKind: (e.payload as { kind?: string } | null)?.kind ?? null,
+    payloadBy: (e.payload as { by?: string } | null)?.by ?? null,
   }));
 
   const pay = paymentMeta(paymentStatus);
@@ -242,6 +271,19 @@ export default async function BookingDetailPage({ params }: PageProps) {
           </div>
         </div>
       </header>
+
+      {cancellationRequest && (
+        <CancellationRequestBanner
+          bookingId={booking.id}
+          requestedLabel={new Date(cancellationRequest.requestedAt).toLocaleString("en-GB", {
+            dateStyle: "medium",
+            timeStyle: "short",
+            timeZone: BOOKING_TIME_ZONE,
+          })}
+          reason={cancellationRequest.reason}
+          settlesLikeCustomer={settlesLikeCustomer}
+        />
+      )}
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
@@ -312,6 +354,27 @@ export default async function BookingDetailPage({ params }: PageProps) {
               label="Scheduled"
               value={booking.scheduled_at ? formatBookingWhen(booking) : "Not scheduled"}
             />
+            {pendingReschedule && (
+              <Row
+                icon={CalendarClock}
+                label={pendingReschedule.byCustomer ? "New time requested by the customer" : "New time proposed by the mechanic"}
+                value={
+                  <>
+                    {pendingReschedule.label}
+                    <span className="block text-xs font-normal text-text-muted">
+                      {pendingReschedule.byCustomer
+                        ? "Waiting on the mechanic to accept or suggest another time. The booking keeps its time until then."
+                        : "Waiting on the customer to accept, keep the original time, choose another mechanic or ask us to cancel."}
+                    </span>
+                    {pendingReschedule.note && (
+                      <span className="mt-1 block text-xs font-normal text-text-secondary">
+                        &ldquo;{pendingReschedule.note}&rdquo;
+                      </span>
+                    )}
+                  </>
+                }
+              />
+            )}
             {isFlexibleBooking(booking) && (
               <Row
                 icon={CalendarClock}
@@ -600,6 +663,7 @@ export default async function BookingDetailPage({ params }: PageProps) {
               canRefund={canRefund}
               refundablePence={refundablePence}
               hasMechanic={booking.mechanic_id != null}
+              settlesLikeCustomer={settlesLikeCustomer}
             />
           </Card>
         </div>

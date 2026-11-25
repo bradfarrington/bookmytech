@@ -4,12 +4,13 @@ import { CheckCircle, ArrowRight } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { formatPrice, formatJobNumber } from "@/lib/utils";
-import { formatBookingWhen } from "@/lib/slots";
+import { formatBookingSlot, formatBookingWhen } from "@/lib/slots";
 import { groupRepairLines, repairLinesFor, type BookingRepairRow } from "@/lib/bookings/repair-lines";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { BookingTracker, type BookingMechanic } from "./_components/booking-tracker";
 import { RescheduleProposal } from "@/components/customer/reschedule-proposal";
+import { RescheduleRequest } from "@/components/customer/reschedule-request";
 import { QuoteProposal } from "@/components/customer/quote-proposal";
 import { RevisionProposal } from "@/components/customer/revision-proposal";
 import { loadQuotesForBooking, quoteMoney } from "@/lib/quotes/load";
@@ -34,7 +35,7 @@ export default async function ConfirmedPage({ params }: ConfirmedPageProps) {
 
   const { data: booking } = await supabase
     .from("bookings")
-    .select("id, job_number, vehicle_reg, vehicle_make, vehicle_model, scheduled_at, slot_window, candidate_days, created_at, total_pence, customer_name, customer_email, address_line_1, status, mechanic_id, reschedule_status, reschedule_proposed_at, reschedule_note, repair_node_id, repair_description")
+    .select("id, job_number, vehicle_reg, vehicle_make, vehicle_model, scheduled_at, slot_window, candidate_days, created_at, total_pence, customer_name, customer_email, address_line_1, status, mechanic_id, reschedule_status, reschedule_proposed_at, reschedule_note, reschedule_proposed_by, reschedule_proposed_window, repair_node_id, repair_description")
     .eq("id", id)
     .single();
 
@@ -89,6 +90,15 @@ export default async function ConfirmedPage({ params }: ConfirmedPageProps) {
   const ref = formatJobNumber(booking.job_number);
   const slotDate = booking.scheduled_at ? formatBookingWhen(booking) : null;
 
+  // An open new time is either the mechanic's, for the customer to answer, or
+  // (0092) the customer's own request, waiting on the mechanic. Null "by" is a
+  // proposal from before 0092: the mechanic's.
+  const openProposal =
+    booking.reschedule_status === "proposed" && booking.reschedule_proposed_at && booking.status !== "cancelled"
+      ? booking.reschedule_proposed_at
+      : null;
+  const customerRequested = booking.reschedule_proposed_by === "customer";
+
   const vehicle = [booking.vehicle_make, booking.vehicle_model]
     .filter(Boolean)
     .join(" ");
@@ -109,13 +119,25 @@ export default async function ConfirmedPage({ params }: ConfirmedPageProps) {
       </div>
 
       {/* Mechanic-proposed reschedule awaiting the customer's response */}
-      {booking.reschedule_status === "proposed" && booking.reschedule_proposed_at && (
+      {openProposal && !customerRequested && (
         <RescheduleProposal
           bookingId={booking.id}
-          proposedAt={booking.reschedule_proposed_at}
+          proposedAt={openProposal}
           currentAt={booking.scheduled_at}
           currentLabel={slotDate}
           note={booking.reschedule_note}
+          signedIn={signedIn}
+        />
+      )}
+
+      {/* The customer's own new time, waiting on the mechanic */}
+      {openProposal && customerRequested && (
+        <RescheduleRequest
+          bookingId={booking.id}
+          requestedLabel={formatBookingSlot(openProposal, booking.reschedule_proposed_window)}
+          currentLabel={slotDate}
+          note={booking.reschedule_note}
+          canWithdraw={signedIn}
         />
       )}
 

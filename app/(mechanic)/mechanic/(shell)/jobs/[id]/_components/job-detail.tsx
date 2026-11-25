@@ -35,6 +35,7 @@ import { Timeline, type TimelineEvent } from "@/app/(admin)/admin/(shell)/jobs/[
 import type { ArrivalWindowOptions } from "@/lib/mechanics/arrival-windows";
 import { EarningsBreakdown } from "./earnings-breakdown";
 import { JobActions } from "./job-actions";
+import { CustomerRescheduleRequest } from "./customer-reschedule-request";
 import { PhotoUploader, type JobPhoto } from "./photo-uploader";
 import { PartsOrder, type JobPart } from "./parts-order";
 import { ArrivalWindowPicker } from "./arrival-window-picker";
@@ -99,6 +100,14 @@ export interface JobDetailProps {
   cancellationReason: string | null;
   rescheduleStatus: string | null;
   rescheduleProposedAt: string | null;
+  /** Who made the open proposal (0092): "customer", "mechanic", or null (before 0092, the mechanic's). */
+  rescheduleProposedBy: string | null;
+  rescheduleNote: string | null;
+  /**
+   * The customer's request for a new time, labelled ("Wed 2 Dec · 2pm–4pm"),
+   * while it waits on this mechanic (0092); null otherwise.
+   */
+  customerRequestLabel: string | null;
   scheduledAt: string | null;
   slotWindow: string | null;
   // Arrival window (Task 21): present only while this is a confirmed ALL-DAY
@@ -229,6 +238,17 @@ export function JobDetail(props: JobDetailProps) {
           </p>
           <p className="mt-1 text-sm text-red-800">{cancellationReason}</p>
         </Card>
+      )}
+
+      {/* A new time the customer asked for, waiting on this mechanic (0092) */}
+      {props.customerRequestLabel && props.rescheduleProposedAt && (
+        <CustomerRescheduleRequest
+          bookingId={bookingId}
+          requestedIso={props.rescheduleProposedAt}
+          requestedLabel={props.customerRequestLabel}
+          currentLabel={props.whenLabel}
+          note={props.rescheduleNote}
+        />
       )}
 
       {/* Arrival window — an all-day job the mechanic hasn't narrowed yet */}
@@ -502,6 +522,7 @@ export function JobDetail(props: JobDetailProps) {
               scheduledAt={props.scheduledAt}
               rescheduleStatus={props.rescheduleStatus}
               rescheduleProposedAt={props.rescheduleProposedAt}
+              rescheduleProposedBy={props.rescheduleProposedBy}
               chargePence={props.chargePence}
             />
           </Card>

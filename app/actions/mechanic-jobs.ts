@@ -5,8 +5,7 @@ import { requireMechanic } from "@/lib/mechanics/require-mechanic";
 import { cancelOwnJobFor } from "@/lib/mechanics/cancel-job";
 import { proposeRescheduleFor, proposeReschedulesFor } from "@/lib/bookings/propose-reschedule";
 import { setArrivalWindowFor } from "@/lib/mechanics/set-arrival-window";
-import { respondToCustomerRescheduleFor } from "@/lib/bookings/customer-reschedule";
-import { requestAdminCancellationFor } from "@/lib/bookings/cancellation-request";
+import { acceptCustomerRescheduleFor } from "@/lib/bookings/customer-reschedule";
 
 export type MechanicJobResult = { ok: true } | { ok: false; error: string };
 
@@ -54,30 +53,13 @@ export async function proposeReschedule(
 }
 
 /**
- * Accept or decline a new time the customer asked for (0092). To counter,
- * call `proposeReschedule` instead — it replaces the request.
+ * Accept a new time the customer asked for (0092). To say no, suggest another
+ * time with `proposeReschedule` — it replaces the request.
  */
-export async function respondToCustomerReschedule(
-  bookingId: string,
-  decision: "accept" | "decline",
-): Promise<MechanicJobResult> {
+export async function acceptCustomerReschedule(bookingId: string): Promise<MechanicJobResult> {
   const guard = await requireMechanic();
   if (!guard.ok) return guard;
-  const res = await respondToCustomerRescheduleFor(guard.mechanicId, bookingId, decision);
-  return res.ok ? res : { ok: false, error: res.error };
-}
-
-/**
- * Ask Book My Tech to cancel this job — an admin decides, and can charge the
- * customer's cancellation fee (lib/bookings/cancellation-request.ts).
- */
-export async function requestCancellationFromAdmin(
-  bookingId: string,
-  reason: string,
-): Promise<MechanicJobResult> {
-  const guard = await requireMechanic();
-  if (!guard.ok) return guard;
-  const res = await requestAdminCancellationFor(guard.mechanicId, bookingId, reason);
+  const res = await acceptCustomerRescheduleFor(guard.mechanicId, bookingId);
   return res.ok ? res : { ok: false, error: res.error };
 }
 

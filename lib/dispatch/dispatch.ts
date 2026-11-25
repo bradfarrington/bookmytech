@@ -245,35 +245,21 @@ export async function redispatchPending(): Promise<number> {
 /**
  * The customer changed the time of a booking nobody has accepted yet. Offers
  * read the booking's time live, so every open offer card and the CRM's jobs
- * list already show the new one; this makes sure the mechanics hear about it.
- *
- *   - A mechanic who DECLINED may have done so because of the old time, so
- *     their offer is reopened.
- *   - Everyone now holding a live offer is told the time changed, with the
- *     same repair · district · day line as a new offer.
- *   - Then a normal dispatch, which offers it to anyone newly in range (and
- *     buzzes only them, as `dispatchBooking` always does).
- *
- * Nothing here can fail the reschedule: it is told after the fact.
+ * list already show the new one; this tells the mechanics HOLDING an offer, so
+ * nobody accepts on the strength of the old time. Deliberately nothing more:
+ * no re-offer to mechanics who declined and no new dispatch (owner's call,
+ * 2026-11-25). Never fails the reschedule.
  */
-export async function reofferAfterTimeChange(bookingId: string): Promise<void> {
+export async function notifyOfferHoldersOfNewTime(bookingId: string): Promise<void> {
   const admin = createAdminClient();
   try {
-    await admin
-      .from("job_offers")
-      .update({ response: null, responded_at: null })
-      .eq("booking_id", bookingId)
-      .eq("response", "declined");
-
     const { data: live } = await admin
       .from("job_offers")
       .select("id, mechanic_id")
       .eq("booking_id", bookingId)
       .is("response", null);
     await notifyNewOffers(admin, bookingId, (live ?? []) as NewOffer[], "Job offer: new time");
-
-    await dispatchBooking(bookingId);
   } catch (err) {
-    console.error("[dispatch] re-offer after time change failed", err);
+    console.error("[dispatch] new-time notice failed", err);
   }
 }

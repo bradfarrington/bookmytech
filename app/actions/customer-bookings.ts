@@ -7,6 +7,8 @@ import {
   rescheduleBookingFor,
   respondToRescheduleFor,
   withdrawRescheduleRequestFor,
+  findAnotherMechanicFor,
+  askBookMyTechToCancelFor,
   type BookingCaller,
 } from "@/lib/bookings/manage-booking";
 import { slotAvailabilityFor } from "@/lib/availability/slot-availability";
@@ -108,6 +110,24 @@ export async function withdrawRescheduleRequest(bookingId: string) {
   const caller = await cookieCaller();
   if (!caller) return { ok: false as const, error: "Please sign in." };
   return withdrawRescheduleRequestFor(bookingId, caller);
+}
+
+/**
+ * Turn down the mechanic's suggested time and have the job offered to other
+ * mechanics at `newIso` (0092). Signed-in only: it takes the job off a
+ * mechanic, which a guest link shouldn't be able to do.
+ */
+export async function findAnotherMechanic(bookingId: string, newIso: string, slotWindow?: string | null) {
+  const caller = await cookieCaller();
+  if (!caller) return { ok: false as const, error: "Please sign in." };
+  return findAnotherMechanicFor(bookingId, newIso, caller, typeof slotWindow === "string" ? slotWindow : null);
+}
+
+/** Turn down the mechanic's suggested time and ask Book My Tech to cancel (0092). */
+export async function askBookMyTechToCancel(bookingId: string, reason: string) {
+  const caller = await cookieCaller();
+  if (!caller) return { ok: false as const, error: "Please sign in." };
+  return askBookMyTechToCancelFor(bookingId, reason, caller);
 }
 
 export type RescheduleAvailabilityResult =

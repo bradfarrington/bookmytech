@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { loadCustomerBooking } from "@/lib/dashboard/customer-bookings";
 import { CANCELLABLE, quoteCancellationFor } from "@/lib/bookings/manage-booking";
 import { cancellationPolicy } from "@/lib/bookings/cancellation-policy";
+import { formatBookingSlot } from "@/lib/slots";
 import { cn, formatJobNumber, formatPrice } from "@/lib/utils";
 import {
   ButtonLink,
@@ -20,6 +21,7 @@ import {
   TextLink,
   Tile,
 } from "@/components/dashboard/ui";
+import { requestedTime } from "../../../_home/booking-logic";
 import { CancelForm } from "./_components/cancel-form";
 
 // Cancel a booking (Task 48, mockup 04 "Cancel confirm"). The fee shown is
@@ -73,6 +75,8 @@ export default async function CancelBookingPage({ params }: { params: Promise<{ 
   ]);
 
   const noCardHold = booking.paymentMode === "free";
+  // A new time the mechanic hasn't accepted doesn't move the booking (0092), so the fee is from the current time.
+  const requested = requestedTime(booking);
 
   return (
     <Screen>
@@ -90,6 +94,12 @@ export default async function CancelBookingPage({ params }: { params: Promise<{ 
           <Caption className="mt-1.5">
             {booking.repairDescription} · {booking.whenLabel}
           </Caption>
+          {requested && (
+            <Caption className="mt-1">
+              The new time you asked for ({formatBookingSlot(requested.at, requested.window)}) hasn&apos;t been
+              accepted yet, so any fee is worked out from your current time.
+            </Caption>
+          )}
         </div>
 
         {noCardHold ? (

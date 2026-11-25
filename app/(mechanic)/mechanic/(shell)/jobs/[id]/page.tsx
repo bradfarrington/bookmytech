@@ -9,7 +9,13 @@ import { cancelFeeTiers } from "@/lib/bookings/manage-booking";
 import { geocodePostcode, haversineMiles, type LatLng } from "@/lib/geo/postcodes";
 import { jobMoney } from "@/lib/mechanics/job-money";
 import { isHaynesProConfigured } from "@/lib/haynespro/client";
-import { ALL_DAY_SLOT, formatBookingWhen, isFlexibleBooking, londonDateKey } from "@/lib/slots";
+import {
+  ALL_DAY_SLOT,
+  formatBookingSlot,
+  formatBookingWhen,
+  isFlexibleBooking,
+  londonDateKey,
+} from "@/lib/slots";
 import { formatJobNumber } from "@/lib/utils";
 import { repairLinesFor, type BookingRepairRow } from "@/lib/bookings/repair-lines";
 import {
@@ -47,6 +53,7 @@ export default async function MechanicJobDetailPage({ params }: PageProps) {
        address_line_1, address_line_2,
        customer_name, customer_phone, special_instructions,
        cancellation_reason, reschedule_status, reschedule_proposed_at,
+       reschedule_proposed_by, reschedule_proposed_window, reschedule_note,
        repair_node_id, repair_description, vehicle_raw_duration_hours, service_duration_hours, mileage, hourly_rate_pence,
        credit_applied_pence, discount_pence`,
     )
@@ -118,7 +125,7 @@ export default async function MechanicJobDetailPage({ params }: PageProps) {
   // --- Timeline (assigned jobs only; offered-but-unassigned have no access) -
   const { data: eventRows } = await supabase
     .from("booking_events")
-    .select("id, event_type, actor_role, reason, created_at")
+    .select("id, event_type, actor_role, reason, payload, created_at")
     .eq("booking_id", id)
     .order("created_at", { ascending: true });
 
@@ -128,6 +135,8 @@ export default async function MechanicJobDetailPage({ params }: PageProps) {
     actorRole: e.actor_role,
     reason: e.reason,
     createdAt: e.created_at,
+    noteKind: (e.payload as { kind?: string } | null)?.kind ?? null,
+    payloadBy: (e.payload as { by?: string } | null)?.by ?? null,
   }));
 
   // --- Job evidence (mechanic photos) --------------------------------------
@@ -234,6 +243,18 @@ export default async function MechanicJobDetailPage({ params }: PageProps) {
         )
       : null;
 
+  // --- A new time the customer asked for (0092) ------------------------------
+  // The request is this mechanic's to answer only while the job is confirmed
+  // and theirs; setting off closes it server-side.
+  const ownConfirmed = booking.status === "confirmed" && booking.mechanic_id === user.id;
+  const customerRequestLabel =
+    ownConfirmed &&
+    booking.reschedule_status === "proposed" &&
+    booking.reschedule_proposed_by === "customer" &&
+    booking.reschedule_proposed_at
+      ? formatBookingSlot(booking.reschedule_proposed_at, booking.reschedule_proposed_window, { relative: true })
+      : null;
+
   const address =
     [booking.address_line_1, booking.address_line_2, booking.postcode].filter(Boolean).join(", ") || "Not given";
 
@@ -293,6 +314,9 @@ export default async function MechanicJobDetailPage({ params }: PageProps) {
     cancellationReason: booking.cancellation_reason,
     rescheduleStatus: booking.reschedule_status,
     rescheduleProposedAt: booking.reschedule_proposed_at,
+    rescheduleProposedBy: booking.reschedule_proposed_by ?? null,
+    rescheduleNote: booking.reschedule_note ?? null,
+    customerRequestLabel,
     scheduledAt: booking.scheduled_at,
     slotWindow: booking.slot_window ?? null,
     arrivalWindows,

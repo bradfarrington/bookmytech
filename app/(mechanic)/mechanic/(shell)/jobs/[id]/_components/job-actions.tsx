@@ -6,10 +6,11 @@ import { toast } from "sonner";
 import { CalendarClock, Ban, CheckCircle2, Navigation, Wrench, BadgePoundSterling } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
-import { cancelOwnJob, proposeReschedule } from "@/app/actions/mechanic-jobs";
+import { cancelOwnJob } from "@/app/actions/mechanic-jobs";
 import { CANCEL_REASONS as CANCEL_REASON_OPTIONS, joinCancelReason } from "@/lib/mechanics/cancel-reasons";
 import { startJourney, beginWork, completeAndCharge } from "@/app/actions/job-progress";
 import { formatPrice } from "@/lib/utils";
+import { ProposeTimeForm } from "./propose-time-form";
 
 interface JobActionsProps {
   bookingId: string;
@@ -17,21 +18,17 @@ interface JobActionsProps {
   scheduledAt: string | null;
   rescheduleStatus: string | null;
   rescheduleProposedAt: string | null;
+  /**
+   * Who made the open proposal (0092). "customer": their request, which the
+   * card above the page answers. "mechanic" or null (before 0092): this
+   * mechanic's own, waiting on the customer.
+   */
+  rescheduleProposedBy: string | null;
   /** What completing will take off the customer's card, for the confirm step. */
   chargePence: number;
 }
 
 const CANCEL_REASONS = [{ value: "", label: "Select a reason…" }, ...CANCEL_REASON_OPTIONS];
-
-// Pre-fill the reschedule picker with the current slot in the format a
-// datetime-local input expects (local time, no timezone suffix).
-function toLocalInput(iso: string | null): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
 
 export function JobActions({
   bookingId,
@@ -39,6 +36,7 @@ export function JobActions({
   scheduledAt,
   rescheduleStatus,
   rescheduleProposedAt,
+  rescheduleProposedBy,
   chargePence,
 }: JobActionsProps) {
   const router = useRouter();
@@ -47,8 +45,6 @@ export function JobActions({
 
   const [reason, setReason] = useState("");
   const [reasonDetails, setReasonDetails] = useState("");
-  const [newTime, setNewTime] = useState(() => toLocalInput(scheduledAt));
-  const [note, setNote] = useState("");
 
   // Live job lifecycle. Each transition fires its server action and refreshes;
   // the customer's tracker reads the same status. (GPS live-location tracking
@@ -168,25 +164,6 @@ export function JobActions({
   }
 
   // status === "confirmed" (the only actionable desktop state).
-  function handleReschedule() {
-    if (!newTime) {
-      toast.error("Pick a new date and time.");
-      return;
-    }
-    // datetime-local has no timezone — treat the entered value as local time.
-    const iso = new Date(newTime).toISOString();
-    startTransition(async () => {
-      const res = await proposeReschedule(bookingId, iso, note);
-      if (res.ok) {
-        toast.success("New time proposed. The customer has been notified.");
-        setNote("");
-        router.refresh();
-      } else {
-        toast.error(res.error);
-      }
-    });
-  }
-
   function handleCancel() {
     if (!reason) {
       toast.error("Choose a reason for cancelling.");
@@ -204,12 +181,18 @@ export function JobActions({
     });
   }
 
-  const pendingProposal = rescheduleStatus === "proposed" && rescheduleProposedAt;
+  const openProposal = rescheduleStatus === "proposed" && !!rescheduleProposedAt;
+  // The customer's request (0092) is answered on its own card at the top of the
+  // page; only this mechanic's own proposal waits on the customer here.
+  const customerRequest = openProposal && rescheduleProposedBy === "customer";
+  const pendingProposal = openProposal && !customerRequest;
 
   return (
     <div className="space-y-5">
-      {/* Start the live job. Hidden while a reschedule is awaiting the customer
-          so the slot isn't started under a contested time. */}
+      {/* Start the live job. Hidden while the mechanic's own new time is
+          awaiting the customer, so the slot isn't started under a contested
+          time. A customer's request doesn't block it: setting off keeps the
+          booked time and closes the request. */}
       {!pendingProposal && (
         <div>
           <Button
@@ -223,6 +206,7 @@ export function JobActions({
           </Button>
           <p className="mt-1.5 text-xs text-text-muted">
             Marks you as on the way and shows the customer your live status.
+            {customerRequest && " Setting off keeps the booked time and closes the customer's request for a new one."}
           </p>
         </div>
       )}
@@ -243,39 +227,22 @@ export function JobActions({
         </div>
       )}
 
-      {/* Reschedule */}
-      <div>
-        <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.04em] text-text-muted">
-          <CalendarClock size={12} />
-          Propose a new time
+      {/* Reschedule. While the customer's own request is open, "Suggest
+          another time" on its card does this instead. */}
+      {!customerRequest && (
+        <div>
+          <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.04em] text-text-muted">
+            <CalendarClock size={12} />
+            Propose a new time
+          </div>
+          <ProposeTimeForm
+            bookingId={bookingId}
+            initialIso={scheduledAt}
+            disabled={pending}
+            help="The customer is notified. They can accept it, keep the original slot, have the job offered to another mechanic, or ask Book My Tech to cancel."
+          />
         </div>
-        <input
-          type="datetime-local"
-          value={newTime}
-          onChange={(e) => setNewTime(e.target.value)}
-          className="w-full rounded-button border border-border bg-surface-card px-3 py-2 text-sm text-text-primary focus:border-brand-blue focus:outline-none"
-        />
-        <textarea
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          rows={2}
-          placeholder="Optional note for the customer"
-          className="mt-2 w-full rounded-button border border-border bg-surface-card px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:border-brand-blue focus:outline-none"
-        />
-        <Button
-          variant="secondary"
-          size="sm"
-          className="mt-2"
-          disabled={pending || !newTime}
-          onClick={handleReschedule}
-        >
-          Propose new time
-        </Button>
-        <p className="mt-1.5 text-xs text-text-muted">
-          The customer is notified and can accept, suggest another time, or keep
-          the original slot.
-        </p>
-      </div>
+      )}
 
       {/* Cancel */}
       <div className="border-t border-border-subtle pt-4">

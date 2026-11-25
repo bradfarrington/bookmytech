@@ -7,7 +7,11 @@ import type { CustomerBooking } from "@/lib/dashboard/customer-bookings";
 import { isLiveStatus, isPastStatus } from "@/lib/bookings/status-meta";
 import { BOOKING_TIME_ZONE, daysBetweenKeys, londonDateKey } from "@/lib/slots";
 
-/** bookings.reschedule_status while a mechanic's proposed time waits on the customer. */
+/**
+ * bookings.reschedule_status while a new time waits on an answer: from the
+ * mechanic, which the customer answers, or (0092) the customer's own request,
+ * which the mechanic answers. `reschedule_proposed_by` says which.
+ */
 export const RESCHEDULE_PROPOSED = "proposed";
 
 /** A completed job can be reported for this long (the same rule as /dashboard/disputes/new). */
@@ -196,12 +200,40 @@ export function paymentNote(
   return "Your payment is pre-authorised on your card. No money leaves your account until your mechanic completes the job.";
 }
 
-/** A proposed new time the customer can still answer. */
-export function proposedTime(
-  booking: Pick<CustomerBooking, "status" | "rescheduleStatus" | "rescheduleProposedAt">,
-): string | null {
+type RescheduleFields = Pick<
+  CustomerBooking,
+  "status" | "rescheduleStatus" | "rescheduleProposedAt" | "rescheduleProposedBy" | "rescheduleProposedWindow"
+>;
+
+/**
+ * A new time the mechanic proposed that the customer can still answer. Never
+ * the customer's own request (0092): that one is the mechanic's to answer, and
+ * the server refuses a customer accepting it.
+ */
+export function proposedTime(booking: RescheduleFields): string | null {
   if (booking.rescheduleStatus !== RESCHEDULE_PROPOSED || !booking.rescheduleProposedAt) return null;
+  if (booking.rescheduleProposedBy === "customer") return null;
   return isPastStatus(booking.status) ? null : booking.rescheduleProposedAt;
+}
+
+/**
+ * A new time the customer asked for on a confirmed booking, waiting on the
+ * mechanic (0092). The booking keeps its own time until they accept.
+ */
+export function requestedTime(booking: RescheduleFields): { at: string; window: string | null } | null {
+  if (booking.rescheduleStatus !== RESCHEDULE_PROPOSED || !booking.rescheduleProposedAt) return null;
+  if (booking.rescheduleProposedBy !== "customer") return null;
+  if (isPastStatus(booking.status)) return null;
+  return { at: booking.rescheduleProposedAt, window: booking.rescheduleProposedWindow };
+}
+
+/**
+ * Where "Find another mechanic" goes (0092): the reschedule screen in its
+ * "another" mode, which takes the job off the mechanic and offers it to others
+ * at the time picked.
+ */
+export function findAnotherMechanicHref(bookingId: string): string {
+  return `/dashboard/bookings/${bookingId}/reschedule?mode=another`;
 }
 
 export type WaitingItem<B extends CustomerBooking = CustomerBooking> =

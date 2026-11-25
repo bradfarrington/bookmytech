@@ -26,8 +26,8 @@ export default async function CancellationPolicyPage() {
     {
       heading: "The short version",
       body: [
-        `You can cancel or reschedule from your dashboard at any time. More than 24 hours before your slot it costs ${free ? "nothing" : formatPrice(tiers.before24h)}. Closer to the appointment, or once a mechanic is already on the way, a fee applies because someone has held that time for you and started travelling to it.`,
-        "Rescheduling is always free. If you can move the job rather than cancel it, you keep your mechanic and you pay no fee at all.",
+        `You can cancel from your dashboard at any time. More than 24 hours before your slot it costs ${free ? "nothing" : formatPrice(tiers.before24h)}. Closer to the appointment, or once a mechanic is already on the way, a fee applies because someone has held that time for you and started travelling to it.`,
+        "Changing the time is always free. Until a mechanic accepts your booking you can move it whenever you like. Once one has, a new time is a request: they accept it or suggest another, and your booking keeps its original time, and the cancellation fee that goes with it, until they accept.",
       ],
     },
     {
@@ -52,8 +52,10 @@ export default async function CancellationPolicyPage() {
     {
       heading: "Rescheduling",
       body: [
-        "Rescheduling is free and does not count as a cancellation, however close to your slot you do it. You keep the same mechanic wherever possible.",
-        "Your mechanic may also propose a new time; if they do, you will be asked to accept or decline it. Declining a proposed time does not incur a fee.",
+        "Rescheduling is free and does not count as a cancellation.",
+        "Before a mechanic has accepted your booking, you can change the time freely from your dashboard.",
+        "Once a mechanic has accepted, a new time is a request to them. They can accept it or suggest another time. Until they accept, your booking stays at its original time, and any cancellation fee is worked out from that original time, not the one you asked for. You can withdraw a request they haven't answered yet.",
+        "Your mechanic may also suggest a new time, on their own or in answer to your request. If the time they suggest doesn't suit you, you can keep your original time at no cost, have us offer the job to another mechanic at a time you choose, or ask us to cancel. If you ask us to cancel, your booking keeps its original time while we look at it, and we decide whether a cancellation fee applies under this policy, based on your booking's time.",
       ],
     },
     {
@@ -91,7 +93,7 @@ export default async function CancellationPolicyPage() {
       eyebrow="Legal"
       title="Cancellation Policy"
       intro="What it costs to cancel or move a booking, when each fee applies, and how your pre-authorisation is handled."
-      lastUpdated="26 August 2026"
+      lastUpdated="25 November 2026"
       sections={sections}
     />
   );

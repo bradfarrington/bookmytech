@@ -1,11 +1,14 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { Ban, CalendarClock, ClipboardList, MessageCircle, Phone, Scale, Search, ShieldAlert, Star } from "lucide-react";
+import { Ban, CalendarClock, ClipboardList, Flag, MessageCircle, Phone, Scale, Search, ShieldAlert, Star } from "lucide-react";
 import { CANCELLABLE, RESCHEDULABLE } from "@/lib/bookings/manage-booking";
+import { openCancellationRequest } from "@/lib/bookings/cancellation-request";
 import { bookingStatusMeta, isPastStatus } from "@/lib/bookings/status-meta";
 import { loadCustomerBooking, vehicleName } from "@/lib/dashboard/customer-bookings";
 import { DISPUTE_STATUS_LABELS } from "@/lib/disputes/constants";
 import { CLOSED_STATUSES } from "@/lib/messages/send";
+import { formatBookingSlot } from "@/lib/slots";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { formatJobNumber, formatPrice } from "@/lib/utils";
 import {
@@ -34,9 +37,11 @@ import {
   jobsDoneLabel,
   mechanicFirstName,
   paymentNote,
+  requestedTime,
   telHref,
   waitingOnCustomer,
 } from "../../_home/booking-logic";
+import { RescheduleRequestCard } from "../../_home/reschedule-request-card";
 import { WaitingCard } from "../../_home/waiting-on-you";
 import { LiveLocation } from "./_components/live-location";
 import { ParkingLabel } from "./_components/parking-label";
@@ -63,6 +68,13 @@ export default async function BookingDetailPage({ params }: { params: Promise<{ 
   const mechanic = booking.mechanic;
   const who = mechanicFirstName(mechanic?.name);
   const waiting = waitingOnCustomer([booking]);
+  // The customer's own request for a new time, waiting on the mechanic (0092).
+  const requested = requestedTime(booking);
+  const requestedLabel = requested ? formatBookingSlot(requested.at, requested.window) : null;
+  // Their own unanswered "please cancel" (0092). The booking is proved theirs above.
+  const cancelRequest = (CANCELLABLE as readonly string[]).includes(booking.status)
+    ? await openCancellationRequest(createAdminClient(), booking.id)
+    : null;
   const messagesOpen = !!mechanic && !(CLOSED_STATUSES as readonly string[]).includes(booking.status);
   const detailHref = `/dashboard/bookings/${booking.id}`;
 
@@ -75,7 +87,8 @@ export default async function BookingDetailPage({ params }: { params: Promise<{ 
     : undefined;
 
   const actions = [
-    (RESCHEDULABLE as readonly string[]).includes(booking.status) && (
+    // While a request is with the mechanic, it's withdrawn (on its card) before another is made.
+    (RESCHEDULABLE as readonly string[]).includes(booking.status) && !requested && (
       <ListRow
         key="reschedule"
         href={`${detailHref}/reschedule`}
@@ -162,6 +175,22 @@ export default async function BookingDetailPage({ params }: { params: Promise<{ 
           <WaitingCard key={item.key} item={item} />
         ))}
 
+        {cancelRequest && (
+          <Notice icon={Flag} title="You've asked us to cancel this booking">
+            We&apos;ll be in touch. Until then your booking stays at {booking.whenLabel}.
+          </Notice>
+        )}
+
+        {requestedLabel && (
+          <RescheduleRequestCard
+            bookingId={booking.id}
+            mechanicName={who}
+            requestedLabel={requestedLabel}
+            currentLabel={booking.whenLabel}
+            note={booking.rescheduleNote}
+          />
+        )}
+
         {booking.status === "en_route" && booking.mechanicId && (
           <LiveLocation mechanicId={booking.mechanicId} mechanicName={who} />
         )}
@@ -212,7 +241,19 @@ export default async function BookingDetailPage({ params }: { params: Promise<{ 
 
         <Section title="Details">
           <ListCard>
-            <DetailRow label="When" value={booking.whenLabel} />
+            <DetailRow
+              label="When"
+              value={
+                requestedLabel ? (
+                  <>
+                    <div>{booking.whenLabel}</div>
+                    <div className="text-xs font-normal text-text-muted">New time requested: {requestedLabel}</div>
+                  </>
+                ) : (
+                  booking.whenLabel
+                )
+              }
+            />
             <DetailRow
               label="Where"
               value={where.length ? where.map((line, index) => <div key={`${index}-${line}`}>{line}</div>) : "Not set"}

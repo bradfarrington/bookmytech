@@ -7,12 +7,8 @@ import { UserCog, Ban, Flag, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { formatPrice } from "@/lib/utils";
-import {
-  cancelBooking,
-  markDisputed,
-  reassignMechanic,
-  refundBooking,
-} from "@/app/actions/bookings";
+import { markDisputed, reassignMechanic, refundBooking } from "@/app/actions/bookings";
+import { AdminCancelFlow } from "./admin-cancel-flow";
 
 interface BookingActionsProps {
   bookingId: string;
@@ -22,6 +18,11 @@ interface BookingActionsProps {
   canRefund: boolean;
   refundablePence: number;
   hasMechanic: boolean;
+  /**
+   * Finding a mechanic, confirmed or on the way: cancelling settles like the
+   * customer's own cancel, with the fee their booking's time allows.
+   */
+  settlesLikeCustomer: boolean;
 }
 
 export function BookingActions({
@@ -32,12 +33,12 @@ export function BookingActions({
   canRefund,
   refundablePence,
   hasMechanic,
+  settlesLikeCustomer,
 }: BookingActionsProps) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
 
   const [mechanic, setMechanic] = useState<string>(currentMechanicId ?? "");
-  const [cancelReason, setCancelReason] = useState("");
   const [disputeReason, setDisputeReason] = useState("");
   const [refundAmount, setRefundAmount] = useState("");
   const [refundReason, setRefundReason] = useState("");
@@ -185,23 +186,11 @@ export function BookingActions({
           <Ban size={12} />
           Cancel booking
         </div>
-        <textarea
-          value={cancelReason}
-          onChange={(e) => setCancelReason(e.target.value)}
-          rows={2}
-          placeholder="Reason for cancellation"
-          className="w-full rounded-button border border-border bg-surface-card px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:border-red-400 focus:outline-none"
-        />
-        <button
-          disabled={pending || !cancelReason.trim()}
-          onClick={() => run(() => cancelBooking(bookingId, cancelReason), "Booking cancelled.")}
-          className="mt-2 inline-flex h-9 items-center rounded-button bg-red-600 px-4 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          Cancel booking
-        </button>
+        <AdminCancelFlow bookingId={bookingId} settlesLikeCustomer={settlesLikeCustomer} />
         <p className="mt-1.5 text-xs text-text-muted">
-          Releases the Stripe pre-authorisation (auto-releases within 7 days).
-          An admin cancellation takes no fee from the customer.
+          {settlesLikeCustomer
+            ? "Settles like the customer's own cancellation: the fee their booking's time allows (which you can waive), the rest of the hold released, and the customer and mechanic told."
+            : "Closes the booking without touching the payment. Use a refund for any money owed."}
         </p>
       </div>
     </div>
