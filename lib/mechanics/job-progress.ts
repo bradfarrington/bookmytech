@@ -156,8 +156,10 @@ const MAX_MILEAGE = 1_500_000;
 /**
  * Record the vehicle's odometer reading on the job (Task 30). Not a
  * transition, so no `booking_events` row of its own — `completeAndCharge`
- * carries the final figure in its `status_changed` payload. Servicing and
- * inspection jobs REQUIRE it before completion (Task 32).
+ * carries the final figure in its `status_changed` payload. EVERY job requires
+ * it before completion — first only checklist jobs (Task 32), now all of them:
+ * the reading at sign-off is our record of the vehicle when the work was done,
+ * should a part we fitted later be claimed as faulty.
  */
 export async function setJobMileageFor(
   mechanicId: string,
@@ -204,12 +206,14 @@ export async function completionGate(
   // mechanic has to deal with them in.
   const quotes = quoteMoney(await loadQuotesForBooking(admin, bookingId));
 
-  // Checklist gate (Task 32): every item answered, and the mileage recorded.
+  // Checklist gate (Task 32): every item answered.
   for (const list of checklists) {
     const unfinished = unfinishedMessage(list.name, list.progress);
     if (unfinished) return { blocker: unfinished, quotes };
   }
-  if (checklists.length > 0 && mileage == null)
+  // Mileage on EVERY job, checklist or not: the odometer reading at sign-off is
+  // what answers a later "that part you fitted failed" claim.
+  if (mileage == null)
     return { blocker: "Enter the vehicle's mileage before completing the job.", quotes };
 
   // Quotes (Task 33): a quote still waiting on the customer blocks completion —

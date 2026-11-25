@@ -12,9 +12,9 @@ import { setJobMileage } from "@/app/actions/job-progress";
 // to a stale form, and the page re-renders with the stored value. Read-only
 // once the job is no longer active.
 //
-// `required` is set by Task 32 on a servicing / inspection job, where the
-// server refuses completion without a reading — the hint tells the mechanic
-// before they get that far.
+// `required` is set on every job now (first Task 32's servicing / inspection
+// jobs only): the server refuses completion without a reading, and the hint
+// tells the mechanic before they get that far.
 
 interface MileageFieldProps {
   bookingId: string;

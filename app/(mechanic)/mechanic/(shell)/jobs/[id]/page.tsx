@@ -255,7 +255,8 @@ export default async function MechanicJobDetailPage({ params }: PageProps) {
     vehicle: [booking.vehicle_make, booking.vehicle_model].filter(Boolean).join(" ") || "Vehicle",
     reg: booking.vehicle_reg,
     mileage: booking.mileage ?? null,
-    mileageRequired: checklists.length > 0,
+    // Every job, since the reading at sign-off covers us on later part claims.
+    mileageRequired: true,
     checklists,
     faults,
     quotes,

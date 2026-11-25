@@ -14,7 +14,7 @@ import { completeAndChargeFor } from "@/lib/mechanics/job-progress";
 // (2026-09-08); the mechanic's confirmation in the app is the record.
 // 200:  { status: "completed", chargedPence, payoutPence }
 // 409:  it can't complete right now, and the sentence says why:
-//         · an unfinished checklist, or no mileage on a checklist job
+//         · an unfinished checklist, or no mileage recorded (any job)
 //         · a quote or a revised job still waiting on the customer
 //         · the job isn't `in_progress`
 //         · "Couldn't take payment: … The job stays open. Try again." — the
