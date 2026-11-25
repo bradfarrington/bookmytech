@@ -7,6 +7,12 @@ import {
   MECHANIC_DOC_LABEL,
   type MechanicDocType,
 } from "@/lib/onboarding/docs";
+import {
+  UPLOAD_CHECK_MESSAGE,
+  checkUploadedDoc,
+  signDocUpload,
+  type SignedDocUpload,
+} from "@/lib/storage/direct-doc-upload";
 
 // A mechanic's own documents, shared by the website's server actions
 // (app/actions/documents.ts) and the mechanic app's route handlers
@@ -59,21 +65,38 @@ export async function uploadMechanicDocumentFor(
   const ext = ACCEPTED_DOC_MIME[file.type];
   if (!ext) return refuse("invalid", "Use a PDF, JPG, PNG or WebP file.");
 
-  const expiresRaw = (input.expiresAt ?? "").trim();
-  if (expiresRaw && !/^\d{4}-\d{2}-\d{2}$/.test(expiresRaw)) {
-    return refuse("invalid", "Enter the expiry date as a real date.");
-  }
-  const expiresAt = expiresRaw || null;
+  const expiresAt = parseExpiry(input.expiresAt);
+  if (expiresAt === undefined) return refuse("invalid", "Enter the expiry date as a real date.");
 
   const admin = createAdminClient();
-  const path = `documents/${mechanicId}/${docType}-${Date.now()}.${ext}`;
+  const path = documentPath(mechanicId, docType, ext);
   const bytes = new Uint8Array(await file.arrayBuffer());
   const { error: upErr } = await admin.storage
     .from(DOCS_BUCKET)
     .upload(path, bytes, { contentType: file.type, upsert: false });
   if (upErr) return refuse("failed", upErr.message);
 
-  const { data: row, error: rowErr } = await admin
+  return insertDocumentRow(mechanicId, docType, path, expiresAt);
+}
+
+function documentPath(mechanicId: string, docType: MechanicDocType, ext: string): string {
+  return `documents/${mechanicId}/${docType}-${Date.now()}.${ext}`;
+}
+
+/** The "YYYY-MM-DD" to store; null when blank (no expiry); undefined when it isn't a date. */
+function parseExpiry(raw: string | null): string | null | undefined {
+  const value = (raw ?? "").trim();
+  if (!value) return null;
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : undefined;
+}
+
+async function insertDocumentRow(
+  mechanicId: string,
+  docType: MechanicDocType,
+  path: string,
+  expiresAt: string | null,
+): Promise<DocumentUploadResult> {
+  const { data: row, error: rowErr } = await createAdminClient()
     .from("mechanic_documents")
     .insert({
       mechanic_id: mechanicId,
@@ -87,6 +110,55 @@ export async function uploadMechanicDocumentFor(
   if (rowErr || !row) return refuse("failed", rowErr?.message ?? "no row returned");
 
   return { ok: true, id: row.id as string };
+}
+
+// ---------------------------------------------------------------------------
+// Direct-to-Storage uploads (lib/storage/direct-doc-upload.ts). Same rules and
+// same row as `uploadMechanicDocumentFor`; the file just never passes through
+// Vercel, so a document can be the full 10 MB rather than the 4.5 MB a request
+// body is allowed there.
+// ---------------------------------------------------------------------------
+
+export type DocumentUploadSignResult = ({ ok: true } & SignedDocUpload) | MechanicRefusal;
+
+/** Step 1: a one-time token to write this mechanic's next document of this type. */
+export async function signMechanicDocumentUploadFor(
+  mechanicId: string,
+  input: { docType: string; mime: string },
+): Promise<DocumentUploadSignResult> {
+  const docType = input.docType as MechanicDocType;
+  if (!MECHANIC_DOC_LABEL[docType]) return refuse("invalid", "Choose a document type.");
+  const ext = ACCEPTED_DOC_MIME[input.mime];
+  if (!ext) return refuse("invalid", "Use a PDF, JPG, PNG or WebP file.");
+
+  const signed = await signDocUpload(documentPath(mechanicId, docType, ext), { upsert: false });
+  if (!signed) return refuse("failed", "We couldn't start that upload. Please try again.");
+  return { ok: true, ...signed };
+}
+
+/**
+ * Step 3: the file is in Storage — check it and put it on file. The path must
+ * be one step 1 could have issued to THIS mechanic for THIS type, or a crafted
+ * call could file someone else's object as theirs.
+ */
+export async function recordUploadedMechanicDocumentFor(
+  mechanicId: string,
+  input: { docType: string; path: string; expiresAt: string | null },
+): Promise<DocumentUploadResult> {
+  const docType = input.docType as MechanicDocType;
+  if (!MECHANIC_DOC_LABEL[docType]) return refuse("invalid", "Choose a document type.");
+
+  const exts = Object.values(ACCEPTED_DOC_MIME).join("|");
+  const own = new RegExp(`^documents/${mechanicId}/${docType}-\\d+\\.(${exts})$`);
+  if (!own.test(input.path)) return refuse("forbidden", "That upload isn't yours.");
+
+  const expiresAt = parseExpiry(input.expiresAt);
+  if (expiresAt === undefined) return refuse("invalid", "Enter the expiry date as a real date.");
+
+  const check = await checkUploadedDoc(input.path);
+  if (!check.ok) return refuse("invalid", UPLOAD_CHECK_MESSAGE[check.reason]);
+
+  return insertDocumentRow(mechanicId, docType, input.path, expiresAt);
 }
 
 export interface DocumentViewer {

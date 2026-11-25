@@ -7,9 +7,16 @@ import { renderApplicationReceivedEmail } from "@/emails/application-received";
 import { renderAdminNewApplicationEmail } from "@/emails/admin-new-application";
 import { ACCEPTED_DOC_MIME, MAX_DOC_BYTES } from "@/lib/onboarding/docs";
 import {
+  UPLOAD_CHECK_MESSAGE,
+  checkUploadedDoc,
+  signDocUpload,
+  type SignedDocUpload,
+} from "@/lib/storage/direct-doc-upload";
+import {
   DUPLICATE_APPLICATION_MESSAGE,
   applicationDocPath,
   isApplicationDocType,
+  isOwnApplicationDocPath,
   normaliseDraftId,
   refuseApplication,
   validateApplication,
@@ -70,6 +77,54 @@ export async function uploadApplicationDocFor(
   }
 
   return { ok: true, path, fileName: file.name };
+}
+
+// ---------------------------------------------------------------------------
+// Direct-to-Storage uploads (lib/storage/direct-doc-upload.ts), for files over
+// the 4.5 MB Vercel lets through a request body. Same path, same upsert, same
+// rules as `uploadApplicationDocFor`.
+// ---------------------------------------------------------------------------
+
+export type SignApplicationDocResult = ({ ok: true } & SignedDocUpload) | ApplicationRefusal;
+
+/** Step 1: a one-time token to write this draft's document of this type. */
+export async function signApplicationDocUploadFor(
+  draftIdRaw: unknown,
+  docType: unknown,
+  mime: unknown,
+): Promise<SignApplicationDocResult> {
+  const draftId = normaliseDraftId(draftIdRaw);
+  if (!draftId) return refuseApplication("invalid", "Invalid draft.");
+  if (!isApplicationDocType(docType)) return refuseApplication("invalid", "Unknown document type.");
+  const ext = typeof mime === "string" ? ACCEPTED_DOC_MIME[mime] : undefined;
+  if (!ext) return refuseApplication("invalid", "Use a PDF, JPG, PNG or WebP file.");
+
+  // Upsert: replacing a document re-uses the path, as the multipart route does.
+  const signed = await signDocUpload(applicationDocPath(draftId, docType, ext), { upsert: true });
+  if (!signed) return refuseApplication("failed", "We couldn't upload that file. Please try again.");
+  return { ok: true, ...signed };
+}
+
+/**
+ * Step 3: check what landed. Returns the path for the submit's `docs`, exactly
+ * as the multipart route does — and the submit still re-checks the path
+ * belongs to this draft and type (`isOwnApplicationDocPath`).
+ */
+export async function confirmApplicationDocFor(
+  draftIdRaw: unknown,
+  docType: unknown,
+  path: unknown,
+): Promise<{ ok: true; path: string } | ApplicationRefusal> {
+  const draftId = normaliseDraftId(draftIdRaw);
+  if (!draftId) return refuseApplication("invalid", "Invalid draft.");
+  if (!isApplicationDocType(docType)) return refuseApplication("invalid", "Unknown document type.");
+  if (typeof path !== "string" || !isOwnApplicationDocPath(path, draftId, docType)) {
+    return refuseApplication("invalid", "We couldn't upload that file. Please try again.");
+  }
+
+  const check = await checkUploadedDoc(path);
+  if (!check.ok) return refuseApplication("invalid", UPLOAD_CHECK_MESSAGE[check.reason]);
+  return { ok: true, path };
 }
 
 export type SubmitApplicationResult = { ok: true; applicationId: string } | ApplicationRefusal;
