@@ -25,7 +25,7 @@ export async function GET(
 ): Promise<Response> {
   const { id } = await params;
   if (!isUuid(id)) return apiError("We couldn't find that booking.", 400);
-  const auth = await mobileActionCaller(request, "action");
+  const auth = await mobileActionCaller(request, "bookingfeed");
   if (!auth.ok) return auth.response;
   return apiOk(await listRevisionsFor(id, auth.bookingCaller));
 }

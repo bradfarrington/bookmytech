@@ -63,6 +63,17 @@ export const RATE_LIMIT_DEFAULTS = {
   mobile_action_user_daily: 40,
   mobile_action_ip_burst: 20,
   mobile_action_ip_daily: 200,
+  // The customer app's booking READS that sit beside those actions: the
+  // cancellation fee preview and the extra-work quotes and revised-job lists.
+  // They were metered as `action`, and the booking screen re-reads quotes and
+  // revisions on every open and every Realtime change, so a customer who just
+  // looked at their booking used up the day's 40 and was then refused the
+  // cancel itself. Kept apart for the same reason as `mechanicfeed`: looking
+  // must never spend the budget for doing. Each is one RLS-scoped read.
+  mobile_bookingfeed_user_burst: 60,
+  mobile_bookingfeed_user_daily: 1500,
+  mobile_bookingfeed_ip_burst: 120,
+  mobile_bookingfeed_ip_daily: 6000,
   // Dispute thread messages. Chatty by nature — a real argument is a dozen
   // messages back and forth — so much looser than the actions above. It writes
   // a row and emails the mechanic, which is what stops this being unlimited.

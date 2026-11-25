@@ -65,6 +65,11 @@ export async function requireMobileCustomer(request: Request): Promise<MobileCus
  *   booking  — writing the booking row
  *   action   — managing a booking afterwards (cancel, reschedule, review,
  *              dispute open/withdraw, releasing a stranded hold)
+ *   bookingfeed — the customer app's booking READS (cancellation fee
+ *              preview, extra-work quotes, revised jobs). Re-read on every
+ *              open and Realtime change, so kept apart from `action` — the
+ *              same split as `mechanicfeed` — or looking at a booking all day
+ *              uses up the budget for cancelling it
  *   message  — dispute thread messages
  *   upload   — dispute photos
  *   vehicle  — correcting the vehicle a reg resolved to (shared pricing state)
@@ -88,6 +93,7 @@ export type MobileLimitFamily =
   | "checkout"
   | "booking"
   | "action"
+  | "bookingfeed"
   | "message"
   | "upload"
   | "vehicle"
