@@ -97,7 +97,6 @@ export async function checkUploadedDoc(path: string): Promise<UploadedDocCheck> 
 /** The applicant- and mechanic-facing wording for a refused upload. */
 export const UPLOAD_CHECK_MESSAGE: Record<Exclude<UploadedDocCheck, { ok: true }>["reason"], string> = {
   missing: "That file didn't finish uploading. Please try again.",
-  too_big:
-    "This file is over 25 MB. Try scanning it at a lower quality, or upload a photo of it instead — photos are made smaller automatically.",
+  too_big: "This file is over 25 MB. Please compress it and try again.",
   wrong_type: "Use a PDF, JPG, PNG or WebP file.",
 };
