@@ -1,7 +1,12 @@
+import path from "node:path";
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   devIndicators: false,
+  // There is a stray package-lock.json in the home directory above this repo,
+  // so Next infers the workspace root as ~ and traces the wrong node_modules.
+  // Pin the root to this project.
+  outputFileTracingRoot: path.join(__dirname),
   async redirects() {
     return [
       // The packaged-services catalogue is gone (Task 17): every booking is a
