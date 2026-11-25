@@ -27,6 +27,8 @@ const EVENT_LABELS: Record<string, string> = {
   dispute_resolved: "Dispute resolved",
   reschedule_proposed: "New time proposed",
   reschedule_accepted: "New time agreed",
+  // 0092: the mechanic's answer to a time the customer asked for.
+  reschedule_declined: "Your mechanic can't make the new time",
   arrival_window_set: "Arrival window confirmed",
   message_sent: "New message from your mechanic",
   fault_added: "Mechanic noted a fault",
@@ -87,6 +89,13 @@ export function describeEvent(event: CustomerEvent): string | null {
     return payload?.outcome === "customer_declined_revision"
       ? "Visit ended after the revised job was declined"
       : EVENT_LABELS.cancelled;
+  }
+
+  if (event.event_type === "reschedule_declined") {
+    // Only the mechanic turning down a time the customer asked for (0092). The
+    // same event type records the customer declining a mechanic's proposal,
+    // which is their own action, not news.
+    return payload?.requested_by === "customer" ? EVENT_LABELS.reschedule_declined : null;
   }
 
   if (event.event_type === "payment_captured") {

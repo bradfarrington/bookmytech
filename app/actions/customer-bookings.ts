@@ -6,6 +6,7 @@ import {
   quoteCancellationFor,
   rescheduleBookingFor,
   respondToRescheduleFor,
+  withdrawRescheduleRequestFor,
   type BookingCaller,
 } from "@/lib/bookings/manage-booking";
 import { slotAvailabilityFor } from "@/lib/availability/slot-availability";
@@ -78,7 +79,9 @@ export async function cancelBooking(bookingId: string, reason: string) {
 }
 
 /**
- * Move a booking to a new slot, keeping the same mechanic. `slotWindow` is the
+ * Ask for a new slot, keeping the same mechanic: applied at once while no
+ * mechanic has accepted, a request for the mechanic to accept once one has
+ * (`requested: true` in the result — see `rescheduleBookingFor`). `slotWindow` is the
  * 2-hour window picked ("2pm–4pm"): the booking keeps it when `newIso` is that
  * window's start, and otherwise the move is an exact time (see
  * `rescheduleBookingFor`). Optional, so older callers behave as before.
@@ -98,6 +101,13 @@ export async function rescheduleBooking(
     caller,
     typeof slotWindow === "string" ? slotWindow : null,
   );
+}
+
+/** Take back a new time the customer asked for that the mechanic hasn't answered (0092). */
+export async function withdrawRescheduleRequest(bookingId: string) {
+  const caller = await cookieCaller();
+  if (!caller) return { ok: false as const, error: "Please sign in." };
+  return withdrawRescheduleRequestFor(bookingId, caller);
 }
 
 export type RescheduleAvailabilityResult =

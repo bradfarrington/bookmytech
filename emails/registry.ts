@@ -526,6 +526,29 @@ export const EMAIL_TEMPLATE_DEFS: readonly EmailTemplateDef[] = [
     ],
   },
   {
+    key: "reschedule_request_declined",
+    label: "New time declined (customer)",
+    description: "Sent to the customer when their mechanic can't do the time they asked for. The booking keeps its original time.",
+    category: "customer",
+    subject: "Your mechanic can't make that time",
+    preheader: "Your booking keeps its original time.",
+    variables: [
+      { name: "name", description: "Customer's name", example: "Alex" },
+      { name: "proposed", description: "The time the customer asked for", example: "Wednesday 5 August · 2pm–4pm" },
+      { name: "original", description: "The time the booking stays at", example: "Monday 3 August · 8am–10am" },
+    ],
+    blocks: [
+      { id: "heading", type: "heading", text: "That time doesn't work" },
+      { id: "greeting", type: "paragraph", text: "Hi {{name}}," },
+      {
+        id: "body",
+        type: "paragraph",
+        text: "Your mechanic can't do **{{proposed}}**, so your booking stays at **{{original}}**.",
+      },
+      { id: "footnote", type: "note", text: "You can ask for a different time from your booking." },
+    ],
+  },
+  {
     key: "mechanic_confirmed",
     label: "Mechanic confirmed",
     description: "Sent to the customer when a mechanic accepts their booking.",
@@ -755,6 +778,28 @@ export const EMAIL_TEMPLATE_DEFS: readonly EmailTemplateDef[] = [
         type: "note",
         text: "Nothing is charged until you book. When you do, the amount is pre-authorised on your card and only taken once the job is done.",
       },
+    ],
+  },
+  {
+    key: "admin_cancellation_requested",
+    label: "Admin: mechanic asked us to cancel",
+    description: "Internal alert when a mechanic asks Book My Tech to cancel a booking (for example after the customer asked to move it). An admin decides, and can charge the cancellation fee.",
+    category: "internal",
+    subject: "Cancel request: job {{ref}}",
+    preheader: "{{mechanic}} has asked us to cancel job {{ref}}.",
+    variables: [
+      { name: "ref", description: "Job number", example: "00123" },
+      { name: "mechanic", description: "Mechanic's name", example: "Gareth" },
+      { name: "slot", description: "The job's current time", example: "Monday 3 August · 8am–10am" },
+      { name: "reason", description: "The mechanic's reason", example: "Customer has moved this three times." },
+      { name: "url", description: "Link to the job in the admin", example: "https://bookmytech.co.uk/admin/jobs/…" },
+    ],
+    blocks: [
+      { id: "heading", type: "heading", text: "Cancellation requested" },
+      { id: "intro", type: "paragraph", text: "**{{mechanic}}** has asked us to cancel job **{{ref}}** ({{slot}})." },
+      { id: "reason", type: "paragraph", text: "\"{{reason}}\"" },
+      { id: "cta", type: "button", text: "Open the job", hrefVar: "url" },
+      { id: "footnote", type: "note", text: "From the job you can cancel it and charge the cancellation fee the booking's time allows, or waive it." },
     ],
   },
   {
@@ -1131,6 +1176,50 @@ export const EMAIL_TEMPLATE_DEFS: readonly EmailTemplateDef[] = [
     blocks: [
       { id: "heading", type: "heading", text: "Job cancelled" },
       { id: "body", type: "paragraph", text: "The customer cancelled their booking. It's been removed from your jobs." },
+    ],
+  },
+  {
+    key: "mechanic_reschedule_requested",
+    label: "Customer asked for a new time (to mechanic)",
+    description: "Sent to the assigned mechanic when the customer asks to move a confirmed job. The job keeps its time until the mechanic accepts.",
+    category: "mechanic",
+    subject: "A customer has asked to move their booking",
+    preheader: "Accept, decline or suggest another time.",
+    variables: [
+      { name: "slot", description: "The time the customer asked for", example: "Wednesday 5 August · 2pm–4pm" },
+      { name: "current", description: "The job's current time", example: "Monday 3 August · 8am–10am" },
+      { name: "optional_note", description: "Customer's note (if any)", example: "The customer's note: \"Car's at work that day.\"" },
+    ],
+    blocks: [
+      { id: "heading", type: "heading", text: "New time requested" },
+      {
+        id: "body",
+        type: "paragraph",
+        text: "The customer has asked to move their booking to **{{slot}}**. It stays at **{{current}}** unless you accept.",
+      },
+      { id: "note", type: "custom", render: "optional_note" },
+      {
+        id: "footnote",
+        type: "note",
+        text: "Accept it, decline it, or suggest another time from the job in your app or dashboard.",
+      },
+    ],
+  },
+  {
+    key: "mechanic_job_cancelled_by_admin",
+    label: "Job cancelled by Book My Tech (to mechanic)",
+    description: "Sent to the assigned mechanic when a Book My Tech admin cancels their job — for example after they asked us to.",
+    category: "mechanic",
+    subject: "Job {{ref}} has been cancelled",
+    preheader: "Book My Tech cancelled this job.",
+    variables: [{ name: "ref", description: "Job number", example: "00123" }],
+    blocks: [
+      { id: "heading", type: "heading", text: "Job cancelled" },
+      {
+        id: "body",
+        type: "paragraph",
+        text: "Book My Tech has cancelled job **{{ref}}**. It's been removed from your jobs. If a cancellation fee was charged, your share is paid out as usual.",
+      },
     ],
   },
   {

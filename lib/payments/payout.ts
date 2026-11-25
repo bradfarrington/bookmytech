@@ -41,7 +41,7 @@ export interface PayoutArgs {
   /** Ledger / timeline wording, e.g. "Job 00123 payout" or "Job 00123 on-site diagnostic fee". */
   description: string;
   actorId: string | null;
-  actorRole: "mechanic" | "customer" | "system";
+  actorRole: "mechanic" | "customer" | "admin" | "system";
 }
 
 export async function payoutToMechanic(args: PayoutArgs): Promise<{ transferredPence: number }> {

@@ -78,7 +78,21 @@ async function transition(
 
   const { error } = await admin
     .from("bookings")
-    .update({ status: to, [stamp]: new Date().toISOString() })
+    .update({
+      status: to,
+      [stamp]: new Date().toISOString(),
+      // Setting off ends any open reschedule, either side's (0092): the job is
+      // happening at its booked time, so a pending request has lapsed.
+      ...(to === "en_route"
+        ? {
+            reschedule_status: null,
+            reschedule_proposed_by: null,
+            reschedule_proposed_at: null,
+            reschedule_proposed_window: null,
+            reschedule_note: null,
+          }
+        : {}),
+    })
     .eq("id", bookingId)
     .eq("mechanic_id", mechanicId)
     .eq("status", from);

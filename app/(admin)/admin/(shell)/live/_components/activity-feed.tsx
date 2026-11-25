@@ -73,6 +73,10 @@ function describe(e: ActivityEvent): { icon: LucideIcon; label: string; tone: To
       return { icon: UserCheck, label: "Job reassigned to another mechanic", tone: "active" };
     case "reschedule_proposed":
       return { icon: CalendarClock, label: "Reschedule proposed", tone: "pending" };
+    case "reschedule_requested":
+      return { icon: CalendarClock, label: "Customer asked for a new time", tone: "pending" };
+    case "reschedule_withdrawn":
+      return { icon: CalendarClock, label: "Customer withdrew their new time", tone: "neutral" };
     case "reschedule_accepted":
       return { icon: CalendarClock, label: "Reschedule accepted", tone: "success" };
     case "reschedule_declined":

@@ -84,6 +84,7 @@ async function notifyNewOffers(
   admin: ReturnType<typeof createAdminClient>,
   bookingId: string,
   offers: NewOffer[],
+  title = "New job offer",
 ): Promise<void> {
   if (offers.length === 0) return;
   try {
@@ -104,7 +105,7 @@ async function notifyNewOffers(
     await Promise.all(
       offers.map((offer) =>
         sendPushToMechanic(offer.mechanic_id, {
-          title: "New job offer",
+          title,
           body,
           channelId: ANDROID_OFFERS_CHANNEL,
           // `offerId` is what the app deep-links on: bmtmechanic://offer/<offerId>.
@@ -239,4 +240,40 @@ export async function redispatchPending(): Promise<number> {
     if (offered > 0) reached += 1;
   }
   return reached;
+}
+
+/**
+ * The customer changed the time of a booking nobody has accepted yet. Offers
+ * read the booking's time live, so every open offer card and the CRM's jobs
+ * list already show the new one; this makes sure the mechanics hear about it.
+ *
+ *   - A mechanic who DECLINED may have done so because of the old time, so
+ *     their offer is reopened.
+ *   - Everyone now holding a live offer is told the time changed, with the
+ *     same repair · district · day line as a new offer.
+ *   - Then a normal dispatch, which offers it to anyone newly in range (and
+ *     buzzes only them, as `dispatchBooking` always does).
+ *
+ * Nothing here can fail the reschedule: it is told after the fact.
+ */
+export async function reofferAfterTimeChange(bookingId: string): Promise<void> {
+  const admin = createAdminClient();
+  try {
+    await admin
+      .from("job_offers")
+      .update({ response: null, responded_at: null })
+      .eq("booking_id", bookingId)
+      .eq("response", "declined");
+
+    const { data: live } = await admin
+      .from("job_offers")
+      .select("id, mechanic_id")
+      .eq("booking_id", bookingId)
+      .is("response", null);
+    await notifyNewOffers(admin, bookingId, (live ?? []) as NewOffer[], "Job offer: new time");
+
+    await dispatchBooking(bookingId);
+  } catch (err) {
+    console.error("[dispatch] re-offer after time change failed", err);
+  }
 }

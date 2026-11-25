@@ -488,6 +488,8 @@ export async function endJobOnSite(
       reschedule_proposed_at: null,
       reschedule_note: null,
       reschedule_status: null,
+      reschedule_proposed_by: null,
+      reschedule_proposed_window: null,
     })
     .eq("id", booking.id)
     .eq("mechanic_id", mechanicId)

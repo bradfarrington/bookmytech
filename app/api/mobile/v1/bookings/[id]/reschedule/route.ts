@@ -2,10 +2,10 @@ import { rescheduleBookingFor } from "@/lib/bookings/manage-booking";
 import { isUuid, mobileActionCaller } from "@/lib/mobile/customer-actions";
 import { apiError, apiOk, readJsonBody } from "@/lib/mobile/respond";
 
-// POST /api/mobile/v1/bookings/:id/reschedule — move a booking. AUTHENTICATED.
+// POST /api/mobile/v1/bookings/:id/reschedule — ask for a new time. AUTHENTICATED.
 //
 // Body: { scheduledAt, reason, slotWindow? }
-// 200:  { ok: true } | { ok: false, error }. A booking that's past the point of
+// 200:  { ok: true, requested? } | { ok: false, error }. A booking that's past the point of
 //       moving, or a slot in the past, is a request that RAN with a negative
 //       answer. Only transport-level problems return `{ error }` with a
 //       non-2xx: 401, 400/415 (bad body or id), 429.
@@ -13,11 +13,17 @@ import { apiError, apiOk, readJsonBody } from "@/lib/mobile/respond";
 // Thin wrapper over `rescheduleBookingFor` — the SAME function the website's
 // dashboard calls through app/actions/customer-bookings.ts.
 //
-// This APPLIES the new time rather than proposing it: the customer sets the
-// slot, the mechanic is emailed, and they can re-propose or cancel from their
-// own tools if it doesn't work. It also supersedes any pending mechanic
-// proposal, so an app that shows both a "reschedule" button and a "respond to
-// proposal" banner will find this clears the banner.
+// 0092: what this does depends on whether a mechanic has accepted the job.
+//   - Still finding a mechanic: the time changes at once (the old behaviour),
+//     and mechanics holding or having declined the offer are told.
+//     200 { ok: true }.
+//   - Confirmed: it is a REQUEST. The booking keeps its time until the mechanic
+//     accepts, declines or suggests another (which arrives as the usual
+//     mechanic proposal). 200 { ok: true, requested: true }. The booking reads
+//     back with reschedule_status 'proposed', reschedule_proposed_by
+//     'customer'. A pending mechanic proposal is replaced by it.
+// Older builds that ignore `requested` see the booking keep its time on their
+// re-read, which is the truth.
 //
 // `scheduledAt` without `slotWindow` clears the booking's arrival window
 // (`slot_window`) and any choice of days the customer offered (`candidate_days`,

@@ -88,6 +88,9 @@ interface EventWording {
 }
 
 const EVENT_WORDING: Record<string, EventWording> = {
+  // 0092: the customer asking for a new time is the mechanic's to answer.
+  reschedule_requested: { title: "The customer asked for a new time", tone: "warning", icon: "calendar" },
+  reschedule_withdrawn: { title: "The customer no longer needs the job moved", tone: "neutral", icon: "calendar" },
   reschedule_accepted: { title: "New time agreed", tone: "success", icon: "calendar" },
   reschedule_declined: { title: "New time declined", tone: "warning", icon: "calendar" },
   quote_approved: { title: "Quote approved", tone: "success", icon: "quote" },

@@ -197,6 +197,8 @@ export async function redistributeFromCase(caseId: string, note?: string): Promi
       reschedule_proposed_at: null,
       reschedule_note: null,
       reschedule_status: null,
+      reschedule_proposed_by: null,
+      reschedule_proposed_window: null,
     })
     .eq("id", booking.id);
   if (error) return { ok: false, error: error.message };

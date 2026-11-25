@@ -8,6 +8,7 @@ import { renderSmsTemplate } from "@/lib/sms/render-template";
 import { formatBookingSlot } from "@/lib/slots";
 import { siteUrl } from "@/lib/utils";
 import { refuse, type MechanicRefusal } from "@/lib/mechanics/refusal";
+import { sendPushToCustomer } from "@/lib/push/send";
 
 // The one implementation of "the mechanic proposes a new time" (Task 38 —
 // extracted from app/actions/mechanic-jobs.ts, which now calls it). The
@@ -36,7 +37,9 @@ export async function proposeRescheduleFor(
 
   const { data: booking } = await admin
     .from("bookings")
-    .select("id, status, mechanic_id, scheduled_at, customer_email, customer_name, customer_phone")
+    .select(
+      "id, status, mechanic_id, customer_id, scheduled_at, customer_email, customer_name, customer_phone, reschedule_status, reschedule_proposed_by",
+    )
     .eq("id", bookingId)
     .single();
 
@@ -46,12 +49,18 @@ export async function proposeRescheduleFor(
     return refuse("conflict", "Only confirmed jobs that haven't started can be rescheduled.");
 
   const trimmedNote = note.trim() || null;
+  const countering =
+    booking.reschedule_status === "proposed" && booking.reschedule_proposed_by === "customer";
   const { error } = await admin
     .from("bookings")
     .update({
       reschedule_proposed_at: when.toISOString(),
       reschedule_note: trimmedNote,
       reschedule_status: "proposed",
+      // 0092: the customer answers this one. When it replaces a time the
+      // customer asked for, it is the mechanic's counter-offer.
+      reschedule_proposed_by: "mechanic",
+      reschedule_proposed_window: null,
     })
     .eq("id", bookingId)
     .eq("mechanic_id", mechanicId);
@@ -63,8 +72,18 @@ export async function proposeRescheduleFor(
     actor_id: mechanicId,
     actor_role: "mechanic",
     reason: trimmedNote,
-    payload: { from: booking.scheduled_at, proposed: when.toISOString() },
+    payload: {
+      from: booking.scheduled_at,
+      proposed: when.toISOString(),
+      ...(countering ? { counter: true } : {}),
+    },
   });
+
+  sendPushToCustomer(booking.customer_id, {
+    title: countering ? "Your mechanic suggested another time" : "Your mechanic proposed a new time",
+    body: `${formatBookingSlot(when.toISOString())}. Accept it or keep your current time.`,
+    bookingId,
+  }).catch(() => {});
 
   // UK-time label ("Thu 4 Sep · 14:00") — a proposal is an exact time, not a window.
   const slotLabel = formatBookingSlot(when.toISOString());

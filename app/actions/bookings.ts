@@ -12,6 +12,13 @@ import { renderTemplateEmail } from "@/emails/resolve";
 import { sendSms } from "@/lib/sms/send-sms";
 import { renderSmsTemplate } from "@/lib/sms/render-template";
 import { ALL_DAY_SLOT, formatBookingWhen, isFlexibleBooking } from "@/lib/slots";
+import {
+  CANCELLABLE,
+  adminCancelBookingFor,
+  adminCancellationQuoteFor,
+  type CancellationQuote,
+} from "@/lib/bookings/manage-booking";
+import { dismissCancellationRequestFor } from "@/lib/bookings/cancellation-request";
 
 export type BookingActionResult = { ok: true } | { ok: false; error: string };
 
@@ -47,6 +54,14 @@ function revalidate(id: string) {
 export async function cancelBooking(
   id: string,
   reason: string,
+  /**
+   * Charge the cancellation fee the booking's time allows (the customer's own
+   * tiers). Defaults to true; false waives it and releases the whole hold.
+   * Only meaningful while the booking is still cancellable by the customer
+   * rules (finding a mechanic, confirmed, on the way) — past that, this falls
+   * back to closing the booking without touching the payment.
+   */
+  chargeFee = true,
 ): Promise<BookingActionResult> {
   const trimmed = reason.trim();
   if (!trimmed) return { ok: false, error: "A cancellation reason is required." };
@@ -64,14 +79,23 @@ export async function cancelBooking(
   if (booking.status === "cancelled")
     return { ok: false, error: "This booking is already cancelled." };
 
+  // The customer-rules path: settles the card hold (fee or full release), pays
+  // the mechanic their share of a fee, tells the customer and mechanic.
+  if ((CANCELLABLE as readonly string[]).includes(booking.status)) {
+    const res = await adminCancelBookingFor(id, actorId, trimmed, chargeFee);
+    revalidate(id);
+    return res.ok ? { ok: true } : res;
+  }
+
   const { error } = await supabase
     .from("bookings")
     .update({ status: "cancelled" })
     .eq("id", id);
   if (error) return { ok: false, error: error.message };
 
-  // Append-only audit. Stripe auto-releases the manual-capture authorisation
-  // after 7 days; capture/refund + fees land in Task 12.
+  // Append-only audit. A booking past the customer's cancel window (work
+  // started, completed, disputed) has its money handled by refunds/disputes,
+  // so this only closes it.
   await supabase.from("booking_events").insert({
     booking_id: id,
     event_type: "cancelled",
@@ -83,6 +107,25 @@ export async function cancelBooking(
 
   revalidate(id);
   return { ok: true };
+}
+
+/** The fee cancelling now would charge, for the admin's confirm. */
+export async function adminCancellationQuote(id: string): Promise<CancellationQuote> {
+  const guard = await requireAdmin();
+  if (!guard.ok) return guard;
+  return adminCancellationQuoteFor(id);
+}
+
+/** Say no to a mechanic's request that we cancel (lib/bookings/cancellation-request.ts). */
+export async function dismissCancellationRequest(
+  id: string,
+  note: string,
+): Promise<BookingActionResult> {
+  const guard = await requireAdmin();
+  if (!guard.ok) return guard;
+  const res = await dismissCancellationRequestFor(id, guard.actorId, note);
+  revalidate(id);
+  return res;
 }
 
 export async function markDisputed(

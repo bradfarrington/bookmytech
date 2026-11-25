@@ -66,6 +66,8 @@ export async function cancelOwnJobFor(
       reschedule_proposed_at: null,
       reschedule_note: null,
       reschedule_status: null,
+      reschedule_proposed_by: null,
+      reschedule_proposed_window: null,
     })
     .eq("id", bookingId)
     .eq("mechanic_id", mechanicId);

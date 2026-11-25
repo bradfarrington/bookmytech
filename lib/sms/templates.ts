@@ -115,6 +115,18 @@ export const SMS_TEMPLATE_DEFS: readonly SmsTemplateDef[] = [
       "Your Book My Tech booking is now set for {{slot}}. Your pre-authorisation stays in place.",
   },
   {
+    key: "reschedule_request_declined",
+    label: "Mechanic declined the new time",
+    description: "Sent to the customer when their mechanic can't do the time they asked for; the booking keeps its original time.",
+    audience: "customer",
+    variables: [
+      { name: "proposed", description: "The time the customer asked for", example: "Thu 4 Sep · 2pm–4pm" },
+      { name: "original", description: "The time the booking stays at", example: "Wed 3 Sep · 8am–10am" },
+    ],
+    defaultBody:
+      "Book My Tech: your mechanic can't do {{proposed}}, so your booking stays at {{original}}. You can ask for another time from your booking.",
+  },
+  {
     key: "finding_replacement",
     label: "Finding a replacement mechanic",
     description: "Sent to the customer when their mechanic drops out and the job is re-broadcast.",
@@ -328,6 +340,17 @@ export const SMS_TEMPLATE_DEFS: readonly SmsTemplateDef[] = [
       "Book My Tech: the customer has cancelled job {{ref}}. It's been removed from your schedule.",
   },
   {
+    key: "mech_job_cancelled_admin",
+    label: "Book My Tech cancelled the job",
+    description: "Sent to the mechanic when a Book My Tech admin cancels a job they had accepted.",
+    audience: "mechanic",
+    variables: [
+      { name: "ref", description: "Job number", example: "00123" },
+    ],
+    defaultBody:
+      "Book My Tech: we've cancelled job {{ref}}. It's been removed from your schedule.",
+  },
+  {
     key: "mech_booking_rescheduled",
     label: "Customer moved the job",
     description: "Sent to the mechanic when the customer reschedules a job they had accepted.",
@@ -338,6 +361,18 @@ export const SMS_TEMPLATE_DEFS: readonly SmsTemplateDef[] = [
     ],
     defaultBody:
       "Book My Tech: the customer moved job {{ref}} to {{slot}}. Check your schedule.",
+  },
+  {
+    key: "mech_reschedule_requested",
+    label: "Customer asked for a new time",
+    description: "Sent to the mechanic when the customer asks to move a confirmed job. The job keeps its time until they accept.",
+    audience: "mechanic",
+    variables: [
+      { name: "ref", description: "Job number", example: "00123" },
+      { name: "slot", description: "The time the customer asked for", example: "Thu 4 Sep · 2pm–4pm" },
+    ],
+    defaultBody:
+      "Book My Tech: the customer asked to move job {{ref}} to {{slot}}. Accept, decline or suggest another time in the app.",
   },
   {
     key: "mech_reschedule_accepted",
