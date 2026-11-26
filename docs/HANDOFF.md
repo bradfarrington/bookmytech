@@ -119,7 +119,7 @@ You are working on **Book My Tech**, a UK mobile-mechanic booking platform. This
 
 ## Current task
 
-### 📌 2026-11-26: Repair manuals and technical data in the mechanic app (Task 86), not yet pushed
+### 📌 2026-11-26: Repair manuals and technical data in the mechanic app (Task 86), pushed 2026-11-26 (`cb7e864`)
 
 Read `docs/tasks/86-mechanic-app-technical-data.md`. Three read-only routes under `/api/mobile/v1/mechanic/bookings/[id]/technical/` (manuals list, one manual, data) over the same HaynesPro reads as the website's technical page, mapped to stable shapes of our own. No migration; additive API only. **Mechanic app:** new Technical data card and screens; needs this deployed, then an EAS build.
 
