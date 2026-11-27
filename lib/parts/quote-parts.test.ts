@@ -182,6 +182,87 @@ describe("priceJobParts", () => {
     expect(result.ok && result.parts[0]).toMatchObject({ source: "default", linePence: 2910 });
   });
 
+  describe("one part listed under two part types (job 00133)", () => {
+    const belt: SupplierOffer = { ...filter, partNumber: "GAT5PK1650", brand: "GATES", description: "V-RIBBED BELT", costPence: 1877 };
+    const ok = (list: SupplierOffer[]): AagPartOffers => ({ state: "ok", offers: list, pricedAt: PRICED_AT, lastKnown: false });
+    const beltJob: PartsJob = {
+      nodeId: "belt",
+      description: "Renew the ancillary drive belt",
+      groups: [
+        { genartId: 10, label: "V-belt" },
+        { genartId: 305, label: "V-ribbed belt" },
+      ],
+    };
+
+    it("charges the shared part once", () => {
+      const result = priceJobParts({ jobs: [beltJob], offers: new Map([[10, ok([belt])], [305, ok([belt])]]) });
+      expect(result.ok && result.parts.map((p) => [p.genartId, p.partNumber, p.linePence])).toEqual([[10, "GAT5PK1650", 1877]]);
+    });
+
+    it("still charges each job its own belt", () => {
+      const result = priceJobParts({
+        jobs: [beltJob, { ...beltJob, nodeId: "belt-2" }],
+        offers: new Map([[10, ok([belt])], [305, ok([belt])]]),
+      });
+      expect(result.ok && result.parts.map((p) => p.nodeId)).toEqual(["belt", "belt-2"]);
+    });
+
+    const bulbJob: PartsJob = {
+      nodeId: "bulb",
+      description: "Renew the left main beam bulb",
+      groups: [
+        { genartId: 107, label: "Bulb, headlight" },
+        { genartId: 106, label: "Bulb, high beam headlight" },
+      ],
+    };
+    const highBeam = { ...belt, partNumber: "RINRX2277", costPence: 500 };
+    const dipped = { ...belt, partNumber: "RINRW477", costPence: 300 };
+
+    it("charges both types when they pick different parts: separate parts", () => {
+      const choices = new Map([[choiceKey("bulb", 107), { car_type_id: 1, node_id: "bulb", genart_id: 107, supplier: "aag" as const, part_number: "RINRW477", brand: null, description: null, chosen_at: PRICED_AT }]]);
+      const result = priceJobParts({ jobs: [bulbJob], offers: new Map([[107, ok([dipped, highBeam])], [106, ok([highBeam])]]), choices });
+      expect(result.ok && result.parts.map((p) => [p.genartId, p.partNumber])).toEqual([
+        [107, "RINRW477"],
+        [106, "RINRX2277"],
+      ]);
+    });
+
+    it("charges once when two types with different lists pick the same part", () => {
+      const result = priceJobParts({ jobs: [bulbJob], offers: new Map([[107, ok([highBeam])], [106, ok([highBeam, { ...dipped, buyable: false }])]]) });
+      expect(result.ok && result.parts.map((p) => [p.genartId, p.partNumber])).toEqual([[107, "RINRX2277"]]);
+    });
+
+    it("keeps the quantity the car needs, never the sum of the repeats", () => {
+      const pair = { ...belt, quantityOfFit: 2 };
+      const result = priceJobParts({ jobs: [beltJob], offers: new Map([[10, ok([belt])], [305, ok([pair])]]) });
+      expect(result.ok && result.parts.map((p) => [p.partNumber, p.quantity, p.linePence])).toEqual([["GAT5PK1650", 2, 3754]]);
+    });
+
+    it("leaves a type NAPA lists nothing for as a gap, as before", () => {
+      const result = priceJobParts({ jobs: [beltJob], offers: new Map<number, AagPartOffers>([[10, { state: "empty", pricedAt: PRICED_AT }], [305, ok([belt])]]) });
+      expect(result.ok).toBe(false);
+      expect(result.parts.map((p) => p.genartId)).toEqual([305]);
+    });
+
+    it("charges both when the lists share nothing", () => {
+      const other = { ...belt, partNumber: "OTHER" };
+      const result = priceJobParts({ jobs: [beltJob], offers: new Map([[10, ok([belt])], [305, ok([other])]]) });
+      expect(result.ok && result.parts.map((p) => p.partNumber)).toEqual(["GAT5PK1650", "OTHER"]);
+    });
+
+    it("keeps an admin's choice of a different part", () => {
+      const other = { ...belt, partNumber: "OTHER" };
+      const choices = new Map([
+        [
+          choiceKey("belt", 305),
+          { car_type_id: 1, node_id: "belt", genart_id: 305, supplier: "aag" as const, part_number: "OTHER", brand: null, description: null, chosen_at: PRICED_AT },
+        ],
+      ]);
+      const result = priceJobParts({ jobs: [beltJob], offers: new Map([[10, ok([belt])], [305, ok([belt, other])]]), choices });
+      expect(result.ok && result.parts.map((p) => p.partNumber)).toEqual(["GAT5PK1650", "OTHER"]);
+    });
+  });
+
   it("carries a last known price through", () => {
     const result = priceJobParts({ jobs: [job], offers: new Map([[8, { ...filters, lastKnown: true }]]), uncharged: new Set([2021]) });
     expect(result.ok && result.parts[0].lastKnown).toBe(true);

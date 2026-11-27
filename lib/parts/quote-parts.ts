@@ -291,7 +291,7 @@ export function priceJobParts(args: {
         const offer = selection.offer;
         const unitPence = offer.costPence as number;
         const quantity = wanted && wanted > 0 ? wanted : 1;
-        parts.push({
+        const line: QuotedPart = {
           nodeId: job.nodeId,
           genartId: group.genartId,
           groupLabel: group.label,
@@ -311,7 +311,8 @@ export function priceJobParts(args: {
           pricedAt: lookup.pricedAt,
           ...(offer.fromCatalogue ? { fromCatalogue: true as const } : {}),
           ...(offer.modelPart ? { modelPart: true as const } : {}),
-        });
+        };
+        if (!mergeRepeatedPart(parts, line)) parts.push(line);
       }
     }
   }
@@ -339,6 +340,41 @@ function alternativesToSkip(
     skip.add(kitPriced ? single : kit);
   }
   return skip;
+}
+
+/**
+ * Charge each supplier part once per job (2026-11-27). HaynesPro sometimes
+ * tags a job with two part types NAPA files the same part under: "Renew the
+ * ancillary drive belt" carries "V-belt" and "V-ribbed belt", and both came
+ * back as Gates 5PK1650, so the customer paid for one belt twice (job 00133).
+ * Brad: the exact same product code is what cancels out; part types that
+ * pick different parts are separate parts and both charge.
+ *
+ * Each part type works out how many the car needs on its own (slotQuantity:
+ * NAPA's count per vehicle, the unit of issue, "both"/"all" in the job), so a
+ * repeat already carries the full need: the line keeps the larger quantity,
+ * never the sum. Left and right, front and rear stay separate lines.
+ * Returns true when the part was already on the job (and merged into it).
+ */
+function mergeRepeatedPart(parts: QuotedPart[], next: QuotedPart): boolean {
+  const same = parts.find(
+    (p) =>
+      p.nodeId === next.nodeId &&
+      p.genartId !== next.genartId &&
+      p.supplier != null &&
+      p.supplier === next.supplier &&
+      p.partNumber === next.partNumber &&
+      // NAPA may give the axle under one part type and not the other (the
+      // Leon's EGR valve). A side is never assumed: left and right both stay.
+      (p.position === next.position || p.position == null || next.position == null) &&
+      (p.side ?? null) === (next.side ?? null),
+  );
+  if (!same) return false;
+  if (next.quantity > same.quantity) {
+    same.quantity = next.quantity;
+    same.linePence = same.unitPence * same.quantity;
+  }
+  return true;
 }
 
 /** Each gap's HaynesPro name and a repair that needs it. */
