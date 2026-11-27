@@ -80,11 +80,11 @@ describe("the mechanic's view of a part's versions (Task 87)", () => {
 
   it("says what to check, or what the customer said", () => {
     const unknown = readFitOptions(stored)!;
-    expect(fitOptionsHeading(unknown)).toBe("Check air-con before buying: we don't know which this car has.");
+    expect(fitOptionsHeading(unknown)).toBe("Check for air-con before buying: we don't know if this car has it.");
     expect(customerSaid(unknown)).toBeNull();
     const answered = readFitOptions({ ...stored, answered: { air_con: false } })!;
     expect(fitOptionsHeading(answered)).toBe("The customer said the car doesn't have air-con. If not, buy the other version.");
-    expect(fitOptionsNote(unknown)).toBe("check air-con: With air-con GAT5PK1680 / Without air-con GAT5PK1650");
+    expect(fitOptionsNote(unknown)).toBe("check for air-con: With air-con GAT5PK1680 / Without air-con GAT5PK1650");
     expect(fitOptionsFooter(unknown)).toBe("Ask the customer in the chat, or check on arrival.");
     expect(fitOptionsFooter(answered)).toBeNull();
   });

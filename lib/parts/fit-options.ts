@@ -78,7 +78,7 @@ export function customerSaid(fit: FitOptions): string | null {
 export function fitOptionsHeading(fit: FitOptions): string {
   if (fit.dependsOn.includes("car")) return "Check which version fits this car before buying: NAPA lists more than one.";
   const unknown = equipmentOf(fit).filter((key) => fit.answered?.[key] === undefined);
-  if (unknown.length > 0) return `Check ${names(unknown)} before buying: we don't know which this car has.`;
+  if (unknown.length > 0) return `Check for ${names(unknown)} before buying: we don't know if this car has it.`;
   return `${customerSaid(fit) ?? ""} If not, buy the other version.`.trim();
 }
 
@@ -102,5 +102,5 @@ export function fitOptionsNote(fit: FitOptions | null | undefined): string | nul
   if (!fit || fit.options.length < 2) return null;
   const versions = fit.options.map((o) => `${o.label} ${o.partNumber}`).join(" / ");
   const equipment = equipmentOf(fit);
-  return `check ${equipment.length > 0 ? names(equipment) : "which fits"}: ${versions}`;
+  return `check ${equipment.length > 0 ? `for ${names(equipment)}` : "which fits"}: ${versions}`;
 }
