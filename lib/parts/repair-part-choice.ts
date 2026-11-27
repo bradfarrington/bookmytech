@@ -75,15 +75,17 @@ export interface CarTraits {
   airCon?: boolean | null;
   /** ADDITIVE (Task 87). Likewise stop-start. */
   stopStart?: boolean | null;
+  /** ADDITIVE (Task 87). Likewise an electronic handbrake. */
+  electricHandbrake?: boolean | null;
 }
 
 /** Equipment that decides between NAPA's alternatives, and that only the customer (or the car) can tell us. */
-export type EquipmentKey = "air_con" | "stop_start";
+export type EquipmentKey = "air_con" | "stop_start" | "electric_handbrake";
 
-export const EQUIPMENT_KEYS: readonly EquipmentKey[] = ["air_con", "stop_start"];
+export const EQUIPMENT_KEYS: readonly EquipmentKey[] = ["air_con", "stop_start", "electric_handbrake"];
 
 /** The offer field and the car's answer for each piece of equipment. */
-const EQUIPMENT_FIELD = { air_con: "airCon", stop_start: "stopStart" } as const satisfies Record<EquipmentKey, keyof SupplierOffer & keyof CarTraits>;
+const EQUIPMENT_FIELD = { air_con: "airCon", stop_start: "stopStart", electric_handbrake: "electricHandbrake" } as const satisfies Record<EquipmentKey, keyof SupplierOffer & keyof CarTraits>;
 
 function offerEquipment(offer: SupplierOffer, key: EquipmentKey): boolean | null {
   return offer[EQUIPMENT_FIELD[key]] ?? null;
@@ -93,9 +95,16 @@ export function carEquipment(car: CarTraits | null | undefined, key: EquipmentKe
   return car?.[EQUIPMENT_FIELD[key]] ?? null;
 }
 
-/** "With air-con", "Without stop-start". */
+/** What each is called in a sentence. */
+export const EQUIPMENT_NAME: Record<EquipmentKey, string> = {
+  air_con: "air-con",
+  stop_start: "stop-start",
+  electric_handbrake: "an electronic handbrake",
+};
+
+/** "With air-con", "Without stop-start", "With an electronic handbrake". */
 export function equipmentLabel(key: EquipmentKey, has: boolean): string {
-  const name = key === "air_con" ? "air-con" : "stop-start";
+  const name = EQUIPMENT_NAME[key];
   return `${has ? "With" : "Without"} ${name}`;
 }
 

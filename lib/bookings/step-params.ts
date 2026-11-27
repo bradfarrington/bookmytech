@@ -27,6 +27,8 @@ export interface BookingBaseParams {
   ac?: EquipmentAnswer;
   /** Task 87: likewise stop-start. */
   ss?: EquipmentAnswer;
+  /** Task 87: likewise an electronic handbrake. */
+  eh?: EquipmentAnswer;
 }
 
 /** The arrival window chosen on the Time step. */
@@ -88,6 +90,7 @@ export function stepQuery(base: BookingBaseParams, time?: BookingTimeParams | nu
     if (base.pref) query.set("pref", base.pref);
     if (base.ac) query.set("ac", base.ac);
     if (base.ss) query.set("ss", base.ss);
+    if (base.eh) query.set("eh", base.eh);
   }
   if (base.postcode) query.set("postcode", base.postcode);
   if (time) {

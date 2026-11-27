@@ -13,6 +13,8 @@ import {
   builtInRange,
   carNotesOf,
   chassisFits,
+  electricHandbrakeIn,
+  electricHandbrakeOf,
   madeInFits,
   stopStartOf,
   vinYear,
@@ -121,7 +123,7 @@ describe("reading NAPA's fitment", () => {
       stopStart: null,
       fitmentText: "-AC",
       chassis: { note: "TO CH. 7H-6H079890", fits: true },
-      readVersion: 4,
+      readVersion: 5,
     });
   });
 });
@@ -251,7 +253,7 @@ describe("car details only someone at the car can check (Task 87)", () => {
       carNotesOf(
         [
           { name: "Engine Code", value: "SPJC" },
-          { name: "Vehicle Detail", value: "Engine Starts:360000;With start-stop function" },
+          { name: "Vehicle Detail", value: "Engine Starts:360000;With start-stop function;With Elec. H/B" },
           { name: "Applic Note", value: "(South Korea Production)" },
           { name: "Transmission Code", value: "MB6" },
           { name: "Year built", value: "To Dec 1, 2013 From Aug 1, 2009" },
@@ -283,15 +285,33 @@ describe("car details only someone at the car can check (Task 87)", () => {
     expect(madeInFits("With Elec. H/B", "U5YPH813SGL089445")).toBeNull();
   });
 
+  it("reads an electronic handbrake as a question for the customer, not a car detail", () => {
+    expect(electricHandbrakeOf("With Elec. H/B")).toBe(true);
+    expect(electricHandbrakeOf("Without Elec. H/B")).toBe(false);
+    expect(electricHandbrakeOf("for vehicles with electric parking brake")).toBe(true);
+    expect(electricHandbrakeOf("Sport Models")).toBeNull();
+    expect(electricHandbrakeIn([{ name: "Vehicle Detail", value: "Without Elec. H/B" }])).toBe(false);
+    const without = pad("BREP30051", 2000, []);
+    const withEhb = pad("BREP30067", 2600, []);
+    without.electricHandbrake = false;
+    withEhb.electricHandbrake = true;
+    const unknown = priceJobParts({ jobs: [job], offers: new Map([[402, ok([without, withEhb])]]) });
+    expect(unknown.ok && unknown.parts.map((p) => [p.partNumber, p.fitOptions?.dependsOn])).toEqual([["BREP30067", ["electric_handbrake"]]]);
+    expect(unknown.parts[0].fitOptions?.options.map((o) => o.label)).toEqual(["With an electronic handbrake", "Without an electronic handbrake"]);
+    expect(equipmentQuestions(unknown.parts)).toEqual(["electric_handbrake"]);
+    const lever = priceJobParts({ jobs: [job], offers: new Map([[402, ok([without, withEhb])]]), car: { sports: false, electricHandbrake: false } });
+    expect(lever.ok && lever.parts.map((p) => p.partNumber)).toEqual(["BREP30051"]);
+  });
+
   it("prices the dearer and lists each version for the mechanic, never asking the customer", () => {
-    const without = pad("BREP30051", 2000, [{ text: "Without Elec. H/B", fits: null }]);
-    const withEhb = pad("BREP30067", 2600, [{ text: "With Elec. H/B", fits: null }]);
+    const without = pad("BREP30051", 2000, [{ text: "Tailgate", fits: null }]);
+    const withEhb = pad("BREP30067", 2600, [{ text: "Back doors", fits: null }]);
     const result = priceJobParts({ jobs: [job], offers: new Map([[402, ok([without, withEhb])]]) });
     expect(result.ok && result.parts.map((p) => [p.partNumber, p.linePence])).toEqual([["BREP30067", 2600]]);
     expect(result.parts[0].fitOptions).toMatchObject({ dependsOn: ["car"] });
     expect(result.parts[0].fitOptions?.options.map((o) => [o.label, o.partNumber])).toEqual([
-      ["Without Elec. H/B", "BREP30051"],
-      ["With Elec. H/B", "BREP30067"],
+      ["Tailgate", "BREP30051"],
+      ["Back doors", "BREP30067"],
     ]);
     expect(equipmentQuestions(result.parts)).toEqual([]);
     expect(equipmentAsked(result.parts)).toEqual([]);

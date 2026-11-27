@@ -9,6 +9,7 @@ import { optionalMobileUser } from "@/lib/supabase/mobile";
 import {
   equipmentFromBody,
   equipmentQuestionsForApp,
+  equipmentValue,
   mergeEquipment,
   savedCarEquipment,
 } from "@/lib/bookings/car-equipment";
@@ -73,12 +74,14 @@ import {
 //
 // ADDITIVE (Task 87): air-con and stop-start. NAPA lists some parts (an
 // ancillary belt, for one) in versions for cars with and without them.
-//   Body:   equipment?: { airCon?: true | false | null, stopStart?: … }
+//   Body:   equipment?: { airCon?: true | false | null, stopStart?: …,
+//                         electricHandbrake?: … }
 //           true / false = the customer's answer, null = "Not sure", a key
 //           left out = not asked. Signed-in callers (a Bearer token is read
 //           if sent, never required) get their saved car's answers for keys
 //           they leave out.
-//   200:    quote.equipmentQuestions: [{ key: "air_con" | "stop_start",
+//   200:    quote.equipmentQuestions: [{ key: "air_con" | "stop_start" |
+//             "electric_handbrake" (more may be added: show any key, as worded),
 //             question, why, answer: true | false | null }]
 //           One per piece of equipment a part in the price depends on, with
 //           the answer it was priced with (null: not known, priced at the
@@ -193,7 +196,7 @@ export async function POST(request: Request): Promise<Response> {
     // ADDITIVE (Task 87): what to ask, with the answer the price used.
     equipmentQuestions: equipmentQuestionsForApp(quote.equipmentAsked).map((q) => ({
       ...q,
-      answer: q.key === "air_con" ? (equipment.airCon ?? null) : (equipment.stopStart ?? null),
+      answer: equipmentValue(equipment, q.key),
     })),
   };
 

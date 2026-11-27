@@ -84,7 +84,7 @@ interface BookingBody {
    */
   promoCode?: unknown;
   /**
-   * ADDITIVE (Task 87). `{ airCon, stopStart }`: true / false / null ("Not
+   * ADDITIVE (Task 87). `{ airCon, stopStart, electricHandbrake }`: true / false / null ("Not
    * sure"), exactly as sent to /quote and /checkout/prepare. Kept on the
    * booking and the customer's saved car.
    */

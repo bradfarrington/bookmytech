@@ -1,13 +1,14 @@
 import Link from "next/link";
-import { Snowflake, Power } from "lucide-react";
+import { CircleParking, Snowflake, Power } from "lucide-react";
 
 import { EQUIPMENT_QUESTION, EQUIPMENT_WHY, type EquipmentAnswer } from "@/lib/bookings/car-equipment";
 import type { EquipmentKey } from "@/lib/parts/repair-part-choice";
 import { cn } from "@/lib/utils";
 
-// Task 87: the price step asks about air-con and stop-start, only when a part
-// the jobs need depends on it. Plain links, no client code: each answer is a
-// URL, re-priced on the server like every other change on this step.
+// Task 87: the price step asks about air-con, stop-start and an electronic
+// handbrake, only when a part the jobs need depends on it. Plain links, no
+// client code: each answer is a URL, re-priced on the server like every other
+// change on this step.
 
 export interface EquipmentQuestion {
   key: EquipmentKey;
@@ -23,7 +24,7 @@ const CHOICES: ReadonlyArray<{ value: EquipmentAnswer; label: string }> = [
   { value: "u", label: "Not sure" },
 ];
 
-const ICON = { air_con: Snowflake, stop_start: Power } as const;
+const ICON = { air_con: Snowflake, stop_start: Power, electric_handbrake: CircleParking } as const;
 
 export function EquipmentQuestions({ questions }: { questions: EquipmentQuestion[] }) {
   if (questions.length === 0) return null;

@@ -62,6 +62,7 @@ import {
   type QuotedPart,
 } from "@/lib/parts/quote-parts";
 import type { EquipmentKey } from "@/lib/parts/repair-part-choice";
+import { mergeEquipment } from "@/lib/bookings/car-equipment";
 import type { CombinedRepairTimes } from "./combine";
 import { engineOilForVehicle } from "./engine-oil";
 import { excludedRepairNodeIdsForVehicle } from "./exclusions";
@@ -138,7 +139,7 @@ export interface RepairsQuote {
   // --- Equipment (Task 87). ADDITIVE. ---
   /**
    * What to ask the customer: equipment some part's price depends on and
-   * they haven't answered ("air_con", "stop_start"). Empty when nothing does.
+   * they haven't answered ("air_con", "stop_start", "electric_handbrake"). Empty when nothing does.
    * Unanswered, the part is priced at the dearer option and the mechanic is
    * told both. Absent on quotes snapshotted before Task 87, and on follow-on
    * and custom quotes (their parts are already chosen).
@@ -350,7 +351,7 @@ export function buildRepairsQuote(args: {
     // Filled in by quoteRepairsResult with the customer's answers (Task 87).
     equipmentQuestions: equipmentQuestions(parts),
     equipmentAsked: equipmentAsked(parts),
-    equipment: { airCon: null, stopStart: null },
+    equipment: mergeEquipment({}, null),
   };
 }
 
@@ -546,7 +547,7 @@ export async function quoteRepairsResult(
 function withEquipment(quote: RepairsQuote, equipment: CarEquipment): RepairsQuote {
   return {
     ...quote,
-    equipment: { airCon: equipment.airCon ?? null, stopStart: equipment.stopStart ?? null },
+    equipment: mergeEquipment(equipment, null),
     equipmentQuestions: equipmentQuestions(quote.parts),
     equipmentAsked: equipmentAsked(quote.parts),
   };

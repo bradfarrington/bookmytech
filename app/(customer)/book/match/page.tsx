@@ -18,11 +18,13 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import {
   answerOf,
+  EQUIPMENT_SLOTS,
+  equipmentAnswersFromParams,
   equipmentFromParams,
   mergeEquipment,
-  readEquipmentAnswer,
   savedCarEquipment,
   type EquipmentAnswer,
+  type EquipmentParam,
 } from "@/lib/bookings/car-equipment";
 import { productIncludes } from "@/lib/catalogue/products";
 import { partGroupName } from "@/lib/parts/quote-parts";
@@ -48,9 +50,10 @@ interface MatchPageProps {
     postcode?: string;
     /** Preferred mechanic id (rebook "same mechanic") — forwarded to /book/slot. */
     pref?: string;
-    /** Task 87: air-con / stop-start, as answered here ("y", "n", "u" = Not sure). */
+    /** Task 87: air-con / stop-start / electronic handbrake, as answered here ("y", "n", "u" = Not sure). */
     ac?: string;
     ss?: string;
+    eh?: string;
   }>;
 }
 
@@ -73,18 +76,19 @@ export default async function MatchPage({ searchParams }: MatchPageProps) {
   const prefParam = params.pref ? `&pref=${encodeURIComponent(params.pref)}` : "";
   const browserHref = `/book/repairs?reg=${encodeURIComponent(reg)}${vehicleParams ? `&${vehicleParams}` : ""}${prefParam}`;
 
-  // Air-con and stop-start (Task 87): the answers on this URL, else the
-  // signed-in customer's saved car's. Carried to every later step.
-  const ac = readEquipmentAnswer(params.ac);
-  const ss = readEquipmentAnswer(params.ss);
-  const equipmentParam = `${ac ? `&ac=${ac}` : ""}${ss ? `&ss=${ss}` : ""}`;
+  // Air-con, stop-start, electronic handbrake (Task 87): the answers on this
+  // URL, else the signed-in customer's saved car's. Carried to every later step.
+  const answers = equipmentAnswersFromParams(params);
+  const equipmentParam = Object.entries(answers)
+    .map(([param, answer]) => `&${param}=${answer}`)
+    .join("");
   const admin = createAdminClient();
   const session = await createClient();
   const {
     data: { user: viewer },
   } = await session.auth.getUser();
   const saved = await savedCarEquipment(admin, viewer?.id ?? null, reg);
-  const equipment = mergeEquipment(equipmentFromParams({ ac, ss }), saved);
+  const equipment = mergeEquipment(equipmentFromParams(answers), saved);
 
   // Server-authoritative price from (reg, items) — the URL never carries one.
   const result = await quoteRepairsResult(reg, ids, admin, {}, equipment);
@@ -153,8 +157,7 @@ export default async function MatchPage({ searchParams }: MatchPageProps) {
     model: params.model,
     postcode: params.postcode,
     pref: params.pref,
-    ac: ac ?? undefined,
-    ss: ss ?? undefined,
+    ...answers,
   };
   const timeHref = `/book/time?${stepQuery(stepBase)}`;
   const addHref = `${browserHref}${withRepairs(quote.itemIds)}`;
@@ -166,18 +169,19 @@ export default async function MatchPage({ searchParams }: MatchPageProps) {
       : browserHref;
   };
   // Task 87: each answer is this page again with it set.
-  const answerHref = (key: "ac" | "ss", value: EquipmentAnswer) =>
-    `/book/match?${stepQuery({ ...stepBase, [key]: value })}`;
-  const savedAnswer = (value: boolean | null | undefined): EquipmentAnswer | null =>
-    value == null ? null : answerOf(value);
-  const equipmentQuestions: EquipmentQuestion[] = (quote.equipmentAsked ?? []).map((key) => {
-    const param = key === "air_con" ? "ac" : "ss";
-    const given = key === "air_con" ? ac : ss;
-    return {
-      key,
-      answer: given ?? savedAnswer(key === "air_con" ? saved.airCon : saved.stopStart),
-      hrefs: { y: answerHref(param, "y"), n: answerHref(param, "n"), u: answerHref(param, "u") },
-    };
+  const answerHref = (param: EquipmentParam, value: EquipmentAnswer) =>
+    `/book/match?${stepQuery({ ...stepBase, [param]: value })}`;
+  const equipmentQuestions: EquipmentQuestion[] = (quote.equipmentAsked ?? []).flatMap((key) => {
+    const slot = EQUIPMENT_SLOTS.find((s) => s.key === key);
+    if (!slot) return [];
+    const savedValue = saved[slot.field];
+    return [
+      {
+        key,
+        answer: answers[slot.param] ?? (savedValue == null ? null : answerOf(savedValue)),
+        hrefs: { y: answerHref(slot.param, "y"), n: answerHref(slot.param, "n"), u: answerHref(slot.param, "u") },
+      },
+    ];
   });
   const multiJobs = quote.lines.length > 1;
   const canAdd = quote.itemIds.length < MAX_REPAIRS_PER_BOOKING;

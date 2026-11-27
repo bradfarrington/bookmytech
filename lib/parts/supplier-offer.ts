@@ -127,6 +127,12 @@ export interface SupplierOffer {
   airCon?: boolean | null;
   /** ADDITIVE (Task 87). Likewise stop-start: "FOR STOP-START" / "NOT FOR STOP-START". */
   stopStart?: boolean | null;
+  /**
+   * ADDITIVE (Task 87). Whether the part is for a car with an electronic
+   * handbrake, from NAPA's "Vehicle Detail" ("With Elec. H/B" / "Without
+   * Elec. H/B"): rear pads, calipers and hoses. Asked like air-con.
+   */
+  electricHandbrake?: boolean | null;
   /** ADDITIVE (Task 87). NAPA's own "Fitment" wording, as it gave it. */
   fitmentText?: string | null;
   /**
@@ -155,9 +161,9 @@ export interface CarNote {
 /**
  * Bump when aagOffers reads something new from NAPA's details. 2: suspension
  * (2026-11-18). 3: driven unit, air-con, stop-start, chassis (Task 87).
- * 4: the car details (Task 87, carNotes).
+ * 4: the car details (Task 87, carNotes). 5: electronic handbrake.
  */
-export const OFFER_READ_VERSION = 4;
+export const OFFER_READ_VERSION = 5;
 
 export type SupplierPanel =
   | { state: "ok"; offers: SupplierOffer[] }
@@ -365,7 +371,7 @@ export function cylinderOf(properties: ReadonlyArray<{ name: string; value: stri
 function fitmentOf(
   properties: ReadonlyArray<{ name: string; value: string }> | undefined,
   car: AagVehicleFacts | null | undefined,
-): Pick<SupplierOffer, "drivenUnit" | "airCon" | "stopStart" | "fitmentText" | "chassis" | "carNotes"> {
+): Pick<SupplierOffer, "drivenUnit" | "airCon" | "stopStart" | "fitmentText" | "chassis" | "carNotes" | "electricHandbrake"> {
   const fitment = property(properties, /^fitment$/i);
   const chassisNote = property(properties, /^chassis\s+note$/i);
   return {
@@ -375,6 +381,7 @@ function fitmentOf(
     fitmentText: fitment,
     chassis: chassisNote ? { note: chassisNote, fits: chassisFits(chassisNote, car) } : null,
     carNotes: carNotesOf(properties, car),
+    electricHandbrake: electricHandbrakeIn(properties),
   };
 }
 
@@ -410,6 +417,18 @@ export function stopStartOf(fitment: string | null | undefined): boolean | null 
   const text = String(fitment ?? "");
   const no = NO_STOP_START.test(text);
   const yes = HAS_STOP_START.test(text.replace(NO_STOP_START, " "));
+  return no === yes ? null : yes;
+}
+
+const E_HANDBRAKE = "(?:elec(?:tric|tronic)?\\.?\\s*(?:h\\/?b|hand\\s*brake|park(?:ing)?\\s*brake)|e-?pb)";
+const NO_E_HANDBRAKE = new RegExp(`\\b(?:without|w\\/o|no|non|excl\\.?|not\\s+for)[\\s-]+(?:an?\\s+)?${E_HANDBRAKE}`, "i");
+const HAS_E_HANDBRAKE = new RegExp(`\\b(?:with|for(?:\\s+vehicles\\s+with)?|incl\\.?)\\s+(?:an?\\s+)?${E_HANDBRAKE}`, "i");
+
+/** Electronic handbrake from a car detail: "With Elec. H/B" true, "Without Elec. H/B" false, else null. Pure. */
+export function electricHandbrakeOf(text: string | null | undefined): boolean | null {
+  const t = String(text ?? "");
+  const no = NO_E_HANDBRAKE.test(t);
+  const yes = HAS_E_HANDBRAKE.test(t.replace(NO_E_HANDBRAKE, " "));
   return no === yes ? null : yes;
 }
 
@@ -521,6 +540,17 @@ export function madeInFits(value: string, vin: string | null | undefined): boole
   return named[0].vin.test(v);
 }
 
+/** Electronic handbrake from NAPA's car details ("Vehicle Detail", "Applic Note"), or null. Pure. */
+export function electricHandbrakeIn(properties: ReadonlyArray<{ name: string; value: string }> | undefined): boolean | null {
+  const answers = new Set(
+    (properties ?? [])
+      .filter((p) => /^(vehicle\s+detail|applic(ation)?\s+note)$/i.test(p.name.trim()))
+      .map((p) => electricHandbrakeOf(p.value))
+      .filter((v): v is boolean => v != null),
+  );
+  return answers.size === 1 ? [...answers][0] : null;
+}
+
 /** NAPA's car details for a part (Task 87), each settled where the car's VIN or registration can. Pure. */
 export function carNotesOf(
   properties: ReadonlyArray<{ name: string; value: string }> | undefined,
@@ -530,7 +560,16 @@ export function carNotesOf(
   for (const { name, value } of properties ?? []) {
     const field = CAR_NOTE_FIELDS.find((f) => f.name.test(name.trim()));
     if (!field) continue;
-    const text = (field.kind === "other" ? value.replace(NOT_CAR_DETAIL, "") : value).replace(/^[;\s]+|[;\s]+$/g, "").trim();
+    // An electronic handbrake is asked of the customer (electricHandbrake), not left to the mechanic.
+    const detail =
+      field.kind === "other"
+        ? value
+            .replace(NOT_CAR_DETAIL, "")
+            .split(/[;,]/)
+            .filter((part) => electricHandbrakeOf(part) == null)
+            .join(";")
+        : value;
+    const text = detail.replace(/^[;\s]+|[;\s]+$/g, "").trim();
     if (!text) continue;
     const fits =
       field.kind === "year" ? builtInRange(text, car?.registered) : field.kind === "other" ? madeInFits(text, car?.vin) : null;

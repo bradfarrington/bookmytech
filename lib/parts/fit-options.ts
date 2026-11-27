@@ -7,10 +7,10 @@
 
 import type { EquipmentKey, FitDependsOn, FitOption, FitOptions } from "./repair-part-choice";
 
-const KEYS: readonly EquipmentKey[] = ["air_con", "stop_start"];
+const KEYS: readonly EquipmentKey[] = ["air_con", "stop_start", "electric_handbrake"];
 
 function isKey(value: unknown): value is EquipmentKey {
-  return value === "air_con" || value === "stop_start";
+  return value === "air_con" || value === "stop_start" || value === "electric_handbrake";
 }
 
 function isDependsOn(value: unknown): value is FitDependsOn {
@@ -49,7 +49,7 @@ export function readFitOptions(raw: unknown): FitOptions | null {
   return { dependsOn, options, ...(Object.keys(answered).length > 0 ? { answered } : {}) };
 }
 
-const NAME: Record<EquipmentKey, string> = { air_con: "air-con", stop_start: "stop-start" };
+const NAME: Record<EquipmentKey, string> = { air_con: "air-con", stop_start: "stop-start", electric_handbrake: "an electronic handbrake" };
 
 /** "air-con", "air-con and stop-start". */
 function names(keys: readonly EquipmentKey[]): string {

@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 import { cn, formatPrice, vehicleLabel } from "@/lib/utils";
 import { prepareCheckout, createBookingAction } from "@/app/actions/create-booking";
-import { answerOf } from "@/lib/bookings/car-equipment";
+import { answerOf, EQUIPMENT_SLOTS } from "@/lib/bookings/car-equipment";
 import type { CarEquipment } from "@/lib/parts/quote-parts";
 import type { CreateBookingInput, PrepareCheckoutResult } from "@/app/actions/create-booking";
 import { groupRepairLines, type RepairLineLite } from "@/lib/bookings/repair-lines";
@@ -203,8 +203,9 @@ function returnParams(c: ConfirmCommon): Record<string, string> {
     if (c.preferredMechanicId) params.pref = c.preferredMechanicId;
   }
   if (!c.quoteId) {
-    if (c.carEquipment && "airCon" in c.carEquipment) params.ac = answerOf(c.carEquipment.airCon ?? null);
-    if (c.carEquipment && "stopStart" in c.carEquipment) params.ss = answerOf(c.carEquipment.stopStart ?? null);
+    for (const slot of EQUIPMENT_SLOTS) {
+      if (c.carEquipment && slot.field in c.carEquipment) params[slot.param] = answerOf(c.carEquipment[slot.field] ?? null);
+    }
   }
   if (c.selectedSlot) params.slot = c.selectedSlot;
   if (c.selectedWindow) params.window = c.selectedWindow;

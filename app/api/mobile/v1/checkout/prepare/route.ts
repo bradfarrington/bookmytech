@@ -31,7 +31,7 @@ import { requireMobileUser } from "@/lib/supabase/mobile";
 // to initPaymentSheet (alongside paymentIntentClientSecret) lists the saved
 // cards. A card typed in the sheet is not saved.
 //
-// ADDITIVE (Task 87): `equipment?: { airCon, stopStart }` exactly as sent to
+// ADDITIVE (Task 87): `equipment?: { airCon, stopStart, electricHandbrake }` as sent to
 // POST /quote (see there). Send the same here and to POST /bookings, or the
 // hold and the booking may price a different version of a part.
 //

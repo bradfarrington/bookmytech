@@ -55,7 +55,7 @@ The core transaction record. The columns below the first divider were added in `
 | vehicle_reg                | text        | UK reg plate                                                          |
 | vehicle_make               | text        | from DVLA lookup                                                      |
 | vehicle_model              | text        | from DVLA + DVSA MOT enrichment                                       |
-| car_air_con / car_stop_start | boolean   | 0093 (Task 87) — the customer's answer when a part depends on it ("Does your car have air conditioning?"). Null: not asked, or "Not sure". Prices the mechanic's extra work and revisions on the same car |
+| car_air_con / car_stop_start / car_electric_handbrake | boolean | 0093 (Task 87) — the customer's answer when a part depends on it ("Does your car have air conditioning?"). Null: not asked, or "Not sure". Prices the mechanic's extra work and revisions on the same car |
 | postcode                   | text        | customer's postcode (uppercased on insert)                            |
 | scheduled_at               | timestamptz | nullable until slot picked. The arrival window's **start** (ordering, day grouping, the 24-hour cancellation-fee boundary). On a flexible booking (Task 28) it is 8am on the **earliest** offered day until the mechanic picks |
 | slot_window                | text        | 0028 — the arrival window the customer picked, verbatim: `"8am–10am"` … `"6pm–8pm"` or `"All day (8am–8pm)"` (`lib/slots.ts`). Null on legacy rows and once anyone sets an exact time (customer reschedule, accepted proposal). A mechanic narrowing an all-day booking (Task 21) rewrites it to the 2-hour label in place |

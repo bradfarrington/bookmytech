@@ -2,7 +2,8 @@
 -- 0093 — Parts that depend on the car's equipment (Task 87)
 --
 -- NAPA lists some parts in two versions, for cars with and without air-con
--- (an Astra K 1.0: Gates 5PK1680 with, 5PK1650 without) or stop-start, and
+-- (an Astra K 1.0: Gates 5PK1680 with, 5PK1650 without), stop-start or an
+-- electronic handbrake (rear pads, calipers and hoses), and
 -- says which is which. Nothing we look up says what a car has. So:
 --
 --   • The customer is asked, only when it changes a part: "Does your car have
@@ -27,21 +28,27 @@
 
 alter table public.bookings
   add column if not exists car_air_con boolean,
-  add column if not exists car_stop_start boolean;
+  add column if not exists car_stop_start boolean,
+  add column if not exists car_electric_handbrake boolean;
 
 comment on column public.bookings.car_air_con is
   'Task 87. Whether the car has air-con, as the customer said when booking. Null: not asked, or "Not sure". Decides between NAPA''s +AC / -AC parts.';
 comment on column public.bookings.car_stop_start is
   'Task 87. Whether the car has stop-start, as the customer said. Null: not asked, or "Not sure".';
+comment on column public.bookings.car_electric_handbrake is
+  'Task 87. Whether the car has an electronic handbrake (a switch, not a lever), as the customer said. Null: not asked, or "Not sure". Decides between NAPA''s rear pads, calipers and hoses for cars with and without one.';
 
 alter table public.customer_vehicles
   add column if not exists air_con boolean,
-  add column if not exists stop_start boolean;
+  add column if not exists stop_start boolean,
+  add column if not exists electric_handbrake boolean;
 
 comment on column public.customer_vehicles.air_con is
   'Task 87. The customer''s last answer for this car: has air-con. Server-written from a booking. Null: never answered.';
 comment on column public.customer_vehicles.stop_start is
   'Task 87. The customer''s last answer for this car: has stop-start. Server-written from a booking. Null: never answered.';
+comment on column public.customer_vehicles.electric_handbrake is
+  'Task 87. The customer''s last answer for this car: has an electronic handbrake. Server-written from a booking. Null: never answered.';
 
 -- 0073 revoked UPDATE on customer_vehicles and granted back `nickname` only,
 -- so the new columns are already server-written. Nothing to grant.
@@ -51,7 +58,7 @@ alter table public.booking_parts
 
 comment on column public.booking_parts.fit_options is
   'Task 87. Null unless NAPA lists this part in versions for different cars. Then '
-  '{ "dependsOn": ["air_con" | "stop_start" | "car"], "options": [{ "supplier", "partNumber", "brand", "description", '
+  '{ "dependsOn": ["air_con" | "stop_start" | "electric_handbrake" | "car"], "options": [{ "supplier", "partNumber", "brand", "description", '
   '"for": { "air_con": true }, "label": "With air-con" }], "answered"?: { "air_con": true } }. "car" is a detail only '
   'someone at the car can check (electronic handbrake, tailgate, gearbox code); each option''s label is NAPA''s wording. '
   'With the customer''s answer the line is that version; otherwise the dearest, and the mechanic checks before buying.';

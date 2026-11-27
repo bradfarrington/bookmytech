@@ -1,15 +1,17 @@
 // The car's equipment, as the customer tells us (Task 87).
 //
-// NAPA lists some parts in two versions, for cars with and without air-con or
-// stop-start, and nothing we look up says what a car has. So the customer is
-// asked, only when it changes a part ("Does your car have air conditioning?
+// NAPA lists some parts in two versions, for cars with and without air-con,
+// stop-start or an electronic handbrake, and nothing we look up says what a
+// car has. So the customer is asked, only when it changes a part ("Does your car have air conditioning?
 // Yes / No / Not sure"). The answer:
-//   • travels with the website funnel in the URL, `ac` and `ss`: "y", "n" or
-//     "u" (Not sure). Not personal, like the reg and the jobs;
-//   • comes from the apps in the body: `equipment: { airCon, stopStart }`,
-//     each true, false or null (Not sure). Absent = not asked;
-//   • is kept on the booking (bookings.car_air_con / car_stop_start) and the
-//     customer's saved car (customer_vehicles.air_con / stop_start, migration
+//   • travels with the website funnel in the URL, `ac`, `ss` and `eh`: "y",
+//     "n" or "u" (Not sure). Not personal, like the reg and the jobs;
+//   • comes from the apps in the body: `equipment: { airCon, stopStart,
+//     electricHandbrake }`, each true, false or null (Not sure). Absent = not
+//     asked;
+//   • is kept on the booking (bookings.car_air_con / car_stop_start /
+//     car_electric_handbrake) and the customer's saved car
+//     (customer_vehicles.air_con / stop_start / electric_handbrake, migration
 //     0093), so a signed-in customer is asked once per car.
 //
 // An answer given now wins over the saved car's, "Not sure" included.
@@ -21,10 +23,24 @@ import type { EquipmentKey } from "@/lib/parts/repair-part-choice";
 
 export type EquipmentAnswer = "y" | "n" | "u";
 
+/**
+ * Each question, and where its answer lives: the funnel URL parameter, the
+ * app body / CarEquipment field, the bookings column and the saved car's
+ * column (migration 0093).
+ */
+export const EQUIPMENT_SLOTS = [
+  { key: "air_con", param: "ac", field: "airCon", booking: "car_air_con", garage: "air_con" },
+  { key: "stop_start", param: "ss", field: "stopStart", booking: "car_stop_start", garage: "stop_start" },
+  { key: "electric_handbrake", param: "eh", field: "electricHandbrake", booking: "car_electric_handbrake", garage: "electric_handbrake" },
+] as const satisfies ReadonlyArray<{ key: EquipmentKey; param: string; field: keyof CarEquipment; booking: string; garage: string }>;
+
+export type EquipmentParam = (typeof EQUIPMENT_SLOTS)[number]["param"];
+
 /** What the customer is asked, verbatim. The apps show it as sent. */
 export const EQUIPMENT_QUESTION: Record<EquipmentKey, string> = {
   air_con: "Does your car have air conditioning?",
   stop_start: "Does your car have stop-start? (The engine switches off by itself when you stop in traffic.)",
+  electric_handbrake: "Does your car have an electronic handbrake? (A switch or button instead of a lever.)",
 };
 
 /** Why we ask, under the question. */
@@ -46,41 +62,56 @@ export function answerOf(value: boolean | null): EquipmentAnswer {
   return value === true ? "y" : value === false ? "n" : "u";
 }
 
-/**
- * The answers in a funnel URL. A key is present only when the customer
- * answered, so a saved car's answer can fill the rest. Pure.
- */
-export function equipmentFromParams(params: { ac?: string | null; ss?: string | null }): CarEquipment {
-  const out: CarEquipment = {};
-  const ac = readEquipmentAnswer(params.ac);
-  const ss = readEquipmentAnswer(params.ss);
-  if (ac) out.airCon = answerValue(ac);
-  if (ss) out.stopStart = answerValue(ss);
+/** The answers on a funnel URL, by parameter ("ac", "ss", "eh"), only those given. Pure. */
+export function equipmentAnswersFromParams(params: Partial<Record<EquipmentParam, string | null | undefined>>): Partial<Record<EquipmentParam, EquipmentAnswer>> {
+  const out: Partial<Record<EquipmentParam, EquipmentAnswer>> = {};
+  for (const slot of EQUIPMENT_SLOTS) {
+    const answer = readEquipmentAnswer(params[slot.param]);
+    if (answer) out[slot.param] = answer;
+  }
   return out;
 }
 
 /**
- * The answers in an app's request body (`equipment: { airCon, stopStart }`).
- * true / false / null are answers (null: Not sure); anything else, or absent,
- * is not. Pure.
+ * The answers in a funnel URL. A key is present only when the customer
+ * answered, so a saved car's answer can fill the rest. Pure.
+ */
+export function equipmentFromParams(params: Partial<Record<EquipmentParam, string | null | undefined>>): CarEquipment {
+  const out: CarEquipment = {};
+  for (const slot of EQUIPMENT_SLOTS) {
+    const answer = readEquipmentAnswer(params[slot.param]);
+    if (answer) out[slot.field] = answerValue(answer);
+  }
+  return out;
+}
+
+/**
+ * The answers in an app's request body (`equipment: { airCon, stopStart,
+ * electricHandbrake }`). true / false / null are answers (null: Not sure);
+ * anything else, or absent, is not. Pure.
  */
 export function equipmentFromBody(raw: unknown): CarEquipment {
   if (!raw || typeof raw !== "object") return {};
   const body = raw as Record<string, unknown>;
   const out: CarEquipment = {};
-  for (const key of ["airCon", "stopStart"] as const) {
-    const v = body[key];
-    if (v === true || v === false || v === null) out[key] = v;
+  for (const { field } of EQUIPMENT_SLOTS) {
+    const v = body[field];
+    if (v === true || v === false || v === null) out[field] = v;
   }
   return out;
 }
 
 /** The answers given now, with the saved car's for any not given. Pure. */
 export function mergeEquipment(given: CarEquipment, saved: CarEquipment | null | undefined): CarEquipment {
-  return {
-    airCon: "airCon" in given ? (given.airCon ?? null) : (saved?.airCon ?? null),
-    stopStart: "stopStart" in given ? (given.stopStart ?? null) : (saved?.stopStart ?? null),
-  };
+  const out: CarEquipment = {};
+  for (const { field } of EQUIPMENT_SLOTS) out[field] = field in given ? (given[field] ?? null) : (saved?.[field] ?? null);
+  return out;
+}
+
+/** The answer a quote was priced with for one question. Pure. */
+export function equipmentValue(equipment: CarEquipment | null | undefined, key: EquipmentKey): boolean | null {
+  const slot = EQUIPMENT_SLOTS.find((s) => s.key === key);
+  return slot ? (equipment?.[slot.field] ?? null) : null;
 }
 
 function isMissing(error: { code?: string; message?: string } | null): boolean {
@@ -98,15 +129,17 @@ export async function savedCarEquipment(db: SupabaseClient, customerId: string |
   try {
     const { data, error } = await db
       .from("customer_vehicles")
-      .select("air_con, stop_start")
+      .select("*")
       .eq("customer_id", customerId)
       .eq("registration", normaliseReg(reg))
       .maybeSingle();
     if (error || !data) return {};
-    const row = data as { air_con: boolean | null; stop_start: boolean | null };
+    const row = data as Record<string, unknown>;
     const out: CarEquipment = {};
-    if (row.air_con != null) out.airCon = row.air_con;
-    if (row.stop_start != null) out.stopStart = row.stop_start;
+    for (const slot of EQUIPMENT_SLOTS) {
+      const v = row[slot.garage];
+      if (typeof v === "boolean") out[slot.field] = v;
+    }
     return out;
   } catch {
     return {};
@@ -126,8 +159,10 @@ export async function rememberCarEquipment(
 ): Promise<void> {
   if (!customerId || !reg.trim() || !equipment) return;
   const patch: Record<string, boolean> = {};
-  if (equipment.airCon != null) patch.air_con = equipment.airCon;
-  if (equipment.stopStart != null) patch.stop_start = equipment.stopStart;
+  for (const slot of EQUIPMENT_SLOTS) {
+    const v = equipment[slot.field];
+    if (v != null) patch[slot.garage] = v;
+  }
   if (Object.keys(patch).length === 0) return;
   try {
     const { error } = await db
@@ -144,10 +179,15 @@ export async function rememberCarEquipment(
 /** A booking's answers, for pricing the mechanic's extra work on it. Never throws; none before 0093. */
 export async function bookingCarEquipment(db: SupabaseClient, bookingId: string): Promise<CarEquipment> {
   try {
-    const { data, error } = await db.from("bookings").select("car_air_con, car_stop_start").eq("id", bookingId).maybeSingle();
+    const { data, error } = await db.from("bookings").select("*").eq("id", bookingId).maybeSingle();
     if (error || !data) return {};
-    const row = data as { car_air_con: boolean | null; car_stop_start: boolean | null };
-    return { airCon: row.car_air_con, stopStart: row.car_stop_start };
+    const row = data as Record<string, unknown>;
+    const out: CarEquipment = {};
+    for (const slot of EQUIPMENT_SLOTS) {
+      const v = row[slot.booking];
+      out[slot.field] = typeof v === "boolean" ? v : null;
+    }
+    return out;
   } catch {
     return {};
   }
@@ -156,8 +196,10 @@ export async function bookingCarEquipment(db: SupabaseClient, bookingId: string)
 /** The booking columns for a quote's answers. Only the ones answered, so a booking before 0093 is unaffected. Pure. */
 export function bookingEquipmentColumns(equipment: CarEquipment | null | undefined): Record<string, boolean> {
   const out: Record<string, boolean> = {};
-  if (equipment?.airCon != null) out.car_air_con = equipment.airCon;
-  if (equipment?.stopStart != null) out.car_stop_start = equipment.stopStart;
+  for (const slot of EQUIPMENT_SLOTS) {
+    const v = equipment?.[slot.field];
+    if (v != null) out[slot.booking] = v;
+  }
   return out;
 }
 

@@ -115,6 +115,7 @@ export interface QuotedPart {
 export interface CarEquipment {
   airCon?: boolean | null;
   stopStart?: boolean | null;
+  electricHandbrake?: boolean | null;
 }
 
 /**
@@ -423,7 +424,11 @@ function gapSightings(jobs: readonly PartsJob[], gaps: readonly number[]) {
 
 /** Whether the car is a sports model, from HaynesPro's name for it. Standard when unknown. Never throws. */
 export async function loadCarTraits(db: SupabaseClient, reg: string, equipment?: CarEquipment | null): Promise<CarTraits> {
-  const answers = { airCon: equipment?.airCon ?? null, stopStart: equipment?.stopStart ?? null };
+  const answers = {
+    airCon: equipment?.airCon ?? null,
+    stopStart: equipment?.stopStart ?? null,
+    electricHandbrake: equipment?.electricHandbrake ?? null,
+  };
   try {
     const { data } = await db.from("haynespro_vehicle_cache").select("description").eq("reg", aagRegKey(reg)).maybeSingle();
     return { sports: isSportsModel((data as { description?: string | null } | null)?.description), ...answers };

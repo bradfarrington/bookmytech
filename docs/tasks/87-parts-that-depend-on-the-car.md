@@ -67,11 +67,16 @@ Brad: "shouldn't we sort these as well" (engine variants, other chassis formats)
 
 On the 12 scanned cars this flags 144 part lines across 10,604 job prices (about 1.4%): rear pads, calipers and hoses with / without an electronic handbrake; start-stop batteries; adaptive-cruise wheel speed sensors; sport / non-sport fog lights; tailgate / back-door wipers; the 308's clutch parts by gearbox; one Fiesta exhaust kit whose date range is too near its registration to call. `OFFER_READ_VERSION` 4.
 
+## Electronic handbrake: a third question (Brad, 2026-11-27: "yeah ok")
+
+The commonest car detail, and one a customer can answer, so it's asked like air-con: "Does your car have an electronic handbrake? (A switch or button instead of a lever.)" Read from NAPA's "Vehicle Detail" / "Applic Note" ("With Elec. H/B", "Without Elec. H/B", "for vehicles with electric parking brake": `electricHandbrakeOf`) onto `SupplierOffer.electricHandbrake`, and taken out of the mechanic-only car details. Funnel URL `eh`; app body `equipment.electricHandbrake`; `bookings.car_electric_handbrake`, `customer_vehicles.electric_handbrake` (0093). The question table is one list now (`EQUIPMENT_SLOTS` in `lib/bookings/car-equipment.ts`), so a fourth is one entry there plus the offer reader. `OFFER_READ_VERSION` 5.
+
+On the scanned cars it asks on 17 part lines (rear pads, calipers and hoses on the Sportage, Vivaro and 308); mechanic-only car checks drop from 144 to 127. The customer app shows any question key it knows and leaves off one it doesn't (`isKnownEquipmentKey`), so a later question can't strand an old build.
+
 ## Not done
 
 - Engine-variant splits (above): NAPA's engine codes can't tell engines apart. The pick rule chooses, as before.
 - Chassis notes in formats other than VW group's.
-- The electronic handbrake is the commonest car detail and a customer could answer it ("a button, not a lever"); it could become a third question like air-con.
 
 ## Acceptance criteria
 
@@ -83,7 +88,8 @@ On the 12 scanned cars this flags 144 part lines across 10,604 job prices (about
 - [x] Unanswered: dearer version charged, mechanic shown every version
 - [x] Answer kept on the booking and the saved car; reused for the mechanic's extra work
 - [x] Car details settled from the VIN / registration where possible, otherwise shown to the mechanic
-- [x] Tests: `equipment-fit.test.ts`, `car-equipment.test.ts`, `quote-parts.test.ts`. 956 pass; `tsc` clean
+- [x] Electronic handbrake asked like air-con
+- [x] Tests: `equipment-fit.test.ts`, `car-equipment.test.ts`, `quote-parts.test.ts`. 957 pass; `tsc` clean
 
 ## Apps
 

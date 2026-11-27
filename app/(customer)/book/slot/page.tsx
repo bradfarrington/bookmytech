@@ -82,7 +82,7 @@ export default async function SlotPage({ searchParams }: SlotPageProps) {
         make={(base.make ?? "").toUpperCase()}
         model={base.model}
         quoteId={base.quote}
-        carEquipment={base.quote ? undefined : equipmentFromParams({ ac: base.ac, ss: base.ss })}
+        carEquipment={base.quote ? undefined : equipmentFromParams(base)}
         repairNodeIds={base.quote ? [] : quote.itemIds}
         repairLines={quote.lines.map(({ nodeId, description, chargedHours, itemId, itemLabel }) => ({
           nodeId,

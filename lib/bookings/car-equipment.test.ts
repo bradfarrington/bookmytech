@@ -33,9 +33,9 @@ describe("air-con and stop-start answers (Task 87)", () => {
 
   it("lets an answer given now win over the saved car's, Not sure included", () => {
     const saved = { airCon: true, stopStart: false };
-    expect(mergeEquipment({}, saved)).toEqual({ airCon: true, stopStart: false });
-    expect(mergeEquipment({ airCon: null }, saved)).toEqual({ airCon: null, stopStart: false });
-    expect(mergeEquipment({ airCon: false }, null)).toEqual({ airCon: false, stopStart: null });
+    expect(mergeEquipment({}, saved)).toEqual({ airCon: true, stopStart: false, electricHandbrake: null });
+    expect(mergeEquipment({ airCon: null }, saved)).toEqual({ airCon: null, stopStart: false, electricHandbrake: null });
+    expect(mergeEquipment({ electricHandbrake: false }, null)).toEqual({ airCon: null, stopStart: null, electricHandbrake: false });
   });
 
   it("writes only answered columns on the booking", () => {
@@ -44,7 +44,10 @@ describe("air-con and stop-start answers (Task 87)", () => {
   });
 
   it("carries the answers through the funnel's steps", () => {
-    expect(stepQuery({ reg: "SW16PFD", repairs: ["a"], ac: "y", ss: "u" })).toBe("reg=SW16PFD&repairs=a&ac=y&ss=u");
+    expect(stepQuery({ reg: "SW16PFD", repairs: ["a"], ac: "y", ss: "u", eh: "n" })).toBe("reg=SW16PFD&repairs=a&ac=y&ss=u&eh=n");
+    expect(equipmentFromParams({ eh: "y" })).toEqual({ electricHandbrake: true });
+    expect(equipmentFromBody({ electricHandbrake: null })).toEqual({ electricHandbrake: null });
+    expect(bookingEquipmentColumns({ electricHandbrake: false })).toEqual({ car_electric_handbrake: false });
     expect(stepQuery({ reg: "SW16PFD", repairs: ["a"] })).toBe("reg=SW16PFD&repairs=a");
   });
 
