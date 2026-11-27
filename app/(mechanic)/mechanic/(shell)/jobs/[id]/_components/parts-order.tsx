@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { AlertTriangle, Truck, Wrench } from "lucide-react";
-import { fitOptionsHeading, isChargedOption } from "@/lib/parts/fit-options";
+import { fitOptionsFooter, fitOptionsHeading, fitOptionsUnsure, isChargedOption } from "@/lib/parts/fit-options";
 import type { FitOptions } from "@/lib/parts/repair-part-choice";
 import { cn, formatPrice } from "@/lib/utils";
 import { setPartSourcing } from "@/app/actions/booking-parts";
@@ -137,7 +137,7 @@ export function PartsOrder({
  * (or stop-start). Which one the car takes, and what the customer said.
  */
 function FitOptionsBox({ fit, charged }: { fit: FitOptions; charged?: string | null }) {
-  const unsure = fit.dependsOn.some((key) => fit.answered?.[key] === undefined);
+  const unsure = fitOptionsUnsure(fit);
   return (
     <div
       className={cn(
@@ -159,7 +159,7 @@ function FitOptionsBox({ fit, charged }: { fit: FitOptions; charged?: string | n
           </li>
         ))}
       </ul>
-      {unsure && <p className="mt-1.5">Ask the customer in the chat, or check on arrival.</p>}
+      {fitOptionsFooter(fit) && <p className="mt-1.5">{fitOptionsFooter(fit)}</p>}
     </div>
   );
 }

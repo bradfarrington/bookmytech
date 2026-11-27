@@ -50,7 +50,8 @@ alter table public.booking_parts
   add column if not exists fit_options jsonb;
 
 comment on column public.booking_parts.fit_options is
-  'Task 87. Null unless NAPA lists this part in versions for cars with and without air-con or stop-start. Then '
-  '{ "dependsOn": ["air_con" | "stop_start"], "options": [{ "supplier", "partNumber", "brand", "description", '
-  '"for": { "air_con": true }, "label": "With air-con" }], "answered"?: { "air_con": true } }. With the customer''s '
-  'answer the line is that version; without, the dearest, and the mechanic checks the car (or asks) before buying.';
+  'Task 87. Null unless NAPA lists this part in versions for different cars. Then '
+  '{ "dependsOn": ["air_con" | "stop_start" | "car"], "options": [{ "supplier", "partNumber", "brand", "description", '
+  '"for": { "air_con": true }, "label": "With air-con" }], "answered"?: { "air_con": true } }. "car" is a detail only '
+  'someone at the car can check (electronic handbrake, tailgate, gearbox code); each option''s label is NAPA''s wording. '
+  'With the customer''s answer the line is that version; otherwise the dearest, and the mechanic checks before buying.';

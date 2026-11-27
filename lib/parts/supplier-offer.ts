@@ -134,13 +134,30 @@ export interface SupplierOffer {
    * whether this car's VIN is inside it: null when that can't be told.
    */
   chassis?: { note: string; fits: boolean | null } | null;
+  /**
+   * ADDITIVE (Task 87). NAPA's details that describe the CAR the part is for,
+   * not the part: year built, "Vehicle Detail" ("With Elec.
+   * H/B"), "Applic Note" ("Slovakia Production"), gearbox and option codes.
+   * `fits` is true / false when the car's VIN or registration date settles it
+   * (year built, production country), null when only someone at the car can.
+   * Product details (sizes, filter grades, battery grades) are not here.
+   */
+  carNotes?: CarNote[];
+}
+
+/** One detail of the car a part is for (Task 87), as NAPA words it, and whether this car matches it. */
+export interface CarNote {
+  /** "Engine SPJA", "With Elec. H/B", "Year built: To Dec 1, 2013". */
+  text: string;
+  fits: boolean | null;
 }
 
 /**
  * Bump when aagOffers reads something new from NAPA's details. 2: suspension
  * (2026-11-18). 3: driven unit, air-con, stop-start, chassis (Task 87).
+ * 4: the car details (Task 87, carNotes).
  */
-export const OFFER_READ_VERSION = 3;
+export const OFFER_READ_VERSION = 4;
 
 export type SupplierPanel =
   | { state: "ok"; offers: SupplierOffer[] }
@@ -348,7 +365,7 @@ export function cylinderOf(properties: ReadonlyArray<{ name: string; value: stri
 function fitmentOf(
   properties: ReadonlyArray<{ name: string; value: string }> | undefined,
   car: AagVehicleFacts | null | undefined,
-): Pick<SupplierOffer, "drivenUnit" | "airCon" | "stopStart" | "fitmentText" | "chassis"> {
+): Pick<SupplierOffer, "drivenUnit" | "airCon" | "stopStart" | "fitmentText" | "chassis" | "carNotes"> {
   const fitment = property(properties, /^fitment$/i);
   const chassisNote = property(properties, /^chassis\s+note$/i);
   return {
@@ -357,6 +374,7 @@ function fitmentOf(
     stopStart: stopStartOf(fitment),
     fitmentText: fitment,
     chassis: chassisNote ? { note: chassisNote, fits: chassisFits(chassisNote, car) } : null,
+    carNotes: carNotesOf(properties, car),
   };
 }
 
@@ -400,6 +418,125 @@ export interface AagVehicleFacts {
   vin?: string | null;
   /** Year of manufacture, to read the VIN's model-year letter. */
   year?: number | null;
+  /** First registration, "YYYY-MM-DD" (Task 87: year-built ranges). */
+  registered?: string | null;
+}
+
+/**
+ * NAPA details that say which cars a part is for. Matched on the name; the
+ * value is the car detail. Engine codes are left out: NAPA tags each part
+ * with whichever naming its source uses, so a 2010 Fiesta 1.4 reads C14HDEZ
+ * on some parts and SPJC on others (engine-codes.ts), and a different code
+ * says nothing about a different engine (2026-11-27: 746 false splits on 12
+ * scanned cars). "Fitment" is read for air-con and stop-start only
+ * (airConOf): on other parts it describes the part ("Activated Carbon
+ * Filter", "Before catalytic converter"). "Note" is left out: it is mostly
+ * safety-sheet and fitting-time text.
+ */
+const CAR_NOTE_FIELDS: ReadonlyArray<{ name: RegExp; label: (value: string) => string; kind: "year" | "other" }> = [
+  { name: /^year\s+built$/i, label: (v) => `Built ${v.replace(/\b(From|To)\b/g, (m) => m.toLowerCase())}`, kind: "year" },
+  { name: /^vehicle\s+detail$/i, label: (v) => v, kind: "other" },
+  { name: /^applic(ation)?\s+note$/i, label: (v) => v.replace(/^\((.*)\)$/, "$1"), kind: "other" },
+  { name: /^model\s+detail$/i, label: (v) => v, kind: "other" },
+  { name: /^transmission\s+code$/i, label: (v) => `Gearbox ${v}`, kind: "other" },
+  { name: /^for\s+pr\s+number$/i, label: (v) => `Factory option ${v}`, kind: "other" },
+];
+
+/**
+ * Parts of a "Vehicle Detail" that describe the part, not the car: a
+ * battery's rated engine starts; model-year and production-date ranges on
+ * fluids. Taken out before the rest is read as a car detail.
+ */
+const NOT_CAR_DETAIL = /\b(engine starts|model year (from|to)|(from|to) prod\. date)\s*:\s*[^;]*;?/gi;
+
+const MONTHS: Record<string, number> = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11 };
+
+/** "To Dec 1, 2013 From Aug 1, 2009" → { to, from } as UTC times. Pure. */
+export function yearBuiltRange(value: string): { from: number | null; to: number | null } | null {
+  const range = { from: null as number | null, to: null as number | null };
+  for (const [, dir, mon, day, year] of value.matchAll(/\b(From|To)\s+([A-Za-z]{3})[a-z]*\.?\s+(\d{1,2}),?\s+(\d{4})/gi)) {
+    const month = MONTHS[mon.toLowerCase()];
+    if (month === undefined) return null;
+    const at = Date.UTC(Number(year), month, Number(day));
+    if (/^from$/i.test(dir)) range.from = at;
+    else range.to = at;
+  }
+  return range.from == null && range.to == null ? null : range;
+}
+
+const YEAR_MS = 365 * 24 * 3600 * 1000;
+
+/**
+ * Whether a car first registered on `registered` was built inside NAPA's
+ * range. A car is built before it is registered, usually within months, so:
+ * registered before "To" → fits; registered before "From" → doesn't; more
+ * than a year either side of a limit → settled; nearer → can't tell. Pure.
+ */
+export function builtInRange(value: string, registered: string | null | undefined): boolean | null {
+  const range = yearBuiltRange(value);
+  const reg = registered ? Date.parse(`${registered}T00:00:00Z`) : NaN;
+  if (!range || Number.isNaN(reg)) return null;
+  let fits: boolean | null = true;
+  if (range.to != null) {
+    if (reg > range.to + YEAR_MS) return false;
+    if (reg > range.to) fits = null;
+  }
+  if (range.from != null) {
+    if (reg < range.from) return false;
+    if (reg < range.from + YEAR_MS) fits = null;
+  }
+  return fits;
+}
+
+/** VIN world-manufacturer prefixes by country (ISO 3780), for "Slovakia Production" and the like. */
+const VIN_COUNTRY: ReadonlyArray<{ country: RegExp; vin: RegExp }> = [
+  { country: /\b(south\s+)?korea\b/i, vin: /^K[L-R]/ },
+  { country: /\bslovakia\b/i, vin: /^U[5-7]|^TM/ },
+  { country: /\bczech\b/i, vin: /^T[J-P]/ },
+  { country: /\bjapan\b/i, vin: /^J/ },
+  { country: /\b(uk|united kingdom|england|great britain)\b/i, vin: /^S[A-M]/ },
+  { country: /\bgermany\b/i, vin: /^W|^S[N-T]/ },
+  { country: /\bfrance\b/i, vin: /^V[F-R]/ },
+  { country: /\bspain\b/i, vin: /^V[S-W]/ },
+  { country: /\bitaly\b/i, vin: /^Z[A-R]/ },
+  { country: /\bturkey\b/i, vin: /^N[M-T]/ },
+  { country: /\bindia\b/i, vin: /^M[A-E]/ },
+  { country: /\bthailand\b/i, vin: /^M[L-R]/ },
+  { country: /\bchina\b/i, vin: /^L/ },
+  { country: /\bhungary\b/i, vin: /^T[R-V]/ },
+  { country: /\bpoland\b/i, vin: /^S[U-Z]/ },
+  { country: /\bromania\b/i, vin: /^U[U-Z]/ },
+  { country: /\bportugal\b/i, vin: /^T[W-Z1]/ },
+  { country: /\bmexico\b/i, vin: /^3/ },
+  { country: /\b(usa|united states)\b/i, vin: /^[145]/ },
+];
+
+/** Whether a "made in" detail ("Slovakia Production", "Prod. Country: Slovakia") matches the car's VIN; null when it names no country we know. Pure. */
+export function madeInFits(value: string, vin: string | null | undefined): boolean | null {
+  if (!/\b(production|prod\.|manufacture|made in|country)\b/i.test(value)) return null;
+  const v = String(vin ?? "").trim().toUpperCase();
+  if (!/^[A-HJ-NPR-Z0-9]{17}$/.test(v)) return null;
+  const named = VIN_COUNTRY.filter((c) => c.country.test(value));
+  if (named.length !== 1) return null;
+  return named[0].vin.test(v);
+}
+
+/** NAPA's car details for a part (Task 87), each settled where the car's VIN or registration can. Pure. */
+export function carNotesOf(
+  properties: ReadonlyArray<{ name: string; value: string }> | undefined,
+  car: AagVehicleFacts | null | undefined,
+): CarNote[] {
+  const notes: CarNote[] = [];
+  for (const { name, value } of properties ?? []) {
+    const field = CAR_NOTE_FIELDS.find((f) => f.name.test(name.trim()));
+    if (!field) continue;
+    const text = (field.kind === "other" ? value.replace(NOT_CAR_DETAIL, "") : value).replace(/^[;\s]+|[;\s]+$/g, "").trim();
+    if (!text) continue;
+    const fits =
+      field.kind === "year" ? builtInRange(text, car?.registered) : field.kind === "other" ? madeInFits(text, car?.vin) : null;
+    notes.push({ text: field.label(text), fits });
+  }
+  return notes;
 }
 
 /** VIN model-year letters from 1980 ("A") in order; digits 1–9 are 2001–2009. */

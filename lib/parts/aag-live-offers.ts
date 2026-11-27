@@ -137,7 +137,12 @@ function vehicleFacts(body: AagQuoteBody | null | undefined): AagVehicleFacts | 
   const car = body?.VehicleDetails?.[0];
   if (!car) return null;
   const year = Number(String(car.YearOfManufacture ?? "").trim() || String(car.DateRegistered ?? "").slice(0, 4));
-  return { vin: car.Vin ?? null, year: Number.isInteger(year) && year > 1900 ? year : null };
+  const reg = /^(\d{4})(\d{2})(\d{2})$/.exec(String(car.DateRegistered ?? "").trim());
+  return {
+    vin: car.Vin ?? null,
+    year: Number.isInteger(year) && year > 1900 ? year : null,
+    registered: reg ? `${reg[1]}-${reg[2]}-${reg[3]}` : null,
+  };
 }
 
 async function safely<T extends { kind: string }>(call: () => Promise<T>): Promise<T | { kind: "failed"; reason: string }> {

@@ -55,10 +55,23 @@ Nothing we look up says whether a car has air-con or stop-start: not HaynesPro (
 
 Bookings already made keep their parts: the two existing bookings with the duplicated belt (job numbers 132 and 133, SW16 PFD) still have both lines.
 
+## Car details only someone at the car can check (2026-11-27, second pass)
+
+Brad: "shouldn't we sort these as well" (engine variants, other chassis formats). Surveyed first: NAPA re-asked (read-only) for every part type with two or more alternatives on the 12 scanned cars (581; 478 answered), comparing the details that differ between them.
+
+- **"Fitment" mostly describes the part, not the car** ("Activated Carbon Filter" vs "Particulate Filter"; "Before" vs "After catalytic converter"), so it is read for air-con and stop-start only.
+- **Engine codes are naming, not engines.** NAPA tags a 2010 Fiesta 1.4's parts C14HDEZ on some and SPJC on others (the same engine, engine-codes.ts); counting them flagged 746 versions on 12 cars. Left out. HaynesPro can't settle it either: it returns no engine code with the vehicle, and where it names one it doesn't reliably match NAPA's (Astra: B10XFT vs NAPA's B10XFL).
+- **Real car details**, kept as `SupplierOffer.carNotes` (`carNotesOf`): "Year built", "Vehicle Detail" (electronic handbrake, tailgate / back doors, sport models, start-stop battery, adaptive cruise, ESP, ABS), "Applic Note" (production country, electronic suspension, sunroof, spare wheel), "Model Detail", gearbox codes, VW factory option codes. A battery's rated engine starts and fluids' production-date ranges are taken out (they describe the part).
+- **Settled automatically:** year built against the first registration NAPA returns (`builtInRange`: registered before "To" fits, before "From" doesn't, more than a year either side of a limit is settled, nearer can't be told); production country against the VIN's country prefix (`madeInFits`); VW chassis notes (above). Ruled-out versions are dropped (`forChassis`).
+- **Everything else goes to the mechanic** (`carVariantOptions`, `dependsOn: ["car"]`): priced at the dearest version, each listed in NAPA's words ("Without Elec. H/B", "Gearbox MB6", "Any other" for a part with no car detail), heading "Check which version fits this car before buying: NAPA lists more than one.", footer "Check the car on arrival before fitting." Never asked of the customer (`equipmentQuestions` is air-con and stop-start only).
+
+On the 12 scanned cars this flags 144 part lines across 10,604 job prices (about 1.4%): rear pads, calipers and hoses with / without an electronic handbrake; start-stop batteries; adaptive-cruise wheel speed sensors; sport / non-sport fog lights; tailgate / back-door wipers; the 308's clutch parts by gearbox; one Fiesta exhaust kit whose date range is too near its registration to call. `OFFER_READ_VERSION` 4.
+
 ## Not done
 
-- Engine-variant splits ("FOR CARB" / "FOR MONOP") aren't resolved: NAPA's and HaynesPro's engine codes don't reliably match (the Astra is B10XFL to NAPA, B10XFT to HaynesPro). The pick rule chooses, as before.
-- Chassis notes in other formats than VW group's.
+- Engine-variant splits (above): NAPA's engine codes can't tell engines apart. The pick rule chooses, as before.
+- Chassis notes in formats other than VW group's.
+- The electronic handbrake is the commonest car detail and a customer could answer it ("a button, not a lever"); it could become a third question like air-con.
 
 ## Acceptance criteria
 
@@ -69,11 +82,12 @@ Bookings already made keep their parts: the two existing bookings with the dupli
 - [x] Customer asked about air-con / stop-start only when it changes a part (website price step; apps via API)
 - [x] Unanswered: dearer version charged, mechanic shown every version
 - [x] Answer kept on the booking and the saved car; reused for the mechanic's extra work
-- [x] Tests: `equipment-fit.test.ts`, `car-equipment.test.ts`, `quote-parts.test.ts`. 949 pass; `tsc` clean
+- [x] Car details settled from the VIN / registration where possible, otherwise shown to the mechanic
+- [x] Tests: `equipment-fit.test.ts`, `car-equipment.test.ts`, `quote-parts.test.ts`. 956 pass; `tsc` clean
 
 ## Apps
 
 - **Customer app (`a13cd2d`):** the price step shows `quote.equipmentQuestions` (Yes / No / Not sure, wording as sent), re-quotes with `equipment`, and sends the same `equipment` to the confirm re-quote, `/checkout/prepare` and `POST /bookings`; a held authorisation is reused only when the answers match. Answers live in the booking draft, cleared on a change of reg.
-- **Mechanic app (`d89a6ca`):** the job's parts read `booking_parts` with `select('*')` (safe before 0093) and show the versions box, same wording as the website.
+- **Mechanic app (`d89a6ca`, plus the car-detail follow-up):** the job's parts read `booking_parts` with `select('*')` (safe before 0093) and show the versions box, same wording as the website, including `dependsOn: "car"`.
 - Both: the 0093 columns are hand-added to `src/types/database.ts`; re-run `npm run db:types` once the migration is live. Not run on a device yet.
 - Old builds keep working: no field they use changed.

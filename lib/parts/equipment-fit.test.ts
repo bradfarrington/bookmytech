@@ -7,7 +7,17 @@ import { describe, expect, it } from "vitest";
 import type { AagPartOffers } from "./aag-part-prices";
 import { equipmentAsked, equipmentQuestions, priceJobParts, type PartsJob } from "./quote-parts";
 import { selectJobParts } from "./repair-part-choice";
-import { aagOffers, airConOf, chassisFits, stopStartOf, vinYear, type SupplierOffer } from "./supplier-offer";
+import {
+  aagOffers,
+  airConOf,
+  builtInRange,
+  carNotesOf,
+  chassisFits,
+  madeInFits,
+  stopStartOf,
+  vinYear,
+  type SupplierOffer,
+} from "./supplier-offer";
 
 const PRICED_AT = "2026-11-27T08:00:00.000Z";
 
@@ -111,7 +121,7 @@ describe("reading NAPA's fitment", () => {
       stopStart: null,
       fitmentText: "-AC",
       chassis: { note: "TO CH. 7H-6H079890", fits: true },
-      readVersion: 3,
+      readVersion: 4,
     });
   });
 });
@@ -228,5 +238,79 @@ describe("stop-start and chassis (Proace, Transporter)", () => {
     expect(result.ok && result.parts[0].fitOptions?.options.map((o) => o.partNumber)).toEqual(["GAT6DPK1195", "GAT6PK1123"]);
     const answered = priceJobParts({ jobs: [job], offers: new Map([[305, ok(offers)]]), car: { sports: false, airCon: false } });
     expect(answered.ok && answered.parts.map((p) => p.partNumber)).toEqual(["GAT6PK1123"]);
+  });
+});
+
+describe("car details only someone at the car can check (Task 87)", () => {
+  const job: PartsJob = { nodeId: "pads", description: "Renew the rear brake pads", groups: [{ genartId: 402, label: "Brake pad set, disc brake" }] };
+  const pad = (partNumber: string, costPence: number, notes: Array<{ text: string; fits: boolean | null }>) =>
+    belt(partNumber, costPence, { description: "BRAKE PAD - REAR", carNotes: notes });
+
+  it("reads NAPA's car details, leaving out what describes the part", () => {
+    expect(
+      carNotesOf(
+        [
+          { name: "Engine Code", value: "SPJC" },
+          { name: "Vehicle Detail", value: "Engine Starts:360000;With start-stop function" },
+          { name: "Applic Note", value: "(South Korea Production)" },
+          { name: "Transmission Code", value: "MB6" },
+          { name: "Year built", value: "To Dec 1, 2013 From Aug 1, 2009" },
+          { name: "Size mm", value: "1650" },
+        ],
+        { vin: "U5YPH813SGL089445", registered: "2016-03-01" },
+      ),
+    ).toEqual([
+      { text: "With start-stop function", fits: null },
+      { text: "South Korea Production", fits: false },
+      { text: "Gearbox MB6", fits: null },
+      { text: "Built to Dec 1, 2013 from Aug 1, 2009", fits: false },
+    ]);
+  });
+
+  it("places a registration against a year-built range, a year either side to be sure", () => {
+    expect(builtInRange("To Dec 1, 2013", "2013-06-01")).toBe(true);
+    expect(builtInRange("To Dec 1, 2013", "2014-03-01")).toBeNull();
+    expect(builtInRange("To Dec 1, 2013", "2015-03-01")).toBe(false);
+    expect(builtInRange("From Jun 1, 2017", "2017-02-01")).toBe(false);
+    expect(builtInRange("From Jun 1, 2017", "2017-09-01")).toBeNull();
+    expect(builtInRange("From Jun 1, 2017", "2019-01-01")).toBe(true);
+    expect(builtInRange("From Jun 1, 2017", null)).toBeNull();
+  });
+
+  it("reads where the car was made from its VIN", () => {
+    expect(madeInFits("Slovakia Production", "U5YPH813SGL089445")).toBe(true);
+    expect(madeInFits("(South Korea Production)", "U5YPH813SGL089445")).toBe(false);
+    expect(madeInFits("With Elec. H/B", "U5YPH813SGL089445")).toBeNull();
+  });
+
+  it("prices the dearer and lists each version for the mechanic, never asking the customer", () => {
+    const without = pad("BREP30051", 2000, [{ text: "Without Elec. H/B", fits: null }]);
+    const withEhb = pad("BREP30067", 2600, [{ text: "With Elec. H/B", fits: null }]);
+    const result = priceJobParts({ jobs: [job], offers: new Map([[402, ok([without, withEhb])]]) });
+    expect(result.ok && result.parts.map((p) => [p.partNumber, p.linePence])).toEqual([["BREP30067", 2600]]);
+    expect(result.parts[0].fitOptions).toMatchObject({ dependsOn: ["car"] });
+    expect(result.parts[0].fitOptions?.options.map((o) => [o.label, o.partNumber])).toEqual([
+      ["Without Elec. H/B", "BREP30051"],
+      ["With Elec. H/B", "BREP30067"],
+    ]);
+    expect(equipmentQuestions(result.parts)).toEqual([]);
+    expect(equipmentAsked(result.parts)).toEqual([]);
+  });
+
+  it("drops the versions the car's registration or VIN rules out", () => {
+    const old = pad("OLD", 3000, [{ text: "Built to Dec 1, 2013", fits: false }]);
+    const current = pad("NEW", 2000, [{ text: "Built from Dec 1, 2013", fits: true }]);
+    const result = priceJobParts({ jobs: [job], offers: new Map([[402, ok([old, current])]]) });
+    expect(result.ok && result.parts.map((p) => [p.partNumber, p.fitOptions])).toEqual([["NEW", undefined]]);
+  });
+
+  it("counts a part with no car detail as fitting any car", () => {
+    const sport = pad("SPORT", 3000, [{ text: "Sport Models", fits: null }]);
+    const plain = pad("PLAIN", 2000, []);
+    const result = priceJobParts({ jobs: [job], offers: new Map([[402, ok([sport, plain])]]) });
+    expect(result.parts[0].fitOptions?.options.map((o) => [o.label, o.partNumber])).toEqual([
+      ["Sport Models", "SPORT"],
+      ["Any other", "PLAIN"],
+    ]);
   });
 });

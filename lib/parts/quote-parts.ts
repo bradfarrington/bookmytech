@@ -122,10 +122,10 @@ export interface CarEquipment {
  * 87). Empty when nothing does, or they've answered. In EQUIPMENT_KEYS order. Pure.
  */
 export function equipmentQuestions(parts: readonly Pick<QuotedPart, "fitOptions">[]): EquipmentKey[] {
-  const wanted = new Set(
-    parts.flatMap((part) => (part.fitOptions?.dependsOn ?? []).filter((key) => part.fitOptions?.answered?.[key] === undefined)),
+  // Only air-con and stop-start are asked: a "car" detail is for the mechanic.
+  return EQUIPMENT_KEYS.filter((key) =>
+    parts.some((part) => part.fitOptions?.dependsOn.includes(key) && part.fitOptions.answered?.[key] === undefined),
   );
-  return EQUIPMENT_KEYS.filter((key) => wanted.has(key));
 }
 
 /** Every piece of equipment some part depends on, answered or not: what the price step shows. Pure. */

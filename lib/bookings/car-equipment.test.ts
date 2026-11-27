@@ -10,7 +10,7 @@ import {
   readEquipmentAnswer,
 } from "./car-equipment";
 import { stepQuery } from "./step-params";
-import { customerSaid, fitOptionsHeading, fitOptionsNote, readFitOptions } from "@/lib/parts/fit-options";
+import { customerSaid, fitOptionsFooter, fitOptionsHeading, fitOptionsNote, readFitOptions } from "@/lib/parts/fit-options";
 
 describe("air-con and stop-start answers (Task 87)", () => {
   it("reads funnel URL answers, Not sure included", () => {
@@ -82,5 +82,20 @@ describe("the mechanic's view of a part's versions (Task 87)", () => {
     const answered = readFitOptions({ ...stored, answered: { air_con: false } })!;
     expect(fitOptionsHeading(answered)).toBe("The customer said the car doesn't have air-con. If not, buy the other version.");
     expect(fitOptionsNote(unknown)).toBe("check air-con: With air-con GAT5PK1680 / Without air-con GAT5PK1650");
+    expect(fitOptionsFooter(unknown)).toBe("Ask the customer in the chat, or check on arrival.");
+    expect(fitOptionsFooter(answered)).toBeNull();
+  });
+
+  it("reads a car-detail split, for the mechanic to check at the car", () => {
+    const car = readFitOptions({
+      dependsOn: ["car"],
+      options: [
+        { supplier: "aag", partNumber: "BREP30051", brand: "BREMBO", description: "PAD", for: {}, label: "Without Elec. H/B" },
+        { supplier: "aag", partNumber: "BREP30067", brand: "BREMBO", description: "PAD", for: {}, label: "With Elec. H/B" },
+      ],
+    })!;
+    expect(fitOptionsHeading(car)).toBe("Check which version fits this car before buying: NAPA lists more than one.");
+    expect(fitOptionsFooter(car)).toBe("Check the car on arrival before fitting.");
+    expect(fitOptionsNote(car)).toBe("check which fits: Without Elec. H/B BREP30051 / With Elec. H/B BREP30067");
   });
 });
