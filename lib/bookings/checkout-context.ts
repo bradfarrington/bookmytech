@@ -8,6 +8,7 @@ import { parseRepairIds } from "./repair-ids";
 import { quoteFollowOn } from "@/lib/quotes/book-follow-on";
 import { quoteCustomQuoteForBooking } from "@/lib/custom-quotes/server";
 import { stepQuery, type BookingBaseParams } from "./step-params";
+import { equipmentFromParams, mergeEquipment, readEquipmentAnswer, savedCarEquipment } from "./car-equipment";
 
 // The job being booked, loaded once per step of the second half of the funnel
 // (Task 47: Time, Address and Confirm). The price is re-quoted on the server at
@@ -25,6 +26,9 @@ export interface CheckoutSearchParams {
   pref?: string;
   /** A follow-on quote (Task 34), or a custom quote (Task 75). */
   quote?: string;
+  /** Task 87: air-con / stop-start answers ("y", "n", "u"). */
+  ac?: string;
+  ss?: string;
 }
 
 export interface CheckoutContext {
@@ -108,14 +112,24 @@ export async function loadCheckoutContext(
   const ids = parseRepairIds(params);
   if (!reg.trim() || ids.length === 0) redirect("/book");
   // Re-quote server-side: the same (reg, items) price identically here, at
-  // checkout and at booking create.
-  const result = await quoteRepairsResult(reg, ids, createAdminClient());
+  // checkout and at booking create. Air-con and stop-start (Task 87): the
+  // answers in the URL, else the signed-in customer's saved car's, exactly as
+  // prepareCheckout and createBooking resolve them.
+  const ac = readEquipmentAnswer(params.ac) ?? undefined;
+  const ss = readEquipmentAnswer(params.ss) ?? undefined;
+  const admin = createAdminClient();
+  const session = await createClient();
+  const {
+    data: { user: viewer },
+  } = await session.auth.getUser();
+  const equipment = mergeEquipment(equipmentFromParams({ ac, ss }), await savedCarEquipment(admin, viewer?.id ?? null, reg));
+  const result = await quoteRepairsResult(reg, ids, admin, {}, equipment);
   if (!result.ok) {
     // A part the job needs can't be priced right now (Task 43): the price step
     // says so. Anything else means the items no longer price for this car.
     if (result.reason === "parts_unavailable") {
       redirect(
-        `/book/match?${stepQuery({ reg, repairs: ids, make: params.make, model: params.model, postcode: params.postcode, pref: params.pref })}`,
+        `/book/match?${stepQuery({ reg, repairs: ids, make: params.make, model: params.model, postcode: params.postcode, pref: params.pref, ac, ss })}`,
       );
     }
     redirect(`/book/repairs?reg=${encodeURIComponent(reg)}`);
@@ -128,6 +142,8 @@ export async function loadCheckoutContext(
     model: params.model,
     postcode: params.postcode?.trim() || undefined,
     pref: params.pref,
+    ac,
+    ss,
   };
   return withLabels(base, quote, "catalogue", `/book/match?${stepQuery(base)}`);
 }

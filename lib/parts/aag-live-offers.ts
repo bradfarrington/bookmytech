@@ -29,8 +29,9 @@ import {
   flattenQuote,
   unambiguousClassic,
 } from "@/lib/aag/quote";
+import type { AagQuoteBody } from "@/lib/aag/types";
 import type { EngineCodeSource } from "./engine-codes";
-import { aagOffers, type SupplierOffer } from "./supplier-offer";
+import { aagOffers, type AagVehicleFacts, type SupplierOffer } from "./supplier-offer";
 
 export type AagLiveOffers =
   | { kind: "ok"; offers: SupplierOffer[]; from: "quote" | "classic" }
@@ -98,7 +99,7 @@ async function fetchOneCode(
   const standard = await safely(() => lookups.quote(reg, genart, callOptions));
   if (standard.kind === "ok") {
     engineCodes?.seen(engineCodesOf(standard.body));
-    const offers = aagOffers(flattenQuote(standard.body));
+    const offers = aagOffers(flattenQuote(standard.body), vehicleFacts(standard.body));
     if (offers.length > 0) return { kind: "ok", offers, from: "quote" };
   }
 
@@ -129,6 +130,14 @@ async function fetchOneCode(
   if (classic.kind === "no_parts") return { kind: "no_parts" };
   if (classic.kind === "ok" && "answered" in standard && standard.answered) return { kind: "no_parts" };
   return { kind: "failed", reason: standard.kind === "failed" ? standard.reason : "NAPA Auto Parts didn't answer." };
+}
+
+/** The VIN and year NAPA's exact-match answer gives for the car (Task 87: chassis notes). */
+function vehicleFacts(body: AagQuoteBody | null | undefined): AagVehicleFacts | null {
+  const car = body?.VehicleDetails?.[0];
+  if (!car) return null;
+  const year = Number(String(car.YearOfManufacture ?? "").trim() || String(car.DateRegistered ?? "").slice(0, 4));
+  return { vin: car.Vin ?? null, year: Number.isInteger(year) && year > 1900 ? year : null };
 }
 
 async function safely<T extends { kind: string }>(call: () => Promise<T>): Promise<T | { kind: "failed"; reason: string }> {

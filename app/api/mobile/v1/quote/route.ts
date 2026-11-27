@@ -5,6 +5,13 @@ import { MAX_REPAIRS_PER_BOOKING, readRepairIdList } from "@/lib/bookings/repair
 import { enforceCatalogueLimits } from "@/lib/mobile/catalogue-limits";
 import { apiError, apiOk, readJsonBody } from "@/lib/mobile/respond";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { optionalMobileUser } from "@/lib/supabase/mobile";
+import {
+  equipmentFromBody,
+  equipmentQuestionsForApp,
+  mergeEquipment,
+  savedCarEquipment,
+} from "@/lib/bookings/car-equipment";
 
 // POST /api/mobile/v1/quote — the price for one repair, or several booked
 // together, on one vehicle. Unauthenticated (the app lets people price a job
@@ -64,6 +71,22 @@ import { createAdminClient } from "@/lib/supabase/admin";
 // With it, `quoteJobs: string[]` names the repairs that need it, to prefill
 // the request.
 //
+// ADDITIVE (Task 87): air-con and stop-start. NAPA lists some parts (an
+// ancillary belt, for one) in versions for cars with and without them.
+//   Body:   equipment?: { airCon?: true | false | null, stopStart?: … }
+//           true / false = the customer's answer, null = "Not sure", a key
+//           left out = not asked. Signed-in callers (a Bearer token is read
+//           if sent, never required) get their saved car's answers for keys
+//           they leave out.
+//   200:    quote.equipmentQuestions: [{ key: "air_con" | "stop_start",
+//             question, why, answer: true | false | null }]
+//           One per piece of equipment a part in the price depends on, with
+//           the answer it was priced with (null: not known, priced at the
+//           dearer version). Show `question` and `why` verbatim with Yes /
+//           No / Not sure, re-quote with the answer, and send the same
+//           `equipment` to /checkout/prepare and POST /bookings so the hold
+//           and the booking match. Empty when nothing depends on it.
+//
 // Thin wrapper over quoteRepairsResult, which is the SAME function the web
 // funnel prices with — match, slot, checkout hold and booking create each
 // re-derive the quote from (reg, nodes) server-side. The figure returned here
@@ -74,6 +97,8 @@ interface QuoteBody {
   reg?: unknown;
   repairNodeId?: unknown;
   repairNodeIds?: unknown;
+  /** ADDITIVE (Task 87). */
+  equipment?: unknown;
 }
 
 export async function POST(request: Request): Promise<Response> {
@@ -103,7 +128,15 @@ export async function POST(request: Request): Promise<Response> {
   const limited = await enforceCatalogueLimits(request);
   if (limited) return limited;
 
-  const result = await quoteRepairsResult(reg, ids, createAdminClient());
+  // Air-con and stop-start (Task 87): the answers sent, else the signed-in
+  // caller's saved car's. A guest (no token) is fine: nothing saved.
+  const admin = createAdminClient();
+  const caller = await optionalMobileUser(request);
+  const equipment = mergeEquipment(
+    equipmentFromBody(parsed.body.equipment),
+    await savedCarEquipment(admin, caller?.userId ?? null, reg),
+  );
+  const result = await quoteRepairsResult(reg, ids, admin, {}, equipment);
 
   // Every "can't price it" reason shares one code — unmatched vehicle, unknown
   // or admin-hidden node, a group with no book time, HaynesPro down. Only a
@@ -157,6 +190,11 @@ export async function POST(request: Request): Promise<Response> {
     // ADDITIVE (Task 43): the supplier parts in the price. Same mapper as
     // /checkout/prepare, so the two can't drift.
     parts: customerPartLines(quote.parts),
+    // ADDITIVE (Task 87): what to ask, with the answer the price used.
+    equipmentQuestions: equipmentQuestionsForApp(quote.equipmentAsked).map((q) => ({
+      ...q,
+      answer: q.key === "air_con" ? (equipment.airCon ?? null) : (equipment.stopStart ?? null),
+    })),
   };
 
   return apiOk({

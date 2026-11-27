@@ -417,6 +417,7 @@ describe("catalogueBookingPartRows", () => {
         node_id: "discs",
         priced_at: PRICED_AT,
         price_estimated: false,
+        fit_options: null,
       },
     ]);
   });

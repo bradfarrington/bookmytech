@@ -3,6 +3,7 @@ import "server-only";
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { quoteRepairs } from "@/lib/haynespro/repair-booking";
+import { bookingCarEquipment } from "@/lib/bookings/car-equipment";
 import { searchRepairCatalogue } from "@/lib/haynespro/catalogue";
 import { dedupeRepairIds, MAX_REPAIRS_PER_BOOKING } from "@/lib/bookings/repair-ids";
 import { cancelFeeTiers } from "@/lib/bookings/manage-booking";
@@ -198,10 +199,17 @@ async function buildPreview(
   // Priced exactly as the checkout prices a basket for this car — at the
   // booking's snapshotted rate and commission, so a Pro-tier mechanic keeps
   // theirs and a platform rate change since booking doesn't reprice the job.
-  const quote = await quoteRepairs(booking.vehicle_reg, repairIds, admin, {
-    hourlyRatePence: booking.hourly_rate_pence ?? undefined,
-    commissionRate: booking.commission_rate == null ? undefined : Number(booking.commission_rate),
-  });
+  // With the customer's air-con / stop-start answers from booking (Task 87).
+  const quote = await quoteRepairs(
+    booking.vehicle_reg,
+    repairIds,
+    admin,
+    {
+      hourlyRatePence: booking.hourly_rate_pence ?? undefined,
+      commissionRate: booking.commission_rate == null ? undefined : Number(booking.commission_rate),
+    },
+    await bookingCarEquipment(admin, booking.id),
+  );
   if (!quote)
     return refuse(
       "invalid",

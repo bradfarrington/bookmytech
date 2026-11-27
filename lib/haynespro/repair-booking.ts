@@ -52,7 +52,16 @@ import {
 import { servicePartsJobs } from "@/lib/catalogue/service-parts";
 import { partGroupsOnNodes } from "@/lib/parts/part-groups";
 import { vehicleFuelFamily } from "./fuel";
-import { needsManualQuote, quoteJobParts, type PartsJob, type QuotedPart } from "@/lib/parts/quote-parts";
+import {
+  equipmentAsked,
+  equipmentQuestions,
+  needsManualQuote,
+  quoteJobParts,
+  type CarEquipment,
+  type PartsJob,
+  type QuotedPart,
+} from "@/lib/parts/quote-parts";
+import type { EquipmentKey } from "@/lib/parts/repair-part-choice";
 import type { CombinedRepairTimes } from "./combine";
 import { engineOilForVehicle } from "./engine-oil";
 import { excludedRepairNodeIdsForVehicle } from "./exclusions";
@@ -126,6 +135,19 @@ export interface RepairsQuote {
    * any oil, they make breakdown.partsPence.
    */
   parts: QuotedPart[];
+  // --- Equipment (Task 87). ADDITIVE. ---
+  /**
+   * What to ask the customer: equipment some part's price depends on and
+   * they haven't answered ("air_con", "stop_start"). Empty when nothing does.
+   * Unanswered, the part is priced at the dearer option and the mechanic is
+   * told both. Absent on quotes snapshotted before Task 87, and on follow-on
+   * and custom quotes (their parts are already chosen).
+   */
+  equipmentQuestions?: EquipmentKey[];
+  /** Every piece of equipment a part depends on, answered or not: what the price step shows, with the answer. */
+  equipmentAsked?: EquipmentKey[];
+  /** The answers the quote was priced with. */
+  equipment?: CarEquipment;
 }
 
 /** The pre-Task-24 single-repair quote. Unchanged shape; still what /api/mobile/v1/quote returns. */
@@ -325,6 +347,10 @@ export function buildRepairsQuote(args: {
     oil,
     visitHours,
     parts,
+    // Filled in by quoteRepairsResult with the customer's answers (Task 87).
+    equipmentQuestions: equipmentQuestions(parts),
+    equipmentAsked: equipmentAsked(parts),
+    equipment: { airCon: null, stopStart: null },
   };
 }
 
@@ -385,6 +411,8 @@ export async function quoteRepairsResult(
    * reprice it because the platform rate moved since it was booked.
    */
   overrides: { hourlyRatePence?: number; commissionRate?: number } = {},
+  /** ADDITIVE (Task 87). The customer's answers on air-con and stop-start. */
+  equipment: CarEquipment = {},
 ): Promise<RepairsQuoteResult> {
   const fail: RepairsQuoteResult = { ok: false, reason: "not_priceable" };
   try {
@@ -467,7 +495,7 @@ export async function quoteRepairsResult(
         ? Promise.resolve(overrides.commissionRate)
         : getTakeRateBase(db),
       getRepairCombineMode(db),
-      quoteJobParts({ db, reg, carTypeId: vehicle.carTypeId, jobs: partsJobs }),
+      quoteJobParts({ db, reg, carTypeId: vehicle.carTypeId, jobs: partsJobs, equipment }),
     ]);
     if (!pricedParts.ok) {
       if (!needsManualQuote(pricedParts.missing)) return { ok: false, reason: "parts_unavailable" };
@@ -507,11 +535,21 @@ export async function quoteRepairsResult(
       hourlyRatePence,
       commissionRate,
     });
-    return quote ? { ok: true, quote } : fail;
+    return quote ? { ok: true, quote: withEquipment(quote, equipment) } : fail;
   } catch (err) {
     console.error("[haynespro] repairs quote failed:", err);
     return fail;
   }
+}
+
+/** The answers a quote was priced with, and what's left to ask (Task 87). Pure. */
+function withEquipment(quote: RepairsQuote, equipment: CarEquipment): RepairsQuote {
+  return {
+    ...quote,
+    equipment: { airCon: equipment.airCon ?? null, stopStart: equipment.stopStart ?? null },
+    equipmentQuestions: equipmentQuestions(quote.parts),
+    equipmentAsked: equipmentAsked(quote.parts),
+  };
 }
 
 /**
@@ -523,8 +561,9 @@ export async function quoteRepairs(
   ids: readonly string[],
   db: SupabaseClient,
   overrides: { hourlyRatePence?: number; commissionRate?: number } = {},
+  equipment: CarEquipment = {},
 ): Promise<RepairsQuote | null> {
-  const result = await quoteRepairsResult(reg, ids, db, overrides);
+  const result = await quoteRepairsResult(reg, ids, db, overrides, equipment);
   return result.ok ? result.quote : null;
 }
 

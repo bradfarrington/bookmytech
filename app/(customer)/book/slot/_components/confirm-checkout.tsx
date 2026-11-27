@@ -16,6 +16,8 @@ import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 import { cn, formatPrice, vehicleLabel } from "@/lib/utils";
 import { prepareCheckout, createBookingAction } from "@/app/actions/create-booking";
+import { answerOf } from "@/lib/bookings/car-equipment";
+import type { CarEquipment } from "@/lib/parts/quote-parts";
 import type { CreateBookingInput, PrepareCheckoutResult } from "@/app/actions/create-booking";
 import { groupRepairLines, type RepairLineLite } from "@/lib/bookings/repair-lines";
 import { reportOrphanedHold } from "@/app/actions/orphaned-hold";
@@ -200,6 +202,10 @@ function returnParams(c: ConfirmCommon): Record<string, string> {
     if (c.model) params.model = c.model;
     if (c.preferredMechanicId) params.pref = c.preferredMechanicId;
   }
+  if (!c.quoteId) {
+    if (c.carEquipment && "airCon" in c.carEquipment) params.ac = answerOf(c.carEquipment.airCon ?? null);
+    if (c.carEquipment && "stopStart" in c.carEquipment) params.ss = answerOf(c.carEquipment.stopStart ?? null);
+  }
   if (c.selectedSlot) params.slot = c.selectedSlot;
   if (c.selectedWindow) params.window = c.selectedWindow;
   if (c.candidateDays.length >= 2) params.days = c.candidateDays.join(",");
@@ -237,6 +243,8 @@ interface ConfirmCheckoutProps {
   preferredMechanicId?: string;
   /** A follow-on quote (Task 34): the server prices from it instead of the catalogue. */
   quoteId?: string;
+  /** Task 87: the customer's air-con / stop-start answers from the price step (only those given). */
+  carEquipment?: CarEquipment;
   /** Signed-in customer's spendable account credit (0 for guests). */
   availableCreditPence?: number;
   /** Whether the visitor is signed in AS A CUSTOMER: hides the account block. */
@@ -271,6 +279,7 @@ export function ConfirmCheckout({
   pricePence,
   preferredMechanicId,
   quoteId,
+  carEquipment,
   availableCreditPence = 0,
   signedIn = false,
   wrongRole,
@@ -581,6 +590,7 @@ export function ConfirmCheckout({
         repairNodeIds,
         quoteId,
         promoCode: promoInput.trim() || undefined,
+        carEquipment,
       });
       if (!result.ok) {
         setStripeError(result.error);
@@ -606,6 +616,7 @@ export function ConfirmCheckout({
       repairNodeIds,
       quoteId,
       promoCode: code,
+      carEquipment,
     });
     if (!result.ok) return result.error;
     if (!result.promoCode) return "That discount code couldn't be applied to this booking.";
@@ -661,6 +672,7 @@ export function ConfirmCheckout({
     preferredMechanicId,
     quoteId,
     promoCode: appliedPromo ?? undefined,
+    carEquipment,
     // Identity is settled before this step: the checkout no longer asks.
     customerName: signedIn ? customerName : name.trim(),
     customerEmail: signedIn ? customerEmail : email.trim(),
@@ -1059,6 +1071,8 @@ interface ConfirmCommon {
   quoteId?: string;
   /** A discount code the customer applied (Task 35): re-validated server-side. */
   promoCode?: string;
+  /** Task 87: air-con / stop-start as answered on the price step. Absent on drafts parked before it. */
+  carEquipment?: CarEquipment;
   /** Resolved before this step: the customer always has an account by now. */
   customerName: string;
   customerEmail: string;
@@ -1088,6 +1102,7 @@ function bookingInputFrom(
     preferredMechanicId: c.preferredMechanicId || undefined,
     quoteId: c.quoteId || undefined,
     promoCode: c.promoCode || undefined,
+    carEquipment: c.carEquipment,
     ...extra,
   };
 }

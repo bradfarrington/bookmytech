@@ -1,5 +1,7 @@
 import "server-only";
 
+import { bookingCarEquipment } from "@/lib/bookings/car-equipment";
+import { fitOptionsNote } from "@/lib/parts/fit-options";
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getHourlyRatePence, getTakeRateBase } from "@/lib/pricing/calculate";
@@ -403,13 +405,25 @@ export async function suggestQuoteParts(
     ];
   });
 
-  const priced = await quoteJobParts({ db: owned.admin, reg: owned.booking.vehicle_reg, carTypeId: vehicle.carTypeId, jobs });
+  const priced = await quoteJobParts({
+    db: owned.admin,
+    reg: owned.booking.vehicle_reg,
+    carTypeId: vehicle.carTypeId,
+    jobs,
+    // The customer's air-con / stop-start answers from booking (Task 87).
+    equipment: await bookingCarEquipment(owned.admin, bookingId),
+  });
   return {
     ok: true,
     parts: priced.parts.map((part, index) => ({
       key: `${part.nodeId}:${part.genartId}:${part.position ?? "any"}:${index}`,
       nodeId: part.nodeId,
-      description: [partGroupName(part), part.brand, part.partNumber].filter(Boolean).join(" · ").slice(0, 200),
+      // Task 87: where the car's equipment decides, the mechanic is on site and
+      // can check it: name every version.
+      description: [partGroupName(part), part.brand, part.partNumber, fitOptionsNote(part.fitOptions)]
+        .filter(Boolean)
+        .join(" · ")
+        .slice(0, 200),
       quantity: part.quantity,
       unitPence: part.unitPence,
       source: part.source,

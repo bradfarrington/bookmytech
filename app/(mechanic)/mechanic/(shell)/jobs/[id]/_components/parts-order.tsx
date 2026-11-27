@@ -2,7 +2,9 @@
 
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { Truck, Wrench } from "lucide-react";
+import { AlertTriangle, Truck, Wrench } from "lucide-react";
+import { fitOptionsHeading, isChargedOption } from "@/lib/parts/fit-options";
+import type { FitOptions } from "@/lib/parts/repair-part-choice";
 import { cn, formatPrice } from "@/lib/utils";
 import { setPartSourcing } from "@/app/actions/booking-parts";
 
@@ -21,6 +23,8 @@ export interface JobPart {
   brand?: string | null;
   /** The price was estimated for this car, not taken from a listed part (Task 72). */
   estimated?: boolean;
+  /** Task 87: the versions for cars with / without air-con or stop-start, when NAPA lists them. */
+  fitOptions?: FitOptions | null;
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -87,6 +91,7 @@ export function PartsOrder({
                     )}
                   </p>
                 )}
+                {p.fitOptions && <FitOptionsBox fit={p.fitOptions} charged={p.supplierPartNumber} />}
               </div>
               <span className="shrink-0 text-sm font-semibold tabular-nums text-text-primary">
                 {formatPrice(p.totalPence)}
@@ -123,6 +128,38 @@ export function PartsOrder({
         Parts you source yourself are reimbursed in your payout. Order via BMT
         and we deliver the part; its cost comes off your payout instead.
       </p>
+    </div>
+  );
+}
+
+/**
+ * Task 87: NAPA lists this part in versions for cars with and without air-con
+ * (or stop-start). Which one the car takes, and what the customer said.
+ */
+function FitOptionsBox({ fit, charged }: { fit: FitOptions; charged?: string | null }) {
+  const unsure = fit.dependsOn.some((key) => fit.answered?.[key] === undefined);
+  return (
+    <div
+      className={cn(
+        "mt-2 rounded-button border px-3 py-2 text-xs",
+        unsure ? "border-amber-300 bg-amber-50 text-amber-900" : "border-border bg-surface text-text-secondary",
+      )}
+    >
+      <p className="flex items-start gap-1.5 font-semibold">
+        <AlertTriangle size={13} className="mt-0.5 shrink-0" aria-hidden />
+        {fitOptionsHeading(fit)}
+      </p>
+      <ul className="mt-1.5 space-y-1">
+        {fit.options.map((o) => (
+          <li key={`${o.partNumber}:${o.label}`} className="flex flex-wrap items-baseline gap-x-1.5">
+            <span className="font-medium">{o.label}:</span>
+            <span>{o.brand ?? "NAPA Auto Parts"}</span>
+            <span className="font-mono">{o.partNumber}</span>
+            {isChargedOption(o, charged) && <span className="text-text-muted">(priced as)</span>}
+          </li>
+        ))}
+      </ul>
+      {unsure && <p className="mt-1.5">Ask the customer in the chat, or check on arrival.</p>}
     </div>
   );
 }

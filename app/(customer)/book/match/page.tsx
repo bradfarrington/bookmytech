@@ -15,11 +15,21 @@ import {
 import { TrackOnMount } from "@/components/analytics/track-on-mount";
 import { FUNNEL_EVENTS } from "@/lib/analytics/events";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
+import {
+  answerOf,
+  equipmentFromParams,
+  mergeEquipment,
+  readEquipmentAnswer,
+  savedCarEquipment,
+  type EquipmentAnswer,
+} from "@/lib/bookings/car-equipment";
 import { productIncludes } from "@/lib/catalogue/products";
 import { partGroupName } from "@/lib/parts/quote-parts";
 import { stepQuery } from "@/lib/bookings/step-params";
 import { PriceHero } from "./_components/price-hero";
 import { ProductInfoSheets } from "./_components/product-info-sheets";
+import { EquipmentQuestions, type EquipmentQuestion } from "./_components/equipment-questions";
 
 // Step 3: the price. One job, or several priced as one visit (Task 24) — the
 // customer can add another from here and comes back with it appended. A
@@ -38,6 +48,9 @@ interface MatchPageProps {
     postcode?: string;
     /** Preferred mechanic id (rebook "same mechanic") — forwarded to /book/slot. */
     pref?: string;
+    /** Task 87: air-con / stop-start, as answered here ("y", "n", "u" = Not sure). */
+    ac?: string;
+    ss?: string;
   }>;
 }
 
@@ -60,8 +73,21 @@ export default async function MatchPage({ searchParams }: MatchPageProps) {
   const prefParam = params.pref ? `&pref=${encodeURIComponent(params.pref)}` : "";
   const browserHref = `/book/repairs?reg=${encodeURIComponent(reg)}${vehicleParams ? `&${vehicleParams}` : ""}${prefParam}`;
 
+  // Air-con and stop-start (Task 87): the answers on this URL, else the
+  // signed-in customer's saved car's. Carried to every later step.
+  const ac = readEquipmentAnswer(params.ac);
+  const ss = readEquipmentAnswer(params.ss);
+  const equipmentParam = `${ac ? `&ac=${ac}` : ""}${ss ? `&ss=${ss}` : ""}`;
+  const admin = createAdminClient();
+  const session = await createClient();
+  const {
+    data: { user: viewer },
+  } = await session.auth.getUser();
+  const saved = await savedCarEquipment(admin, viewer?.id ?? null, reg);
+  const equipment = mergeEquipment(equipmentFromParams({ ac, ss }), saved);
+
   // Server-authoritative price from (reg, items) — the URL never carries one.
-  const result = await quoteRepairsResult(reg, ids, createAdminClient());
+  const result = await quoteRepairsResult(reg, ids, admin, {}, equipment);
   if (!result.ok && result.reason !== "parts_unavailable") {
     // Vehicle no longer resolves or an item is stale/hidden — back to the browser.
     redirect(browserHref);
@@ -120,22 +146,39 @@ export default async function MatchPage({ searchParams }: MatchPageProps) {
 
   const withRepairs = (list: string[]) => `&${repairsQuery(list)}`;
   // Task 47: Price → Time → Address → Confirm, matching the app.
-  const timeHref = `/book/time?${stepQuery({
+  const stepBase = {
     reg,
     repairs: quote.itemIds,
     make: params.make,
     model: params.model,
     postcode: params.postcode,
     pref: params.pref,
-  })}`;
+    ac: ac ?? undefined,
+    ss: ss ?? undefined,
+  };
+  const timeHref = `/book/time?${stepQuery(stepBase)}`;
   const addHref = `${browserHref}${withRepairs(quote.itemIds)}`;
   // Dropping an item rewrites the URL; dropping the last one is "start again".
   const removeHref = (itemId: string) => {
     const rest = quote.itemIds.filter((id) => id !== itemId);
     return rest.length
-      ? `/book/match?reg=${encodeURIComponent(reg)}${withRepairs(rest)}${vehicleParams ? `&${vehicleParams}` : ""}${prefParam}`
+      ? `/book/match?reg=${encodeURIComponent(reg)}${withRepairs(rest)}${vehicleParams ? `&${vehicleParams}` : ""}${prefParam}${equipmentParam}`
       : browserHref;
   };
+  // Task 87: each answer is this page again with it set.
+  const answerHref = (key: "ac" | "ss", value: EquipmentAnswer) =>
+    `/book/match?${stepQuery({ ...stepBase, [key]: value })}`;
+  const savedAnswer = (value: boolean | null | undefined): EquipmentAnswer | null =>
+    value == null ? null : answerOf(value);
+  const equipmentQuestions: EquipmentQuestion[] = (quote.equipmentAsked ?? []).map((key) => {
+    const param = key === "air_con" ? "ac" : "ss";
+    const given = key === "air_con" ? ac : ss;
+    return {
+      key,
+      answer: given ?? savedAnswer(key === "air_con" ? saved.airCon : saved.stopStart),
+      hrefs: { y: answerHref(param, "y"), n: answerHref(param, "n"), u: answerHref(param, "u") },
+    };
+  });
   const multiJobs = quote.lines.length > 1;
   const canAdd = quote.itemIds.length < MAX_REPAIRS_PER_BOOKING;
   // A booking of fixed-price products only (Task 31) has no book time to talk about.
@@ -204,6 +247,9 @@ export default async function MatchPage({ searchParams }: MatchPageProps) {
       />
 
       {/* Task 74: what a product asks the customer to read before booking it. */}
+      {/* Task 87: air-con / stop-start, only when a part depends on it. */}
+      <EquipmentQuestions questions={equipmentQuestions} />
+
       <ProductInfoSheets
         sheets={quote.products.flatMap((p) =>
           p.infoSheet ? [{ id: p.id, name: p.name, infoSheet: p.infoSheet }] : [],

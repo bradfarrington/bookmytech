@@ -6,6 +6,7 @@ import { loadCheckoutContext, type CheckoutSearchParams } from "@/lib/bookings/c
 import { contextKeyFor, readTimeParams, stepQuery } from "@/lib/bookings/step-params";
 import { partGroupName } from "@/lib/parts/quote-parts";
 import { ConfirmCheckout } from "./_components/confirm-checkout";
+import { equipmentFromParams } from "@/lib/bookings/car-equipment";
 
 // Confirm (Task 47): the last step before the booking is made. Account, discount
 // code and payment. The URL stays /book/slot because Stripe returns customers
@@ -81,6 +82,7 @@ export default async function SlotPage({ searchParams }: SlotPageProps) {
         make={(base.make ?? "").toUpperCase()}
         model={base.model}
         quoteId={base.quote}
+        carEquipment={base.quote ? undefined : equipmentFromParams({ ac: base.ac, ss: base.ss })}
         repairNodeIds={base.quote ? [] : quote.itemIds}
         repairLines={quote.lines.map(({ nodeId, description, chargedHours, itemId, itemLabel }) => ({
           nodeId,

@@ -1,4 +1,5 @@
 import { notFound, redirect } from "next/navigation";
+import { readFitOptions } from "@/lib/parts/fit-options";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { loadBookingChecklists, productIdsInLines } from "@/lib/checklists/load";
@@ -175,6 +176,8 @@ export default async function MechanicJobDetailPage({ params }: PageProps) {
     brand: (p.brand as string | null | undefined) ?? null,
     // Migration 0087 (Task 72); absent until it's applied.
     estimated: p.price_estimated === true,
+    // Migration 0093 (Task 87): versions for cars with / without air-con or stop-start.
+    fitOptions: readFitOptions(p.fit_options),
   }));
   const partsPence = jobParts.reduce((s, p) => s + p.totalPence, 0);
   // The same sum the mechanic app is served (lib/mechanics/job-money.ts).

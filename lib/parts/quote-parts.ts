@@ -33,10 +33,13 @@ import { alternativePairs } from "./job-charges";
 import { loadModelPartOffers, loadVehicleModel } from "./model-parts";
 import { recordPartGaps } from "./part-gaps";
 import {
+  EQUIPMENT_KEYS,
   isSportsModel,
   jobPosition,
   selectJobParts,
   type CarTraits,
+  type EquipmentKey,
+  type FitOptions,
   type FluidNeed,
   type RepairPartChoiceRow,
 } from "./repair-part-choice";
@@ -99,6 +102,36 @@ export interface QuotedPart {
   modelPart?: true;
   /** When the price was given (by AAG, or set by the admin), ISO. */
   pricedAt: string;
+  /**
+   * ADDITIVE (Task 87). NAPA lists one part for cars with air-con (or
+   * stop-start) and one for cars without. The part charged is the one for the
+   * customer's answer (`answered`), or the dearer when they haven't said; the
+   * mechanic is told every option.
+   */
+  fitOptions?: FitOptions;
+}
+
+/** The car's equipment as the customer told us (Task 87). Null or absent: not known. */
+export interface CarEquipment {
+  airCon?: boolean | null;
+  stopStart?: boolean | null;
+}
+
+/**
+ * What to ask the customer: the equipment some part's price depends on (Task
+ * 87). Empty when nothing does, or they've answered. In EQUIPMENT_KEYS order. Pure.
+ */
+export function equipmentQuestions(parts: readonly Pick<QuotedPart, "fitOptions">[]): EquipmentKey[] {
+  const wanted = new Set(
+    parts.flatMap((part) => (part.fitOptions?.dependsOn ?? []).filter((key) => part.fitOptions?.answered?.[key] === undefined)),
+  );
+  return EQUIPMENT_KEYS.filter((key) => wanted.has(key));
+}
+
+/** Every piece of equipment some part depends on, answered or not: what the price step shows. Pure. */
+export function equipmentAsked(parts: readonly Pick<QuotedPart, "fitOptions">[]): EquipmentKey[] {
+  const keys = new Set(parts.flatMap((part) => part.fitOptions?.dependsOn ?? []));
+  return EQUIPMENT_KEYS.filter((key) => keys.has(key));
 }
 
 export interface PartsJob {
@@ -281,7 +314,7 @@ export function priceJobParts(args: {
         continue;
       }
       const choice = args.choices?.get(choiceKey(job.nodeId, group.genartId)) ?? null;
-      for (const { position, side, selection, quantity: wanted } of selectJobParts(job.description, lookup.offers, choice, fluidNeedFor(group.label, args.fluids), args.car, args.rule)) {
+      for (const { position, side, selection, quantity: wanted, fitOptions } of selectJobParts(job.description, lookup.offers, choice, fluidNeedFor(group.label, args.fluids), args.car, args.rule)) {
         // NAPA listed the part type for this car, but nothing that fits, or
         // not how many a job renewing every one of them needs.
         if (selection.source === "none" || selection.offer.costPence == null || wanted === null) {
@@ -311,6 +344,7 @@ export function priceJobParts(args: {
           pricedAt: lookup.pricedAt,
           ...(offer.fromCatalogue ? { fromCatalogue: true as const } : {}),
           ...(offer.modelPart ? { modelPart: true as const } : {}),
+          ...(fitOptions ? { fitOptions } : {}),
         };
         if (!mergeRepeatedPart(parts, line)) parts.push(line);
       }
@@ -388,12 +422,13 @@ function gapSightings(jobs: readonly PartsJob[], gaps: readonly number[]) {
 }
 
 /** Whether the car is a sports model, from HaynesPro's name for it. Standard when unknown. Never throws. */
-export async function loadCarTraits(db: SupabaseClient, reg: string): Promise<CarTraits> {
+export async function loadCarTraits(db: SupabaseClient, reg: string, equipment?: CarEquipment | null): Promise<CarTraits> {
+  const answers = { airCon: equipment?.airCon ?? null, stopStart: equipment?.stopStart ?? null };
   try {
     const { data } = await db.from("haynespro_vehicle_cache").select("description").eq("reg", aagRegKey(reg)).maybeSingle();
-    return { sports: isSportsModel((data as { description?: string | null } | null)?.description) };
+    return { sports: isSportsModel((data as { description?: string | null } | null)?.description), ...answers };
   } catch {
-    return { sports: false };
+    return { sports: false, ...answers };
   }
 }
 
@@ -425,6 +460,8 @@ export async function quoteJobParts(args: {
   reg: string;
   carTypeId: number;
   jobs: readonly PartsJob[];
+  /** ADDITIVE (Task 87). The customer's answers on air-con and stop-start, when given. */
+  equipment?: CarEquipment | null;
 }): Promise<JobPartsResult> {
   const [result, markup] = await Promise.all([quoteJobPartsAtCost(args), loadPartsMarkupRate(args.db)]);
   return { ...result, parts: applyPartsMarkup(result.parts, markup) };
@@ -436,6 +473,7 @@ async function quoteJobPartsAtCost(args: {
   reg: string;
   carTypeId: number;
   jobs: readonly PartsJob[];
+  equipment?: CarEquipment | null;
 }): Promise<JobPartsResult> {
   const genartIds = [...new Set(args.jobs.flatMap((job) => job.groups.map((g) => g.genartId)))];
   if (genartIds.length === 0) return { ok: true, parts: [] };
@@ -450,7 +488,7 @@ async function quoteJobPartsAtCost(args: {
     loadAagPartOffers(args.db, args.reg, charged),
     loadChoices(args.db, args.carTypeId, args.jobs.map((job) => job.nodeId)),
     hasFluid ? fluidCapacitiesFor(args.carTypeId) : Promise.resolve(null),
-    loadCarTraits(args.db, args.reg),
+    loadCarTraits(args.db, args.reg, args.equipment),
     loadPartPickRule(args.db),
   ]);
   if (!offers.enabled) return { ok: true, parts: [] };
@@ -566,28 +604,38 @@ export function catalogueBookingPartRows(bookingId: string, parts: readonly Quot
     // mixed estimated and NAPA-priced parts (2026-11-23). If the column is
     // ever missing, insertCatalogueBookingParts retries without it.
     price_estimated: part.source === "estimate",
+    // Migration 0093 (Task 87): the parts the mechanic chooses between when
+    // the car's equipment decides and the customer didn't say. Null otherwise.
+    fit_options: part.fitOptions ?? null,
   }));
 }
 
 /**
- * Insert the rows `catalogueBookingPartRows` built. Until migration 0087 adds
- * `price_estimated`, a row carrying it would fail the whole insert, so it is
- * retried without the flag: the price is still right, only the marker is lost.
+ * Insert the rows `catalogueBookingPartRows` built. Until migration 0093 adds
+ * `fit_options` (or 0087 `price_estimated`), a row carrying it would fail the
+ * whole insert, so it is retried without it: the price is still right, only
+ * the mechanic's options (or the marker) are lost.
  */
 export async function insertCatalogueBookingParts(
   db: SupabaseClient,
   rows: ReturnType<typeof catalogueBookingPartRows>,
 ): Promise<{ error: { code?: string; message?: string } | null }> {
-  const first = await db.from("booking_parts").insert(rows);
-  if (!first.error || !isMissingColumn(first.error) || !rows.some((r) => "price_estimated" in r)) return first;
-  console.error("[parts] booking_parts.price_estimated is missing (migration 0087); saving without it");
-  return db.from("booking_parts").insert(
-    rows.map((row) => {
-      const rest: Record<string, unknown> = { ...row };
-      delete rest.price_estimated;
+  // Newest column first: each retry drops one a migration hasn't added yet.
+  const optional = ["fit_options", "price_estimated"] as const;
+  let attempt: Array<Record<string, unknown>> = rows.map((row) => ({ ...row }));
+  let result = await db.from("booking_parts").insert(attempt);
+  for (const column of optional) {
+    if (!result.error || !isMissingColumn(result.error)) return result;
+    if (!attempt.some((r) => column in r)) continue;
+    console.error(`[parts] booking_parts.${column} is missing; saving without it`);
+    attempt = attempt.map((row) => {
+      const rest = { ...row };
+      delete rest[column];
       return rest;
-    }),
-  );
+    });
+    result = await db.from("booking_parts").insert(attempt);
+  }
+  return result;
 }
 
 /**

@@ -1,4 +1,5 @@
 import { prepareCheckoutFor } from "@/lib/bookings/create-booking";
+import { equipmentFromBody } from "@/lib/bookings/car-equipment";
 import { MAX_REPAIRS_PER_BOOKING, readRepairIdList } from "@/lib/bookings/repair-ids";
 import { enforceBookingLimits, staffRefusal } from "@/lib/mobile/booking-guards";
 import { apiError, apiOk, readJsonBody } from "@/lib/mobile/respond";
@@ -29,6 +30,10 @@ import { requireMobileUser } from "@/lib/supabase/mobile";
 // card; then the hold is made against their Stripe Customer, and passing both
 // to initPaymentSheet (alongside paymentIntentClientSecret) lists the saved
 // cards. A card typed in the sheet is not saved.
+//
+// ADDITIVE (Task 87): `equipment?: { airCon, stopStart }` exactly as sent to
+// POST /quote (see there). Send the same here and to POST /bookings, or the
+// hold and the booking may price a different version of a part.
 //
 // Thin wrapper over `prepareCheckoutFor` — the SAME function the website's
 // checkout calls through app/actions/create-booking.ts. Everything that decides
@@ -66,6 +71,8 @@ interface PrepareBody {
    * sentence to show. The success arms gain `discountPence` and `promoCode`.
    */
   promoCode?: unknown;
+  /** ADDITIVE (Task 87): air-con / stop-start answers, as sent to /quote. */
+  equipment?: unknown;
 }
 
 const asString = (value: unknown): string => (typeof value === "string" ? value.trim() : "");
@@ -116,6 +123,7 @@ export async function POST(request: Request): Promise<Response> {
       repairNodeIds: repairNodeIds && repairNodeIds.length ? repairNodeIds : undefined,
       quoteId: quoteId || undefined,
       promoCode: asString(parsed.body.promoCode) || undefined,
+      carEquipment: equipmentFromBody(parsed.body.equipment),
     },
     caller.userId,
   );

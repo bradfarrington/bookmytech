@@ -67,6 +67,101 @@ export function offersFrom(panels: readonly SupplierPanel[]): SupplierOffer[] {
  */
 export interface CarTraits {
   sports: boolean;
+  /**
+   * ADDITIVE (Task 87). Whether the car has air-con, as the customer told us.
+   * Null or absent: not known (not asked, or "Not sure"). Nothing we look up
+   * says: not HaynesPro, NAPA, DVLA or the MOT history.
+   */
+  airCon?: boolean | null;
+  /** ADDITIVE (Task 87). Likewise stop-start. */
+  stopStart?: boolean | null;
+}
+
+/** Equipment that decides between NAPA's alternatives, and that only the customer (or the car) can tell us. */
+export type EquipmentKey = "air_con" | "stop_start";
+
+export const EQUIPMENT_KEYS: readonly EquipmentKey[] = ["air_con", "stop_start"];
+
+/** The offer field and the car's answer for each piece of equipment. */
+const EQUIPMENT_FIELD = { air_con: "airCon", stop_start: "stopStart" } as const satisfies Record<EquipmentKey, keyof SupplierOffer & keyof CarTraits>;
+
+function offerEquipment(offer: SupplierOffer, key: EquipmentKey): boolean | null {
+  return offer[EQUIPMENT_FIELD[key]] ?? null;
+}
+
+export function carEquipment(car: CarTraits | null | undefined, key: EquipmentKey): boolean | null {
+  return car?.[EQUIPMENT_FIELD[key]] ?? null;
+}
+
+/** "With air-con", "Without stop-start". */
+export function equipmentLabel(key: EquipmentKey, has: boolean): string {
+  const name = key === "air_con" ? "air-con" : "stop-start";
+  return `${has ? "With" : "Without"} ${name}`;
+}
+
+/** One of the parts a job could need, when the car's equipment decides which (Task 87). */
+export interface FitOption {
+  supplier: SupplierId;
+  partNumber: string;
+  brand: string | null;
+  description: string | null;
+  /** The equipment it's for: { air_con: true }. */
+  for: Partial<Record<EquipmentKey, boolean>>;
+  /** "With air-con", or "With air-con, without stop-start". */
+  label: string;
+}
+
+/**
+ * The parts a job could need when NAPA lists one for cars with the equipment
+ * and one for cars without. Unanswered, the job is priced at the dearer, and
+ * the mechanic is told both (Brad, 2026-11-27); answered, the customer's, and
+ * the mechanic still sees the others.
+ */
+export interface FitOptions {
+  dependsOn: EquipmentKey[];
+  options: FitOption[];
+  /**
+   * The customer's answers, for the equipment they answered: the part charged
+   * is the one for that car, and the others are what to buy if they were
+   * wrong. A key absent from here is unknown: the part is the dearest.
+   */
+  answered?: Partial<Record<EquipmentKey, boolean>>;
+}
+
+/**
+ * Parts for equipment the car doesn't have go, once the customer has said
+ * (Task 87): with air-con, the "-AC" belt is out. Parts that fit either stay.
+ * Never empties the list. Pure.
+ */
+export function forEquipment(offers: readonly SupplierOffer[], car: CarTraits | null | undefined): readonly SupplierOffer[] {
+  let kept = offers;
+  for (const key of EQUIPMENT_KEYS) {
+    const has = carEquipment(car, key);
+    if (has == null) continue;
+    const narrowed = kept.filter((o) => offerEquipment(o, key) == null || offerEquipment(o, key) === has);
+    if (narrowed.length > 0) kept = narrowed;
+  }
+  return kept;
+}
+
+/**
+ * Parts NAPA's chassis note rules out for this car's VIN go (Task 87: a VW
+ * Transporter's belt changes at chassis 7H-6H079890). Never empties the list. Pure.
+ */
+export function forChassis(offers: readonly SupplierOffer[]): readonly SupplierOffer[] {
+  const kept = offers.filter((o) => o.chassis?.fits !== false);
+  return kept.length > 0 ? kept : offers;
+}
+
+/** The equipment, not yet known, that NAPA's buyable parts here split on: some for cars with it, some without. Pure. */
+export function equipmentSplit(offers: readonly SupplierOffer[], car: CarTraits | null | undefined): EquipmentKey[] {
+  const buyable = offers.filter((o) => o.buyable && o.costPence != null);
+  return EQUIPMENT_KEYS.filter(
+    (key) =>
+      carEquipment(car, key) == null &&
+      buyable.some((o) => offerEquipment(o, key) === true) &&
+      buyable.some((o) => offerEquipment(o, key) === false),
+  );
 }
 
 /**
@@ -340,9 +435,49 @@ export interface PartSlot {
  */
 export function partSlots(jobDescription: string | null | undefined, offers: readonly SupplierOffer[]): PartSlot[] {
   const needs = jobNeeds(jobDescription);
-  return partBuckets(jobDescription, offers).flatMap((bucket) =>
-    bySide(bucket, needs).flatMap((slot) => byCylinder(slot, needs)),
-  );
+  return partBuckets(jobDescription, offers)
+    .flatMap((bucket) => byDrivenUnit(bucket, jobDescription, needs))
+    .flatMap((bucket) => bySide(bucket, needs).flatMap((slot) => byCylinder(slot, needs)));
+}
+
+/** Jobs on an ancillary drive belt or its pulleys: the ones NAPA's "Driven Unit" decides between. */
+const DRIVE_BELT_JOB = /\b(drive belts?|ancillary|auxiliary|v-?belts?|(v-)?ribbed belts?|belt (tensioner|idler|pulley|damper)s?)\b/i;
+
+/**
+ * What a belt drives, as the job names it and as NAPA does ("Driven Unit").
+ * A job naming none ("Renew the ancillary drive belt") is the main belt, the
+ * one that drives the alternator.
+ */
+const DRIVEN_UNITS: ReadonlyArray<{ job: RegExp; offer: RegExp }> = [
+  { job: /\b(coolant|water) pump\b/i, offer: /\b(coolant|water) pump\b/i },
+  { job: /\bpower steering\b/i, offer: /\b(power steering|steering pump|p\/?s pump)\b/i },
+  { job: /\b(air[\s-]?condition\w*|a\/c|compressor)\b/i, offer: /\b(air[\s-]?con\w*|a\/c|compressor)\b/i },
+  { job: /\boil pump\b/i, offer: /\boil pump\b/i },
+  { job: /\balternator\b/i, offer: /\balternator\b/i },
+];
+const MAIN_BELT = /\balternator\b/i;
+
+/**
+ * Task 87. A car with more than one ancillary belt (a Peugeot 308 1.2: a
+ * 6PK1043 for the alternator, a 3PK576 stretch-fit for the water pump) gets
+ * both listed under both belt part types, and NAPA says which drives what.
+ * A job naming what its belt drives takes that belt; one naming nothing takes
+ * the main (alternator) belt; "Renew all the ancillary drive belts" takes one
+ * of each. Only on drive-belt jobs, and only when NAPA names two or more
+ * driven units. Pure.
+ */
+function byDrivenUnit(bucket: PartBucket, jobDescription: string | null | undefined, needs: JobNeeds): PartBucket[] {
+  const text = String(jobDescription ?? "");
+  const unitOf = (o: SupplierOffer) => o.drivenUnit?.trim().toLowerCase() || null;
+  const units = [...new Set(bucket.offers.map(unitOf).filter((u): u is string => !!u))];
+  if (units.length < 2 || !DRIVE_BELT_JOB.test(text)) return [bucket];
+  if (wantsSet(needs)) {
+    return units.map((unit) => ({ position: bucket.position, offers: bucket.offers.filter((o) => unitOf(o) === unit) }));
+  }
+  const named = DRIVEN_UNITS.find((u) => u.job.test(text));
+  const wanted = named ? named.offer : MAIN_BELT;
+  const own = bucket.offers.filter((o) => wanted.test(o.drivenUnit ?? ""));
+  return [own.length > 0 ? { position: bucket.position, offers: own } : bucket];
 }
 
 function bySide(bucket: PartBucket, needs: JobNeeds): PartSlot[] {
@@ -413,6 +548,11 @@ export interface JobPartSelection {
    * NAPA doesn't say how many.
    */
   quantity?: number | null;
+  /**
+   * ADDITIVE (Task 87). The parts it could be when the car's equipment
+   * decides and we don't know it: priced at the dearer, the mechanic told both.
+   */
+  fitOptions?: FitOptions;
 }
 
 /**
@@ -432,10 +572,15 @@ export function selectJobParts(
   rule: PartPickRule = DEFAULT_PART_PICK_RULE,
 ): JobPartSelection[] {
   const chosen = (o: SupplierOffer) => !!choice && o.supplier === choice.supplier && o.partNumber === choice.part_number;
-  // An admin's pick stands whatever its suspension: only the default is narrowed.
-  const slots = partSlots(jobDescription, offers).map((slot) =>
-    slot.offers.some(chosen) ? slot : { ...slot, offers: [...forSuspension(slot.offers, car)] },
-  );
+  // A part the car's VIN or the customer's answer rules out goes first, an
+  // admin's pick included (Task 87). An admin's pick then stands whatever its
+  // suspension: only the default is narrowed.
+  // `whole` keeps every kind of car's parts for the mechanic's options; the
+  // slot itself only this car's, once the customer has said.
+  const whole = partSlots(jobDescription, offers)
+    .map((slot) => ({ ...slot, offers: [...forChassis(slot.offers)] }))
+    .map((slot) => (slot.offers.some(chosen) ? slot : { ...slot, offers: [...forSuspension(slot.offers, car)] }));
+  const slots = whole.map((slot) => ({ ...slot, offers: [...forEquipment(slot.offers, car)] }));
   const home = choice
     ? slots.findIndex((b) => b.offers.some((o) => o.supplier === choice.supplier && o.partNumber === choice.part_number))
     : -1;
@@ -458,6 +603,12 @@ export function selectJobParts(
         return { position: slot.position, side: slot.side, selection, quantity: Math.max(1, Math.ceil(litresOfProduct(selection.offer, fluid) / litres - 1e-9)) };
       }
     }
+    const depends = fluid ? [] : equipmentSplit(whole[index].offers, null);
+    if (depends.length > 0) {
+      const missingChoice = selection.source === "choice" ? null : selection.missingChoice;
+      const options = equipmentOptions(jobDescription, whole[index], depends, car, index === home ? choice : null, missingChoice, slotsOnAxle, rule);
+      if (options) return { position: slot.position, side: slot.side, ...options };
+    }
     return {
       position: slot.position,
       side: slot.side,
@@ -465,4 +616,62 @@ export function selectJobParts(
       quantity: selection.source === "none" ? 1 : slotQuantity(jobDescription, slot, selection.offer, slotsOnAxle),
     };
   });
+}
+
+/**
+ * A slot whose parts split on air-con or stop-start (Task 87): the part the
+ * pick rule (or the admin's choice) takes for each kind of car, every one
+ * listed for the mechanic. Charged: the one for the customer's answer, and
+ * where they haven't answered the dearest, so they never pay more than quoted. Parts that fit either kind are in every group. Null when
+ * every kind of car would take the same part. Pure.
+ */
+function equipmentOptions(
+  jobDescription: string | null | undefined,
+  slot: PartSlot,
+  depends: EquipmentKey[],
+  car: CarTraits | null | undefined,
+  choice: MissingChoice | null,
+  missingChoice: MissingChoice | null,
+  slotsOnAxle: number,
+  rule: PartPickRule,
+): Pick<JobPartSelection, "selection" | "quantity" | "fitOptions"> | null {
+  const kinds = depends.reduce<Array<Partial<Record<EquipmentKey, boolean>>>>(
+    (acc, key) => acc.flatMap((kind) => [{ ...kind, [key]: true }, { ...kind, [key]: false }]),
+    [{}],
+  );
+  const picks: Array<{ kind: Partial<Record<EquipmentKey, boolean>>; offer: SupplierOffer; source: "choice" | "default"; quantity: number | null; line: number }> = [];
+  for (const kind of kinds) {
+    const group = slot.offers.filter((o) => depends.every((key) => offerEquipment(o, key) == null || offerEquipment(o, key) === kind[key]));
+    const inGroup = choice && group.some((o) => o.supplier === choice.supplier && o.partNumber === choice.part_number) ? choice : null;
+    const selection = selectRepairPart([{ state: "ok", offers: group }], inGroup, rule);
+    if (selection.source === "none" || selection.offer.costPence == null) continue;
+    const quantity = slotQuantity(jobDescription, slot, selection.offer, slotsOnAxle);
+    picks.push({ kind, offer: selection.offer, source: selection.source, quantity, line: selection.offer.costPence * (quantity ?? 1) });
+  }
+  // The same part for every kind of car (one that fits either won): nothing to tell apart.
+  if (new Set(picks.map((p) => `${p.offer.supplier}:${p.offer.partNumber}`)).size < 2) return null;
+  // This car's kind, as far as the customer has said; the dearest of those.
+  const answered: Partial<Record<EquipmentKey, boolean>> = {};
+  for (const key of depends) {
+    const has = carEquipment(car, key);
+    if (has != null) answered[key] = has;
+  }
+  const theirs = picks.filter((p) => depends.every((key) => answered[key] === undefined || p.kind[key] === answered[key]));
+  const dearest = (theirs.length > 0 ? theirs : picks).reduce((a, b) => (b.line > a.line ? b : a));
+  const options: FitOption[] = picks.map((p) => ({
+    supplier: p.offer.supplier,
+    partNumber: p.offer.partNumber,
+    brand: p.offer.brand,
+    description: p.offer.description,
+    for: p.kind,
+    label: depends.map((key) => equipmentLabel(key, p.kind[key] as boolean)).join(", "),
+  }));
+  return {
+    selection:
+      dearest.source === "choice"
+        ? { source: "choice", offer: dearest.offer }
+        : { source: "default", offer: dearest.offer, missingChoice },
+    quantity: dearest.quantity,
+    fitOptions: { dependsOn: depends, options, ...(Object.keys(answered).length > 0 ? { answered } : {}) },
+  };
 }

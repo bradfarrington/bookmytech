@@ -7,6 +7,7 @@
 // address never does; it lives in sessionStorage (lib/bookings/address-draft.ts),
 // keyed by `contextKeyFor`, so personal data stays out of URLs, logs and history.
 
+import type { EquipmentAnswer } from "./car-equipment";
 import { normaliseRepairIds } from "./repair-ids";
 import { ALL_DAY_SLOT, TWO_HOUR_SLOTS, isDayKey } from "@/lib/slots";
 
@@ -22,6 +23,10 @@ export interface BookingBaseParams {
   pref?: string;
   /** A follow-on quote (Task 34): the price and vehicle come from it. */
   quote?: string;
+  /** Task 87: does the car have air-con, as answered on the price step ("y", "n", "u" = Not sure). */
+  ac?: EquipmentAnswer;
+  /** Task 87: likewise stop-start. */
+  ss?: EquipmentAnswer;
 }
 
 /** The arrival window chosen on the Time step. */
@@ -81,6 +86,8 @@ export function stepQuery(base: BookingBaseParams, time?: BookingTimeParams | nu
     if (base.make) query.set("make", base.make);
     if (base.model) query.set("model", base.model);
     if (base.pref) query.set("pref", base.pref);
+    if (base.ac) query.set("ac", base.ac);
+    if (base.ss) query.set("ss", base.ss);
   }
   if (base.postcode) query.set("postcode", base.postcode);
   if (time) {

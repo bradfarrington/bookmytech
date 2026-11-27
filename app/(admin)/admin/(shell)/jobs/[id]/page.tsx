@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { fitOptionsHeading, fitOptionsNote, readFitOptions } from "@/lib/parts/fit-options";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -617,6 +618,15 @@ export default async function BookingDetailPage({ params }: PageProps) {
                             ? `NAPA Auto Parts ${part.supplier_part_number}`
                             : "Set price"}
                       </span>
+                      {/* Task 87: versions for cars with / without air-con or stop-start. */}
+                      {(() => {
+                        const fit = readFitOptions(part.fit_options);
+                        return fit ? (
+                          <span className="block text-amber-800">
+                            {fitOptionsHeading(fit)} {fitOptionsNote(fit)}
+                          </span>
+                        ) : null;
+                      })()}
                     </span>
                     <span className="shrink-0 text-text-muted">{formatPrice(part.total_pence)}</span>
                   </li>

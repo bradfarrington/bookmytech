@@ -119,6 +119,10 @@ You are working on **Book My Tech**, a UK mobile-mechanic booking platform. This
 
 ## Current task
 
+### 📌 2026-11-27: Parts that depend on the car: belts, air-con, stop-start (Task 87), committed locally, not pushed
+
+Read `docs/tasks/87-parts-that-depend-on-the-car.md`. From job 00133 (a drive belt charged twice). The same NAPA part on one job is now charged once, at the vehicle's quantity (`cf18ade`). Belts are matched to what they drive (NAPA's "Driven Unit"); chassis cut-offs are checked against the VIN. Parts NAPA lists for cars with / without air-con or stop-start ask the customer on the price step (Yes / No / Not sure), remembered on the booking and the saved car; unanswered, the dearer version is charged and the mechanic is shown every version (`booking_parts.fit_options`). **Migration `0093` must be applied before deploying.** **Apps:** customer app asks the question and sends `equipment`; mechanic app shows the versions; both regenerate types after 0093.
+
 ### 📌 2026-11-26: Repair manuals and technical data in the mechanic app (Task 86), pushed 2026-11-26 (`cb7e864`)
 
 Read `docs/tasks/86-mechanic-app-technical-data.md`. Three read-only routes under `/api/mobile/v1/mechanic/bookings/[id]/technical/` (manuals list, one manual, data) over the same HaynesPro reads as the website's technical page, mapped to stable shapes of our own. No migration; additive API only. **Mechanic app:** new Technical data card and screens; needs this deployed, then an EAS build.

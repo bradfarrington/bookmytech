@@ -26,6 +26,14 @@ import {
   type CustomerPartLine,
 } from "@/lib/parts/quote-parts";
 import { recordBookedVehicle } from "@/lib/garage/garage";
+import {
+  bookingEquipmentColumns,
+  equipmentFromBody,
+  mergeEquipment,
+  rememberCarEquipment,
+  savedCarEquipment,
+} from "@/lib/bookings/car-equipment";
+import type { CarEquipment } from "@/lib/parts/quote-parts";
 import { checkoutCustomerFor, type CardSurface } from "@/lib/payments/saved-cards";
 import { MAX_REPAIRS_PER_BOOKING, repairIdsFromInput } from "@/lib/bookings/repair-ids";
 import { quoteFollowOn, type FollowOnOrigin } from "@/lib/quotes/book-follow-on";
@@ -124,6 +132,12 @@ export interface CreateBookingInput {
    * from that quote; it is broadcast like any booking.
    */
   quoteId?: string;
+  /**
+   * ADDITIVE (Task 87). The customer's answers on air-con and stop-start
+   * (lib/bookings/car-equipment.ts). A key present is an answer, null being
+   * "Not sure"; a key absent falls back to the saved car's answer.
+   */
+  carEquipment?: CarEquipment;
 }
 
 type ResolvedQuote =
@@ -142,7 +156,7 @@ type ResolvedQuote =
  * prepare and create so the hold and the row can't disagree.
  */
 async function resolveBookingQuote(
-  input: { vehicleReg: string; repairNodeId?: string; repairNodeIds?: string[]; quoteId?: string },
+  input: { vehicleReg: string; repairNodeId?: string; repairNodeIds?: string[]; quoteId?: string; carEquipment?: CarEquipment },
   customerId: string | null,
 ): Promise<ResolvedQuote> {
   if (input.quoteId) {
@@ -165,7 +179,11 @@ async function resolveBookingQuote(
   if (ids.length === 0) return { ok: false, error: "Choose the repairs you need first." };
   if (ids.length > MAX_REPAIRS_PER_BOOKING)
     return { ok: false, error: `You can book up to ${MAX_REPAIRS_PER_BOOKING} jobs in one visit.` };
-  const result = await quoteRepairsResult(input.vehicleReg, ids, createAdminClient());
+  // Air-con and stop-start (Task 87): the answer given now, else the saved car's.
+  const admin = createAdminClient();
+  // Cleaned like an app body: the website's input comes from the browser too.
+  const equipment = mergeEquipment(equipmentFromBody(input.carEquipment), await savedCarEquipment(admin, customerId, input.vehicleReg));
+  const result = await quoteRepairsResult(input.vehicleReg, ids, admin, {}, equipment);
   if (!result.ok)
     return {
       ok: false,
@@ -360,6 +378,8 @@ export async function createBooking(
       // follow-on quote that has no HaynesPro job behind it (Task 34).
       repair_node_id: quote.lines[0].nodeId,
       repair_description: repairDescription,
+      // Task 87 (migration 0093): only when answered, so nothing changes until then.
+      ...bookingEquipmentColumns(quote.equipment),
       // Only named on a multi-job booking: the column arrives with migration
       // 0055, and a single-job insert must keep working before it is applied.
       ...(multiJob ? { combine_source: quote.combineSource } : {}),
@@ -466,6 +486,8 @@ export async function createBooking(
       make: vehicleMake,
       model: vehicleModel,
     });
+    // Their air-con / stop-start answer, so they're asked once per car (Task 87).
+    await rememberCarEquipment(db, customerId, vehicleReg, quote.equipment);
   }
 
   // A return visit booked from a follow-on quote (Task 34): the quote's parts
@@ -623,6 +645,8 @@ export interface PrepareCheckoutInput {
   quoteId?: string;
   /** A discount code the customer typed (Task 35). Validated server-side. Signed-in only. */
   promoCode?: string;
+  /** ADDITIVE (Task 87). As CreateBookingInput.carEquipment: the hold must match the booking. */
+  carEquipment?: CarEquipment;
 }
 
 export type PrepareCheckoutResult =

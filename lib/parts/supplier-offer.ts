@@ -113,10 +113,34 @@ export interface SupplierOffer {
    * asked again rather than used as fresh.
    */
   readVersion?: number;
+  /**
+   * ADDITIVE (Task 87). What a belt or pulley drives, from NAPA's "Driven
+   * Unit": "Water pump", "Alternator". A Peugeot 308 1.2 has two ancillary
+   * belts, and NAPA lists both under both belt part types.
+   */
+  drivenUnit?: string | null;
+  /**
+   * ADDITIVE (Task 87). Whether the part is for a car with air-con, from
+   * NAPA's "Fitment": true for "+AC", false for "-AC". Absent or null when
+   * NAPA doesn't say.
+   */
+  airCon?: boolean | null;
+  /** ADDITIVE (Task 87). Likewise stop-start: "FOR STOP-START" / "NOT FOR STOP-START". */
+  stopStart?: boolean | null;
+  /** ADDITIVE (Task 87). NAPA's own "Fitment" wording, as it gave it. */
+  fitmentText?: string | null;
+  /**
+   * ADDITIVE (Task 87). NAPA's "Chassis Note" ("TO CH. 7H-6H079890") and
+   * whether this car's VIN is inside it: null when that can't be told.
+   */
+  chassis?: { note: string; fits: boolean | null } | null;
 }
 
-/** Bump when aagOffers reads something new from NAPA's details. 2: suspension (2026-11-18). */
-export const OFFER_READ_VERSION = 2;
+/**
+ * Bump when aagOffers reads something new from NAPA's details. 2: suspension
+ * (2026-11-18). 3: driven unit, air-con, stop-start, chassis (Task 87).
+ */
+export const OFFER_READ_VERSION = 3;
 
 export type SupplierPanel =
   | { state: "ok"; offers: SupplierOffer[] }
@@ -320,8 +344,111 @@ export function cylinderOf(properties: ReadonlyArray<{ name: string; value: stri
   return /\bcyl/i.test(position) ? position : null;
 }
 
+/** The Task 87 fields: what the part drives, the equipment and chassis it's for. Pure. */
+function fitmentOf(
+  properties: ReadonlyArray<{ name: string; value: string }> | undefined,
+  car: AagVehicleFacts | null | undefined,
+): Pick<SupplierOffer, "drivenUnit" | "airCon" | "stopStart" | "fitmentText" | "chassis"> {
+  const fitment = property(properties, /^fitment$/i);
+  const chassisNote = property(properties, /^chassis\s+note$/i);
+  return {
+    drivenUnit: drivenUnitOf(properties),
+    airCon: airConOf(fitment),
+    stopStart: stopStartOf(fitment),
+    fitmentText: fitment,
+    chassis: chassisNote ? { note: chassisNote, fits: chassisFits(chassisNote, car) } : null,
+  };
+}
+
+/** A NAPA detail's value by name, or null. */
+function property(properties: ReadonlyArray<{ name: string; value: string }> | undefined, name: RegExp): string | null {
+  return (properties ?? []).find((p) => name.test(p.name))?.value.trim() || null;
+}
+
+/** What a belt or pulley drives ("Driven Unit": "Water pump"), or null. Pure. */
+export function drivenUnitOf(properties: ReadonlyArray<{ name: string; value: string }> | undefined): string | null {
+  return property(properties, /^driven\s+unit$/i);
+}
+
+const AIR_CON = "(?:A\\/?C|AIR[\\s-]?CON(?:DITIONING|DITIONED)?)";
+const NO_AIR_CON = new RegExp(`(?:^|[\\s,(/])-\\s*A\\/?C\\b|\\b(?:WITHOUT|NO|NON|NOT\\s+FOR|EXC(?:L(?:UDING)?)?\\.?)[\\s-]*${AIR_CON}\\b`, "i");
+const HAS_AIR_CON = new RegExp(`(?:^|[\\s,(/])\\+\\s*A\\/?C\\b|\\b(?:WITH|FOR|INC(?:L(?:UDING)?)?\\.?)\\s+${AIR_CON}\\b`, "i");
+
+/** Air-con from NAPA's "Fitment": "+AC" true, "-AC" false, null when it doesn't say or says both. Pure. */
+export function airConOf(fitment: string | null | undefined): boolean | null {
+  const text = String(fitment ?? "");
+  const no = NO_AIR_CON.test(text);
+  // "NOT FOR AC" also reads as "FOR AC": the negative wins on its own words.
+  const yes = HAS_AIR_CON.test(text.replace(NO_AIR_CON, " "));
+  return no === yes ? null : yes;
+}
+
+const STOP_START = "(?:STOP[\\s/-]*START|S\\/S)";
+const NO_STOP_START = new RegExp(`(?:^|[\\s,(])-\\s*S\\/S\\b|\\b(?:WITHOUT|NO|NON|NOT\\s+FOR)[\\s-]*${STOP_START}\\b`, "i");
+const HAS_STOP_START = new RegExp(`(?:^|[\\s,(])\\+\\s*S\\/S\\b|\\b(?:WITH|FOR)\\s+${STOP_START}\\b`, "i");
+
+/** Stop-start from NAPA's "Fitment": "FOR STOP-START" true, "NOT FOR STOP-START" false, else null. Pure. */
+export function stopStartOf(fitment: string | null | undefined): boolean | null {
+  const text = String(fitment ?? "");
+  const no = NO_STOP_START.test(text);
+  const yes = HAS_STOP_START.test(text.replace(NO_STOP_START, " "));
+  return no === yes ? null : yes;
+}
+
+/** What NAPA's answer says about the car itself (its VehicleDetails). */
+export interface AagVehicleFacts {
+  vin?: string | null;
+  /** Year of manufacture, to read the VIN's model-year letter. */
+  year?: number | null;
+}
+
+/** VIN model-year letters from 1980 ("A") in order; digits 1–9 are 2001–2009. */
+const VIN_YEAR_LETTERS = "ABCDEFGHJKLMNPRSTVWXY";
+
+/** The model year a VIN year code stands for, the one of its 30-year cycle nearest `near`. Pure. */
+export function vinYear(code: string, near: number): number | null {
+  const c = code.toUpperCase();
+  const letter = VIN_YEAR_LETTERS.indexOf(c);
+  const base = letter >= 0 ? 1980 + letter : /^[1-9]$/.test(c) ? 2000 + Number(c) : null;
+  if (base == null) return null;
+  return [base, base + 30, base + 60].reduce((a, b) => (Math.abs(b - near) < Math.abs(a - near) ? b : a));
+}
+
+/**
+ * Whether a car's VIN is inside NAPA's chassis note, for the notes VW group
+ * cars carry: "TO CH. 7H-6H079890", "FROM CH. 7H-6H079891" (model 7H, model
+ * year 6, plant H, serial 079890; a VIN reads WV1ZZZ7HZ6H079…). Null when
+ * the note isn't that shape, the VIN is another model, or the order can't be
+ * told (another plant in the same year). Pure.
+ */
+export function chassisFits(note: string | null | undefined, car: AagVehicleFacts | null | undefined): boolean | null {
+  const vin = String(car?.vin ?? "").trim().toUpperCase();
+  if (!/^[A-HJ-NPR-Z0-9]{17}$/.test(vin) || !/^\d{6}$/.test(vin.slice(11))) return null;
+  const limits = [...String(note ?? "").matchAll(/\b(FROM|TO|UP\s+TO|UNTIL)\s+CH(?:ASSIS)?\.?\s*(?:NO\.?\s*)?([A-Z0-9]{2})-?([A-Z0-9])([A-Z0-9])(\d{6})\b/gi)];
+  if (limits.length === 0) return null;
+  const near = car?.year && car.year > 1980 ? car.year : null;
+  let fits = true;
+  for (const [, dir, model, yearCode, plant, serial] of limits) {
+    if (vin.slice(6, 8) !== model.toUpperCase()) return null;
+    let order: number;
+    if (vin[9] === yearCode.toUpperCase()) {
+      if (vin[10] !== plant.toUpperCase()) return null;
+      order = Number(vin.slice(11)) - Number(serial);
+    } else {
+      if (near == null) return null;
+      const carYear = vinYear(vin[9], near);
+      const noteYear = vinYear(yearCode, near);
+      if (carYear == null || noteYear == null) return null;
+      order = carYear - noteYear;
+    }
+    const from = /^from$/i.test(dir);
+    if (from ? order < 0 : order > 0) fits = false;
+  }
+  return fits;
+}
+
 /** Map AAG's already-flattened quote lines into the offer shape. */
-export function aagOffers(lines: readonly AagQuoteLine[]): SupplierOffer[] {
+export function aagOffers(lines: readonly AagQuoteLine[], car?: AagVehicleFacts | null): SupplierOffer[] {
   return lines.map((line) => {
     const surchargePence = line.surchargePence != null && line.surchargePence > 0 ? line.surchargePence : null;
     const notes: string[] = [];
@@ -357,6 +484,7 @@ export function aagOffers(lines: readonly AagQuoteLine[]): SupplierOffer[] {
       perVehicle: perVehicleOf(line.properties, line.article),
       cylinder: cylinderOf(line.properties),
       suspension: suspensionOf(line.properties),
+      ...fitmentOf(line.properties, car),
       fitRead: true as const,
       readVersion: OFFER_READ_VERSION,
     };
