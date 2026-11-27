@@ -1,6 +1,6 @@
 # Task 87: Parts that depend on the car (belts, air-con, stop-start)
 
-**Status:** ✅ Complete (2026-11-27). One NAPA part is charged once per job; drive belts are matched to what they drive; parts NAPA lists in versions for cars with / without air-con or stop-start ask the customer (website price step, both apps' API), are priced at the dearer version when unanswered, and show the mechanic every version. Migration `0093`. Customer and mechanic app work done in their repos (uncommitted at time of writing; see "Apps").
+**Status:** ✅ Complete (2026-11-27). One NAPA part is charged once per job; drive belts are matched to what they drive; parts NAPA lists in versions for cars with / without air-con or stop-start ask the customer (website price step, both apps' API), are priced at the dearer version when unanswered, and show the mechanic every version. Migration `0093`. Customer app `a13cd2d`, mechanic app `d89a6ca` (committed locally, not pushed).
 
 Brad, 2026-11-27, from job 00133 (Astra K 1.0, SW16 PFD): "Renew the ancillary drive belt" charged twice, as a V-belt and a V-ribbed belt.
 
@@ -73,6 +73,7 @@ Bookings already made keep their parts: the two existing bookings with the dupli
 
 ## Apps
 
-- **Customer app:** show `quote.equipmentQuestions` on the price screen (Yes / No / Not sure, verbatim), re-quote with `equipment`, send the same `equipment` to `/checkout/prepare` and `POST /bookings`. Regenerate types after 0093 (`npm run db:types`).
-- **Mechanic app:** show `booking_parts.fit_options` on the job's parts, as the website does. Regenerate types after 0093.
+- **Customer app (`a13cd2d`):** the price step shows `quote.equipmentQuestions` (Yes / No / Not sure, wording as sent), re-quotes with `equipment`, and sends the same `equipment` to the confirm re-quote, `/checkout/prepare` and `POST /bookings`; a held authorisation is reused only when the answers match. Answers live in the booking draft, cleared on a change of reg.
+- **Mechanic app (`d89a6ca`):** the job's parts read `booking_parts` with `select('*')` (safe before 0093) and show the versions box, same wording as the website.
+- Both: the 0093 columns are hand-added to `src/types/database.ts`; re-run `npm run db:types` once the migration is live. Not run on a device yet.
 - Old builds keep working: no field they use changed.
