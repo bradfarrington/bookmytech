@@ -119,9 +119,9 @@ You are working on **Book My Tech**, a UK mobile-mechanic booking platform. This
 
 ## Current task
 
-### 📌 2026-11-27: Parts that depend on the car: belts, air-con, stop-start (Task 87), committed locally, not pushed
+### 📌 2026-11-27: Parts that depend on the car: belts, air-con, stop-start (Task 87), pushed 2026-11-27 (`e458398`; customer app `5ee21bd`, mechanic app `1d65f0b`); migration 0093 applied
 
-Read `docs/tasks/87-parts-that-depend-on-the-car.md`. From job 00133 (a drive belt charged twice). The same NAPA part on one job is now charged once, at the vehicle's quantity (`cf18ade`). Belts are matched to what they drive (NAPA's "Driven Unit"); chassis cut-offs are checked against the VIN. Parts NAPA lists for cars with / without air-con, stop-start or an electronic handbrake ask the customer on the price step (Yes / No / Not sure); other car details (tailgate, sport models, gearbox) go to the mechanic, remembered on the booking and the saved car; unanswered, the dearer version is charged and the mechanic is shown every version (`booking_parts.fit_options`). **Migration `0093` must be applied before deploying.** **Apps:** customer app asks the question and sends `equipment`; mechanic app shows the versions; both regenerate types after 0093.
+Read `docs/tasks/87-parts-that-depend-on-the-car.md`. From job 00133 (a drive belt charged twice). The same NAPA part on one job is now charged once, at the vehicle's quantity (`cf18ade`). Belts are matched to what they drive (NAPA's "Driven Unit"); chassis cut-offs are checked against the VIN. Parts NAPA lists for cars with / without air-con, stop-start or an electronic handbrake ask the customer on the price step (Yes / No / Not sure); other car details (tailgate, sport models, gearbox) go to the mechanic, remembered on the booking and the saved car; unanswered, the dearer version is charged and the mechanic is shown every version (`booking_parts.fit_options`). Migration `0093` applied 2026-11-27 and both apps' types match the live schema. **Apps:** customer app asks the questions and sends `equipment`; mechanic app shows the versions; both need an EAS build. Existing bookings were left as they are (Brad).
 
 ### 📌 2026-11-26: Repair manuals and technical data in the mechanic app (Task 86), pushed 2026-11-26 (`cb7e864`)
 

@@ -1,6 +1,6 @@
 # Task 87: Parts that depend on the car (belts, air-con, stop-start)
 
-**Status:** ✅ Complete (2026-11-27). One NAPA part is charged once per job; drive belts are matched to what they drive; parts NAPA lists in versions for cars with / without air-con or stop-start ask the customer (website price step, both apps' API), are priced at the dearer version when unanswered, and show the mechanic every version. Migration `0093`. Customer app `a13cd2d`, mechanic app `d89a6ca` (committed locally, not pushed).
+**Status:** ✅ Complete (2026-11-27). One NAPA part is charged once per job; drive belts are matched to what they drive; parts NAPA lists in versions for cars with / without air-con or stop-start ask the customer (website price step, both apps' API), are priced at the dearer version when unanswered, and show the mechanic every version. Migration `0093`. Pushed 2026-11-27; migration 0093 applied the same day. Customer app `a13cd2d`/`5ee21bd`, mechanic app `d89a6ca`…`1d65f0b`, pushed; both need an EAS build.
 
 Brad, 2026-11-27, from job 00133 (Astra K 1.0, SW16 PFD): "Renew the ancillary drive belt" charged twice, as a V-belt and a V-ribbed belt.
 
